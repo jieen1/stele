@@ -61,10 +61,12 @@ async function loadConfig(projectDir) {
   try {
     const raw = await readFile(path.join(projectDir, "stele.config.json"), "utf8");
     const parsed = JSON.parse(stripBom(raw));
+    const protectedPatterns = Object.prototype.hasOwnProperty.call(parsed ?? {}, "protected")
+      ? readProtectedConfig(parsed?.protected)
+      : [...DEFAULT_PROTECTED];
+
     return {
-      protected: Array.isArray(parsed?.protected)
-        ? parsed.protected.filter((value) => typeof value === "string")
-        : [...DEFAULT_PROTECTED],
+      protected: protectedPatterns,
     };
   } catch (error) {
     if (isMissingFileError(error)) {
@@ -73,6 +75,24 @@ async function loadConfig(projectDir) {
 
     throw new Error(`Unable to parse Stele config: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+function readProtectedConfig(value) {
+  if (!Array.isArray(value)) {
+    throw new Error("invalid protected config: protected must be an array of strings.");
+  }
+
+  for (const pattern of value) {
+    if (typeof pattern !== "string") {
+      throw new Error("invalid protected config: protected must be an array of strings.");
+    }
+
+    if (pattern.includes("[") || pattern.includes("]")) {
+      throw new Error(`unsupported glob pattern in protected config: bracket syntax is not supported: ${pattern}`);
+    }
+  }
+
+  return [...value];
 }
 
 function parseHookInput(stdin) {
@@ -166,10 +186,9 @@ function shouldIgnorePythonCache(relativePath) {
     return false;
   }
 
-  const segments = relativePath.split("/");
-  const basename = segments.at(-1) ?? "";
+  const basename = relativePath.split("/").at(-1) ?? "";
 
-  return segments.includes("__pycache__") || PYTHON_CACHE_SUFFIXES.some((suffix) => basename.endsWith(suffix));
+  return PYTHON_CACHE_SUFFIXES.some((suffix) => basename.endsWith(suffix));
 }
 
 function startsWithinProtectedPrefix(relativePath, pattern) {
@@ -270,7 +289,7 @@ function escapeSegment(segment) {
 }
 
 function hasGlobMeta(segment) {
-  return /[*?[\]]/.test(segment);
+  return /[*?]/.test(segment);
 }
 
 function isWithinProject(projectDir, candidatePath) {

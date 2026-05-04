@@ -190,6 +190,41 @@ describe("pre-tool-protect hook", () => {
     );
   });
 
+  it("does not allow non-cache files just because a protected path contains __pycache__", async () => {
+    const projectDir = await createProject({
+      protected: ["contract/**"],
+    });
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "contract/__pycache__/evil.py",
+      },
+    });
+
+    expectDenied(result);
+  });
+
+  it("allows only real Python cache artifact suffixes inside __pycache__", async () => {
+    const projectDir = await createProject({
+      protected: ["contract/**"],
+    });
+
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          file_path: "contract/__pycache__/x.pyc",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        input: {
+          path: "contract/__pycache__/x.pyo",
+        },
+      }),
+    );
+  });
+
   it("allows when stele.config.json is missing", async () => {
     const projectDir = await createTempDir();
 
@@ -238,6 +273,54 @@ describe("pre-tool-protect hook", () => {
     expect(result.stderr).toContain("Unable to parse Stele config");
   });
 
+  it("fails closed when protected config contains non-string entries", async () => {
+    const projectDir = await createProject({
+      protected: [42, true, null],
+    });
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "contract/main.stele",
+      },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("invalid protected config");
+  });
+
+  it("fails closed when protected config is not an array", async () => {
+    const projectDir = await createProject({
+      protected: "contract/**",
+    });
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "contract/main.stele",
+      },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("invalid protected config");
+  });
+
+  it("fails closed when protected config uses unsupported bracket glob syntax", async () => {
+    const projectDir = await createProject({
+      protected: ["docs/[a-z].md"],
+    });
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "docs/a.md",
+      },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("unsupported glob pattern");
+  });
+
   it("fails closed when hook stdin JSON is malformed", async () => {
     const projectDir = await createProject();
 
@@ -249,7 +332,7 @@ describe("pre-tool-protect hook", () => {
   });
 });
 
-async function createProject(overrides: { protected?: string[]; omitProtected?: boolean } = {}): Promise<string> {
+async function createProject(overrides: { protected?: unknown; omitProtected?: boolean } = {}): Promise<string> {
   const projectDir = await createTempDir();
   const config: Record<string, unknown> = {
     version: "0.1",
