@@ -3,6 +3,15 @@ export { SteleError } from "./errors/SteleError.js";
 export { lex } from "./lexer/lexer.js";
 export type { Token } from "./lexer/token.js";
 export { loadContract, validateContract } from "./loader/loadContract.js";
+export type {
+  ContractManifest,
+  ManifestProtectedFile,
+  VerificationFileStatus,
+  VerificationResult,
+  VerifiedProtectedFile,
+} from "./manifest/manifest.js";
+export { verifyManifest, writeManifest } from "./manifest/manifest.js";
+export { normalizeContract } from "./normalizer/normalize.js";
 export { parseFile } from "./parser/parser.js";
 export type { ParsedFile } from "./parser/parser.js";
 export type {
