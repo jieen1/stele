@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -83,6 +83,75 @@ describe("generation coordinator", () => {
         content: "# top-level\nROOT_ALPHA\nROOT_ZETA\n",
       },
     ]);
+  });
+
+  it("accepts backend-declared support files alongside canonical generated files", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(group accounts",
+        "  (invariant ACCOUNT_001",
+        "    (severity medium)",
+        '    (description "account rule")',
+        "    (assert (eq 1 1))))",
+        "(invariant ROOT_RULE",
+        "  (severity critical)",
+        '  (description "root rule")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    });
+    const contract = await loadContract(project.rootPath);
+    const backend = createLiteralBackend(
+      [
+        {
+          path: "tests/contract/_stele_runtime.py",
+          content: "# runtime helper\n",
+        },
+        {
+          path: "tests/contract/test_accounts.py",
+          content: "# group accounts\nACCOUNT_001\n",
+        },
+        {
+          path: "tests/contract/test_contract.py",
+          content: "# top-level\nROOT_RULE\n",
+        },
+      ],
+      [
+        {
+          path: "tests/contract/__init__.py",
+          content: "",
+        },
+      ],
+    );
+
+    const generated = coordinateGeneration(contract, backend, { projectRoot: project.directory });
+
+    expect(generated).toEqual([
+      {
+        path: "tests/contract/__init__.py",
+        content: "",
+      },
+      {
+        path: "tests/contract/_stele_runtime.py",
+        content: "# runtime helper\n",
+      },
+      {
+        path: "tests/contract/test_accounts.py",
+        content: "# group accounts\nACCOUNT_001\n",
+      },
+      {
+        path: "tests/contract/test_contract.py",
+        content: "# top-level\nROOT_RULE\n",
+      },
+    ]);
+
+    for (const file of generated) {
+      await writeGeneratedFile(project.directory, file);
+    }
+
+    const verification = await verifyGenerated(contract, backend, { projectRoot: project.directory });
+
+    expect(verification.ok).toBe(true);
+    expect(verification.unchanged).toEqual(generated.map((file) => file.path));
   });
 
   it("emits runtime and group files only when the contract has no top-level invariants", async () => {
@@ -256,6 +325,39 @@ describe("generation coordinator", () => {
           {
             path: "tests/contract/bonus.py",
             content: "# extra\n",
+          },
+        ]),
+        { projectRoot: project.directory },
+      ),
+    ).toThrowError(SteleError);
+  });
+
+  it("rejects undeclared support files even when the path is otherwise harmless", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant ROOT_RULE",
+        "  (severity critical)",
+        '  (description "root rule")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    });
+    const contract = await loadContract(project.rootPath);
+
+    expect(() =>
+      coordinateGeneration(
+        contract,
+        createLiteralBackend([
+          {
+            path: "tests/contract/__init__.py",
+            content: "",
+          },
+          {
+            path: "tests/contract/_stele_runtime.py",
+            content: "# runtime helper\n",
+          },
+          {
+            path: "tests/contract/test_contract.py",
+            content: "# top-level\nROOT_RULE\n",
           },
         ]),
         { projectRoot: project.directory },
@@ -482,6 +584,63 @@ describe("generation coordinator", () => {
     expect(verification.extra).toEqual([]);
     expect(verification.files.every((file) => file.status === "unchanged")).toBe(true);
   });
+
+  it("reports non-regular output entries as extras during verification", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant ROOT_RULE",
+        "  (severity critical)",
+        '  (description "root rule")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    });
+    const contract = await loadContract(project.rootPath);
+    const backend = createLiteralBackend(
+      [
+        {
+          path: "tests/contract/_stele_runtime.py",
+          content: "# runtime helper\n",
+        },
+        {
+          path: "tests/contract/test_contract.py",
+          content: "# top-level\nROOT_RULE\n",
+        },
+      ],
+      [
+        {
+          path: "tests/contract/__init__.py",
+          content: "",
+        },
+      ],
+    );
+
+    for (const file of coordinateGeneration(contract, backend, { projectRoot: project.directory })) {
+      await writeGeneratedFile(project.directory, file);
+    }
+
+    const outputRoot = join(project.directory, "tests", "contract");
+    const targetDirectory = join(project.directory, "linked-target");
+    await mkdir(targetDirectory, { recursive: true });
+    await writeFile(join(targetDirectory, "ignored.py"), "# target\n", "utf8");
+
+    const linkPath = join(outputRoot, "linked-dir");
+    const createdLink = await tryCreateNonRegularEntry(targetDirectory, linkPath);
+
+    if (!createdLink) {
+      return;
+    }
+
+    const verification = await verifyGenerated(contract, backend, { projectRoot: project.directory });
+    const extraEntry = verification.files.find((file) => file.path === "tests/contract/linked-dir");
+
+    expect(verification.ok).toBe(false);
+    expect(verification.extra).toContain("tests/contract/linked-dir");
+    expect(extraEntry).toMatchObject({
+      path: "tests/contract/linked-dir",
+      status: "extra",
+      actualContent: "[non-regular entry]",
+    });
+  });
 });
 
 async function createTempProject(files: Record<string, string>): Promise<{ directory: string; rootPath: string }> {
@@ -502,7 +661,7 @@ async function createTempProject(files: Record<string, string>): Promise<{ direc
   };
 }
 
-function createLiteralBackend(files: GeneratedFile[]): LanguageBackend {
+function createLiteralBackend(files: GeneratedFile[], supportFiles: GeneratedFile[] = []): LanguageBackend {
   return {
     name: "literal-python",
     framework: "pytest",
@@ -510,6 +669,9 @@ function createLiteralBackend(files: GeneratedFile[]): LanguageBackend {
     version: "1.0.0",
     generate() {
       return files;
+    },
+    supportFiles() {
+      return supportFiles;
     },
   };
 }
@@ -634,4 +796,23 @@ async function fileExists(path: string): Promise<boolean> {
 
 function relativePath(projectRoot: string, fullPath: string): string {
   return fullPath.slice(projectRoot.length + 1).replaceAll("\\", "/");
+}
+
+async function tryCreateNonRegularEntry(targetDirectory: string, linkPath: string): Promise<boolean> {
+  for (const type of ["junction", "dir"] as const) {
+    try {
+      await symlink(targetDirectory, linkPath, type);
+      return true;
+    } catch (error) {
+      if (!isSymlinkPermissionError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isSymlinkPermissionError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && (error.code === "EPERM" || error.code === "EACCES" || error.code === "UNKNOWN");
 }

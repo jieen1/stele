@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import { posix, relative, resolve, win32 } from "node:path";
 import { SteleError } from "../errors/SteleError.js";
 import type { Contract } from "../validator/structure.js";
@@ -21,6 +21,7 @@ export interface LanguageBackend {
   fileExtension: string;
   version: string;
   generate(contract: Contract, config: GenerationConfig): GeneratedFile[];
+  supportFiles?(contract: Contract, config: GenerationConfig): GeneratedFile[];
 }
 
 export type GeneratedVerificationStatus = "missing" | "changed" | "extra" | "unchanged";
@@ -47,10 +48,16 @@ type ResolvedGenerationConfig = {
   outputDir: string;
 };
 
+type ExistingGeneratedEntry = {
+  path: string;
+  kind: "file" | "non-regular";
+};
+
 export function coordinateGeneration(contract: Contract, backend: LanguageBackend, config: GenerationConfig): GeneratedFile[] {
   const resolvedConfig = resolveGenerationConfig(config);
-  const expectedPaths = buildExpectedGeneratedPaths(contract, backend, resolvedConfig);
+  const canonicalPaths = buildCanonicalGeneratedPaths(contract, backend, resolvedConfig);
   const generatedFiles = backend.generate(contract, resolvedConfig);
+  const supportFiles = backend.supportFiles?.(contract, resolvedConfig) ?? [];
 
   if (!Array.isArray(generatedFiles)) {
     throw generationError(
@@ -61,7 +68,18 @@ export function coordinateGeneration(contract: Contract, backend: LanguageBacken
     );
   }
 
-  const normalizedFiles = normalizeGeneratedFiles(generatedFiles, resolvedConfig.outputDir);
+  if (!Array.isArray(supportFiles)) {
+    throw generationError(
+      "E0501",
+      `Backend "${backend.name}" returned an invalid support file list.`,
+      "Expected supportFiles() to return an array of { path, content } objects.",
+      "Return a deterministic array of generated support files from backend.supportFiles().",
+    );
+  }
+
+  const normalizedSupportFiles = normalizeGeneratedFiles(supportFiles, resolvedConfig.outputDir);
+  const expectedPaths = mergeExpectedGeneratedPaths(canonicalPaths, normalizedSupportFiles.map((file) => file.path));
+  const normalizedFiles = normalizeGeneratedFiles([...generatedFiles, ...supportFiles], resolvedConfig.outputDir);
   assertGeneratedFilesMatchExpectedLayout(normalizedFiles, expectedPaths, backend.name);
   return normalizedFiles;
 }
@@ -74,12 +92,18 @@ export async function verifyGenerated(
   const resolvedConfig = resolveGenerationConfig(config);
   const expectedFiles = coordinateGeneration(contract, backend, resolvedConfig);
   const expectedByPath = new Map(expectedFiles.map((file) => [file.path, file.content]));
-  const actualPaths = await collectExistingGeneratedFiles(resolvedConfig.projectRoot, resolvedConfig.outputDir);
+  const actualEntries = await collectExistingGeneratedEntries(resolvedConfig.projectRoot, resolvedConfig.outputDir);
   const actualByPath = new Map<string, string>();
+  const actualEntryKinds = new Map(actualEntries.map((entry) => [entry.path, entry.kind]));
 
   await Promise.all(
-    actualPaths.map(async (generatedPath) => {
-      actualByPath.set(generatedPath, await readGeneratedFile(resolvedConfig.projectRoot, generatedPath));
+    actualEntries.map(async (entry) => {
+      if (entry.kind !== "file") {
+        actualByPath.set(entry.path, "[non-regular entry]");
+        return;
+      }
+
+      actualByPath.set(entry.path, await readGeneratedFile(resolvedConfig.projectRoot, entry.path));
     }),
   );
 
@@ -87,6 +111,7 @@ export async function verifyGenerated(
 
   for (const expectedFile of expectedFiles) {
     const actualContent = actualByPath.get(expectedFile.path);
+    const actualKind = actualEntryKinds.get(expectedFile.path);
 
     if (actualContent === undefined) {
       files.push({
@@ -99,21 +124,21 @@ export async function verifyGenerated(
 
     files.push({
       path: expectedFile.path,
-      status: actualContent === expectedFile.content ? "unchanged" : "changed",
+      status: actualKind === "file" && actualContent === expectedFile.content ? "unchanged" : "changed",
       expectedContent: expectedFile.content,
       actualContent,
     });
   }
 
-  for (const actualPath of actualPaths) {
-    if (expectedByPath.has(actualPath)) {
+  for (const actualEntry of actualEntries) {
+    if (expectedByPath.has(actualEntry.path)) {
       continue;
     }
 
     files.push({
-      path: actualPath,
+      path: actualEntry.path,
       status: "extra",
-      actualContent: actualByPath.get(actualPath),
+      actualContent: actualByPath.get(actualEntry.path),
     });
   }
 
@@ -146,7 +171,7 @@ function resolveGenerationConfig(config: GenerationConfig): ResolvedGenerationCo
   };
 }
 
-function buildExpectedGeneratedPaths(
+function buildCanonicalGeneratedPaths(
   contract: Contract,
   backend: LanguageBackend,
   config: ResolvedGenerationConfig,
@@ -180,6 +205,19 @@ function buildExpectedGeneratedPaths(
 
   for (const groupPath of groupPaths) {
     registerGeneratedPath(groupPath, seenPaths, seenCaseFoldedPaths, "canonical generated file path", (path) => expectedPaths.push(path));
+  }
+
+  expectedPaths.sort((left, right) => left.localeCompare(right));
+  return expectedPaths;
+}
+
+function mergeExpectedGeneratedPaths(canonicalPaths: string[], supportPaths: string[]): string[] {
+  const expectedPaths: string[] = [];
+  const seenPaths = new Set<string>();
+  const seenCaseFoldedPaths = new Map<string, string>();
+
+  for (const path of [...canonicalPaths, ...supportPaths]) {
+    registerGeneratedPath(path, seenPaths, seenCaseFoldedPaths, "expected generated file path", (value) => expectedPaths.push(value));
   }
 
   expectedPaths.sort((left, right) => left.localeCompare(right));
@@ -244,7 +282,7 @@ function assertGeneratedFilesMatchExpectedLayout(
   );
 }
 
-async function collectExistingGeneratedFiles(projectRoot: string, outputDir: string): Promise<string[]> {
+async function collectExistingGeneratedEntries(projectRoot: string, outputDir: string): Promise<ExistingGeneratedEntry[]> {
   const outputDirectoryPath = resolve(projectRoot, outputDir);
 
   try {
@@ -261,30 +299,47 @@ async function collectExistingGeneratedFiles(projectRoot: string, outputDir: str
     throw error;
   }
 
-  const files = await walkGeneratedDirectory(outputDirectoryPath, projectRoot);
-  files.sort((left, right) => left.localeCompare(right));
-  return files;
+  const entries = await walkGeneratedDirectory(outputDirectoryPath, projectRoot);
+  entries.sort((left, right) => left.path.localeCompare(right.path) || left.kind.localeCompare(right.kind));
+  return entries;
 }
 
-async function walkGeneratedDirectory(directoryPath: string, projectRoot: string): Promise<string[]> {
+async function walkGeneratedDirectory(directoryPath: string, projectRoot: string): Promise<ExistingGeneratedEntry[]> {
   const entries = await readdir(directoryPath, { withFileTypes: true });
-  const results: string[] = [];
+  const results: ExistingGeneratedEntry[] = [];
 
   entries.sort((left, right) => left.name.localeCompare(right.name));
 
   for (const entry of entries) {
     const fullPath = resolve(directoryPath, entry.name);
+    const pathOnDisk = normalizeRelativeFilePath(relative(projectRoot, fullPath), "generated disk path");
+    const entryStats = await lstat(fullPath);
+
+    if (entryStats.isSymbolicLink()) {
+      results.push({
+        path: pathOnDisk,
+        kind: "non-regular",
+      });
+      continue;
+    }
 
     if (entry.isDirectory()) {
       results.push(...(await walkGeneratedDirectory(fullPath, projectRoot)));
       continue;
     }
 
-    if (!entry.isFile()) {
+    if (entry.isFile()) {
+      results.push({
+        path: pathOnDisk,
+        kind: "file",
+      });
       continue;
     }
 
-    results.push(normalizeRelativeFilePath(relative(projectRoot, fullPath), "generated disk path"));
+    results.push({
+      path: pathOnDisk,
+      kind: "non-regular",
+    });
   }
 
   return results;
