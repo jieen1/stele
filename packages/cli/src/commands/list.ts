@@ -23,7 +23,9 @@ export async function runList(projectDir: string, options: ListOptions): Promise
         invariant.category === undefined ? "<none>" : formatAstNode(invariant.category.valueNode),
         invariant.description,
         toProjectRelativePath(projectDir, invariant.filePath),
-      ].join("\t"),
+      ]
+        .map(escapeTsvCell)
+        .join("\t"),
     ),
   ];
 
@@ -102,4 +104,8 @@ function compareInvariants(left: InvariantDeclaration, right: InvariantDeclarati
 
 function toProjectRelativePath(projectDir: string, filePath: string): string {
   return relative(projectDir, filePath).replaceAll("\\", "/");
+}
+
+function escapeTsvCell(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("\t", "\\t").replaceAll("\r", "\\r").replaceAll("\n", "\\n");
 }

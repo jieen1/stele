@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,9 +38,24 @@ describe("inspection commands", () => {
         "PAYMENT_BASELINE\thigh\t<none>\tBaseline rule used as a dependency target.\tcontract/main.stele",
         'ROOT_PAYMENT_BALANCE\tcritical\tdata-integrity\tPayments remain balanced before settlement.\tcontract/main.stele',
         'COMMENT_RULE\thigh\t<none>\tComment rule with ) and ; inside the string.\tcontract/main.stele',
+        'TSV_RULE\thigh\t<none>\tTabbed\\\\path\\tline\\nnext\\rreturn\tcontract/main.stele',
         'GROUP_CHECKED_SETTLEMENT\tmedium\t(domain ledger)\tSettlement batches require an approved checker.\tcontract/main.stele',
       ].join("\n") + "\n",
     );
+  });
+
+  it("list escapes user-controlled cells so each row remains stable TSV", async () => {
+    const projectDir = await createInspectionFixtureProject();
+    const stdout = captureStdout();
+
+    await runList(projectDir, { severity: "high" });
+
+    const output = stdout.read().trimEnd().split("\n");
+    const tsvRow = output.find((line) => line.startsWith("TSV_RULE\t"));
+
+    expect(tsvRow).toBeDefined();
+    expect(tsvRow!.split("\t")).toHaveLength(5);
+    expect(tsvRow).toContain("Tabbed\\\\path\\tline\\nnext\\rreturn");
   });
 
   it("list applies severity, category, and tag filters against parsed field values", async () => {
@@ -192,6 +207,23 @@ describe("inspection commands", () => {
     );
   });
 
+  it("add-checker rejects checker directories that escape the project root via symlink or junction", async () => {
+    const projectDir = await createInspectionFixtureProject();
+    const externalDir = await createTempDir();
+    const checkerImplDir = join(projectDir, "contract", "checker_impls");
+
+    await rm(checkerImplDir, { recursive: true, force: true });
+
+    const createdLink = await tryCreateNonRegularEntry(externalDir, checkerImplDir);
+
+    if (!createdLink) {
+      return;
+    }
+
+    await expect(runAddChecker(projectDir, "probe_checker")).rejects.toThrow(/checkerImplDir|project root|symlink|junction|non-regular/i);
+    await expect(readdir(externalDir)).resolves.toEqual([]);
+  });
+
   it("CLI wiring forwards cwd, filters, ids, and checker names to the new handlers", async () => {
     const handlers = {
       list: vi.fn(async () => undefined),
@@ -249,6 +281,11 @@ async function createInspectionFixtureProject(): Promise<string> {
       "  ; note: this comment mentions ) and should not end the invariant",
       '  (description "Comment rule with ) and ; inside the string.")',
       '  (rationale "Rationale keeps ) and ; as literal text.")',
+      "  (assert (eq 1 1)))",
+      "",
+      "(invariant TSV_RULE",
+      "  (severity high)",
+      '  (description "Tabbed\\\\path\\tline\\nnext\\rreturn")',
       "  (assert (eq 1 1)))",
       "",
       "(group batch-reconciliation",
@@ -313,4 +350,23 @@ function captureStderr(): { read(): string } {
   return {
     read: () => chunks.join(""),
   };
+}
+
+async function tryCreateNonRegularEntry(targetDirectory: string, linkPath: string): Promise<boolean> {
+  for (const type of ["junction", "dir"] as const) {
+    try {
+      await symlink(targetDirectory, linkPath, type);
+      return true;
+    } catch (error) {
+      if (!isSymlinkPermissionError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isSymlinkPermissionError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && (error.code === "EPERM" || error.code === "EACCES" || error.code === "UNKNOWN");
 }
