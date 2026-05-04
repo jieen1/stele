@@ -61,6 +61,37 @@ describe("pre-tool-protect hook", () => {
     );
   });
 
+  it("denies protected directory roots for checker implementations and generated tests", async () => {
+    const projectDir = await createProject();
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "contract/checker_impls",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        input: {
+          path: "tests/contract",
+        },
+      }),
+    );
+  });
+
+  it("denies absolute protected directory roots inside the project", async () => {
+    const projectDir = await createProject();
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        path: join(projectDir, "contract", "checker_impls"),
+      },
+    });
+
+    expectDenied(result);
+  });
+
   it("denies normalized traversal targets that resolve to protected files", async () => {
     const projectDir = await createProject();
 
@@ -114,6 +145,17 @@ describe("pre-tool-protect hook", () => {
     const result = runHook(projectDir, {
       tool_input: {
         path: toWindowsDevicePath(join(projectDir, "contract", "main.stele"), "."),
+      },
+    });
+
+    expectDenied(result);
+  });
+
+  windowsOnly("denies Windows namespaced protected directory roots", async () => {
+    const projectDir = await createProject();
+    const result = runHook(projectDir, {
+      tool_input: {
+        path: toWindowsDevicePath(join(projectDir, "tests", "contract"), "?"),
       },
     });
 
@@ -187,6 +229,18 @@ describe("pre-tool-protect hook", () => {
     const result = runHook(projectDir, {
       tool_input: {
         file_path: "src/app.py",
+      },
+    });
+
+    expectAllowed(result);
+  });
+
+  it("allows sibling prefixes outside protected directory roots", async () => {
+    const projectDir = await createProject();
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "tests/contractor/report.txt",
       },
     });
 

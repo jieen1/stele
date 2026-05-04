@@ -174,7 +174,7 @@ function shouldDenyTarget(projectDir, patterns, targetPath) {
   }
 
   if (withinProject) {
-    return patterns.some((pattern) => matchGlob(relativeToProject, pattern));
+    return patterns.some((pattern) => matchGlob(relativeToProject, pattern) || startsWithinProtectedPrefix(relativeToProject, pattern));
   }
 
   if (shouldIgnorePythonCache(normalizedInput)) {
