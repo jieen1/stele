@@ -4,7 +4,7 @@ Stele is meant to attach to an existing Python application, not replace its doma
 
 ## Install and adopt
 
-For local or pre-publish evaluation, install the packed workspace artifacts that were verified in this repository:
+For local or pre-publish evaluation, install the packed workspace artifacts that are automatically verified in this repository by `pnpm test:packed-adoption` and the CI workflow:
 
 ```bash
 npm install --save-dev /absolute/path/to/stele-core-0.1.0.tgz /absolute/path/to/stele-backend-python-0.1.0.tgz /absolute/path/to/stele-cli-0.1.0.tgz

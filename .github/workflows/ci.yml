@@ -29,6 +29,7 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm lint
+      - run: pnpm test:packed-adoption
       - run: node ../../packages/cli/dist/index.js generate
         working-directory: fixtures/python-app
       - run: python -m pytest tests/contract -q
