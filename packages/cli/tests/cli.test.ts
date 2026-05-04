@@ -146,6 +146,61 @@ describe("stele CLI", () => {
     await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/project-relative|inside the project root/i);
   });
 
+  it("generate fails closed on malformed protected config and does not proceed", async () => {
+    for (const protectedValue of [42, [42], [""], ["/contract/**"], ["C:\\contract\\**"], ["C:contract\\**"], ["\\\\server\\share"], ["../contract/**"], ["contract/../secrets/**"], ["docs/[a-z].md"]]) {
+      const projectDir = await createFixtureProject();
+      await writeConfig(projectDir, { protected: protectedValue });
+
+      await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/protected|project-relative|unsupported glob/i);
+      await expect(pathExists(join(projectDir, "tests", "contract", "test_contract.py"))).resolves.toBe(false);
+      await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
+    }
+  });
+
+  it("lock fails closed on malformed protected config and does not write or refresh the manifest", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+    const manifestPath = join(projectDir, "contract", ".manifest.json");
+
+    await writeConfig(projectDir, { protected: [42] });
+    await expect(runLock(projectDir, { reason: "should fail" })).rejects.toThrow(/protected/i);
+    await expect(pathExists(manifestPath)).resolves.toBe(false);
+
+    await writeConfig(projectDir, { protected: DEFAULT_CONFIG.protected });
+    await runLock(projectDir, { reason: "initial baseline" });
+    const manifestBefore = await readFile(manifestPath, "utf8");
+
+    await writeConfig(projectDir, { protected: ["../contract/**"] });
+    await expect(runLock(projectDir, { reason: "should still fail" })).rejects.toThrow(/protected|project-relative/i);
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
+  });
+
+  it("check fails closed on malformed protected config and rejects stale manifest bypasses", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerateAndLock(projectDir, "initial baseline");
+
+    await writeConfig(projectDir, { protected: [42] });
+    await expect(runCheck(projectDir)).rejects.toThrow(/protected/i);
+
+    await writeConfig(projectDir, { protected: ["docs/[a-z].md"] });
+    await expect(runCheck(projectDir)).rejects.toThrow(/protected|unsupported glob/i);
+  });
+
+  it("valid custom brace protected patterns remain accepted", async () => {
+    const projectDir = await createFixtureProject({
+      protected: ["docs/{api,other}/**/*"],
+    });
+    await writeProjectFile(projectDir, "docs/api/readme.txt", "# api\n");
+    await writeProjectFile(projectDir, "docs/other/readme.txt", "# other\n");
+
+    await runGenerate(projectDir, { force: false });
+    await runLock(projectDir, { reason: "brace pattern baseline" });
+
+    const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
+    expect(Object.keys(manifest.protected_files)).toContain("docs/api/readme.txt");
+    expect(Object.keys(manifest.protected_files)).toContain("docs/other/readme.txt");
+  });
+
   it("check fails after generate until the manifest is explicitly locked", async () => {
     const projectDir = await createFixtureProject();
 
@@ -578,7 +633,10 @@ async function readJson(path: string): Promise<any> {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
-async function writeConfig(projectDir: string, overrides: Partial<typeof DEFAULT_CONFIG>): Promise<void> {
+async function writeConfig(
+  projectDir: string,
+  overrides: Partial<Omit<typeof DEFAULT_CONFIG, "protected">> & { protected?: unknown },
+): Promise<void> {
   const config = {
     ...(await readJson(join(projectDir, STELE_CONFIG_FILE))),
     ...overrides,

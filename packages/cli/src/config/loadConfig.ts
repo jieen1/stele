@@ -36,10 +36,36 @@ export async function loadConfig(projectDir: string): Promise<SteleConfig> {
     targetLanguage: readString(parsed.targetLanguage, DEFAULT_CONFIG.targetLanguage),
     testFramework: readString(parsed.testFramework, DEFAULT_CONFIG.testFramework),
     pathMode: readString(parsed.pathMode, DEFAULT_CONFIG.pathMode),
-    protected: Array.isArray(parsed.protected)
-      ? parsed.protected.filter((value): value is string => typeof value === "string")
+    protected: Object.prototype.hasOwnProperty.call(parsed, "protected")
+      ? readProtectedConfig(parsed.protected)
       : [...DEFAULT_CONFIG.protected],
   };
+}
+
+function readProtectedConfig(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error('Config field "protected" must be an array of non-empty project-relative glob strings.');
+  }
+
+  for (const pattern of value) {
+    if (typeof pattern !== "string" || pattern.length === 0) {
+      throw new Error('Config field "protected" must be an array of non-empty project-relative glob strings.');
+    }
+
+    if (isAbsoluteLikePath(pattern)) {
+      throw new Error(`Config field "protected" must contain only project-relative glob strings. Invalid pattern: ${pattern}`);
+    }
+
+    if (containsParentTraversal(pattern)) {
+      throw new Error(`Config field "protected" must not escape the project root. Invalid pattern: ${pattern}`);
+    }
+
+    if (pattern.includes("[") || pattern.includes("]")) {
+      throw new Error(`Config field "protected" does not support bracket glob syntax. Invalid pattern: ${pattern}`);
+    }
+  }
+
+  return [...value];
 }
 
 function readString(value: unknown, fallback: string): string {
@@ -89,6 +115,26 @@ function validateProjectRelativePath(
 
 function isAbsoluteLikePath(value: string): boolean {
   return posix.isAbsolute(value) || win32.isAbsolute(value) || /^[A-Za-z]:(?![\\/])/.test(value);
+}
+
+function normalizeGlobPattern(value: string): string {
+  const normalized = win32
+    .normalize(value)
+    .split(win32.sep)
+    .filter((segment) => segment.length > 0 && segment !== ".")
+    .reduce<string>((current, segment) => (current.length === 0 ? segment : posix.join(current, segment)), "");
+
+  return normalized.length === 0 ? "." : normalized;
+}
+
+function containsParentTraversal(value: string): boolean {
+  return normalizeGlobPattern(value)
+    .split("/")
+    .some((segment) => segment === "..") || toPosixPattern(value).split("/").some((segment) => segment === "..");
+}
+
+function toPosixPattern(value: string): string {
+  return value.replaceAll("\\", "/");
 }
 
 function isWithinProject(projectDir: string, candidatePath: string): boolean {
