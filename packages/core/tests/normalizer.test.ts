@@ -104,6 +104,30 @@ describe("normalizeContract", () => {
       "  (assert (eq 2 2)))",
     ].join("\n"));
   });
+
+  it("preserves leading colons for keyword atoms in expressions and optional fields", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant KEYWORD_RULE",
+        "  (severity high)",
+        '  (description "Keyword atoms must round-trip through normalization.")',
+        "  (assert (eq :status :active))",
+        "  (tags :ledger :critical-path)",
+        "  (applies-to (scope :account :customer)))",
+      ].join("\n"),
+    });
+
+    const normalized = normalizeContract(await loadContract(project.rootPath));
+
+    expect(normalized).toBe([
+      "(invariant KEYWORD_RULE",
+      "  (severity high)",
+      '  (description "Keyword atoms must round-trip through normalization.")',
+      "  (assert (eq :status :active))",
+      "  (tags :ledger :critical-path)",
+      "  (applies-to (scope :account :customer)))",
+    ].join("\n"));
+  });
 });
 
 async function createTempProject(files: Record<string, string>): Promise<{ directory: string; rootPath: string }> {

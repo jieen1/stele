@@ -116,8 +116,9 @@ function renderMultiValueField(field: InvariantMultiValueField | undefined, inde
 function renderNode(node: AstNode): string {
   switch (node.kind) {
     case "identifier":
-    case "keyword":
       return node.value;
+    case "keyword":
+      return node.value.startsWith(":") ? node.value : `:${node.value}`;
     case "string":
       return renderString(node.value);
     case "number":
