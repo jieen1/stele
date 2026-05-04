@@ -171,6 +171,7 @@ class Lexer {
       }
 
       if (char === "\\") {
+        const escapeSpan = this.#span();
         raw += this.#advance();
         const escape = this.#peek();
 
@@ -185,7 +186,7 @@ class Lexer {
         }
 
         raw += this.#advance();
-        value += decodeEscape(escape, span);
+        value += decodeEscape(escape, escapeSpan);
         continue;
       }
 
@@ -220,6 +221,18 @@ class Lexer {
 
     for (let index = 0; index < raw.length; index += 1) {
       this.#advance();
+    }
+
+    const next = this.#peek();
+
+    if (!this.#isNumberDelimiter(next)) {
+      throw this.#error(
+        "E0001",
+        `Invalid number literal "${raw}${next ?? ""}".`,
+        span,
+        `Number literals must be followed by a delimiter, but found "${next}".`,
+        "Insert whitespace, a parenthesis, a comment, or another valid delimiter after the number.",
+      );
     }
 
     return {
@@ -294,6 +307,10 @@ class Lexer {
     }
 
     return /[0-9]/.test(char);
+  }
+
+  #isNumberDelimiter(char: string | undefined): boolean {
+    return char === undefined || char === " " || char === "\t" || char === "\r" || char === "\n" || char === "(" || char === ")" || char === ";";
   }
 }
 

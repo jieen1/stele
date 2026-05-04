@@ -78,7 +78,7 @@ class Parser {
       throw this.#error(
         "E0101",
         "Unmatched opening parenthesis.",
-        this.#peek().span,
+        open.span,
         "Reached end of input before finding a matching closing parenthesis.",
         "Add a closing ')' for this list.",
       );
@@ -100,7 +100,7 @@ class Parser {
       throw this.#error(
         "E0101",
         "Unmatched opening parenthesis.",
-        headToken.span,
+        open.span,
         "Reached end of input before finding a list head or closing parenthesis.",
         "Add a valid identifier head and a closing ')'.",
       );
@@ -123,7 +123,7 @@ class Parser {
         throw this.#error(
           "E0101",
           "Unmatched opening parenthesis.",
-          this.#peek().span,
+          open.span,
           "Reached end of input before finding a matching closing parenthesis.",
           "Add a closing ')' for this list.",
         );

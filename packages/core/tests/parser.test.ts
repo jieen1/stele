@@ -106,7 +106,7 @@ describe("parseFile", () => {
     expectParseError("(eq left 1", {
       code: "E0101",
       line: 1,
-      column: 11,
+      column: 1,
       messageIncludes: "Unmatched",
     });
   });
@@ -117,6 +117,15 @@ describe("parseFile", () => {
       line: 1,
       column: 1,
       messageIncludes: "Unmatched",
+    });
+  });
+
+  it("rejects an empty list", () => {
+    expectParseError("()", {
+      code: "E0102",
+      line: 1,
+      column: 2,
+      messageIncludes: "List head",
     });
   });
 

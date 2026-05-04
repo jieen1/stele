@@ -63,7 +63,45 @@ describe("lex", () => {
     expectLexError("\"bad\\q\"", {
       code: "E0003",
       line: 1,
+      column: 5,
+    });
+  });
+
+  it("rejects a number immediately followed by identifier characters", () => {
+    expectLexError("1abc", {
+      code: "E0001",
+      category: "Lexical Error",
+      line: 1,
       column: 1,
+      messageIncludes: "number",
+    });
+  });
+
+  it("rejects a trailing decimal point without fractional digits", () => {
+    expectLexError("1.", {
+      code: "E0001",
+      category: "Lexical Error",
+      line: 1,
+      column: 1,
+    });
+  });
+
+  it("rejects a standalone minus sign", () => {
+    expectLexError("-", {
+      code: "E0001",
+      category: "Lexical Error",
+      line: 1,
+      column: 1,
+    });
+  });
+
+  it("rejects a standalone colon", () => {
+    expectLexError(":", {
+      code: "E0001",
+      category: "Lexical Error",
+      line: 1,
+      column: 1,
+      messageIncludes: "keyword",
     });
   });
 
@@ -100,6 +138,41 @@ describe("lex", () => {
         span: { file: "positions.stele", line: 4, column: 1 },
       },
     ]);
+  });
+
+  it("tracks line and column across CRLF newlines outside strings", () => {
+    const tokens = lex("alpha\r\nbeta", "windows.stele");
+
+    expect(tokens).toMatchObject([
+      {
+        kind: "identifier",
+        value: "alpha",
+        span: { file: "windows.stele", line: 1, column: 1 },
+      },
+      {
+        kind: "identifier",
+        value: "beta",
+        span: { file: "windows.stele", line: 2, column: 1 },
+      },
+      {
+        kind: "eof",
+        span: { file: "windows.stele", line: 2, column: 5 },
+      },
+    ]);
+  });
+
+  it("rejects newline sequences inside strings", () => {
+    expectLexError("\"hello\nworld\"", {
+      code: "E0002",
+      line: 1,
+      column: 1,
+    });
+
+    expectLexError("\"hello\r\nworld\"", {
+      code: "E0002",
+      line: 1,
+      column: 1,
+    });
   });
 
   it("throws SteleError diagnostics for invalid characters", () => {
@@ -156,6 +229,7 @@ function expectLexError(
     category?: string;
     line: number;
     column: number;
+    messageIncludes?: string;
   },
 ): void {
   expect(() => lex(input)).toThrowError(SteleError);
@@ -186,5 +260,9 @@ function expectLexError(
     }
 
     expect(error).toMatchObject(expected);
+
+    if (expectation.messageIncludes !== undefined) {
+      expect((error as SteleError).message).toContain(expectation.messageIncludes);
+    }
   }
 }
