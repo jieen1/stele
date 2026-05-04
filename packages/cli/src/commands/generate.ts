@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { posix } from "node:path";
+import { posix, win32 } from "node:path";
 import {
   coordinateGeneration,
   loadContract,
@@ -12,15 +12,29 @@ import {
   writeManifest,
 } from "@stele/core";
 import { generatePytestSource, getPythonRuntimeSource, sanitizePythonIdentifier } from "@stele/backend-python";
+import globParent from "glob-parent";
+import { minimatch } from "minimatch";
 import { loadConfig } from "../config/loadConfig.js";
 
 export type GenerateOptions = {
   force?: boolean;
 };
 
+type ProtectedPathOptions = {
+  protected: string[];
+  manifestPath: string;
+  generatedDir: string;
+  checkerImplDir: string;
+  entry: string;
+};
+
 export async function runGenerate(projectDir: string, options: GenerateOptions): Promise<void> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
+  const preGeneratedProtectedPaths = await collectProtectedPaths(projectDir, config);
+
+  assertProtectedContractFilesReachable(projectDir, config.entry, preGeneratedProtectedPaths, contract);
+
   const backend = createLanguageBackend(config.generatedDir, config.targetLanguage, config.testFramework);
   const verification = await verifyManagedGeneratedFiles(projectDir, config.generatedDir, contract, backend);
 
@@ -45,11 +59,9 @@ export async function runGenerate(projectDir: string, options: GenerateOptions):
     }),
   );
 
-  const protectedPaths = await collectProtectedPaths(projectDir, {
-    contractDir: config.contractDir,
-    checkerImplDir: config.checkerImplDir,
-    generatedDir: config.generatedDir,
-  });
+  const protectedPaths = await collectProtectedPaths(projectDir, config);
+
+  assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
   await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
 }
@@ -110,37 +122,31 @@ export function createLanguageBackend(generatedDir: string, targetLanguage: stri
   };
 }
 
-export async function collectProtectedPaths(
-  projectDir: string,
-  paths: {
-    contractDir: string;
-    checkerImplDir: string;
-    generatedDir: string;
-  },
-): Promise<string[]> {
-  const protectedPaths = [
-    ...(await collectFiles(resolve(projectDir, paths.contractDir), (path) => path.endsWith(".stele"))),
-    ...(await collectFiles(resolve(projectDir, paths.checkerImplDir), (path) => !isIgnoredPythonCacheArtifact(path))),
-    ...(await collectFiles(resolve(projectDir, paths.generatedDir), (path) => !isIgnoredPythonCacheArtifact(path))),
-  ];
-
-  return uniqueSortedPaths(protectedPaths);
-}
-
-export async function collectProtectedManifestPaths(
-  projectDir: string,
-  paths: {
-    contractDir: string;
-    checkerImplDir: string;
-    generatedDir: string;
-  },
-): Promise<string[]> {
-  const protectedPaths = await collectProtectedPaths(projectDir, paths);
+export async function collectProtectedPaths(projectDir: string, options: ProtectedPathOptions): Promise<string[]> {
   const normalizedProjectRoot = resolve(projectDir);
+  const normalizedManifestPath = resolve(projectDir, options.manifestPath);
+  const matchedPaths = new Set<string>();
 
-  return protectedPaths
-    .map((path) => normalizeProjectRelativePath(normalizedProjectRoot, path))
-    .sort((left, right) => left.localeCompare(right));
+  for (const protectedPattern of options.protected) {
+    const normalizedPattern = normalizeProtectedPattern(protectedPattern);
+    const matches = await expandProtectedPattern(normalizedProjectRoot, normalizedPattern);
+
+    for (const projectRelativePath of matches) {
+      const absolutePath = resolve(normalizedProjectRoot, projectRelativePath);
+
+      if (absolutePath === normalizedManifestPath) {
+        continue;
+      }
+
+      if (isIgnoredProtectedArtifact(projectRelativePath, options.generatedDir, options.checkerImplDir)) {
+        continue;
+      }
+
+      matchedPaths.add(absolutePath);
+    }
+  }
+
+  return uniqueSortedPaths([...matchedPaths]);
 }
 
 export async function verifyManagedGeneratedFiles(
@@ -178,22 +184,57 @@ export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-async function collectFiles(directory: string, filter?: (path: string) => boolean): Promise<string[]> {
+export function toManifestPaths(projectDir: string, protectedPaths: string[]): string[] {
+  const normalizedProjectRoot = resolve(projectDir);
+
+  return protectedPaths
+    .map((path) => normalizeProjectRelativePath(normalizedProjectRoot, path))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+export function assertProtectedContractFilesReachable(
+  projectDir: string,
+  entryPath: string,
+  protectedPaths: string[],
+  contract: Contract,
+): void {
+  const loadedContractFiles = new Set(contract.files.map((file) => resolve(file.path)));
+  const missingProtectedContractFiles = protectedPaths
+    .filter((path) => path.toLowerCase().endsWith(".stele"))
+    .filter((path) => !loadedContractFiles.has(resolve(path)));
+
+  if (missingProtectedContractFiles.length === 0) {
+    return;
+  }
+
+  throw new Error(
+    `Protected contract files must be reachable from entry "${entryPath}". Import them into the contract entry graph before generating, checking, or locking. Files: ${toManifestPaths(projectDir, missingProtectedContractFiles).join(", ")}.`,
+  );
+}
+
+async function expandProtectedPattern(projectDir: string, pattern: string): Promise<string[]> {
+  const rootPattern = normalizeProtectedPattern(globParent(pattern));
+  const rootDirectory = rootPattern === "." ? projectDir : resolve(projectDir, rootPattern);
+  const files = await walkProtectedRoot(rootDirectory, projectDir);
+
+  return files.filter((file) => minimatch(file, pattern, { dot: true, windowsPathsNoEscape: true }));
+}
+
+async function walkProtectedRoot(directory: string, projectDir: string): Promise<string[]> {
   try {
     const directoryStat = await stat(directory);
 
     if (!directoryStat.isDirectory()) {
+      throw new Error(`Protected root "${normalizeProjectRelativePath(projectDir, directory)}" must be a directory.`);
+    }
+  } catch (error) {
+    if (isMissingFileError(error)) {
       return [];
     }
-  } catch {
-    return [];
+
+    throw error;
   }
 
-  const files = await walkFiles(directory);
-  return filter === undefined ? files : files.filter(filter);
-}
-
-async function walkFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const results = await Promise.all(
     entries
@@ -201,16 +242,22 @@ async function walkFiles(directory: string): Promise<string[]> {
       .sort((left, right) => left.name.localeCompare(right.name))
       .map(async (entry) => {
         const fullPath = join(directory, entry.name);
+        const relativePath = normalizeProjectRelativePath(projectDir, fullPath);
+        const entryStats = await lstat(fullPath);
+
+        if (entryStats.isSymbolicLink()) {
+          throw new Error(`Protected file scanning does not allow symbolic links or other non-regular entries: ${relativePath}.`);
+        }
 
         if (entry.isDirectory()) {
-          return walkFiles(fullPath);
+          return walkProtectedRoot(fullPath, projectDir);
         }
 
         if (entry.isFile()) {
-          return [fullPath];
+          return [relativePath];
         }
 
-        return [];
+        throw new Error(`Protected file scanning does not allow non-regular entries: ${relativePath}.`);
       }),
   );
 
@@ -227,6 +274,54 @@ function normalizeForSort(path: string): string {
 
 function normalizeProjectRelativePath(projectDir: string, absolutePath: string): string {
   return relative(projectDir, absolutePath).replaceAll("\\", "/");
+}
+
+function normalizeProtectedPattern(pattern: string): string {
+  if (typeof pattern !== "string" || pattern.length === 0) {
+    throw new Error("Protected patterns must be non-empty project-relative globs.");
+  }
+
+  if (isAbsoluteLikePattern(pattern)) {
+    throw new Error(`Protected pattern "${pattern}" must stay project-relative.`);
+  }
+
+  const normalized = win32
+    .normalize(pattern)
+    .split(win32.sep)
+    .filter((segment) => segment.length > 0 && segment !== ".")
+    .reduce<string>((current, segment) => (current.length === 0 ? segment : posix.join(current, segment)), "");
+  const normalizedPattern = normalized.length === 0 ? "." : normalized;
+
+  if (normalizedPattern.split("/").includes("..")) {
+    throw new Error(`Protected pattern "${pattern}" must stay inside the project root.`);
+  }
+
+  return normalizedPattern;
+}
+
+function isAbsoluteLikePattern(pattern: string): boolean {
+  return posix.isAbsolute(pattern) || win32.isAbsolute(pattern) || /^[A-Za-z]:(?![\\/])/.test(pattern);
+}
+
+function isIgnoredProtectedArtifact(projectRelativePath: string, generatedDir: string, checkerImplDir: string): boolean {
+  return (
+    isIgnoredArtifactWithinBase(projectRelativePath, generatedDir) || isIgnoredArtifactWithinBase(projectRelativePath, checkerImplDir)
+  );
+}
+
+function isIgnoredArtifactWithinBase(projectRelativePath: string, baseDirectory: string): boolean {
+  const normalizedPath = projectRelativePath.replaceAll("\\", "/");
+  const normalizedBase = baseDirectory.replaceAll("\\", "/");
+
+  if (normalizedPath === normalizedBase) {
+    return false;
+  }
+
+  if (!normalizedPath.startsWith(`${normalizedBase}/`)) {
+    return false;
+  }
+
+  return isIgnoredPythonCacheArtifact(normalizedPath.slice(normalizedBase.length + 1));
 }
 
 function isIgnoredGeneratedArtifact(projectRelativePath: string, generatedDir: string): boolean {
@@ -246,4 +341,8 @@ function isIgnoredPythonCacheArtifact(path: string): boolean {
   const basename = segments[segments.length - 1] ?? "";
 
   return segments.includes("__pycache__") || basename.endsWith(".pyc") || basename.endsWith(".pyo");
+}
+
+function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

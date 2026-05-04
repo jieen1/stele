@@ -17,9 +17,14 @@
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
   },
+  "devDependencies": {
+    "@types/glob-parent": "^5.1.0"
+  },
   "dependencies": {
     "@stele/backend-python": "workspace:*",
     "@stele/core": "workspace:*",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "glob-parent": "^6.0.2",
+    "minimatch": "^9.0.5"
   }
 }

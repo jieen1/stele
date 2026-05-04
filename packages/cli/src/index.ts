@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { runCheck } from "./commands/check.js";
 import { runGenerate } from "./commands/generate.js";
-import { runInit } from "./commands/init.js";
+import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
 import { runLock } from "./commands/lock.js";
 
 type ProgramDependencies = {
@@ -27,7 +27,10 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   program.command("check").action(() => check(cwd()));
   program.command("generate").option("--force").action((options) => generate(cwd(), options));
   program.command("lock").option("--reason <reason>").action((options) => lock(cwd(), options));
-  program.command("init").option("--language <language>", "target language", "python").action((options) => init(cwd(), options));
+  program
+    .command("init")
+    .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))
+    .action((options) => init(cwd(), options));
 
   return program;
 }

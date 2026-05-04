@@ -1,7 +1,13 @@
 import { resolve } from "node:path";
 import { loadContract, normalizeContract, writeManifest } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
-import { collectProtectedPaths, createLanguageBackend, sha256, verifyManagedGeneratedFiles } from "./generate.js";
+import {
+  assertProtectedContractFilesReachable,
+  collectProtectedPaths,
+  createLanguageBackend,
+  sha256,
+  verifyManagedGeneratedFiles,
+} from "./generate.js";
 
 export type LockOptions = {
   reason?: string;
@@ -17,11 +23,8 @@ export async function runLock(projectDir: string, _options: LockOptions): Promis
     throw new Error("Cannot refresh the manifest while generated files are out of date.");
   }
 
-  const protectedPaths = await collectProtectedPaths(projectDir, {
-    contractDir: config.contractDir,
-    checkerImplDir: config.checkerImplDir,
-    generatedDir: config.generatedDir,
-  });
+  const protectedPaths = await collectProtectedPaths(projectDir, config);
+  assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
   await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
 }

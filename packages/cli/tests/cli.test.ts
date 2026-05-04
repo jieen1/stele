@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -46,6 +46,24 @@ describe("stele CLI", () => {
     await expect(readFile(join(projectDir, "tests", "contract", "conftest.py"), "utf8")).resolves.toBe("# custom fixture\n");
   });
 
+  it("init rejects unsupported languages without writing scaffold files", async () => {
+    const projectDir = await createTempDir();
+
+    await expect(runInit(projectDir, { language: "ruby" })).rejects.toThrow(/unsupported language/i);
+
+    await expect(pathExists(join(projectDir, STELE_CONFIG_FILE))).resolves.toBe(false);
+    await expect(pathExists(join(projectDir, "contract", "main.stele"))).resolves.toBe(false);
+    await expect(pathExists(join(projectDir, "tests", "contract", "conftest.py"))).resolves.toBe(false);
+  });
+
+  it("init only treats missing files as creatable and surfaces stable filesystem errors", async () => {
+    const projectDir = await createTempDir();
+    await mkdir(join(projectDir, STELE_CONFIG_FILE), { recursive: true });
+
+    await expect(runInit(projectDir, { language: "python" })).rejects.toThrow(/EISDIR|illegal operation on a directory/i);
+    await expect(pathExists(join(projectDir, "contract", "main.stele"))).resolves.toBe(false);
+  });
+
   it("generate writes canonical Python files and a manifest", async () => {
     const projectDir = await createFixtureProject();
 
@@ -68,6 +86,48 @@ describe("stele CLI", () => {
       "tests/contract/conftest.py",
       "tests/contract/test_contract.py",
     ]);
+  });
+
+  it("generate rejects an entry path outside the project root and writes nothing", async () => {
+    const projectDir = await createFixtureProject();
+    const externalDir = await createTempDir();
+    const externalEntry = join(externalDir, "outside.stele");
+
+    await writeProjectFile(
+      externalDir,
+      "outside.stele",
+      [
+        "(invariant OUTSIDE_RULE",
+        "  (severity high)",
+        '  (description "Outside contract.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    );
+    await writeConfig(projectDir, { entry: externalEntry });
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/project-relative|inside the project root/i);
+    await expect(pathExists(join(projectDir, "tests", "contract", "test_contract.py"))).resolves.toBe(false);
+    await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
+  });
+
+  it("generate rejects parent-traversing manifest paths and does not write outside the project", async () => {
+    const projectDir = await createFixtureProject();
+    const outsideManifestDirName = `outside-manifest-${projectDir.split(/[\\/]/).at(-1)}`;
+    const outsideManifestDir = join(projectDir, "..", outsideManifestDirName);
+    const outsideManifestPath = join(outsideManifestDir, ".manifest.json");
+
+    await writeConfig(projectDir, { manifestPath: `../${outsideManifestDirName}/.manifest.json` });
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/project-relative|inside the project root/i);
+    await expect(pathExists(outsideManifestPath)).resolves.toBe(false);
+    await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
+  });
+
+  it("generate rejects Windows drive-relative config paths", async () => {
+    const projectDir = await createFixtureProject();
+    await writeConfig(projectDir, { generatedDir: "C:outside\\generated" });
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/project-relative|inside the project root/i);
   });
 
   it("check passes after generate and does not modify project files", async () => {
@@ -119,6 +179,29 @@ describe("stele CLI", () => {
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
   });
 
+  it("generate, check, and lock honor custom protected globs for user files", async () => {
+    const projectDir = await createFixtureProject({
+      protected: [...DEFAULT_CONFIG.protected, "docs/**/*.md"],
+    });
+    await writeProjectFile(projectDir, "docs/guide.md", "# guide\n");
+
+    await runGenerate(projectDir, { force: false });
+
+    const manifestPath = join(projectDir, "contract", ".manifest.json");
+    const manifest = await readJson(manifestPath);
+    expect(Object.keys(manifest.protected_files)).toContain("docs/guide.md");
+    expect(Object.keys(manifest.protected_files)).not.toContain("contract/.manifest.json");
+
+    await writeProjectFile(projectDir, "docs/guide.md", "# guide updated\n");
+    await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
+
+    await runLock(projectDir, { reason: "approved docs update" });
+    await expect(runCheck(projectDir)).resolves.toBeUndefined();
+
+    await writeProjectFile(projectDir, "docs/new.md", "# new\n");
+    await expect(runCheck(projectDir)).rejects.toThrow(/new\/unlocked protected files|protected/i);
+  });
+
   it("check fails on a new protected checker file until lock refreshes the manifest", async () => {
     const projectDir = await createFixtureProject();
     await runGenerate(projectDir, { force: false });
@@ -153,6 +236,38 @@ describe("stele CLI", () => {
     await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
 
     await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
+  });
+
+  it("generate fails when a protected unimported stele file exists, even if invalid", async () => {
+    const projectDir = await createFixtureProject();
+    await writeProjectFile(projectDir, "contract/invalid.stele", "(invariant BROKEN\n");
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/import|entry|protected/i);
+  });
+
+  it("lock and check fail when a new protected unimported stele file exists", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "contract/invalid.stele", "(invariant BROKEN\n");
+
+    await expect(runLock(projectDir, { reason: "approved invalid file" })).rejects.toThrow(/import|entry|protected/i);
+    await expect(runCheck(projectDir)).rejects.toThrow(/import|entry|protected|new\/unlocked/i);
+  });
+
+  it("generate fails when a protected unimported but valid stele file exists", async () => {
+    const projectDir = await createFixtureProject();
+    await writeProjectFile(
+      projectDir,
+      "contract/extra.stele",
+      [
+        "(invariant EXTRA_RULE",
+        "  (severity high)",
+        '  (description "Valid but unimported protected file.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    );
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/import|entry|protected/i);
   });
 
   it("lock refreshes the manifest after an approved checker change so check passes again", async () => {
@@ -192,6 +307,21 @@ describe("stele CLI", () => {
       "tests/contract/conftest.py",
       "tests/contract/test_contract.py",
     ]);
+  });
+
+  it("generate fails when protected scanning encounters a non-regular checker entry", async () => {
+    const projectDir = await createFixtureProject();
+    const targetDir = join(projectDir, "linked-target");
+    await mkdir(targetDir, { recursive: true });
+    await writeProjectFile(projectDir, "linked-target/ignored.py", "# ignored\n");
+
+    const createdLink = await tryCreateNonRegularEntry(targetDir, join(projectDir, "contract", "checker_impls", "linked"));
+
+    if (!createdLink) {
+      return;
+    }
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/non-regular|symbolic link|symlink/i);
   });
 
   it("lock does not add Python cache artifacts to the manifest when they already exist", async () => {
@@ -240,10 +370,10 @@ describe("stele CLI", () => {
   });
 });
 
-async function createFixtureProject(): Promise<string> {
+async function createFixtureProject(configOverrides: Partial<typeof DEFAULT_CONFIG> = {}): Promise<string> {
   const projectDir = await createTempDir();
 
-  await writeProjectFile(projectDir, STELE_CONFIG_FILE, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`);
+  await writeProjectFile(projectDir, STELE_CONFIG_FILE, `${JSON.stringify({ ...DEFAULT_CONFIG, ...configOverrides }, null, 2)}\n`);
   await writeProjectFile(
     projectDir,
     "contract/main.stele",
@@ -284,6 +414,14 @@ async function readJson(path: string): Promise<any> {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+async function writeConfig(projectDir: string, overrides: Partial<typeof DEFAULT_CONFIG>): Promise<void> {
+  const config = {
+    ...(await readJson(join(projectDir, STELE_CONFIG_FILE))),
+    ...overrides,
+  };
+  await writeProjectFile(projectDir, STELE_CONFIG_FILE, `${JSON.stringify(config, null, 2)}\n`);
+}
+
 async function snapshotProject(projectDir: string): Promise<Record<string, string>> {
   const files = await walkFiles(projectDir);
   const entries = await Promise.all(
@@ -312,4 +450,32 @@ async function walkFiles(directory: string): Promise<string[]> {
   );
 
   return nested.flat().sort();
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function tryCreateNonRegularEntry(targetDirectory: string, linkPath: string): Promise<boolean> {
+  for (const type of ["junction", "dir"] as const) {
+    try {
+      await symlink(targetDirectory, linkPath, type);
+      return true;
+    } catch (error) {
+      if (!isSymlinkPermissionError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isSymlinkPermissionError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && (error.code === "EPERM" || error.code === "EACCES" || error.code === "UNKNOWN");
 }
