@@ -321,6 +321,24 @@ describe("pre-tool-protect hook", () => {
     expect(result.stderr).toContain("unsupported glob pattern");
   });
 
+  it("fails closed when protected config uses absolute or project-escaping patterns", async () => {
+    for (const protectedPattern of ["C:\\contract\\**", "/contract/**", "../contract/**", "contract/../secrets/**"]) {
+      const projectDir = await createProject({
+        protected: [protectedPattern],
+      });
+
+      const result = runHook(projectDir, {
+        tool_input: {
+          file_path: "contract/main.stele",
+        },
+      });
+
+      expect(result.status).toBe(2);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("invalid protected config");
+    }
+  });
+
   it("fails closed when hook stdin JSON is malformed", async () => {
     const projectDir = await createProject();
 

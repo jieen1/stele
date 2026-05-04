@@ -41,7 +41,7 @@ The protected-glob parser is intentionally conservative:
 - patterns must stay project-relative
 - bracket globs such as `docs/[a-z].md` are rejected
 
-Python cache artifacts inside generated/checker directories are ignored when they end in `.pyc` or `.pyo`.
+Python cache artifacts inside generated/checker directories are ignored only when they end in `.pyc` or `.pyo`. Ordinary files remain protected even when they live under a `__pycache__` directory.
 
 ## `PreToolUse` behavior
 
@@ -106,7 +106,7 @@ Use it before and after material work in a Stele repository, and treat any non-z
 Use this when the user explicitly wants to author or extend protected contract material. The command doc instructs the agent to:
 
 1. clarify whether the change is an invariant, checker, import, or generated-output change
-2. run `stele add-checker <checker-id>` when a new Python checker scaffold is needed
+2. run `stele add-checker <checker-id>` when a new Python checker scaffold is needed; use the canonical CDL checker id, which may be hyphenated
 3. present the emitted checker block or contract snippet for approval
 4. route the protected-file edit through the approved contract-change flow
 

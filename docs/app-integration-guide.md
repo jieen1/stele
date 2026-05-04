@@ -102,13 +102,13 @@ Imports are resolved relative to the importing file. `stele generate`, `stele ch
 Declare the checker in CDL and implement it in Python:
 
 ```bash
-npx stele add-checker balance_change_has_transaction
+npx stele add-checker balance-change-has-transaction
 ```
 
 That command does two things:
 
 1. creates `contract/checker_impls/balance_change_has_transaction.py`
-2. prints the matching `(checker ...)` CDL block to stdout
+2. prints the matching `(checker balance-change-has-transaction ...)` CDL block to stdout
 
 After that:
 
@@ -130,7 +130,7 @@ def stele_context():
     }
 ```
 
-In v0.1, `uses-checker` arguments are parsed but the Python backend rejects checker arguments during generation. Checker-backed invariants must therefore use `uses-checker <checker-id>` without extra arguments.
+In v0.1, `uses-checker` arguments are parsed but the Python backend rejects checker arguments during generation. Checker-backed invariants must therefore use `uses-checker <checker-id>` without extra arguments. The canonical checker id remains hyphenated CDL text; only the Python filename is underscore-normalized.
 
 ## Generated tests
 
@@ -158,7 +158,7 @@ That protection matters for both humans and AI agents:
 - do not change contract files casually during unrelated feature work
 - do not refresh the manifest lock unless the contract/checker change was explicitly approved
 
-Python cache artifacts such as `.pyc`, `.pyo`, and `__pycache__` are intentionally ignored by Stele's protection logic.
+Python cache artifacts ending in `.pyc` or `.pyo` are intentionally ignored by Stele's protection logic. Ordinary files remain protected even when they live under a `__pycache__` directory.
 
 ## Controlled contract-change flow
 

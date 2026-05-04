@@ -11,7 +11,7 @@ Use this skill when a project contains `stele.config.json` or protected Stele co
 
 - Treat `contract/**/*.stele`, `contract/checker_impls/**/*`, `contract/.manifest.json`, and `tests/contract/**/*` as protected unless the user has approved a contract change.
 - Do not make direct protected edits as part of unrelated application work.
-- Ignore Python cache artifacts such as `__pycache__`, `.pyc`, and `.pyo` when reviewing generated output drift.
+- Ignore Python cache artifacts ending in `.pyc` or `.pyo` when reviewing generated output drift. Do not ignore ordinary source files just because they live under a `__pycache__` directory.
 
 ## Working flow
 

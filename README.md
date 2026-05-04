@@ -84,10 +84,10 @@ The generated directory is `tests/contract/`. `conftest.py` stays application-ow
 If an invariant needs custom Python logic, scaffold a checker implementation:
 
 ```bash
-npx stele add-checker balance_change_has_transaction
+npx stele add-checker balance-change-has-transaction
 ```
 
-That command creates `contract/checker_impls/balance_change_has_transaction.py` and prints the matching CDL block to paste into your contract source. Register the approved implementation inside `stele_context["_stele_checkers"]`, regenerate, rerun pytest, refresh the lock, and finish with `stele check`.
+That command creates `contract/checker_impls/balance_change_has_transaction.py` and prints the matching CDL block with the canonical checker id `(checker balance-change-has-transaction ...)` to paste into your contract source. Register the approved implementation inside `stele_context["_stele_checkers"]` under the same hyphenated id, regenerate, rerun pytest, refresh the lock, and finish with `stele check`.
 
 ## CI
 

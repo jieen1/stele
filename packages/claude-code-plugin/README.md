@@ -17,4 +17,6 @@ npm install --save-dev @stele/cli @stele/claude-code-plugin
 - `/stele:init`, `/stele:check`, `/stele:add`, and `/stele:explain`
 - The `contract-author` subagent and `contract-aware-coding` skill
 
+The current v0.1 command set is exactly `/stele:init`, `/stele:check`, `/stele:add`, and `/stele:explain`.
+
 See `docs/plugin-guide.md` for the production installation and workflow details.

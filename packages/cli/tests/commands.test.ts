@@ -19,6 +19,9 @@ const CHECKER_STUB = `def check(inputs: dict) -> dict:
 const CHECKER_BLOCK = `(checker fresh_checker
   (description "TODO: describe what this checker validates."))
 `;
+const HYPHENATED_CHECKER_BLOCK = `(checker fresh-checker
+  (description "TODO: describe what this checker validates."))
+`;
 
 describe("inspection commands", () => {
   afterEach(async () => {
@@ -201,10 +204,20 @@ describe("inspection commands", () => {
     expect(stdout.read()).toBe(CHECKER_BLOCK);
   });
 
+  it("add-checker accepts a hyphenated CDL checker id, creates an underscore Python filename, and prints the CDL id unchanged", async () => {
+    const projectDir = await createInspectionFixtureProject();
+    const stdout = captureStdout();
+
+    await runAddChecker(projectDir, "fresh-checker");
+
+    await expect(readFile(join(projectDir, "contract", "checker_impls", "fresh_checker.py"), "utf8")).resolves.toBe(CHECKER_STUB);
+    expect(stdout.read()).toBe(HYPHENATED_CHECKER_BLOCK);
+  });
+
   it("add-checker rejects invalid or dangerous ids", async () => {
     const projectDir = await createInspectionFixtureProject();
 
-    for (const checkerId of ["", "../escape", "nested/checker", "C:\\evil", "\\\\server\\share", "bad-id", "name.py"]) {
+    for (const checkerId of ["", "../escape", "nested/checker", "C:\\evil", "\\\\server\\share", "-bad", "name.py"]) {
       await expect(runAddChecker(projectDir, checkerId)).rejects.toThrow(/checker/i);
     }
   });
@@ -216,6 +229,15 @@ describe("inspection commands", () => {
     await expect(readFile(join(projectDir, "contract", "checker_impls", "approved_checker.py"), "utf8")).resolves.toBe(
       "def approved_checker(context):\n    return {\"passed\": True, \"message\": None}\n",
     );
+  });
+
+  it("add-checker refuses filename collisions between hyphenated and underscored ids", async () => {
+    const projectDir = await createInspectionFixtureProject();
+
+    await runAddChecker(projectDir, "fresh_checker");
+
+    await expect(runAddChecker(projectDir, "fresh-checker")).rejects.toThrow(/fresh-checker|fresh_checker|already exists|collision/i);
+    await expect(readFile(join(projectDir, "contract", "checker_impls", "fresh_checker.py"), "utf8")).resolves.toBe(CHECKER_STUB);
   });
 
   it("add-checker rejects checker directories that escape the project root via symlink or junction", async () => {

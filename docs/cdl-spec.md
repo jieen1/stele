@@ -113,11 +113,13 @@ The first item must be an identifier. In v0.1, top-level operator declarations a
 Form:
 
 ```lisp
-(checker balance_change_has_transaction
+(checker balance-change-has-transaction
   (description "Validate that a balance delta is backed by a transaction entry."))
 ```
 
 The first item must be an identifier. Checker ids must be unique across the loaded contract graph.
+
+CDL identifiers may contain hyphens after the first character, so hyphenated checker ids such as `balance-change-has-transaction` are valid. When `stele add-checker` scaffolds a Python implementation, it keeps the CDL id unchanged in the emitted declaration and writes the Python file with hyphens normalized to underscores, for example `balance_change_has_transaction.py`.
 
 ### `group`
 

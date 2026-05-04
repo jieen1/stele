@@ -8,7 +8,7 @@
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "test:packed-adoption": "node scripts/verify-packed-adoption.mjs",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm --filter @stele/core build && pnpm --filter @stele/backend-python build && pnpm -r run typecheck",
     "lint": "pnpm -r run lint"
   },
   "devDependencies": {

@@ -83,8 +83,12 @@ function readProtectedConfig(value) {
   }
 
   for (const pattern of value) {
-    if (typeof pattern !== "string") {
+    if (typeof pattern !== "string" || pattern.length === 0) {
       throw new Error("invalid protected config: protected must be an array of strings.");
+    }
+
+    if (isAbsoluteLikePattern(pattern) || containsParentTraversal(pattern)) {
+      throw new Error(`invalid protected config: protected patterns must be project-relative and must not contain '..': ${pattern}`);
     }
 
     if (pattern.includes("[") || pattern.includes("]")) {
@@ -93,6 +97,16 @@ function readProtectedConfig(value) {
   }
 
   return [...value];
+}
+
+function isAbsoluteLikePattern(pattern) {
+  return /^(?:[A-Za-z]:|[\\/]{1,2})/.test(pattern);
+}
+
+function containsParentTraversal(pattern) {
+  return toPosixPath(pattern)
+    .split("/")
+    .some((segment) => segment === "..");
 }
 
 function parseHookInput(stdin) {

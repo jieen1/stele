@@ -2,7 +2,7 @@ import { lstat, mkdir, realpath, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { loadConfig } from "../config/loadConfig.js";
 
-const CHECKER_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const CHECKER_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 const CHECKER_STUB = `def check(inputs: dict) -> dict:
     return {
         "passed": False,
@@ -14,14 +14,15 @@ const CHECKER_STUB = `def check(inputs: dict) -> dict:
 export async function runAddChecker(projectDir: string, checkerId: string): Promise<void> {
   if (!CHECKER_ID_PATTERN.test(checkerId)) {
     throw new Error(
-      `Invalid checker id "${checkerId}". Checker ids must match ${CHECKER_ID_PATTERN} so they stay valid CDL identifiers and Python filenames.`,
+      `Invalid checker id "${checkerId}". Checker ids must match ${CHECKER_ID_PATTERN} so they stay valid CDL identifiers.`,
     );
   }
 
   const config = await loadConfig(projectDir);
   const checkerImplDir = resolve(projectDir, config.checkerImplDir);
   await ensureSafeCheckerImplDirectory(projectDir, checkerImplDir, config.checkerImplDir);
-  const checkerPath = resolve(checkerImplDir, `${checkerId}.py`);
+  const checkerModuleName = toPythonCheckerModuleName(checkerId);
+  const checkerPath = resolve(checkerImplDir, `${checkerModuleName}.py`);
 
   await mkdir(dirname(checkerPath), { recursive: true });
 
@@ -29,13 +30,19 @@ export async function runAddChecker(projectDir: string, checkerId: string): Prom
     await writeFile(checkerPath, CHECKER_STUB, { encoding: "utf8", flag: "wx" });
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "EEXIST") {
-      throw new Error(`Checker implementation "${checkerId}" already exists at ${checkerPath}.`);
+      throw new Error(
+        `Checker implementation for "${checkerId}" already exists at ${checkerPath}. Another checker id may already map to the same Python filename.`,
+      );
     }
 
     throw error;
   }
 
   process.stdout.write(`(checker ${checkerId}\n  (description "TODO: describe what this checker validates."))\n`);
+}
+
+function toPythonCheckerModuleName(checkerId: string): string {
+  return checkerId.replaceAll("-", "_");
 }
 
 async function ensureSafeCheckerImplDirectory(projectDir: string, checkerImplDir: string, configPath: string): Promise<void> {

@@ -9,5 +9,7 @@ Use this command when the user wants to author or extend protected contract mate
 stele add-checker <checker-id>
 ```
 
+Use the canonical CDL checker id when running the command. Hyphenated ids are valid, and the generated Python file is underscore-normalized automatically.
+
 3. Present the emitted checker block or contract snippet to the user for approval.
 4. Route the actual protected-file change through the contract authoring flow instead of editing `contract/**/*.stele`, `contract/checker_impls/**/*`, `contract/.manifest.json`, or `tests/contract/**/*` directly.

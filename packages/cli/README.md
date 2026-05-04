@@ -20,4 +20,6 @@ This package installs the `stele` executable.
 - `stele explain <invariant-id>`
 - `stele add-checker <checker-id>`
 
+`checker-id` is the canonical CDL checker id. Hyphenated ids such as `balance-change-has-transaction` stay hyphenated in the emitted `(checker ...)` block and are written to underscore-safe Python filenames such as `balance_change_has_transaction.py`.
+
 See the repository README and `docs/` guides for the full adoption flow.
