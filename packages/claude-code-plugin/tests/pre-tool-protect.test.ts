@@ -130,6 +130,35 @@ describe("pre-tool-protect hook", () => {
     expectDenied(result);
   });
 
+  it("denies default protected files when config omits the protected field", async () => {
+    const projectDir = await createProject({
+      protected: undefined,
+      omitProtected: true,
+    });
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "contract/main.stele",
+      },
+    });
+
+    expectDenied(result);
+  });
+
+  it("allows protected targets when config explicitly sets protected to an empty array", async () => {
+    const projectDir = await createProject({
+      protected: [],
+    });
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "contract/main.stele",
+      },
+    });
+
+    expectAllowed(result);
+  });
+
   it("allows unprotected files", async () => {
     const projectDir = await createProject();
 
@@ -174,9 +203,9 @@ describe("pre-tool-protect hook", () => {
   });
 });
 
-async function createProject(overrides: { protected?: string[] } = {}): Promise<string> {
+async function createProject(overrides: { protected?: string[]; omitProtected?: boolean } = {}): Promise<string> {
   const projectDir = await createTempDir();
-  const config = {
+  const config: Record<string, unknown> = {
     version: "0.1",
     contractDir: "contract",
     entry: "contract/main.stele",
@@ -186,13 +215,16 @@ async function createProject(overrides: { protected?: string[] } = {}): Promise<
     targetLanguage: "python",
     testFramework: "pytest",
     pathMode: "auto",
-    protected: overrides.protected ?? [
+  };
+
+  if (!overrides.omitProtected) {
+    config.protected = overrides.protected ?? [
       "contract/**/*.stele",
       "contract/checker_impls/**/*",
       "contract/.manifest.json",
       "tests/contract/**/*",
-    ],
-  };
+    ];
+  }
 
   await writeProjectFile(projectDir, "stele.config.json", `${JSON.stringify(config, null, 2)}\n`);
   return projectDir;

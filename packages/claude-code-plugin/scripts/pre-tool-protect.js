@@ -6,6 +6,12 @@ const PROTECTED_REASON =
   "This file is protected by Stele. Use /stele:propose-change or ask the user to approve a contract update.";
 const TARGET_KEYS = ["file_path", "path", "target_path", "notebook_path"];
 const PYTHON_CACHE_SUFFIXES = [".pyc", ".pyo"];
+const DEFAULT_PROTECTED = [
+  "contract/**/*.stele",
+  "contract/checker_impls/**/*",
+  "contract/.manifest.json",
+  "tests/contract/**/*",
+];
 
 try {
   const stdin = await readStdin();
@@ -59,7 +65,7 @@ async function loadConfig(projectDir) {
     return {
       protected: Array.isArray(parsed?.protected)
         ? parsed.protected.filter((value) => typeof value === "string")
-        : [],
+        : [...DEFAULT_PROTECTED],
     };
   } catch (error) {
     if (isMissingFileError(error)) {
