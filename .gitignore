@@ -4,9 +4,13 @@ coverage/
 .worktrees/
 .pnpm-store/
 .npm/
+__pycache__/
+.pytest_cache/
+.venv/
 *.log
 *.tmp
 *.temp
+*.pyc
 *.tsbuildinfo
 pnpm-debug.log*
 npm-debug.log*
