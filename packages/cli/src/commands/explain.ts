@@ -51,10 +51,19 @@ function extractSourceFromSpan(source: string, span: SourceSpan): string | undef
 
   let depth = 0;
   let inString = false;
+  let inComment = false;
   let escaping = false;
 
   for (let index = cursor; index < source.length; index += 1) {
     const character = source[index]!;
+
+    if (inComment) {
+      if (character === "\n") {
+        inComment = false;
+      }
+
+      continue;
+    }
 
     if (inString) {
       if (escaping) {
@@ -76,6 +85,11 @@ function extractSourceFromSpan(source: string, span: SourceSpan): string | undef
 
     if (character === '"') {
       inString = true;
+      continue;
+    }
+
+    if (character === ";") {
+      inComment = true;
       continue;
     }
 

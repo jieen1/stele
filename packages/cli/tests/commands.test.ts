@@ -37,6 +37,7 @@ describe("inspection commands", () => {
         "ID\tSeverity\tCategory\tDescription\tFile Path",
         "PAYMENT_BASELINE\thigh\t<none>\tBaseline rule used as a dependency target.\tcontract/main.stele",
         'ROOT_PAYMENT_BALANCE\tcritical\tdata-integrity\tPayments remain balanced before settlement.\tcontract/main.stele',
+        'COMMENT_RULE\thigh\t<none>\tComment rule with ) and ; inside the string.\tcontract/main.stele',
         'GROUP_CHECKED_SETTLEMENT\tmedium\t(domain ledger)\tSettlement batches require an approved checker.\tcontract/main.stele',
       ].join("\n") + "\n",
     );
@@ -125,6 +126,25 @@ describe("inspection commands", () => {
         "    (category (domain ledger))",
         "    (tags payment (scope nightly) 7)",
         "    (uses-checker approved_checker))",
+      ].join("\n"),
+    );
+  });
+
+  it("explain preserves source when comments contain closing parens and strings contain comment-like characters", async () => {
+    const projectDir = await createInspectionFixtureProject();
+    const stdout = captureStdout();
+
+    await runExplain(projectDir, "COMMENT_RULE");
+
+    expect(stdout.read()).toContain(
+      [
+        "Source:",
+        "(invariant COMMENT_RULE",
+        "  (severity high)",
+        "  ; note: this comment mentions ) and should not end the invariant",
+        '  (description "Comment rule with ) and ; inside the string.")',
+        '  (rationale "Rationale keeps ) and ; as literal text.")',
+        "  (assert (eq 1 1)))",
       ].join("\n"),
     );
   });
@@ -222,6 +242,13 @@ async function createInspectionFixtureProject(): Promise<string> {
       '  (tags payment :priority "batch window")',
       '  (rationale "Preserve the accounting invariant before settlement.")',
       "  (depends-on PAYMENT_BASELINE)",
+      "  (assert (eq 1 1)))",
+      "",
+      "(invariant COMMENT_RULE",
+      "  (severity high)",
+      "  ; note: this comment mentions ) and should not end the invariant",
+      '  (description "Comment rule with ) and ; inside the string.")',
+      '  (rationale "Rationale keeps ) and ; as literal text.")',
       "  (assert (eq 1 1)))",
       "",
       "(group batch-reconciliation",
