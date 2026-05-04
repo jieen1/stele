@@ -1,0 +1,17 @@
+{
+  "name": "@stele/backend-python",
+  "version": "0.1.0",
+  "description": "Python backend for generating pytest-compatible Stele artifacts.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node --eval \"console.log('Scaffold build placeholder for @stele/backend-python: source files arrive in later tasks.')\"",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "node --eval \"console.log('Scaffold typecheck placeholder for @stele/backend-python: no TypeScript sources yet.')\"",
+    "lint": "node --eval \"console.log('Scaffold lint placeholder for @stele/backend-python: no lintable sources yet.')\""
+  }
+}

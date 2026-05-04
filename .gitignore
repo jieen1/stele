@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.worktrees/
+.pnpm-store/
+.npm/
+*.log
+*.tmp
+*.temp
+*.tsbuildinfo
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db

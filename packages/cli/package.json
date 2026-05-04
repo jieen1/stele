@@ -1,0 +1,20 @@
+{
+  "name": "@stele/cli",
+  "version": "0.1.0",
+  "description": "CLI entrypoint for Stele local development and CI workflows.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "stele": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node --eval \"console.log('Scaffold build placeholder for @stele/cli: source files arrive in later tasks.')\"",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "node --eval \"console.log('Scaffold typecheck placeholder for @stele/cli: no TypeScript sources yet.')\"",
+    "lint": "node --eval \"console.log('Scaffold lint placeholder for @stele/cli: no lintable sources yet.')\""
+  }
+}
