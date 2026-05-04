@@ -14,7 +14,7 @@ const denyResponse = {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
     permissionDecisionReason:
-      "This file is protected by Stele. Use /stele:propose-change or ask the user to approve a contract update.",
+      "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.",
   },
 };
 

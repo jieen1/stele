@@ -1,106 +1,201 @@
 # Stele Python App Integration
 
-Stele is meant to attach to an existing Python application, not replace its domain model. Your app owns the runtime state through a `pytest` fixture named `stele_context`; generated tests read that real state, and Stele does not invent fake application objects inside generated files.
+Stele is meant to attach to an existing Python application, not replace its domain model. Your application owns the runtime state through a `pytest` fixture named `stele_context`; generated Stele tests read that real state and never synthesize fake business objects on your behalf.
 
 ## Install and adopt
 
-For local or pre-publish evaluation, install the packed workspace artifacts that are automatically verified in this repository by `pnpm test:packed-adoption` and the CI workflow:
+Until the npm packages are publicly published, the supported external-adoption path is the packed tarball workflow verified in this repository by `pnpm test:packed-adoption`:
 
 ```bash
 npm install --save-dev /absolute/path/to/stele-core-0.1.0.tgz /absolute/path/to/stele-backend-python-0.1.0.tgz /absolute/path/to/stele-cli-0.1.0.tgz
-```
-
-The CLI package name is currently `@stele/cli`, and its executable is `stele`. After install:
-
-```bash
 python -m pytest --version
 npx stele init --language python
-npx stele generate
-pytest tests/contract
-npx stele check
 ```
 
-Your Python environment must already have `pytest` installed because Stele generates pytest suites rather than shipping its own Python test runner.
+After `stele init`, your repository has:
+
+- `stele.config.json`
+- `contract/main.stele`
+- `contract/checker_impls/.gitkeep`
+- `tests/contract/conftest.py`
+
+Your Python environment must already have `pytest` installed because Stele generates pytest suites instead of shipping its own Python test runner.
 
 ## Contract layout
 
-Put contract sources under `contract/`:
+Stele's default repository layout is:
 
 - `contract/main.stele`: entry file referenced by `stele.config.json`
 - `contract/modules/*.stele`: imported contract modules
 - `contract/checker_impls/*.py`: approved checker implementations
-- `contract/.manifest.json`: Stele lock manifest
+- `contract/.manifest.json`: protected-file lock manifest
+- `tests/contract/*.py`: generated pytest modules
+- `tests/contract/_stele_runtime.py`: generated runtime helper
+- `tests/contract/conftest.py`: application-owned fixture wiring
 
-Generated pytest artifacts live under `tests/contract/`.
+The generated output directory is `tests/contract/`, but `conftest.py` remains user-owned and is allowed to live alongside the generated files.
 
-## Application fixture contract
+## The `stele_context` fixture
 
-Your application owns `tests/contract/conftest.py` and must return the real state the contract needs:
+Your application owns the contract runtime surface by returning a dictionary from `stele_context`:
 
 ```python
 import pytest
+
 
 @pytest.fixture
 def stele_context():
     return {
         "account": real_account_snapshot(),
         "positions": load_open_positions(),
+        "_stele_checkers": {},
+    }
+```
+
+Generated tests can traverse dictionaries and Python objects. The generated runtime helper resolves:
+
+1. dictionary keys
+2. object attributes
+3. underscore-normalized attributes for CDL names that contain `-`
+
+That means `(path account total-value)` can resolve either `account["total-value"]` or `account.total_value`.
+
+## Temporal helpers
+
+If your contract uses temporal helpers such as `(modified (path account balance))`, expose both snapshots:
+
+```python
+@pytest.fixture
+def stele_context():
+    return {
+        "state-before": {
+            "account": {"balance": 4800},
+        },
+        "state-after": {
+            "account": {"balance": 5000},
+        },
+        "_stele_checkers": {},
+    }
+```
+
+`state-before` and `state-after` are runtime conventions used by the generated Python backend in v0.1.
+
+## Writing contract source
+
+Put contract source under `contract/` and keep all imported `.stele` files reachable from `contract/main.stele`.
+
+Example:
+
+```lisp
+(import "./modules/account.stele")
+
+(invariant ACCOUNT_IS_ACTIVE
+  (severity high)
+  (description "Brokerage accounts admitted to the contract remain active.")
+  (assert (eq (path account status) "active")))
+```
+
+Imports are resolved relative to the importing file. `stele generate`, `stele check`, and `stele lock` all fail if a protected `.stele` file exists under the protected set but is not reachable from the configured entry graph.
+
+## Checker implementations
+
+Declare the checker in CDL and implement it in Python:
+
+```bash
+npx stele add-checker balance_change_has_transaction
+```
+
+That command does two things:
+
+1. creates `contract/checker_impls/balance_change_has_transaction.py`
+2. prints the matching `(checker ...)` CDL block to stdout
+
+After that:
+
+1. paste or add the checker declaration to a loaded `.stele` file
+2. implement the Python function in `contract/checker_impls/`
+3. register it in `stele_context["_stele_checkers"]`
+4. regenerate and rerun tests
+5. refresh the manifest lock
+
+Example fixture registration:
+
+```python
+@pytest.fixture
+def stele_context():
+    return {
         "_stele_checkers": {
             "balance-change-has-transaction": approved_checker,
         },
     }
 ```
 
-Treat this fixture as application code. Generated Stele tests consume it; they do not mock or synthesize your business state.
+In v0.1, `uses-checker` arguments are parsed but the Python backend rejects checker arguments during generation. Checker-backed invariants must therefore use `uses-checker <checker-id>` without extra arguments.
 
-If your contract uses temporal helpers such as `(modified ...)`, expose the relevant snapshots through `stele_context["state-before"]` and `stele_context["state-after"]`.
+## Generated tests
 
-## Checker implementations and approval
+The Python backend generates:
 
-Declare checkers in `.stele` files and implement them in `contract/checker_impls/`. A generated test calls the checker through `stele_context["_stele_checkers"]`, so `conftest.py` should register approved implementations explicitly.
+- `tests/contract/__init__.py`
+- `tests/contract/_stele_runtime.py`
+- `tests/contract/test_contract.py` for top-level invariants
+- `tests/contract/test_<group>.py` for each group
 
-Recommended checker workflow:
+Stele does not want you to hand-edit those generated files. Change the contract source or checker implementation instead, then rerun generation.
 
-```bash
-npx stele add-checker cash_movement_matches_audit_log
-```
+## Protected files and AI editing
 
-1. Review the generated CDL checker block.
-2. Add or update the matching `.stele` declaration under `contract/`.
-3. Implement the Python checker in `contract/checker_impls/`.
-4. Register it in `stele_context["_stele_checkers"]`.
-5. Re-run `npx stele generate`, `pytest tests/contract`, and `npx stele lock --reason "approved checker update"`.
-
-## Controlled contract changes
-
-These paths are protected by Stele and should only change through an approved contract-change flow:
+The default protected globs are:
 
 - `contract/**/*.stele`
 - `contract/checker_impls/**/*`
 - `contract/.manifest.json`
 - `tests/contract/**/*`
 
-That protection matters for both humans and AI agents. Agents should not directly edit those files unless the user has approved the contract change and the follow-up `stele lock`.
+That protection matters for both humans and AI agents:
 
-For an approved contract or checker change:
+- do not edit generated tests by hand
+- do not change contract files casually during unrelated feature work
+- do not refresh the manifest lock unless the contract/checker change was explicitly approved
+
+Python cache artifacts such as `.pyc`, `.pyo`, and `__pycache__` are intentionally ignored by Stele's protection logic.
+
+## Controlled contract-change flow
+
+When a contract change is approved, use this sequence:
 
 ```bash
 npx stele generate --force
-pytest tests/contract
+python -m pytest tests/contract -q
 npx stele lock --reason "approved contract update"
 npx stele check
 ```
 
-If someone edits a generated test manually, `stele check` fails with exit code `2`. If protected contract/checker state changes without a fresh lock, `stele check` fails with exit code `3`.
+Notes:
 
-## CI integration
+- `--force` is required when generated files intentionally change.
+- `stele lock` updates `contract/.manifest.json` only after generated files are already current.
+- In v0.1, `--reason` is accepted for workflow parity but is not persisted into the manifest file.
 
-Run Stele in CI exactly the way your repository runs it locally:
+## CI
+
+CI should mirror the local sequence:
 
 ```bash
 npx stele generate
-pytest tests/contract
+python -m pytest tests/contract -q
 npx stele check
 ```
 
-`stele check` is the enforcement step. It verifies generated files, manifest state, and locked contract/checker content without rewriting anything.
+`stele check` is the non-mutating enforcement step. It verifies:
+
+- the generated pytest files still match the current contract
+- the protected manifest still matches the current protected file contents
+- the current contract hash still matches the locked manifest
+- no new protected files were added without a fresh lock
+
+## Packed adoption caveat
+
+Pre-publish installation is real and continuously verified, but it is still tarball-based. The automation currently proves that a fresh Python app can install the packed `@stele/core`, `@stele/backend-python`, and `@stele/cli` tarballs together, initialize, generate, run pytest, and pass `stele check`.
+
+The Claude Code plugin is editor-hosted, so its registration flow is documented separately in [plugin-guide.md](plugin-guide.md) rather than included in the tarball adoption script.

@@ -4,7 +4,7 @@ import path from "node:path";
 
 const BLOCK_EXIT_CODE = 2;
 const PROTECTED_REASON =
-  "This file is protected by Stele. Use /stele:propose-change or ask the user to approve a contract update.";
+  "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.";
 const TARGET_KEYS = ["file_path", "path", "target_path", "notebook_path"];
 const PYTHON_CACHE_SUFFIXES = [".pyc", ".pyo"];
 const DEFAULT_PROTECTED = [

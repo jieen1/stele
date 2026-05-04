@@ -1,21 +1,32 @@
 {
   "name": "@stele/claude-code-plugin",
   "version": "0.1.0",
-  "description": "Claude Code plugin package for Stele protected-path enforcement workflows.",
+  "description": "Claude Code plugin bundle for Stele protected-path enforcement and final check workflows.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
     "dist",
     ".claude-plugin",
     "agents",
     "commands",
     "hooks",
+    "README.md",
     "scripts",
     "skills"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
+    "prepack": "pnpm run build",
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
