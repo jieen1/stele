@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
 import { Command, Option } from "commander";
+import { runAddChecker } from "./commands/addChecker.js";
 import { runCheck } from "./commands/check.js";
+import { runExplain } from "./commands/explain.js";
 import { runGenerate } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
+import { runList } from "./commands/list.js";
 import { runLock } from "./commands/lock.js";
 
 type ProgramDependencies = {
@@ -12,6 +15,9 @@ type ProgramDependencies = {
   runGenerate?: typeof runGenerate;
   runLock?: typeof runLock;
   runInit?: typeof runInit;
+  runList?: typeof runList;
+  runExplain?: typeof runExplain;
+  runAddChecker?: typeof runAddChecker;
 };
 
 export function createProgram(dependencies: ProgramDependencies = {}): Command {
@@ -20,6 +26,9 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   const generate = dependencies.runGenerate ?? runGenerate;
   const lock = dependencies.runLock ?? runLock;
   const init = dependencies.runInit ?? runInit;
+  const list = dependencies.runList ?? runList;
+  const explain = dependencies.runExplain ?? runExplain;
+  const addChecker = dependencies.runAddChecker ?? runAddChecker;
   const program = new Command();
 
   program.name("stele").description("Contract management for AI-assisted development").version("0.1.0");
@@ -27,6 +36,14 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   program.command("check").action(() => check(cwd()));
   program.command("generate").option("--force").action((options) => generate(cwd(), options));
   program.command("lock").option("--reason <reason>").action((options) => lock(cwd(), options));
+  program
+    .command("list")
+    .option("--severity <severity>")
+    .option("--category <category>")
+    .option("--tag <tag>")
+    .action((options) => list(cwd(), options));
+  program.command("explain <id>").action((id) => explain(cwd(), id));
+  program.command("add-checker <checker-id>").action((checkerId) => addChecker(cwd(), checkerId));
   program
     .command("init")
     .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))
