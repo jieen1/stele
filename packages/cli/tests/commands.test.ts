@@ -190,6 +190,15 @@ describe("inspection commands", () => {
     expect(stdout.read()).toBe(CHECKER_BLOCK);
   });
 
+  it("add-checker creates a missing checker implementation directory inside the project", async () => {
+    const projectDir = await createInspectionFixtureProject();
+
+    await rm(join(projectDir, "contract", "checker_impls"), { recursive: true, force: true });
+    await runAddChecker(projectDir, "fresh_checker");
+
+    await expect(readFile(join(projectDir, "contract", "checker_impls", "fresh_checker.py"), "utf8")).resolves.toBe(CHECKER_STUB);
+  });
+
   it("add-checker rejects invalid or dangerous ids", async () => {
     const projectDir = await createInspectionFixtureProject();
 
@@ -222,6 +231,22 @@ describe("inspection commands", () => {
 
     await expect(runAddChecker(projectDir, "probe_checker")).rejects.toThrow(/checkerImplDir|project root|symlink|junction|non-regular/i);
     await expect(readdir(externalDir)).resolves.toEqual([]);
+  });
+
+  it("add-checker rejects linked checker ancestors before creating external directories", async () => {
+    const projectDir = await createTempDir();
+    const outsideDir = await createTempDir();
+
+    await writeProjectFile(projectDir, STELE_CONFIG_FILE, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`);
+
+    const createdLink = await tryCreateNonRegularEntry(outsideDir, join(projectDir, "contract"));
+
+    if (!createdLink) {
+      return;
+    }
+
+    await expect(runAddChecker(projectDir, "probe_checker")).rejects.toThrow(/checkerImplDir|project root|symlink|junction|non-regular/i);
+    await expect(readdir(outsideDir)).resolves.toEqual([]);
   });
 
   it("CLI wiring forwards cwd, filters, ids, and checker names to the new handlers", async () => {

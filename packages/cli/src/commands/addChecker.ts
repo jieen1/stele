@@ -39,21 +39,31 @@ export async function runAddChecker(projectDir: string, checkerId: string): Prom
 }
 
 async function ensureSafeCheckerImplDirectory(projectDir: string, checkerImplDir: string, configPath: string): Promise<void> {
-  try {
-    const stats = await lstat(checkerImplDir);
+  const existingAncestors = buildAncestorChain(projectDir, checkerImplDir);
+  let checkerImplDirExists = true;
 
-    if (stats.isSymbolicLink()) {
-      throw new Error(`Config checkerImplDir "${configPath}" must not be a symlink or junction.`);
-    }
+  for (const ancestorPath of existingAncestors) {
+    try {
+      const stats = await lstat(ancestorPath);
 
-    if (!stats.isDirectory()) {
-      throw new Error(`Config checkerImplDir "${configPath}" must resolve to a regular directory inside the project root.`);
-    }
-  } catch (error) {
-    if (!isMissingFileError(error)) {
-      throw error;
-    }
+      if (stats.isSymbolicLink()) {
+        throw new Error(`Config checkerImplDir "${configPath}" must not contain symlink or junction ancestors.`);
+      }
 
+      if (!stats.isDirectory()) {
+        throw new Error(`Config checkerImplDir "${configPath}" must resolve through regular directories inside the project root.`);
+      }
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+
+      checkerImplDirExists = false;
+      break;
+    }
+  }
+
+  if (!checkerImplDirExists) {
     await mkdir(checkerImplDir, { recursive: true });
   }
 
@@ -78,4 +88,16 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
 
 function isAbsoluteLikePath(path: string): boolean {
   return path.startsWith("/") || path.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+function buildAncestorChain(projectDir: string, checkerImplDir: string): string[] {
+  const relativePath = relative(resolve(projectDir), checkerImplDir);
+  const segments = relativePath.split(/[/\\]+/).filter((segment) => segment.length > 0);
+  const ancestors: string[] = [];
+
+  for (let index = 0; index < segments.length; index += 1) {
+    ancestors.push(resolve(projectDir, ...segments.slice(0, index + 1)));
+  }
+
+  return ancestors;
 }
