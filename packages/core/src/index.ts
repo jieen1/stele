@@ -2,6 +2,7 @@ export type { AstNode, AtomNode, ListNode, SourceSpan, SteleType } from "./ast/t
 export { SteleError } from "./errors/SteleError.js";
 export { lex } from "./lexer/lexer.js";
 export type { Token } from "./lexer/token.js";
+export { loadContract, validateContract } from "./loader/loadContract.js";
 export { parseFile } from "./parser/parser.js";
 export type { ParsedFile } from "./parser/parser.js";
 export type {
@@ -11,3 +12,16 @@ export type {
   OperatorSpec,
 } from "./registry/operators.js";
 export { createCoreOperatorRegistry, createOperatorRegistry } from "./registry/operators.js";
+export type {
+  CheckerDeclaration,
+  CheckerUse,
+  Contract,
+  ContractFile,
+  GroupDeclaration,
+  ImportDeclaration,
+  InvariantDeclaration,
+  InvariantDependency,
+  LoadedContractFile,
+  MetadataDeclaration,
+  OperatorDeclaration,
+} from "./validator/structure.js";
