@@ -192,11 +192,13 @@ describe("inspection commands", () => {
 
   it("add-checker creates a missing checker implementation directory inside the project", async () => {
     const projectDir = await createInspectionFixtureProject();
+    const stdout = captureStdout();
 
     await rm(join(projectDir, "contract", "checker_impls"), { recursive: true, force: true });
     await runAddChecker(projectDir, "fresh_checker");
 
     await expect(readFile(join(projectDir, "contract", "checker_impls", "fresh_checker.py"), "utf8")).resolves.toBe(CHECKER_STUB);
+    expect(stdout.read()).toBe(CHECKER_BLOCK);
   });
 
   it("add-checker rejects invalid or dangerous ids", async () => {
