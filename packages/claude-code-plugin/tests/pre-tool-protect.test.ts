@@ -35,6 +35,32 @@ describe("pre-tool-protect hook", () => {
     expectDenied(result);
   });
 
+  it("allows contract directories and non-stele files that are not subtree-protected roots", async () => {
+    const projectDir = await createProject();
+
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "contract",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "contract/modules",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "contract/notes.txt",
+        },
+      }),
+    );
+  });
+
   it("denies checker impl, manifest, and generated files across supported input shapes", async () => {
     const projectDir = await createProject();
 
@@ -56,6 +82,13 @@ describe("pre-tool-protect hook", () => {
       runHook(projectDir, {
         input: {
           notebook_path: "tests/contract/test_contract.py",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "contract/modules/rules.stele",
         },
       }),
     );

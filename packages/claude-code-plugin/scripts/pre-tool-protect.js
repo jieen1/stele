@@ -174,7 +174,7 @@ function shouldDenyTarget(projectDir, patterns, targetPath) {
   }
 
   if (withinProject) {
-    return patterns.some((pattern) => matchGlob(relativeToProject, pattern) || startsWithinProtectedPrefix(relativeToProject, pattern));
+    return patterns.some((pattern) => matchGlob(relativeToProject, pattern) || matchesProtectedDirectoryRoot(relativeToProject, pattern));
   }
 
   if (shouldIgnorePythonCache(normalizedInput)) {
@@ -225,6 +225,16 @@ function startsWithinProtectedPrefix(relativePath, pattern) {
   return prefixSegments.every((segment, index) => segments[index] === segment);
 }
 
+function matchesProtectedDirectoryRoot(relativePath, pattern) {
+  const protectedRoot = getProtectedDirectoryRoot(pattern);
+
+  if (protectedRoot === null) {
+    return false;
+  }
+
+  return normalizeForComparison(relativePath) === normalizeForComparison(protectedRoot);
+}
+
 function absoluteTraversalTouchesProtectedRoot(projectDir, targetPath, pattern) {
   if (!path.isAbsolute(targetPath)) {
     return false;
@@ -257,6 +267,17 @@ function getProtectedPrefix(pattern) {
   }
 
   return prefix;
+}
+
+function getProtectedDirectoryRoot(pattern) {
+  const normalizedPattern = toPosixPath(pattern).replace(/\/+$/u, "");
+
+  if (!normalizedPattern.endsWith("/**/*")) {
+    return null;
+  }
+
+  const root = normalizedPattern.slice(0, -"/**/*".length);
+  return root.length > 0 ? root : null;
 }
 
 function matchGlob(relativePath, pattern) {
