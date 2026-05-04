@@ -201,6 +201,52 @@ describe("pre-tool-protect hook", () => {
 
     expectAllowed(result);
   });
+
+  it("supports UTF-8 BOM config files and still denies default protected targets", async () => {
+    const projectDir = await createTempDir();
+    const config = {
+      version: "0.1",
+      contractDir: "contract",
+      entry: "contract/main.stele",
+      generatedDir: "tests/contract",
+      checkerImplDir: "contract/checker_impls",
+      manifestPath: "contract/.manifest.json",
+      targetLanguage: "python",
+      testFramework: "pytest",
+      pathMode: "auto",
+    };
+
+    await writeProjectFile(projectDir, "stele.config.json", `\uFEFF${JSON.stringify(config, null, 2)}\n`);
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "contract/main.stele",
+      },
+    });
+
+    expectDenied(result);
+  });
+
+  it("fails closed when stele.config.json is malformed", async () => {
+    const projectDir = await createTempDir();
+    await writeProjectFile(projectDir, "stele.config.json", "{ invalid json\n");
+
+    const result = runRawHook(projectDir, '{"tool_input":{"file_path":"contract/main.stele"}}\n');
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Unable to parse Stele config");
+  });
+
+  it("fails closed when hook stdin JSON is malformed", async () => {
+    const projectDir = await createProject();
+
+    const result = runRawHook(projectDir, "{invalid\n");
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Unable to parse Claude hook input");
+  });
 });
 
 async function createProject(overrides: { protected?: string[]; omitProtected?: boolean } = {}): Promise<string> {
@@ -243,13 +289,17 @@ async function writeProjectFile(projectDir: string, relativePath: string, conten
 }
 
 function runHook(projectDir: string, payload: unknown) {
+  return runRawHook(projectDir, `${JSON.stringify(payload)}\n`);
+}
+
+function runRawHook(projectDir: string, input: string) {
   return spawnSync(process.execPath, [scriptPath], {
     cwd: pluginDir,
     env: {
       ...process.env,
       CLAUDE_PROJECT_DIR: projectDir,
     },
-    input: `${JSON.stringify(payload)}\n`,
+    input,
     encoding: "utf8",
   });
 }

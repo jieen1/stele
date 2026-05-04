@@ -2,6 +2,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+const BLOCK_EXIT_CODE = 2;
 const PROTECTED_REASON =
   "This file is protected by Stele. Use /stele:propose-change or ask the user to approve a contract update.";
 const TARGET_KEYS = ["file_path", "path", "target_path", "notebook_path"];
@@ -15,7 +16,7 @@ const DEFAULT_PROTECTED = [
 
 try {
   const stdin = await readStdin();
-  const payload = stdin.trim().length === 0 ? {} : JSON.parse(stdin);
+  const payload = parseHookInput(stdin);
   const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
   const targetPath = extractTargetPath(payload);
 
@@ -43,9 +44,7 @@ try {
     );
   }
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
+  failClosed(error instanceof Error ? error.message : String(error));
 }
 
 async function readStdin() {
@@ -61,7 +60,7 @@ async function readStdin() {
 async function loadConfig(projectDir) {
   try {
     const raw = await readFile(path.join(projectDir, "stele.config.json"), "utf8");
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(stripBom(raw));
     return {
       protected: Array.isArray(parsed?.protected)
         ? parsed.protected.filter((value) => typeof value === "string")
@@ -72,7 +71,19 @@ async function loadConfig(projectDir) {
       return null;
     }
 
-    throw error;
+    throw new Error(`Unable to parse Stele config: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function parseHookInput(stdin) {
+  if (stdin.trim().length === 0) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(stdin);
+  } catch (error) {
+    throw new Error(`Unable to parse Claude hook input: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -285,4 +296,13 @@ function isObject(value) {
 
 function isMissingFileError(error) {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function stripBom(value) {
+  return value.replace(/^\uFEFF/u, "");
+}
+
+function failClosed(message) {
+  process.stderr.write(`${message}\n`);
+  process.exit(BLOCK_EXIT_CODE);
 }
