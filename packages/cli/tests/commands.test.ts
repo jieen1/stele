@@ -242,6 +242,22 @@ describe("inspection commands", () => {
     expect(stdout.read()).toBe(CHECKER_BLOCK);
   });
 
+  it("add-checker rejects case-insensitive collisions across hyphenated and underscored ids", async () => {
+    const projectDir = await createInspectionFixtureProject();
+    const stdout = captureStdout();
+
+    await runAddChecker(projectDir, "Fresh-Checker");
+
+    await expect(runAddChecker(projectDir, "fresh_checker")).rejects.toThrow(/Fresh-Checker|fresh_checker|collision|already exists/i);
+    await expect(runAddChecker(projectDir, "fresh-checker")).rejects.toThrow(/Fresh-Checker|fresh-checker|collision|already exists/i);
+    await expect(readFile(join(projectDir, "contract", "checker_impls", "Fresh_Checker.py"), "utf8")).resolves.toBe(CHECKER_STUB);
+    expect(stdout.read()).toBe(
+      `(checker Fresh-Checker
+  (description "TODO: describe what this checker validates."))
+`,
+    );
+  });
+
   it("add-checker rejects checker directories that escape the project root via symlink or junction", async () => {
     const projectDir = await createInspectionFixtureProject();
     const externalDir = await createTempDir();

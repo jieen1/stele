@@ -1,4 +1,4 @@
-import { lstat, mkdir, realpath, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, realpath, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { loadConfig } from "../config/loadConfig.js";
 
@@ -25,6 +25,7 @@ export async function runAddChecker(projectDir: string, checkerId: string): Prom
   const checkerPath = resolve(checkerImplDir, `${checkerModuleName}.py`);
 
   await mkdir(dirname(checkerPath), { recursive: true });
+  await assertNoCheckerModuleCollision(checkerImplDir, checkerId, checkerModuleName);
 
   try {
     await writeFile(checkerPath, CHECKER_STUB, { encoding: "utf8", flag: "wx" });
@@ -43,6 +44,29 @@ export async function runAddChecker(projectDir: string, checkerId: string): Prom
 
 function toPythonCheckerModuleName(checkerId: string): string {
   return checkerId.replaceAll("-", "_");
+}
+
+async function assertNoCheckerModuleCollision(checkerImplDir: string, checkerId: string, checkerModuleName: string): Promise<void> {
+  const requestedModuleKey = toCheckerModuleKey(checkerModuleName);
+  const directoryEntries = await readdir(checkerImplDir, { withFileTypes: true });
+
+  for (const entry of directoryEntries) {
+    if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".py")) {
+      continue;
+    }
+
+    const existingModuleName = entry.name.slice(0, -3);
+
+    if (toCheckerModuleKey(existingModuleName) === requestedModuleKey) {
+      throw new Error(
+        `Checker implementation for "${checkerId}" would collide with existing Python module "${entry.name}" in ${checkerImplDir}.`,
+      );
+    }
+  }
+}
+
+function toCheckerModuleKey(moduleName: string): string {
+  return moduleName.replaceAll("-", "_").toLowerCase();
 }
 
 async function ensureSafeCheckerImplDirectory(projectDir: string, checkerImplDir: string, configPath: string): Promise<void> {

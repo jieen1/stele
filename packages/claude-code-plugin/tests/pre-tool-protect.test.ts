@@ -98,6 +98,17 @@ describe("pre-tool-protect hook", () => {
     expectDenied(result);
   });
 
+  windowsOnly("denies Windows namespaced absolute protected paths", async () => {
+    const projectDir = await createProject();
+    const result = runHook(projectDir, {
+      tool_input: {
+        path: toWindowsNamespacedPath(join(projectDir, "contract", "main.stele")),
+      },
+    });
+
+    expectDenied(result);
+  });
+
   windowsOnly("denies protected paths case-insensitively on Windows", async () => {
     const projectDir = await createProject();
 
@@ -415,4 +426,12 @@ function expectAllowed(result: ReturnType<typeof runHook>) {
   expect(result.status).toBe(0);
   expect(result.stderr).toBe("");
   expect(result.stdout).toBe("");
+}
+
+function toWindowsNamespacedPath(absolutePath: string): string {
+  if (absolutePath.startsWith("\\\\")) {
+    return `\\\\?\\UNC\\${absolutePath.slice(2)}`;
+  }
+
+  return `\\\\?\\${absolutePath}`;
 }

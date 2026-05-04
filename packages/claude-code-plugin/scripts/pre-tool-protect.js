@@ -163,8 +163,9 @@ function extractFromValue(value, seen) {
 }
 
 function shouldDenyTarget(projectDir, patterns, targetPath) {
-  const normalizedInput = normalizeForComparison(normalizeInputPath(targetPath));
-  const resolvedTarget = path.resolve(projectDir, targetPath);
+  const canonicalTargetPath = canonicalizeTargetPath(targetPath);
+  const normalizedInput = normalizeForComparison(normalizeInputPath(canonicalTargetPath));
+  const resolvedTarget = path.resolve(projectDir, canonicalTargetPath);
   const relativeToProject = normalizeForComparison(toPosixPath(path.relative(projectDir, resolvedTarget)));
   const withinProject = isWithinProject(projectDir, resolvedTarget);
 
@@ -183,8 +184,16 @@ function shouldDenyTarget(projectDir, patterns, targetPath) {
   return patterns.some(
     (pattern) =>
       startsWithinProtectedPrefix(normalizedInput, pattern) ||
-      absoluteTraversalTouchesProtectedRoot(projectDir, targetPath, pattern),
+      absoluteTraversalTouchesProtectedRoot(projectDir, canonicalTargetPath, pattern),
   );
+}
+
+function canonicalizeTargetPath(targetPath) {
+  if (process.platform !== "win32") {
+    return targetPath;
+  }
+
+  return normalizeWindowsNamespacedPath(targetPath);
 }
 
 function normalizeInputPath(targetPath) {
@@ -313,6 +322,22 @@ function isWithinProject(projectDir, candidatePath) {
 
 function toPosixPath(value) {
   return value.replaceAll("\\", "/");
+}
+
+function normalizeWindowsNamespacedPath(value) {
+  const uncMatch = value.match(/^[\\/]{2}\?[\\/]+UNC[\\/]+(.+)$/iu);
+
+  if (uncMatch) {
+    return `\\\\${uncMatch[1].replaceAll("/", "\\")}`;
+  }
+
+  const namespacedMatch = value.match(/^[\\/]{2}\?[\\/]+(.+)$/u);
+
+  if (namespacedMatch) {
+    return namespacedMatch[1];
+  }
+
+  return value;
 }
 
 function normalizeAbsolutePrefix(value) {

@@ -20,7 +20,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
-    "prepack": "pnpm run build",
+    "prepack": "npm run build",
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"

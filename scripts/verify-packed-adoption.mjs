@@ -6,11 +6,13 @@ import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const packageDirs = [
+const publishPackageDirs = [
   join(repoRoot, "packages", "core"),
   join(repoRoot, "packages", "backend-python"),
   join(repoRoot, "packages", "cli"),
+  join(repoRoot, "packages", "claude-code-plugin"),
 ];
+const adoptionPackageDirs = publishPackageDirs.slice(0, 3);
 const pnpmTool = resolveTool("pnpm", ["node_modules", "pnpm", "bin", "pnpm.cjs"]);
 const npmTool = resolveTool("npm", ["node_modules", "npm", "bin", "npm-cli.js"]);
 const npxTool = resolveTool("npx", ["node_modules", "npm", "bin", "npx-cli.js"]);
@@ -26,9 +28,13 @@ async function main() {
     await runTool(pnpmTool, ["build"], { cwd: repoRoot });
     await mkdir(packDir, { recursive: true });
 
+    for (const packageDir of publishPackageDirs) {
+      await verifyNpmReleasePack(packageDir);
+    }
+
     const tarballs = [];
 
-    for (const packageDir of packageDirs) {
+    for (const packageDir of adoptionPackageDirs) {
       tarballs.push(await packPackage(packageDir, packDir));
     }
 
@@ -95,6 +101,36 @@ async function packPackage(packageDir, packDir) {
   }
 
   return isAbsolute(tarballName) ? tarballName : join(packDir, tarballName);
+}
+
+async function verifyNpmReleasePack(packageDir) {
+  const { stdout } = await runTool(npmTool, ["pack", "--dry-run", "--json"], sanitizedNpmOptions({
+    cwd: packageDir,
+    capture: true,
+  }));
+  const packEntries = parseTrailingJsonLine(stdout, packageDir);
+
+  if (!Array.isArray(packEntries) || packEntries.length === 0 || typeof packEntries[0]?.filename !== "string") {
+    throw new Error(`npm pack --dry-run did not return a usable pack result for ${packageDir}.`);
+  }
+}
+
+function parseTrailingJsonLine(stdout, packageDir) {
+  const trimmed = stdout.trim();
+
+  for (let index = trimmed.lastIndexOf("["); index >= 0; index = trimmed.lastIndexOf("[", index - 1)) {
+    try {
+      const parsed = JSON.parse(trimmed.slice(index));
+
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0]?.filename === "string") {
+        return parsed;
+      }
+    } catch {
+      // Keep scanning for the root JSON array after lifecycle log output.
+    }
+  }
+
+  throw new Error(`npm pack --dry-run did not emit JSON output for ${packageDir}.`);
 }
 
 async function writeProjectFile(projectDir, relativePath, content) {
