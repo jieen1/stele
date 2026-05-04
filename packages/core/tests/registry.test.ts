@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   type AstNode,
   createCoreOperatorRegistry,
+  createOperatorRegistry,
   type OperatorParameterSpec,
   type OperatorSpec,
   type SourceSpan,
@@ -129,6 +130,39 @@ describe("createCoreOperatorRegistry", () => {
       expect(diagnostic).toContain("incoming:");
       expect(diagnostic).toContain("path(Symbol, ...Symbol) -> Path [value: Unknown]");
       expect(diagnostic).toContain("path(Symbol) -> Path [value: Path]");
+    }
+  });
+
+  it("rejects registration when explicit parameters disagree with signature metadata", () => {
+    const registry = createOperatorRegistry();
+    const invalid: OperatorSpec = {
+      name: "invalid-collection",
+      minArity: 2,
+      maxArity: 2,
+      argTypes: ["Collection", "Path"],
+      parameters: [required("Collection")],
+      returnType: "Collection",
+      description: "invalid explicit signature metadata",
+    };
+
+    expect(() => registry.register(invalid)).toThrowError(SteleError);
+
+    try {
+      registry.register(invalid);
+    } catch (error) {
+      expect(error).toBeInstanceOf(SteleError);
+      expect(error).toMatchObject({
+        code: "E_INVALID_OPERATOR_SIGNATURE",
+        category: "Registry",
+      });
+
+      const diagnostic = `${(error as SteleError).message}\n${(error as SteleError).detail ?? ""}`;
+
+      expect(diagnostic).toContain('Operator "invalid-collection" has inconsistent signature metadata.');
+      expect(diagnostic).toContain("expected:");
+      expect(diagnostic).toContain("incoming:");
+      expect(diagnostic).toContain("expected: minArity=1, maxArity=1, argTypes=[Collection]");
+      expect(diagnostic).toContain("incoming: minArity=2, maxArity=2, argTypes=[Collection, Path]");
     }
   });
 
