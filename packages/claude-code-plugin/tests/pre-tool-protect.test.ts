@@ -227,6 +227,55 @@ describe("pre-tool-protect hook", () => {
     expectDenied(result);
   });
 
+  it("denies subtree roots derived from custom wildcard protected globs while leaving the parent directory alone", async () => {
+    const projectDir = await createProject({
+      protected: ["docs/*/**/*"],
+    });
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/api",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/other",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/api/readme.txt",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs-api",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "documentation/api",
+        },
+      }),
+    );
+  });
+
   it("denies default protected files when config omits the protected field", async () => {
     const projectDir = await createProject({
       protected: undefined,

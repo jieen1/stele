@@ -226,13 +226,13 @@ function startsWithinProtectedPrefix(relativePath, pattern) {
 }
 
 function matchesProtectedDirectoryRoot(relativePath, pattern) {
-  const protectedRoot = getProtectedDirectoryRoot(pattern);
+  const protectedRootPattern = getProtectedDirectoryRootPattern(pattern);
 
-  if (protectedRoot === null) {
+  if (protectedRootPattern === null) {
     return false;
   }
 
-  return normalizeForComparison(relativePath) === normalizeForComparison(protectedRoot);
+  return matchGlob(relativePath, protectedRootPattern);
 }
 
 function absoluteTraversalTouchesProtectedRoot(projectDir, targetPath, pattern) {
@@ -269,15 +269,15 @@ function getProtectedPrefix(pattern) {
   return prefix;
 }
 
-function getProtectedDirectoryRoot(pattern) {
+function getProtectedDirectoryRootPattern(pattern) {
   const normalizedPattern = toPosixPath(pattern).replace(/\/+$/u, "");
 
   if (!normalizedPattern.endsWith("/**/*")) {
     return null;
   }
 
-  const root = normalizedPattern.slice(0, -"/**/*".length);
-  return root.length > 0 ? root : null;
+  const rootPattern = normalizedPattern.slice(0, -"/**/*".length);
+  return rootPattern.length > 0 ? rootPattern : null;
 }
 
 function matchGlob(relativePath, pattern) {
