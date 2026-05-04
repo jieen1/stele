@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { posix, win32 } from "node:path";
 import {
@@ -33,7 +33,7 @@ export async function runGenerate(projectDir: string, options: GenerateOptions):
   const contract = await loadContract(resolve(projectDir, config.entry));
   const preGeneratedProtectedPaths = await collectProtectedPaths(projectDir, config);
 
-  assertProtectedContractFilesReachable(projectDir, config.entry, preGeneratedProtectedPaths, contract);
+  await assertProtectedContractFilesReachable(projectDir, config.entry, preGeneratedProtectedPaths, contract);
 
   const backend = createLanguageBackend(config.generatedDir, config.targetLanguage, config.testFramework);
   const verification = await verifyManagedGeneratedFiles(projectDir, config.generatedDir, contract, backend);
@@ -61,7 +61,7 @@ export async function runGenerate(projectDir: string, options: GenerateOptions):
 
   const protectedPaths = await collectProtectedPaths(projectDir, config);
 
-  assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
+  await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
   await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
 }
@@ -192,23 +192,31 @@ export function toManifestPaths(projectDir: string, protectedPaths: string[]): s
     .sort((left, right) => left.localeCompare(right));
 }
 
-export function assertProtectedContractFilesReachable(
+export async function assertProtectedContractFilesReachable(
   projectDir: string,
   entryPath: string,
   protectedPaths: string[],
   contract: Contract,
-): void {
-  const loadedContractFiles = new Set(contract.files.map((file) => resolve(file.path)));
-  const missingProtectedContractFiles = protectedPaths
-    .filter((path) => path.toLowerCase().endsWith(".stele"))
-    .filter((path) => !loadedContractFiles.has(resolve(path)));
+): Promise<void> {
+  const loadedContractFiles = new Set(
+    await Promise.all(contract.files.map(async (file) => canonicalizeContractPath(resolve(file.path)))),
+  );
+  const unresolvedProtectedContractFiles: string[] = [];
 
-  if (missingProtectedContractFiles.length === 0) {
+  for (const path of protectedPaths.filter((candidatePath) => candidatePath.toLowerCase().endsWith(".stele"))) {
+    const canonicalPath = await canonicalizeContractPath(resolve(path));
+
+    if (!loadedContractFiles.has(canonicalPath)) {
+      unresolvedProtectedContractFiles.push(path);
+    }
+  }
+
+  if (unresolvedProtectedContractFiles.length === 0) {
     return;
   }
 
   throw new Error(
-    `Protected contract files must be reachable from entry "${entryPath}". Import them into the contract entry graph before generating, checking, or locking. Files: ${toManifestPaths(projectDir, missingProtectedContractFiles).join(", ")}.`,
+    `Protected contract files must be reachable from entry "${entryPath}". Import them into the contract entry graph before generating, checking, or locking. Files: ${toManifestPaths(projectDir, unresolvedProtectedContractFiles).join(", ")}.`,
   );
 }
 
@@ -345,4 +353,10 @@ function isIgnoredPythonCacheArtifact(path: string): boolean {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+async function canonicalizeContractPath(path: string): Promise<string> {
+  const resolvedPath = resolve(path);
+  const canonicalPath = await realpath(resolvedPath).catch(() => resolvedPath);
+  return process.platform === "win32" ? canonicalPath.toLowerCase() : canonicalPath;
 }

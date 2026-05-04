@@ -24,7 +24,7 @@ export async function runLock(projectDir: string, _options: LockOptions): Promis
   }
 
   const protectedPaths = await collectProtectedPaths(projectDir, config);
-  assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
+  await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
   await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
 }

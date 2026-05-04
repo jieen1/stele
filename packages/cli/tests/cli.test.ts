@@ -286,6 +286,39 @@ describe("stele CLI", () => {
     await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/import|entry|protected/i);
   });
 
+  const windowsReachabilityCase = process.platform === "win32" ? it : it.skip;
+
+  windowsReachabilityCase("generate accepts case-insensitive imported protected stele files on Windows", async () => {
+    const projectDir = await createTempDir();
+
+    await writeProjectFile(projectDir, STELE_CONFIG_FILE, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`);
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      ['(import "./Sub.stele")', "(invariant ROOT_RULE", "  (severity high)", '  (description "Root rule.")', "  (assert (eq 1 1)))"].join(
+        "\n",
+      ),
+    );
+    await writeProjectFile(
+      projectDir,
+      "contract/sub.stele",
+      ['(invariant SUB_RULE', "  (severity high)", '  (description "Imported with different case.")', "  (assert (eq 1 1)))"].join(
+        "\n",
+      ),
+    );
+    await writeProjectFile(projectDir, "contract/checker_impls/.gitkeep", "");
+    await writeProjectFile(
+      projectDir,
+      "tests/contract/conftest.py",
+      "import pytest\n\n@pytest.fixture\ndef stele_context():\n    return {}\n",
+    );
+
+    await expect(runGenerate(projectDir, { force: false })).resolves.toBeUndefined();
+
+    const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
+    expect(Object.keys(manifest.protected_files)).toContain("contract/sub.stele");
+  });
+
   it("lock refreshes the manifest after an approved checker change so check passes again", async () => {
     const projectDir = await createFixtureProject();
     await runGenerate(projectDir, { force: false });

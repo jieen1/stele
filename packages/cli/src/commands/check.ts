@@ -24,7 +24,7 @@ export async function runCheck(projectDir: string): Promise<void> {
   }
 
   const protectedPaths = await collectProtectedPaths(projectDir, config);
-  assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
+  await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
   const manifest = await verifyManifest(resolve(projectDir, config.manifestPath));
   const currentProtectedPaths = toManifestPaths(projectDir, protectedPaths);
