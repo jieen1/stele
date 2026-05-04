@@ -30,7 +30,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/claude-code-plugin: {}
+  packages/claude-code-plugin:
+    dependencies:
+      minimatch:
+        specifier: ^9.0.5
+        version: 9.0.9
 
   packages/cli:
     dependencies:

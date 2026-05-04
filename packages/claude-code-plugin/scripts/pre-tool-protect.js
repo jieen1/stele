@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { minimatch } from "minimatch";
 
 const BLOCK_EXIT_CODE = 2;
 const PROTECTED_REASON =
@@ -285,51 +286,11 @@ function matchGlob(relativePath, pattern) {
     return false;
   }
 
-  const regex = compileGlob(pattern);
-  return regex.test(relativePath);
-}
-
-function compileGlob(pattern) {
-  const segments = normalizeForComparison(toPosixPath(pattern))
-    .split("/")
-    .filter((segment) => segment.length > 0);
-
-  if (segments.length === 0) {
-    return /^$/;
-  }
-
-  let source = "^";
-
-  for (let index = 0; index < segments.length; index += 1) {
-    const segment = segments[index];
-
-    if (segment === "**") {
-      if (index === 0) {
-        source += "(?:[^/]+/)*";
-      } else {
-        source += "(?:/[^/]+)*";
-      }
-
-      continue;
-    }
-
-    if (index > 0 && segments[index - 1] !== "**") {
-      source += "/";
-    } else if (index > 0 && segments[index - 1] === "**") {
-      source += "/";
-    }
-
-    source += escapeSegment(segment)
-      .replace(/\\\*/g, "[^/]*")
-      .replace(/\\\?/g, "[^/]");
-  }
-
-  source += "$";
-  return new RegExp(source);
-}
-
-function escapeSegment(segment) {
-  return segment.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&");
+  return minimatch(relativePath, pattern, {
+    dot: true,
+    windowsPathsNoEscape: true,
+    nocase: process.platform === "win32",
+  });
 }
 
 function hasGlobMeta(segment) {

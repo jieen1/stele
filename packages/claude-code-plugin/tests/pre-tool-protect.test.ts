@@ -276,6 +276,62 @@ describe("pre-tool-protect hook", () => {
     );
   });
 
+  it("matches brace-based custom protected globs the same way as the CLI", async () => {
+    const projectDir = await createProject({
+      protected: ["docs/{api,other}/**/*"],
+    });
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/api",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/other",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/api/readme.txt",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/other/readme.txt",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "docs/public/readme.txt",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_input: {
+          path: "documentation/api/readme.txt",
+        },
+      }),
+    );
+  });
+
   it("denies default protected files when config omits the protected field", async () => {
     const projectDir = await createProject({
       protected: undefined,
