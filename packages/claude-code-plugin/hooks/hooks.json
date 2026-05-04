@@ -3,12 +3,24 @@
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit",
-        "command": "node scripts/pre-tool-protect.js"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/pre-tool-protect.js\"",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "Stop": [
       {
-        "command": "node scripts/stop-validate.js"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop-validate.js\"",
+            "timeout": 120
+          }
+        ]
       }
     ]
   }
