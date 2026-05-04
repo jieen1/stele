@@ -325,13 +325,13 @@ function toPosixPath(value) {
 }
 
 function normalizeWindowsNamespacedPath(value) {
-  const uncMatch = value.match(/^[\\/]{2}\?[\\/]+UNC[\\/]+(.+)$/iu);
+  const uncMatch = value.match(/^[\\/]{2}[?.][\\/]+UNC[\\/]+(.+)$/iu);
 
   if (uncMatch) {
     return `\\\\${uncMatch[1].replaceAll("/", "\\")}`;
   }
 
-  const namespacedMatch = value.match(/^[\\/]{2}\?[\\/]+(.+)$/u);
+  const namespacedMatch = value.match(/^[\\/]{2}[?.][\\/]+(.+)$/u);
 
   if (namespacedMatch) {
     return namespacedMatch[1];

@@ -102,7 +102,18 @@ describe("pre-tool-protect hook", () => {
     const projectDir = await createProject();
     const result = runHook(projectDir, {
       tool_input: {
-        path: toWindowsNamespacedPath(join(projectDir, "contract", "main.stele")),
+        path: toWindowsDevicePath(join(projectDir, "contract", "main.stele"), "?"),
+      },
+    });
+
+    expectDenied(result);
+  });
+
+  windowsOnly("denies Windows device absolute protected paths", async () => {
+    const projectDir = await createProject();
+    const result = runHook(projectDir, {
+      tool_input: {
+        path: toWindowsDevicePath(join(projectDir, "contract", "main.stele"), "."),
       },
     });
 
@@ -428,10 +439,10 @@ function expectAllowed(result: ReturnType<typeof runHook>) {
   expect(result.stdout).toBe("");
 }
 
-function toWindowsNamespacedPath(absolutePath: string): string {
+function toWindowsDevicePath(absolutePath: string, prefixMarker: "?" | "."): string {
   if (absolutePath.startsWith("\\\\")) {
-    return `\\\\?\\UNC\\${absolutePath.slice(2)}`;
+    return `\\\\${prefixMarker}\\UNC\\${absolutePath.slice(2)}`;
   }
 
-  return `\\\\?\\${absolutePath}`;
+  return `\\\\${prefixMarker}\\${absolutePath}`;
 }
