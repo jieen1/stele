@@ -98,7 +98,7 @@ describe("@stele/backend-python translator", () => {
       "",
       "def test_ACCT_004(stele_context):",
       "    assert all(",
-      "        stele_get_path(txn, [\"amount\"]) > 0",
+      "        (stele_get_path(txn, [\"amount\"])) > (0)",
       "        for txn in stele_context[\"transactions\"]",
       "    )",
       "",
@@ -117,20 +117,8 @@ describe("@stele/backend-python translator", () => {
         "             (path account cash)))))",
       ].join("\n"),
     });
-    const projectDir = await mkdtemp(join(tmpdir(), "stele-backend-python-smoke-"));
-    tempDirs.push(projectDir);
-    const generatedFiles = getGeneratePytestFiles()(contract);
-
-    await Promise.all(
-      generatedFiles.map(async (file) => {
-        const fullPath = join(projectDir, file.path);
-        await mkdir(dirname(fullPath), { recursive: true });
-        await writeFile(fullPath, file.content, "utf8");
-      }),
-    );
-
-    await writeFile(
-      join(projectDir, "tests", "contract", "conftest.py"),
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
       [
         "import pytest",
         "",
@@ -141,16 +129,142 @@ describe("@stele/backend-python translator", () => {
         "        \"account\": {\"total-value\": 15, \"cash\": 5},",
         "        \"positions\": [{\"value\": 4}, {\"value\": 6}],",
         "    }",
-      ].join("\n"),
-      "utf8",
+      ],
     );
 
-    const result = await execFileAsync("python", ["-m", "pytest", "tests/contract", "-q"], {
-      cwd: projectDir,
-      windowsHide: true,
-    });
+    const result = await runGeneratedPytest(projectDir);
 
     expect(result.stdout).toContain("1 passed");
+  });
+
+  it("disambiguates sanitized sibling invariant ids so pytest collects both tests", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(invariant A-B",
+        "  (severity high)",
+        '  (description "hyphenated invariant id")',
+        "  (assert (eq 1 1)))",
+        "(invariant A_B",
+        "  (severity high)",
+        '  (description "underscored invariant id")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {}",
+      ],
+    );
+    const result = await runGeneratedPytest(projectDir);
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain("def test_A_B(stele_context):");
+    expect(testSource).toContain("def test_A_B_2(stele_context):");
+    expect(result.stdout).toContain("2 passed");
+  });
+
+  it("allocates keyword-safe quantifier bindings for generated pytest", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(invariant KW_BINDING",
+        "  (severity high)",
+        '  (description "python keyword bindings stay valid")',
+        "  (assert",
+        "    (forall for (collection items)",
+        "      (gt (path for value) 0))))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {",
+        "        \"items\": [{\"value\": 1}, {\"value\": 2}],",
+        "    }",
+      ],
+    );
+    const result = await runGeneratedPytest(projectDir);
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain("for for_2 in stele_context[\"items\"]");
+    expect(result.stdout).toContain("1 passed");
+  });
+
+  it("allocates scope-unique nested quantifier bindings when sanitized names collide", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(invariant NESTED_BINDINGS",
+        "  (severity critical)",
+        '  (description "outer and inner bindings remain distinct after sanitization")',
+        "  (assert",
+        "    (forall foo-bar (collection outers)",
+        "      (forall foo_bar (collection inners)",
+        "        (neq (path foo-bar value) (path foo_bar value))))))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {",
+        "        \"outers\": [{\"value\": 1}],",
+        "        \"inners\": [{\"value\": 2}],",
+        "    }",
+      ],
+    );
+    const result = await runGeneratedPytest(projectDir);
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain("for foo_bar in stele_context[\"outers\"]");
+    expect(testSource).toContain("for foo_bar_2 in stele_context[\"inners\"]");
+    expect(result.stdout).toContain("1 passed");
+  });
+
+  it("parenthesizes comparison operands so boolean expressions keep CDL precedence", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(invariant PRECEDENCE_OR",
+        "  (severity high)",
+        '  (description "or equality precedence")',
+        "  (assert",
+        "    (eq (or (gt (path account cash) 0)",
+        "            (gt (path account cash) 1))",
+        "        (gt (path account cash) 2))))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {",
+        "        \"account\": {\"cash\": 1},",
+        "    }",
+      ],
+    );
+    const result = await runGeneratedPytestAllowFailure(projectDir);
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain(") == (");
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("1 failed");
   });
 
   it("translates core expression forms used by the backend templates", () => {
@@ -164,7 +278,7 @@ describe("@stele/backend-python translator", () => {
       "stele_sum(stele_context[\"positions\"], [\"value\"])",
     );
     expect(translateExpression(parseExpression("(forall txn (collection transactions) (gt (path txn amount) 0))"))).toBe(
-      "all(stele_get_path(txn, [\"amount\"]) > 0 for txn in stele_context[\"transactions\"])",
+      "all((stele_get_path(txn, [\"amount\"])) > (0) for txn in stele_context[\"transactions\"])",
     );
   });
 
@@ -241,4 +355,64 @@ function getTranslateExpression(): (node: AstNode) => string {
   expect(value).toBeTypeOf("function");
 
   return value as (node: AstNode) => string;
+}
+
+function getGeneratedTestFile(contract: Contract): string {
+  const testFile = getGeneratePytestFiles()(contract).find((file) => file.path === "tests/contract/test_contract.py");
+
+  expect(testFile?.content).toBeTypeOf("string");
+
+  return testFile!.content;
+}
+
+async function writeGeneratedPytestProject(contract: Contract, conftestLines: string[]): Promise<string> {
+  const projectDir = await mkdtemp(join(tmpdir(), "stele-backend-python-smoke-"));
+  tempDirs.push(projectDir);
+  const generatedFiles = getGeneratePytestFiles()(contract);
+
+  await Promise.all(
+    generatedFiles.map(async (file) => {
+      const fullPath = join(projectDir, file.path);
+      await mkdir(dirname(fullPath), { recursive: true });
+      await writeFile(fullPath, file.content, "utf8");
+    }),
+  );
+
+  await writeFile(join(projectDir, "tests", "contract", "conftest.py"), conftestLines.join("\n"), "utf8");
+
+  return projectDir;
+}
+
+async function runGeneratedPytest(projectDir: string): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync("python", ["-m", "pytest", "tests/contract", "-q"], {
+    cwd: projectDir,
+    windowsHide: true,
+  });
+}
+
+async function runGeneratedPytestAllowFailure(
+  projectDir: string,
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  try {
+    const result = await runGeneratedPytest(projectDir);
+    return {
+      exitCode: 0,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
+  } catch (error) {
+    if (isExecFileError(error)) {
+      return {
+        exitCode: typeof error.code === "number" ? error.code : 1,
+        stdout: error.stdout ?? "",
+        stderr: error.stderr ?? "",
+      };
+    }
+
+    throw error;
+  }
+}
+
+function isExecFileError(error: unknown): error is Error & { code?: number | string; stdout?: string; stderr?: string } {
+  return error instanceof Error && ("stdout" in error || "stderr" in error || "code" in error);
 }

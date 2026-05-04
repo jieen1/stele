@@ -27,5 +27,5 @@ function translateComparison(
 ): string {
   const [left, right] = node.items;
 
-  return `${translate(left!, context)} ${symbol} ${translate(right!, context)}`;
+  return `(${translate(left!, context)}) ${symbol} (${translate(right!, context)})`;
 }

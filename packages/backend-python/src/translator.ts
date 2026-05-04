@@ -24,12 +24,53 @@ export type PythonOperatorHandler = (
 
 export type TranslationContext = {
   readonly bindings: ReadonlyMap<string, string>;
+  readonly usedNames: ReadonlySet<string>;
   bind(identifier: string): { name: string; context: TranslationContext };
   resolve(identifier: string): string | undefined;
 };
 
 const INDENT = "    ";
 const PYTEST_IMPORT_LINE = "from ._stele_runtime import stele_call_checker, stele_get_path, stele_sum";
+const PYTHON_RESERVED_WORDS = new Set([
+  "False",
+  "None",
+  "True",
+  "and",
+  "as",
+  "assert",
+  "async",
+  "await",
+  "break",
+  "case",
+  "class",
+  "continue",
+  "def",
+  "del",
+  "elif",
+  "else",
+  "except",
+  "finally",
+  "for",
+  "from",
+  "global",
+  "if",
+  "import",
+  "in",
+  "is",
+  "lambda",
+  "match",
+  "nonlocal",
+  "not",
+  "or",
+  "pass",
+  "raise",
+  "return",
+  "try",
+  "while",
+  "with",
+  "yield",
+  "_",
+]);
 
 const PYTHON_OPERATOR_HANDLERS: Record<string, PythonOperatorHandler> = {
   path: translatePath,
@@ -62,9 +103,12 @@ export function generatePytestFiles(contract: Contract): GeneratedPytestFile[] {
 export function generatePytestSource(contract: Contract): string {
   const lines = [PYTEST_IMPORT_LINE, "", ""];
   const invariants = contract.invariants.slice().sort(compareInvariants);
+  const usedTestNames = new Set<string>();
 
   invariants.forEach((invariant, index) => {
-    lines.push(...renderInvariantTest(invariant));
+    const testName = allocateUniquePythonName(`test_${sanitizePythonIdentifier(invariant.id, "invariant")}`, usedTestNames);
+    usedTestNames.add(testName);
+    lines.push(...renderInvariantTest(invariant, testName));
     lines.push(index === invariants.length - 1 ? "" : "");
 
     if (index !== invariants.length - 1) {
@@ -137,8 +181,7 @@ export function sanitizePythonIdentifier(identifier: string, fallbackPrefix = "v
   return /^[0-9]/.test(withPrefix) ? `${fallbackPrefix}_${withPrefix}` : withPrefix;
 }
 
-function renderInvariantTest(invariant: InvariantDeclaration): string[] {
-  const testName = `test_${sanitizePythonIdentifier(invariant.id, "invariant")}`;
+function renderInvariantTest(invariant: InvariantDeclaration, testName: string): string[] {
   const lines = [`def ${testName}(stele_context):`];
 
   if (invariant.whenExpression !== undefined) {
@@ -348,22 +391,40 @@ function compareInvariants(left: InvariantDeclaration, right: InvariantDeclarati
   );
 }
 
-function createTranslationContext(bindings = new Map<string, string>()): TranslationContext {
+function createTranslationContext(
+  bindings = new Map<string, string>(),
+  usedNames = new Set<string>(),
+): TranslationContext {
   return {
     bindings,
+    usedNames,
     bind(identifier: string) {
-      const name = sanitizePythonIdentifier(identifier, "item");
+      const name = allocateUniquePythonName(sanitizePythonIdentifier(identifier, "item"), usedNames);
       const nextBindings = new Map(bindings);
+      const nextUsedNames = new Set(usedNames);
       nextBindings.set(identifier, name);
+      nextUsedNames.add(name);
       return {
         name,
-        context: createTranslationContext(nextBindings),
+        context: createTranslationContext(nextBindings, nextUsedNames),
       };
     },
     resolve(identifier: string) {
       return bindings.get(identifier);
     },
   };
+}
+
+function allocateUniquePythonName(baseName: string, usedNames: ReadonlySet<string>): string {
+  let candidate = baseName;
+  let suffix = 2;
+
+  while (usedNames.has(candidate) || PYTHON_RESERVED_WORDS.has(candidate)) {
+    candidate = `${baseName}_${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
 }
 
 function toPythonString(value: string): string {
