@@ -72,6 +72,7 @@ async function main() {
 
     await runTool(npxTool, ["stele", "generate"], sanitizedNpmOptions({ cwd: projectDir }));
     await run(pythonCommand, ["-m", "pytest", "tests/contract", "-q"], { cwd: projectDir });
+    await runTool(npxTool, ["stele", "lock", "--reason", "initial adoption baseline"], sanitizedNpmOptions({ cwd: projectDir }));
     await runTool(npxTool, ["stele", "check"], sanitizedNpmOptions({ cwd: projectDir }));
   } finally {
     await rm(tempRoot, { recursive: true, force: true });

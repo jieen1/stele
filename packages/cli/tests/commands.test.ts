@@ -233,11 +233,13 @@ describe("inspection commands", () => {
 
   it("add-checker refuses filename collisions between hyphenated and underscored ids", async () => {
     const projectDir = await createInspectionFixtureProject();
+    const stdout = captureStdout();
 
     await runAddChecker(projectDir, "fresh_checker");
 
     await expect(runAddChecker(projectDir, "fresh-checker")).rejects.toThrow(/fresh-checker|fresh_checker|already exists|collision/i);
     await expect(readFile(join(projectDir, "contract", "checker_impls", "fresh_checker.py"), "utf8")).resolves.toBe(CHECKER_STUB);
+    expect(stdout.read()).toBe(CHECKER_BLOCK);
   });
 
   it("add-checker rejects checker directories that escape the project root via symlink or junction", async () => {

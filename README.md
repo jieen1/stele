@@ -91,7 +91,7 @@ That command creates `contract/checker_impls/balance_change_has_transaction.py` 
 
 ## CI
 
-Run the same three steps in CI that you use locally:
+For ordinary verification CI on an already locked repository, run:
 
 ```bash
 npx stele generate
@@ -99,7 +99,7 @@ python -m pytest tests/contract -q
 npx stele check
 ```
 
-`stele check` is the enforcement step. It exits `2` when generated files drift and `3` when the protected manifest or protected file set is out of date.
+When you are bootstrapping a repository or approving a contract change, insert `npx stele lock --reason "..."` between pytest and `stele check`. `stele check` is the enforcement step. It exits `2` when generated files drift and `3` when the protected manifest or protected file set is out of date.
 
 ## Claude Code plugin
 

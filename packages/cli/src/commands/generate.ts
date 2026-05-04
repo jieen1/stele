@@ -9,7 +9,6 @@ import {
   type Contract,
   type GeneratedVerificationResult,
   type LanguageBackend,
-  writeManifest,
 } from "@stele/core";
 import { generatePytestSource, getPythonRuntimeSource, sanitizePythonIdentifier } from "@stele/backend-python";
 import globParent from "glob-parent";
@@ -59,11 +58,6 @@ export async function runGenerate(projectDir: string, options: GenerateOptions):
     }),
   );
 
-  const protectedPaths = await collectProtectedPaths(projectDir, config);
-
-  await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
-
-  await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
 }
 
 export function createLanguageBackend(generatedDir: string, targetLanguage: string, testFramework: string): LanguageBackend {

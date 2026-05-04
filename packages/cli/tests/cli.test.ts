@@ -64,7 +64,7 @@ describe("stele CLI", () => {
     await expect(pathExists(join(projectDir, "contract", "main.stele"))).resolves.toBe(false);
   });
 
-  it("generate writes canonical Python files and a manifest", async () => {
+  it("generate writes canonical Python files without writing a manifest", async () => {
     const projectDir = await createFixtureProject();
 
     await runGenerate(projectDir, { force: false });
@@ -77,27 +77,15 @@ describe("stele CLI", () => {
       "def test_ROOT_RULE",
     );
 
-    const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
-    expect(Object.keys(manifest.protected_files)).toEqual([
-      "contract/checker_impls/custom_checker.py",
-      "contract/main.stele",
-      "tests/contract/__init__.py",
-      "tests/contract/_stele_runtime.py",
-      "tests/contract/conftest.py",
-      "tests/contract/test_contract.py",
-    ]);
+    await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
   });
 
-  it("generate preserves manifest content when nothing changed", async () => {
+  it("generate stays manifest-neutral when nothing changed", async () => {
     const projectDir = await createFixtureProject();
 
     await runGenerate(projectDir, { force: false });
-    const manifestPath = join(projectDir, "contract", ".manifest.json");
-    const manifestBefore = await readFile(manifestPath, "utf8");
-
     await runGenerate(projectDir, { force: false });
-
-    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
+    await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
   });
 
   it("generate rejects an entry path outside the project root and writes nothing", async () => {
@@ -158,12 +146,21 @@ describe("stele CLI", () => {
     await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/project-relative|inside the project root/i);
   });
 
-  it("check passes after generate and does not modify project files", async () => {
+  it("check fails after generate until the manifest is explicitly locked", async () => {
     const projectDir = await createFixtureProject();
 
     await runGenerate(projectDir, { force: false });
-    const before = await snapshotProject(projectDir);
+    await expect(runCheck(projectDir)).rejects.toThrow(/manifest/i);
 
+    await runLock(projectDir, { reason: "initial contract baseline" });
+    await expect(runCheck(projectDir)).resolves.toBeUndefined();
+  });
+
+  it("check passes after lock and does not modify project files", async () => {
+    const projectDir = await createFixtureProject();
+
+    await runGenerateAndLock(projectDir, "initial contract baseline");
+    const before = await snapshotProject(projectDir);
     await expect(runCheck(projectDir)).resolves.toBeUndefined();
 
     const after = await snapshotProject(projectDir);
@@ -172,7 +169,7 @@ describe("stele CLI", () => {
 
   it("check fails when a generated file changes", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
 
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
@@ -180,7 +177,7 @@ describe("stele CLI", () => {
 
   it("check fails when a generated file is missing", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await rm(join(projectDir, "tests", "contract", "_stele_runtime.py"));
 
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
@@ -188,7 +185,7 @@ describe("stele CLI", () => {
 
   it("check fails when an extra generated file appears", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "tests/contract/extra.py", "# extra\n");
 
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
@@ -196,7 +193,7 @@ describe("stele CLI", () => {
 
   it("check ignores Python cache artifacts under generated output but still fails on undeclared source files", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "tests/contract/__pycache__/test_contract.cpython-313-pytest-9.0.2.pyc", "pyc");
     await writeProjectFile(projectDir, "tests/contract/__pycache__/conftest.cpython-313-pytest-9.0.2.pyc", "pyc");
     await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/custom_checker.cpython-313.pyc", "pyc");
@@ -217,6 +214,7 @@ describe("stele CLI", () => {
     await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/ignored.pyo", "pyo");
 
     await runGenerate(projectDir, { force: false });
+    await runLock(projectDir, { reason: "capture protected source inside __pycache__" });
 
     const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
     expect(Object.keys(manifest.protected_files)).toContain("contract/__pycache__/evil.py");
@@ -227,7 +225,7 @@ describe("stele CLI", () => {
 
   it("check does not ignore source directories whose names merely contain __pycache__", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "contract/checker_impls/not__pycache__/shadow_checker.py", "def shadow_checker(context):\n    return True\n");
 
     await expect(runCheck(projectDir)).rejects.toThrow(/new\/unlocked protected files|protected/i);
@@ -240,6 +238,7 @@ describe("stele CLI", () => {
     await writeProjectFile(projectDir, "docs/guide.md", "# guide\n");
 
     await runGenerate(projectDir, { force: false });
+    await runLock(projectDir, { reason: "initial docs baseline" });
 
     const manifestPath = join(projectDir, "contract", ".manifest.json");
     const manifest = await readJson(manifestPath);
@@ -258,7 +257,7 @@ describe("stele CLI", () => {
 
   it("check fails on a new protected checker file until lock refreshes the manifest", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "contract/checker_impls/new_checker.py", "def new_checker(context):\n    return True\n");
 
     await expect(runCheck(projectDir)).rejects.toThrow(/new\/unlocked protected files|protected/i);
@@ -269,7 +268,7 @@ describe("stele CLI", () => {
 
   it("check fails on a new protected cdl file before lock", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(
       projectDir,
       "contract/extra.stele",
@@ -286,7 +285,7 @@ describe("stele CLI", () => {
 
   it("check fails when a manifest-protected file changes", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
 
     await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
@@ -301,7 +300,7 @@ describe("stele CLI", () => {
 
   it("lock and check fail when a new protected unimported stele file exists", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "contract/invalid.stele", "(invariant BROKEN\n");
 
     await expect(runLock(projectDir, { reason: "approved invalid file" })).rejects.toThrow(/import|entry|protected/i);
@@ -352,14 +351,15 @@ describe("stele CLI", () => {
     );
 
     await expect(runGenerate(projectDir, { force: false })).resolves.toBeUndefined();
+    await runLock(projectDir, { reason: "windows case-insensitive import baseline" });
 
     const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
     expect(Object.keys(manifest.protected_files)).toContain("contract/sub.stele");
   });
 
-  it("lock refreshes the manifest after an approved checker change so check passes again", async () => {
+  it("generate --force does not refresh the manifest after an approved checker change until lock runs", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir, "initial checker baseline");
 
     const manifestPath = join(projectDir, "contract", ".manifest.json");
     const manifestBefore = await readFile(manifestPath, "utf8");
@@ -369,8 +369,10 @@ describe("stele CLI", () => {
       "contract/checker_impls/custom_checker.py",
       "def custom_checker(context):\n    return {\"passed\": True, \"message\": \"updated\"}\n",
     );
+    await runGenerate(projectDir, { force: true });
 
     await expect(runCheck(projectDir)).rejects.toThrow();
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
     await runLock(projectDir, { reason: "approved checker update" });
     await expect(runCheck(projectDir)).resolves.toBeUndefined();
 
@@ -380,7 +382,7 @@ describe("stele CLI", () => {
 
   it("lock preserves manifest content when nothing changed", async () => {
     const projectDir = await createFixtureProject();
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
 
     const manifestPath = join(projectDir, "contract", ".manifest.json");
     const manifestBefore = await readFile(manifestPath, "utf8");
@@ -390,12 +392,14 @@ describe("stele CLI", () => {
     await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
   });
 
-  it("generate --force does not lock Python cache artifacts from generated or checker directories", async () => {
+  it("generate --force stays manifest-neutral and lock ignores Python cache artifacts from generated or checker directories", async () => {
     const projectDir = await createFixtureProject();
     await writeProjectFile(projectDir, "tests/contract/__pycache__/test_contract.cpython-313-pytest-9.0.2.pyc", "pyc");
     await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/custom_checker.cpython-313.pyc", "pyc");
 
     await runGenerate(projectDir, { force: true });
+    await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
+    await runLock(projectDir, { reason: "ignore cache artifacts" });
 
     const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
     expect(Object.keys(manifest.protected_files)).toEqual([
@@ -473,7 +477,7 @@ describe("stele CLI", () => {
     const stderr = captureStderr();
     const originalExitCode = process.exitCode;
 
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
 
     vi.spyOn(process, "cwd").mockReturnValue(projectDir);
@@ -490,7 +494,7 @@ describe("stele CLI", () => {
     const stderr = captureStderr();
     const originalExitCode = process.exitCode;
 
-    await runGenerate(projectDir, { force: false });
+    await runGenerateAndLock(projectDir);
     await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
 
     vi.spyOn(process, "cwd").mockReturnValue(projectDir);
@@ -500,6 +504,33 @@ describe("stele CLI", () => {
     expect(process.exitCode).toBe(3);
     expect(stderr.read()).toContain("Manifest verification failed");
     process.exitCode = originalExitCode;
+  });
+
+  it("generate --force does not refresh the manifest after a contract change until lock runs", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerateAndLock(projectDir, "initial contract baseline");
+
+    const manifestPath = join(projectDir, "contract", ".manifest.json");
+    const manifestBefore = await readFile(manifestPath, "utf8");
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      [
+        "(invariant ROOT_RULE",
+        "  (severity high)",
+        '  (description "Root rules should generate pytest output after approval.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    );
+
+    await runGenerate(projectDir, { force: true });
+
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
+    await expect(runCheck(projectDir)).rejects.toThrow(/manifest contract hash|manifest/i);
+
+    await runLock(projectDir, { reason: "approved contract update" });
+    await expect(runCheck(projectDir)).resolves.toBeUndefined();
+    await expect(readFile(manifestPath, "utf8")).resolves.not.toBe(manifestBefore);
   });
 });
 
@@ -553,6 +584,11 @@ async function writeConfig(projectDir: string, overrides: Partial<typeof DEFAULT
     ...overrides,
   };
   await writeProjectFile(projectDir, STELE_CONFIG_FILE, `${JSON.stringify(config, null, 2)}\n`);
+}
+
+async function runGenerateAndLock(projectDir: string, reason = "approved baseline"): Promise<void> {
+  await runGenerate(projectDir, { force: false });
+  await runLock(projectDir, { reason });
 }
 
 async function snapshotProject(projectDir: string): Promise<Record<string, string>> {
