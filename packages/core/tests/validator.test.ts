@@ -157,6 +157,64 @@ describe("loadContract validation", () => {
     });
   });
 
+  it("rejects eq and neq when both operand types are known and mismatched", async () => {
+    const eqProject = await createTempProject({
+      "main.stele": [
+        "(invariant BAD_EQ_TYPES",
+        "  (severity high)",
+        '  (description "eq must reject known type mismatches.")',
+        '  (assert (eq 1 "x")))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(eqProject.rootPath), {
+      code: "E0310",
+      file: eqProject.rootPath,
+      line: 4,
+      column: 17,
+      messageIncludes: 'Operands of "eq" must have matching types',
+    });
+
+    const neqProject = await createTempProject({
+      "main.stele": [
+        "(invariant BAD_NEQ_TYPES",
+        "  (severity high)",
+        '  (description "neq must reject known type mismatches.")',
+        '  (assert (neq "x" 1)))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(neqProject.rootPath), {
+      code: "E0310",
+      file: neqProject.rootPath,
+      line: 4,
+      column: 20,
+      messageIncludes: 'Operands of "neq" must have matching types',
+    });
+  });
+
+  it("rejects path expressions in structural slots such as quantifier collections", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant BAD_QUANTIFIER_COLLECTION",
+        "  (severity high)",
+        '  (description "Quantifiers require a real collection expression.")',
+        "  (assert",
+        "    (forall txn",
+        "      (path account total)",
+        "      (gt (path txn amount) 0))))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0310",
+      file: project.rootPath,
+      line: 6,
+      column: 7,
+      messageIncludes: 'Expected Collection but found Path',
+    });
+  });
+
   it("accepts unknown path values in value slots and binds quantifier symbols inside predicates", async () => {
     const project = await createTempProject({
       "main.stele": [
@@ -165,6 +223,7 @@ describe("loadContract validation", () => {
         '  (description "Uses path values and quantifier bindings conservatively.")',
         "  (assert",
         "    (and",
+        "      (eq (path account owner-name) \"alice\")",
         "      (path account active)",
         "      (gt (path account total) 0)",
         "      (forall txn",

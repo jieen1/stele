@@ -7,6 +7,11 @@ type TypeContext = {
   boundNames: Set<string>;
 };
 
+type InferredType = {
+  structuralType: SteleType;
+  valueType?: SteleType;
+};
+
 export function validateTypes(contract: Contract): Contract {
   const registry = createCoreOperatorRegistry();
 
@@ -29,31 +34,33 @@ function inferExpressionType(
   node: AstNode,
   context: TypeContext,
   registry: ReturnType<typeof createCoreOperatorRegistry>,
-): SteleType {
+): InferredType {
   if (node.kind === "list") {
     return inferListType(node, context, registry);
   }
 
   if (node.kind === "number") {
-    return "Number";
+    return { structuralType: "Number" };
   }
 
   if (node.kind === "string") {
-    return "String";
+    return { structuralType: "String" };
   }
 
   if (node.kind === "identifier") {
-    return context.boundNames.has(node.value) ? "Unknown" : "Symbol";
+    return context.boundNames.has(node.value)
+      ? { structuralType: "Symbol", valueType: "Unknown" }
+      : { structuralType: "Symbol" };
   }
 
-  return "Symbol";
+  return { structuralType: "Symbol" };
 }
 
 function inferListType(
   node: ListNode,
   context: TypeContext,
   registry: ReturnType<typeof createCoreOperatorRegistry>,
-): SteleType {
+): InferredType {
   const spec = registry.get(node.head);
 
   if (spec === undefined) {
@@ -73,20 +80,29 @@ function inferListType(
     return inferQuantifierType(node, context, registry);
   }
 
+  const argumentTypes = node.items.map((argument) => inferExpressionType(argument, context, registry));
+
   for (const [index, argument] of node.items.entries()) {
     const expectedType = getExpectedArgumentType(spec, index);
-    const actualType = inferExpressionType(argument, context, registry);
+    const actualType = argumentTypes[index]!;
     assertTypeAssignable(expectedType, actualType, argument, spec.name, undefined, index);
   }
 
-  return spec.valueType ?? spec.returnType;
+  if (spec.name === "eq" || spec.name === "neq") {
+    assertEqualityOperandCompatibility(spec.name, argumentTypes[0]!, node.items[0]!, argumentTypes[1]!, node.items[1]!);
+  }
+
+  return {
+    structuralType: spec.returnType,
+    valueType: spec.valueType,
+  };
 }
 
 function inferQuantifierType(
   node: ListNode,
   context: TypeContext,
   registry: ReturnType<typeof createCoreOperatorRegistry>,
-): SteleType {
+): InferredType {
   const binding = node.items[0]!;
   const collection = node.items[1]!;
   const predicate = node.items[2]!;
@@ -112,7 +128,7 @@ function inferQuantifierType(
   const predicateType = inferExpressionType(predicate, nextContext, registry);
   assertTypeAssignable("Predicate", predicateType, predicate, node.head, undefined, 2);
 
-  return "Boolean";
+  return { structuralType: "Boolean" };
 }
 
 function validateArity(spec: OperatorSpec, node: ListNode): void {
@@ -165,7 +181,7 @@ function getExpectedArgumentType(spec: OperatorSpec, index: number): SteleType {
 
 function assertTypeAssignable(
   expectedType: SteleType,
-  actualType: SteleType,
+  actualType: InferredType,
   node: AstNode,
   operatorName: string,
   invariantId?: string,
@@ -183,27 +199,31 @@ function assertTypeAssignable(
   throw new SteleError(
     "E0310",
     "Validation Error",
-    `${target}: Expected ${expectedType} but found ${actualType}.`,
+    `${target}: Expected ${expectedType} but found ${actualType.structuralType}.`,
     node.span,
     `${invariantDetail}The type checker could prove this mismatch statically.`,
     "Adjust the literal, operator, or surrounding expression so the types line up.",
   );
 }
 
-function isTypeAssignable(expectedType: SteleType, actualType: SteleType): boolean {
-  if (expectedType === actualType) {
+function isTypeAssignable(expectedType: SteleType, actualType: InferredType): boolean {
+  if (expectedType === actualType.structuralType) {
     return true;
   }
 
-  if (expectedType === "Unknown" || actualType === "Unknown") {
+  if (expectedType === "Unknown") {
     return true;
   }
 
-  if (expectedType === "Predicate" && actualType === "Boolean") {
+  if (expectedType === "Predicate" && actualType.structuralType === "Boolean") {
     return true;
   }
 
-  if (expectedType === "Boolean" && actualType === "Predicate") {
+  if (expectedType === "Boolean" && actualType.structuralType === "Predicate") {
+    return true;
+  }
+
+  if (isValueSlotType(expectedType) && isUnknownValue(actualType)) {
     return true;
   }
 
@@ -212,4 +232,41 @@ function isTypeAssignable(expectedType: SteleType, actualType: SteleType): boole
 
 function isQuantifier(name: string): boolean {
   return name === "forall" || name === "exists" || name === "none";
+}
+
+function assertEqualityOperandCompatibility(
+  operatorName: "eq" | "neq",
+  leftType: InferredType,
+  leftNode: AstNode,
+  rightType: InferredType,
+  rightNode: AstNode,
+): void {
+  if (isUnknownValue(leftType) || isUnknownValue(rightType)) {
+    return;
+  }
+
+  if (areEquivalentKnownTypes(leftType.structuralType, rightType.structuralType)) {
+    return;
+  }
+
+  throw new SteleError(
+    "E0310",
+    "Validation Error",
+    `Operands of "${operatorName}" must have matching types, but found ${leftType.structuralType} and ${rightType.structuralType}.`,
+    rightNode.span,
+    "Equality and inequality only reject cases where both operand types are statically known and incompatible.",
+    "Use operands with matching known types, or compare against a value whose type is not statically fixed.",
+  );
+}
+
+function isUnknownValue(type: InferredType): boolean {
+  return type.structuralType === "Unknown" || type.valueType === "Unknown";
+}
+
+function isValueSlotType(type: SteleType): boolean {
+  return type !== "Collection" && type !== "Path" && type !== "Symbol" && type !== "TimeRange";
+}
+
+function areEquivalentKnownTypes(left: SteleType, right: SteleType): boolean {
+  return left === right || (left === "Boolean" && right === "Predicate") || (left === "Predicate" && right === "Boolean");
 }
