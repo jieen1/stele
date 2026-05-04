@@ -123,6 +123,22 @@ describe("stele CLI", () => {
     await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
   });
 
+  it("generate rejects a root-level manifestPath and does not write the manifest", async () => {
+    const projectDir = await createFixtureProject();
+    await writeConfig(projectDir, { manifestPath: ".manifest.json" });
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/manifestPath|first-level project directory|project-relative/i);
+    await expect(pathExists(join(projectDir, ".manifest.json"))).resolves.toBe(false);
+  });
+
+  it("generate rejects a nested manifestPath below a first-level project directory", async () => {
+    const projectDir = await createFixtureProject();
+    await writeConfig(projectDir, { manifestPath: "contract/nested/.manifest.json" });
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/manifestPath|first-level project directory|project-relative/i);
+    await expect(pathExists(join(projectDir, "contract", "nested", ".manifest.json"))).resolves.toBe(false);
+  });
+
   it("generate rejects Windows drive-relative config paths", async () => {
     const projectDir = await createFixtureProject();
     await writeConfig(projectDir, { generatedDir: "C:outside\\generated" });

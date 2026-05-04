@@ -80,6 +80,10 @@ function validateProjectRelativePath(
     throw new Error(`Config field "${label}" must resolve inside the project root.`);
   }
 
+  if (label === "manifestPath") {
+    validateManifestPath(normalizedPath);
+  }
+
   return normalizedPath;
 }
 
@@ -90,4 +94,12 @@ function isAbsoluteLikePath(value: string): boolean {
 function isWithinProject(projectDir: string, candidatePath: string): boolean {
   const relativePath = win32.relative(projectDir, candidatePath);
   return relativePath.length === 0 || (!relativePath.startsWith("..") && !win32.isAbsolute(relativePath));
+}
+
+function validateManifestPath(path: string): void {
+  const segments = path.split("/").filter((segment) => segment.length > 0);
+
+  if (segments.length !== 2) {
+    throw new Error('Config field "manifestPath" must live in a first-level project directory so manifest paths stay project-relative.');
+  }
 }
