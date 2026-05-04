@@ -44,9 +44,9 @@ describe("loadContract loader", () => {
     const contract = await getLoadContract()(project.rootPath);
 
     expect(contract.rootPath).toBe(project.rootPath);
-    expect(contract.files.map((file: { path: string }) => relative(project.directory, file.path)).sort()).toEqual([
+    expect(contract.files.map((file: { path: string }) => normalizeRelativePath(relative(project.directory, file.path))).sort()).toEqual([
       "main.stele",
-      "modules\\account.stele",
+      "modules/account.stele",
     ]);
     expect(contract.checkers.map((checker: { id: string }) => checker.id)).toEqual(["account_checker"]);
     expect(contract.groups).toMatchObject([
@@ -84,7 +84,7 @@ describe("loadContract loader", () => {
       });
       expect((error as SteleError).message).toContain("Circular import");
       expect((error as SteleError).detail).toContain("main.stele");
-      expect((error as SteleError).detail).toContain("modules\\account.stele");
+      expect(normalizeRelativePath((error as SteleError).detail ?? "")).toContain("modules/account.stele");
     }
   });
 });
@@ -113,4 +113,8 @@ function getLoadContract(): (rootPath: string) => Promise<any> {
   expect(loadContract).toBeTypeOf("function");
 
   return loadContract as (rootPath: string) => Promise<any>;
+}
+
+function normalizeRelativePath(value: string): string {
+  return value.replaceAll("\\", "/");
 }

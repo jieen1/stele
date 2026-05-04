@@ -69,6 +69,24 @@ export type InvariantDependency = {
   span: SourceSpan;
 };
 
+export type InvariantSingleValueFieldName = "category" | "tolerance" | "rationale" | "since" | "applies-to";
+
+export type InvariantSingleValueField = {
+  kind: "field";
+  name: InvariantSingleValueFieldName;
+  node: ListNode;
+  span: SourceSpan;
+  valueNode: AstNode;
+};
+
+export type InvariantMultiValueField = {
+  kind: "field";
+  name: "tags";
+  node: ListNode;
+  span: SourceSpan;
+  valueNodes: AstNode[];
+};
+
 export type InvariantDeclaration = {
   kind: "invariant";
   filePath: string;
@@ -82,6 +100,12 @@ export type InvariantDeclaration = {
   usesChecker?: CheckerUse;
   whenExpression?: AstNode;
   dependsOn: InvariantDependency[];
+  category?: InvariantSingleValueField;
+  tags?: InvariantMultiValueField;
+  tolerance?: InvariantSingleValueField;
+  rationale?: InvariantSingleValueField;
+  since?: InvariantSingleValueField;
+  appliesTo?: InvariantSingleValueField;
 };
 
 export type GroupDeclaration = {
@@ -377,6 +401,12 @@ function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: s
   let usesChecker: CheckerUse | undefined;
   let whenExpression: AstNode | undefined;
   let dependsOn: InvariantDependency[] = [];
+  let category: InvariantSingleValueField | undefined;
+  let tags: InvariantMultiValueField | undefined;
+  let tolerance: InvariantSingleValueField | undefined;
+  let rationale: InvariantSingleValueField | undefined;
+  let since: InvariantSingleValueField | undefined;
+  let appliesTo: InvariantSingleValueField | undefined;
 
   for (const field of node.items.slice(1)) {
     if (field.kind !== "list") {
@@ -455,11 +485,28 @@ function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: s
         });
         break;
       case "category":
+        ensureFieldUnset(category, field, `Invariant "${idNode.value}" category`);
+        category = readSingleValueField(field, "category");
+        break;
       case "tags":
+        ensureFieldUnset(tags, field, `Invariant "${idNode.value}" tags`);
+        tags = readMultiValueField(field, "tags");
+        break;
       case "tolerance":
+        ensureFieldUnset(tolerance, field, `Invariant "${idNode.value}" tolerance`);
+        tolerance = readSingleValueField(field, "tolerance");
+        break;
       case "rationale":
+        ensureFieldUnset(rationale, field, `Invariant "${idNode.value}" rationale`);
+        rationale = readSingleValueField(field, "rationale");
+        break;
       case "since":
+        ensureFieldUnset(since, field, `Invariant "${idNode.value}" since`);
+        since = readSingleValueField(field, "since");
+        break;
       case "applies-to":
+        ensureFieldUnset(appliesTo, field, `Invariant "${idNode.value}" applies-to`);
+        appliesTo = readSingleValueField(field, "applies-to");
         break;
     }
   }
@@ -507,6 +554,12 @@ function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: s
     usesChecker,
     whenExpression,
     dependsOn,
+    category,
+    tags,
+    tolerance,
+    rationale,
+    since,
+    appliesTo,
   };
 }
 
@@ -554,6 +607,36 @@ function readSingleExpression(node: ListNode, label: string): AstNode {
   }
 
   return node.items[0]!;
+}
+
+function readSingleValueField(node: ListNode, name: InvariantSingleValueFieldName): InvariantSingleValueField {
+  return {
+    kind: "field",
+    name,
+    node,
+    span: node.span,
+    valueNode: readSingleExpression(node, `Invariant field "${name}"`),
+  };
+}
+
+function readMultiValueField(node: ListNode, name: "tags"): InvariantMultiValueField {
+  if (node.items.length === 0) {
+    throw validationError(
+      "E0305",
+      `Invariant field "${name}" expects at least one value.`,
+      node.span,
+      "This field was declared without any values.",
+      "Provide one or more values for this field.",
+    );
+  }
+
+  return {
+    kind: "field",
+    name,
+    node,
+    span: node.span,
+    valueNodes: [...node.items],
+  };
 }
 
 function ensureFieldUnset(value: unknown, field: ListNode, label: string): void {

@@ -76,6 +76,118 @@ describe("loadContract validation", () => {
     });
   });
 
+  it("preserves accepted optional invariant fields in the contract model", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant OPTIONAL_FIELDS",
+        "  (severity high)",
+        '  (description "Preserve optional fields for later pipeline stages.")',
+        "  (assert (eq 1 1))",
+        "  (category business-rule)",
+        "  (tags critical-path ledger)",
+        "  (tolerance (relative 0.001))",
+        '  (rationale "Protects downstream generators from data loss.")',
+        '  (since "2026-05-04")',
+        '  (applies-to (module "ledger-service")))',
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    const invariant = contract.invariants[0];
+
+    expect(invariant).toMatchObject({
+      id: "OPTIONAL_FIELDS",
+      category: {
+        valueNode: { kind: "identifier", value: "business-rule" },
+      },
+      tags: {
+        valueNodes: [
+          { kind: "identifier", value: "critical-path" },
+          { kind: "identifier", value: "ledger" },
+        ],
+      },
+      tolerance: {
+        valueNode: { kind: "list", head: "relative" },
+      },
+      rationale: {
+        valueNode: { kind: "string", value: "Protects downstream generators from data loss." },
+      },
+      since: {
+        valueNode: { kind: "string", value: "2026-05-04" },
+      },
+      appliesTo: {
+        valueNode: { kind: "list", head: "module" },
+      },
+    });
+    expect(invariant.category?.span).toEqual({ file: project.rootPath, line: 5, column: 3 });
+    expect(invariant.tags?.span).toEqual({ file: project.rootPath, line: 6, column: 3 });
+    expect(invariant.tolerance?.valueNode.span).toEqual({ file: project.rootPath, line: 7, column: 14 });
+    expect(invariant.appliesTo?.valueNode.span).toEqual({ file: project.rootPath, line: 10, column: 15 });
+  });
+
+  it("rejects duplicate checker ids", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(checker shared_checker",
+        '  (description "First checker declaration."))',
+        "(checker shared_checker",
+        '  (description "Second checker declaration."))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0312",
+      file: project.rootPath,
+      line: 3,
+      column: 1,
+      messageIncludes: 'Checker id "shared_checker" is already defined',
+    });
+  });
+
+  it("rejects duplicate group ids", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(group shared_group",
+        "  (invariant FIRST_GROUP_RULE",
+        "    (severity high)",
+        '    (description "First group declaration.")',
+        "    (assert (eq 1 1))))",
+        "(group shared_group",
+        "  (invariant SECOND_GROUP_RULE",
+        "    (severity high)",
+        '    (description "Second group declaration.")',
+        "    (assert (eq 1 1))))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0313",
+      file: project.rootPath,
+      line: 6,
+      column: 1,
+      messageIncludes: 'Group id "shared_group" is already defined',
+    });
+  });
+
+  it("rejects duplicate operator ids", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(operator project_op",
+        '  (description "First operator declaration."))',
+        "(operator project_op",
+        '  (description "Second operator declaration."))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0314",
+      file: project.rootPath,
+      line: 3,
+      column: 1,
+      messageIncludes: 'Operator id "project_op" is already defined',
+    });
+  });
+
   it("rejects uses-checker references that do not resolve to a known checker", async () => {
     const project = await createTempProject({
       "main.stele": [
