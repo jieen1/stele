@@ -6,6 +6,7 @@ import { comparisonOperatorHandlers } from "./templates/comparison.js";
 import { logicOperatorHandlers } from "./templates/logic.js";
 import { temporalOperatorHandlers } from "./templates/temporal.js";
 
+export const PYTEST_PACKAGE_INIT_PATH = "tests/contract/__init__.py";
 export const PYTEST_TEST_PATH = "tests/contract/test_contract.py";
 
 export type GeneratedPytestFile = {
@@ -43,6 +44,10 @@ const PYTHON_OPERATOR_HANDLERS: Record<string, PythonOperatorHandler> = {
 
 export function generatePytestFiles(contract: Contract): GeneratedPytestFile[] {
   return [
+    {
+      path: PYTEST_PACKAGE_INIT_PATH,
+      content: "",
+    },
     {
       path: PYTEST_RUNTIME_PATH,
       content: getPythonRuntimeSource(),

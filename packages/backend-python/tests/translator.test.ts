@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -6,6 +8,7 @@ import { loadContract, parseFile, SteleError, type AstNode, type Contract } from
 import * as backendPython from "../src/index";
 
 const tempDirs: string[] = [];
+const execFileAsync = promisify(execFile);
 
 describe("@stele/backend-python translator", () => {
   afterEach(async () => {
@@ -26,6 +29,7 @@ describe("@stele/backend-python translator", () => {
     const runtimeFile = files.find((file) => file.path === "tests/contract/_stele_runtime.py");
 
     expect(files.map((file) => file.path)).toEqual([
+      "tests/contract/__init__.py",
       "tests/contract/_stele_runtime.py",
       "tests/contract/test_contract.py",
     ]);
@@ -99,6 +103,54 @@ describe("@stele/backend-python translator", () => {
       "    )",
       "",
     ].join("\n"));
+  });
+
+  it("writes package-shaped pytest artifacts that import and collect with python -m pytest", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(invariant ACCT_001",
+        "  (severity critical)",
+        '  (description "account total equals positions plus cash")',
+        "  (assert",
+        "    (eq (path account total-value)",
+        "        (add (sum (collection positions) (path value))",
+        "             (path account cash)))))",
+      ].join("\n"),
+    });
+    const projectDir = await mkdtemp(join(tmpdir(), "stele-backend-python-smoke-"));
+    tempDirs.push(projectDir);
+    const generatedFiles = getGeneratePytestFiles()(contract);
+
+    await Promise.all(
+      generatedFiles.map(async (file) => {
+        const fullPath = join(projectDir, file.path);
+        await mkdir(dirname(fullPath), { recursive: true });
+        await writeFile(fullPath, file.content, "utf8");
+      }),
+    );
+
+    await writeFile(
+      join(projectDir, "tests", "contract", "conftest.py"),
+      [
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {",
+        "        \"account\": {\"total-value\": 15, \"cash\": 5},",
+        "        \"positions\": [{\"value\": 4}, {\"value\": 6}],",
+        "    }",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = await execFileAsync("python", ["-m", "pytest", "tests/contract", "-q"], {
+      cwd: projectDir,
+      windowsHide: true,
+    });
+
+    expect(result.stdout).toContain("1 passed");
   });
 
   it("translates core expression forms used by the backend templates", () => {
