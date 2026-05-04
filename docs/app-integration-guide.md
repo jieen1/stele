@@ -53,6 +53,8 @@ def stele_context():
 
 Treat this fixture as application code. Generated Stele tests consume it; they do not mock or synthesize your business state.
 
+If your contract uses temporal helpers such as `(modified ...)`, expose the relevant snapshots through `stele_context["state-before"]` and `stele_context["state-after"]`.
+
 ## Checker implementations and approval
 
 Declare checkers in `.stele` files and implement them in `contract/checker_impls/`. A generated test calls the checker through `stele_context["_stele_checkers"]`, so `conftest.py` should register approved implementations explicitly.

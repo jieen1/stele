@@ -140,11 +140,13 @@ export async function verifyManifest(manifestPath: string): Promise<Verification
 }
 
 async function readManifestDocument(manifestPath: string): Promise<ContractManifest> {
-  let content: string;
-
   try {
-    content = await readFile(manifestPath, "utf8");
+    return parseManifestDocument(manifestPath, await readFile(manifestPath, "utf8"));
   } catch (error) {
+    if (error instanceof SteleError) {
+      throw error;
+    }
+
     throw toManifestError(
       "E0401",
       `Unable to read manifest "${manifestPath}".`,
@@ -152,7 +154,30 @@ async function readManifestDocument(manifestPath: string): Promise<ContractManif
       "Check that the manifest exists and that Stele has permission to read it.",
     );
   }
+}
 
+async function tryReadManifestDocument(manifestPath: string): Promise<ContractManifest | undefined> {
+  try {
+    return parseManifestDocument(manifestPath, await readFile(manifestPath, "utf8"));
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return undefined;
+    }
+
+    if (error instanceof SteleError) {
+      throw error;
+    }
+
+    throw toManifestError(
+      "E0401",
+      `Unable to read manifest "${manifestPath}".`,
+      error,
+      "Check that the manifest exists and that Stele has permission to read it.",
+    );
+  }
+}
+
+function parseManifestDocument(manifestPath: string, content: string): ContractManifest {
   let parsed: unknown;
 
   try {
@@ -178,18 +203,6 @@ async function readManifestDocument(manifestPath: string): Promise<ContractManif
   }
 
   return parsed;
-}
-
-async function tryReadManifestDocument(manifestPath: string): Promise<ContractManifest | undefined> {
-  try {
-    return await readManifestDocument(manifestPath);
-  } catch (error) {
-    if (isReadManifestFallbackError(error)) {
-      return undefined;
-    }
-
-    throw error;
-  }
 }
 
 async function readProtectedFile(filePath: string): Promise<ManifestProtectedFile> {
@@ -266,13 +279,6 @@ function validateManifestProtectedPath(path: string): void {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
-}
-
-function isReadManifestFallbackError(error: unknown): boolean {
-  return (
-    isMissingFileError(error) ||
-    (error instanceof SteleError && (error.code === "E0402" || error.code === "E0401"))
-  );
 }
 
 function normalizeManifestPath(value: string): string {

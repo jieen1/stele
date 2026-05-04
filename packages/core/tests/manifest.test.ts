@@ -145,6 +145,54 @@ describe("manifest", () => {
     expect(updatedManifest.protected_files["protected/check.py"].sha256).toBe(sha256("print('beta')\n"));
   });
 
+  it("writes a new manifest when the target file is missing", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant MISSING_MANIFEST_RULE",
+        "  (severity medium)",
+        '  (description "Missing manifests should be created.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+      "protected/check.py": "print('alpha')\n",
+    });
+    const manifestPath = join(project.directory, "contract", ".manifest.json");
+    const protectedPath = join(project.directory, "protected", "check.py");
+    const contractHash = sha256(normalizeContract(await loadContract(project.rootPath)));
+
+    await expect(writeManifest([protectedPath], manifestPath, contractHash)).resolves.toBeUndefined();
+
+    await expect(readManifest(manifestPath)).resolves.toMatchObject({
+      contract_hash: contractHash,
+      protected_files: {
+        "protected/check.py": {
+          sha256: sha256("print('alpha')\n"),
+          size: Buffer.byteLength("print('alpha')\n"),
+        },
+      },
+    });
+  });
+
+  it("rejects invalid JSON manifests instead of silently overwriting them", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant INVALID_MANIFEST_RULE",
+        "  (severity medium)",
+        '  (description "Invalid manifests must fail closed.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+      "protected/check.py": "print('alpha')\n",
+    });
+    const manifestPath = join(project.directory, "contract", ".manifest.json");
+    const protectedPath = join(project.directory, "protected", "check.py");
+    const contractHash = sha256(normalizeContract(await loadContract(project.rootPath)));
+
+    await mkdir(dirname(manifestPath), { recursive: true });
+    await writeFile(manifestPath, "{bad json\n", "utf8");
+
+    await expect(writeManifest([protectedPath], manifestPath, contractHash)).rejects.toThrowError(SteleError);
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe("{bad json\n");
+  });
+
   it("rejects manifest protected paths that traverse outside the manifest directory", async () => {
     const project = await createTempProject({});
     const manifestPath = join(project.directory, "contract", ".manifest.json");

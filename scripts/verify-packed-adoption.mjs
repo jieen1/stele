@@ -1,7 +1,8 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -10,17 +11,18 @@ const packageDirs = [
   join(repoRoot, "packages", "backend-python"),
   join(repoRoot, "packages", "cli"),
 ];
-const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+const pnpmTool = resolveTool("pnpm", ["node_modules", "pnpm", "bin", "pnpm.cjs"]);
+const npmTool = resolveTool("npm", ["node_modules", "npm", "bin", "npm-cli.js"]);
+const npxTool = resolveTool("npx", ["node_modules", "npm", "bin", "npx-cli.js"]);
 const pythonCommand = "python";
 
 async function main() {
-  const tempRoot = await mkdtemp(join(tmpdir(), "stele-packed-adoption-"));
+  const tempRoot = await mkdtemp(join(tmpdir(), "stele packed adoption "));
   const packDir = join(tempRoot, "packs");
   const projectDir = join(tempRoot, "fresh-python-app");
 
   try {
+    await runTool(pnpmTool, ["build"], { cwd: repoRoot });
     await mkdir(packDir, { recursive: true });
 
     const tarballs = [];
@@ -31,9 +33,9 @@ async function main() {
 
     await mkdir(projectDir, { recursive: true });
 
-    await run(npmCommand, ["init", "-y"], { cwd: projectDir });
-    await run(npmCommand, ["install", "--save-dev", ...tarballs], { cwd: projectDir });
-    await run(npxCommand, ["stele", "init", "--language", "python"], { cwd: projectDir });
+    await runTool(npmTool, ["init", "-y"], { cwd: projectDir });
+    await runTool(npmTool, ["install", "--save-dev", ...tarballs], { cwd: projectDir });
+    await runTool(npxTool, ["stele", "init", "--language", "python"], { cwd: projectDir });
 
     await writeProjectFile(
       projectDir,
@@ -67,16 +69,16 @@ async function main() {
       ].join("\n") + "\n",
     );
 
-    await run(npxCommand, ["stele", "generate"], { cwd: projectDir });
+    await runTool(npxTool, ["stele", "generate"], { cwd: projectDir });
     await run(pythonCommand, ["-m", "pytest", "tests/contract", "-q"], { cwd: projectDir });
-    await run(npxCommand, ["stele", "check"], { cwd: projectDir });
+    await runTool(npxTool, ["stele", "check"], { cwd: projectDir });
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
 }
 
 async function packPackage(packageDir, packDir) {
-  const { stdout } = await run(pnpmCommand, ["pack", "--pack-destination", packDir], {
+  const { stdout } = await runTool(pnpmTool, ["pack", "--pack-destination", packDir], {
     cwd: packageDir,
     capture: true,
   });
@@ -99,6 +101,38 @@ async function writeProjectFile(projectDir, relativePath, content) {
   await writeFile(fullPath, content, "utf8");
 }
 
+function resolveTool(commandName, windowsCliSegments) {
+  if (process.platform !== "win32") {
+    return { command: commandName, argsPrefix: [] };
+  }
+
+  const candidates = execFileSync("where.exe", [`${commandName}.cmd`], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    windowsHide: true,
+  })
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  for (const candidate of candidates) {
+    const scriptPath = join(dirname(candidate), ...windowsCliSegments);
+
+    if (existsSync(scriptPath)) {
+      return {
+        command: process.execPath,
+        argsPrefix: [scriptPath],
+      };
+    }
+  }
+
+  throw new Error(`Unable to resolve a Windows CLI script for ${commandName}.`);
+}
+
+function runTool(tool, args, options) {
+  return run(tool.command, [...tool.argsPrefix, ...args], options);
+}
+
 async function run(command, args, options) {
   const printable = [command, ...args].join(" ");
   process.stdout.write(`$ ${printable}\n`);
@@ -106,7 +140,6 @@ async function run(command, args, options) {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
-      shell: process.platform === "win32",
       windowsHide: true,
     });
     let stdout = "";
