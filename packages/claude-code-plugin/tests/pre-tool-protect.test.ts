@@ -503,6 +503,22 @@ describe("pre-tool-protect hook", () => {
     expect(result.stderr).toContain("invalid protected config");
   });
 
+  it("fails closed when protected config contains whitespace-only entries", async () => {
+    const projectDir = await createProject({
+      protected: ["   "],
+    });
+
+    const result = runHook(projectDir, {
+      tool_input: {
+        file_path: "contract/main.stele",
+      },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("invalid protected config");
+  });
+
   it("fails closed when protected config is not an array", async () => {
     const projectDir = await createProject({
       protected: "contract/**",

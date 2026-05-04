@@ -84,7 +84,7 @@ function readProtectedConfig(value) {
   }
 
   for (const pattern of value) {
-    if (typeof pattern !== "string" || pattern.length === 0) {
+    if (typeof pattern !== "string" || pattern.trim().length === 0) {
       throw new Error("invalid protected config: protected must be an array of strings.");
     }
 

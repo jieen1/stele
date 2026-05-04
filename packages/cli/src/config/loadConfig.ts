@@ -48,7 +48,7 @@ function readProtectedConfig(value: unknown): string[] {
   }
 
   for (const pattern of value) {
-    if (typeof pattern !== "string" || pattern.length === 0) {
+    if (typeof pattern !== "string" || pattern.trim().length === 0) {
       throw new Error('Config field "protected" must be an array of non-empty project-relative glob strings.');
     }
 

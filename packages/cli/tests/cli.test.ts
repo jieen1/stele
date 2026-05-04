@@ -157,6 +157,28 @@ describe("stele CLI", () => {
     }
   });
 
+  it("generate, lock, and check all fail closed on whitespace-only protected config", async () => {
+    const projectDir = await createFixtureProject();
+    const manifestPath = join(projectDir, "contract", ".manifest.json");
+
+    await writeConfig(projectDir, { protected: ["   "] });
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(/protected/i);
+    await expect(pathExists(join(projectDir, "tests", "contract", "test_contract.py"))).resolves.toBe(false);
+    await expect(pathExists(manifestPath)).resolves.toBe(false);
+
+    await writeConfig(projectDir, { protected: DEFAULT_CONFIG.protected });
+    await runGenerate(projectDir, { force: false });
+    await runLock(projectDir, { reason: "initial baseline" });
+    const manifestBefore = await readFile(manifestPath, "utf8");
+
+    await writeConfig(projectDir, { protected: ["   "] });
+    await expect(runLock(projectDir, { reason: "whitespace should fail" })).rejects.toThrow(/protected/i);
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
+
+    await expect(runCheck(projectDir)).rejects.toThrow(/protected/i);
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
+  });
+
   it("lock fails closed on malformed protected config and does not write or refresh the manifest", async () => {
     const projectDir = await createFixtureProject();
     await runGenerate(projectDir, { force: false });
