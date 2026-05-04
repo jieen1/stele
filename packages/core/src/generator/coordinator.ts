@@ -49,6 +49,7 @@ type ResolvedGenerationConfig = {
 
 export function coordinateGeneration(contract: Contract, backend: LanguageBackend, config: GenerationConfig): GeneratedFile[] {
   const resolvedConfig = resolveGenerationConfig(config);
+  const expectedPaths = buildExpectedGeneratedPaths(contract, backend, resolvedConfig);
   const generatedFiles = backend.generate(contract, resolvedConfig);
 
   if (!Array.isArray(generatedFiles)) {
@@ -60,7 +61,9 @@ export function coordinateGeneration(contract: Contract, backend: LanguageBacken
     );
   }
 
-  return normalizeGeneratedFiles(generatedFiles, resolvedConfig.outputDir);
+  const normalizedFiles = normalizeGeneratedFiles(generatedFiles, resolvedConfig.outputDir);
+  assertGeneratedFilesMatchExpectedLayout(normalizedFiles, expectedPaths, backend.name);
+  return normalizedFiles;
 }
 
 export async function verifyGenerated(
@@ -143,9 +146,50 @@ function resolveGenerationConfig(config: GenerationConfig): ResolvedGenerationCo
   };
 }
 
+function buildExpectedGeneratedPaths(
+  contract: Contract,
+  backend: LanguageBackend,
+  config: ResolvedGenerationConfig,
+): string[] {
+  const expectedPaths: string[] = [];
+  const seenPaths = new Set<string>();
+  const seenCaseFoldedPaths = new Map<string, string>();
+  const fileExtension = normalizeFileExtension(backend.fileExtension);
+  const topLevelInvariants = contract.invariants.filter((invariant) => invariant.groupId === undefined);
+  const groupPaths = contract.groups.map((group) =>
+    posix.join(config.outputDir, `test_${sanitizeGeneratedPathSegment(group.id, "group")}${fileExtension}`),
+  );
+
+  registerGeneratedPath(
+    posix.join(config.outputDir, `_stele_runtime${fileExtension}`),
+    seenPaths,
+    seenCaseFoldedPaths,
+    "canonical generated file path",
+    (path) => expectedPaths.push(path),
+  );
+
+  if (topLevelInvariants.length > 0) {
+    registerGeneratedPath(
+      posix.join(config.outputDir, `test_contract${fileExtension}`),
+      seenPaths,
+      seenCaseFoldedPaths,
+      "canonical generated file path",
+      (path) => expectedPaths.push(path),
+    );
+  }
+
+  for (const groupPath of groupPaths) {
+    registerGeneratedPath(groupPath, seenPaths, seenCaseFoldedPaths, "canonical generated file path", (path) => expectedPaths.push(path));
+  }
+
+  expectedPaths.sort((left, right) => left.localeCompare(right));
+  return expectedPaths;
+}
+
 function normalizeGeneratedFiles(files: GeneratedFile[], outputDir: string): GeneratedFile[] {
   const normalizedFiles: GeneratedFile[] = [];
   const seenPaths = new Set<string>();
+  const seenCaseFoldedPaths = new Map<string, string>();
 
   for (const file of files) {
     if (!isGeneratedFile(file)) {
@@ -159,25 +203,45 @@ function normalizeGeneratedFiles(files: GeneratedFile[], outputDir: string): Gen
 
     const normalizedPath = normalizeRelativeFilePath(file.path, "generated file path");
     assertPathWithinOutputDirectory(normalizedPath, outputDir);
-
-    if (seenPaths.has(normalizedPath)) {
-      throw generationError(
-        "E0503",
-        `Duplicate generated file path "${normalizedPath}".`,
-        "Generated file paths must be unique after normalization.",
-        "Ensure the backend emits each project-relative file path exactly once.",
-      );
-    }
-
-    seenPaths.add(normalizedPath);
-    normalizedFiles.push({
-      path: normalizedPath,
-      content: file.content,
-    });
+    registerGeneratedPath(normalizedPath, seenPaths, seenCaseFoldedPaths, "generated file path", (path) =>
+      normalizedFiles.push({
+        path,
+        content: file.content,
+      }),
+    );
   }
 
   normalizedFiles.sort((left, right) => left.path.localeCompare(right.path) || left.content.localeCompare(right.content));
   return normalizedFiles;
+}
+
+function assertGeneratedFilesMatchExpectedLayout(
+  actualFiles: GeneratedFile[],
+  expectedPaths: string[],
+  backendName: string,
+): void {
+  const actualPaths = actualFiles.map((file) => file.path);
+  const actualPathSet = new Set(actualPaths);
+  const expectedPathSet = new Set(expectedPaths);
+  const missing = expectedPaths.filter((path) => !actualPathSet.has(path));
+  const unexpected = actualPaths.filter((path) => !expectedPathSet.has(path));
+
+  if (missing.length === 0 && unexpected.length === 0) {
+    return;
+  }
+
+  const detailLines = [
+    `expected: ${expectedPaths.join(", ") || "<none>"}`,
+    `missing: ${missing.join(", ") || "<none>"}`,
+    `unexpected: ${unexpected.join(", ") || "<none>"}`,
+  ];
+
+  throw generationError(
+    "E0505",
+    `Backend "${backendName}" did not emit the canonical generated layout.`,
+    detailLines.join("\n"),
+    "Emit exactly the runtime helper plus the canonical top-level and group test files required by core.",
+  );
 }
 
 async function collectExistingGeneratedFiles(projectRoot: string, outputDir: string): Promise<string[]> {
@@ -278,6 +342,25 @@ function normalizeRelativeFilePath(pathValue: string, label: string): string {
   return normalized;
 }
 
+function normalizeFileExtension(fileExtension: string): string {
+  if (typeof fileExtension !== "string" || !/^\.[A-Za-z0-9]+$/.test(fileExtension)) {
+    throw generationError(
+      "E0502",
+      `Invalid backend file extension "${fileExtension}".`,
+      "Expected a simple extension such as .py or .ts for canonical generated output.",
+      "Set backend.fileExtension to a dot-prefixed extension without path separators.",
+    );
+  }
+
+  return fileExtension;
+}
+
+function sanitizeGeneratedPathSegment(value: string, fallbackPrefix: string): string {
+  const sanitized = value.replace(/[^A-Za-z0-9_]+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  const withFallback = sanitized.length === 0 ? fallbackPrefix : sanitized;
+  return /^[0-9]/.test(withFallback) ? `${fallbackPrefix}_${withFallback}` : withFallback;
+}
+
 function normalizeRelativePath(pathValue: string, label: string): string {
   if (typeof pathValue !== "string" || pathValue.length === 0) {
     throw generationError(
@@ -320,6 +403,39 @@ function normalizeRelativePath(pathValue: string, label: string): string {
   }
 
   return projectRelativePath;
+}
+
+function registerGeneratedPath(
+  normalizedPath: string,
+  seenPaths: Set<string>,
+  seenCaseFoldedPaths: Map<string, string>,
+  label: string,
+  register: (path: string) => void,
+): void {
+  if (seenPaths.has(normalizedPath)) {
+    throw generationError(
+      "E0503",
+      `Duplicate ${label} "${normalizedPath}".`,
+      "Generated file paths must be unique after normalization.",
+      "Ensure each project-relative generated file path appears exactly once.",
+    );
+  }
+
+  const caseFoldedPath = normalizedPath.toLowerCase();
+  const collidingPath = seenCaseFoldedPaths.get(caseFoldedPath);
+
+  if (collidingPath !== undefined && collidingPath !== normalizedPath) {
+    throw generationError(
+      "E0503",
+      `Case-insensitive ${label} collision between "${collidingPath}" and "${normalizedPath}".`,
+      "Common Windows filesystems treat those generated paths as the same file.",
+      "Rename the source ids or emitted files so their normalized paths stay distinct ignoring case.",
+    );
+  }
+
+  seenPaths.add(normalizedPath);
+  seenCaseFoldedPaths.set(caseFoldedPath, normalizedPath);
+  register(normalizedPath);
 }
 
 function isGeneratedFile(value: unknown): value is GeneratedFile {
