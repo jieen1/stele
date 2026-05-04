@@ -30,7 +30,7 @@ export type TranslationContext = {
 };
 
 const INDENT = "    ";
-const PYTEST_IMPORT_LINE = "from ._stele_runtime import stele_call_checker, stele_get_path, stele_sum";
+const PYTEST_IMPORT_LINE = "from ._stele_runtime import stele_call_checker, stele_get_path, stele_is_modified, stele_sum";
 const PYTHON_RESERVED_WORDS = new Set([
   "False",
   "None",

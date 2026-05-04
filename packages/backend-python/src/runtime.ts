@@ -1,6 +1,9 @@
 export const PYTEST_RUNTIME_PATH = "tests/contract/_stele_runtime.py";
 
 const RUNTIME_LINES = [
+  "_STELE_MISSING = object()",
+  "",
+  "",
   "def stele_get_path(root, parts):",
   "    current = root",
   "    for part in parts:",
@@ -13,6 +16,14 @@ const RUNTIME_LINES = [
   "        else:",
   "            raise KeyError(f\"Stele path segment not found: {part}\")",
   "    return current",
+  "",
+  "",
+  "def stele_is_modified(stele_context, parts):",
+  "    before_value = _stele_read_optional_path(stele_context[\"state-before\"], parts)",
+  "    after_value = _stele_read_optional_path(stele_context[\"state-after\"], parts)",
+  "    if before_value is _STELE_MISSING or after_value is _STELE_MISSING:",
+  "        return before_value is not after_value",
+  "    return before_value != after_value",
   "",
   "",
   "def stele_sum(items, parts):",
@@ -38,6 +49,13 @@ const RUNTIME_LINES = [
   "            raise KeyError(f\"Stele checker '{name}' returned a dict without 'passed'\")",
   "        return result",
   "    return {\"passed\": bool(result), \"message\": None}",
+  "",
+  "",
+  "def _stele_read_optional_path(root, parts):",
+  "    try:",
+  "        return stele_get_path(root, parts)",
+  "    except KeyError:",
+  "        return _STELE_MISSING",
 ];
 
 const PYTHON_RUNTIME_SOURCE = `${RUNTIME_LINES.join("\n")}\n`;

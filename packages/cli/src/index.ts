@@ -8,6 +8,7 @@ import { runGenerate } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { runLock } from "./commands/lock.js";
+import { getExitCode } from "./errors.js";
 
 type ProgramDependencies = {
   cwd?: () => string;
@@ -58,7 +59,7 @@ export async function runCli(argv = process.argv): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
+    process.exitCode = getExitCode(error) ?? 1;
   }
 }
 

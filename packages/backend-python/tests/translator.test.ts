@@ -49,6 +49,7 @@ describe("@stele/backend-python translator", () => {
     ].join("\n"));
     expect(runtimeFile?.content).toContain("def stele_sum(items, parts):");
     expect(runtimeFile?.content).toContain("def stele_call_checker(name, stele_context, kwargs):");
+    expect(runtimeFile?.content).toContain("def stele_is_modified(stele_context, parts):");
     expect(getRuntimeSource()()).toBe(runtimeFile?.content);
   });
 
@@ -81,7 +82,7 @@ describe("@stele/backend-python translator", () => {
     const testFile = files.find((file) => file.path === "tests/contract/test_contract.py");
 
     expect(testFile?.content).toBe([
-      "from ._stele_runtime import stele_call_checker, stele_get_path, stele_sum",
+      "from ._stele_runtime import stele_call_checker, stele_get_path, stele_is_modified, stele_sum",
       "",
       "",
       "def test_ACCT_001(stele_context):",
@@ -200,6 +201,36 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
+  it("runs modified assertions against state-before/state-after through the generated runtime", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(invariant BALANCE_MODIFIED",
+        "  (severity high)",
+        '  (description "account balance changes are detectable from runtime state snapshots")',
+        "  (assert (modified (path account balance))))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {",
+        "        \"state-before\": {\"account\": {\"balance\": 10}},",
+        "        \"state-after\": {\"account\": {\"balance\": 12}},",
+        "    }",
+      ],
+    );
+    const result = await runGeneratedPytest(projectDir);
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain('assert stele_is_modified(stele_context, ["account","balance"])');
+    expect(result.stdout).toContain("1 passed");
+  });
+
   it("allocates scope-unique nested quantifier bindings when sanitized names collide", async () => {
     const contract = await createContract({
       "main.stele": [
@@ -279,6 +310,9 @@ describe("@stele/backend-python translator", () => {
     );
     expect(translateExpression(parseExpression("(forall txn (collection transactions) (gt (path txn amount) 0))"))).toBe(
       "all((stele_get_path(txn, [\"amount\"])) > (0) for txn in stele_context[\"transactions\"])",
+    );
+    expect(translateExpression(parseExpression("(modified (path account balance))"))).toBe(
+      "stele_is_modified(stele_context, [\"account\",\"balance\"])",
     );
   });
 

@@ -1,0 +1,2 @@
+(checker balance-change-has-transaction
+  (description "Validate that a balance delta is backed by a matching transaction entry."))

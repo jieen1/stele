@@ -7,7 +7,7 @@ import { runCheck } from "../src/commands/check.js";
 import { runGenerate } from "../src/commands/generate.js";
 import { runInit } from "../src/commands/init.js";
 import { runLock } from "../src/commands/lock.js";
-import { createProgram } from "../src/index.js";
+import { createProgram, runCli } from "../src/index.js";
 
 const tempDirs: string[] = [];
 
@@ -193,6 +193,14 @@ describe("stele CLI", () => {
 
     await writeProjectFile(projectDir, "tests/contract/extra.py", "# extra\n");
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
+  });
+
+  it("check does not ignore source directories whose names merely contain __pycache__", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "contract/checker_impls/not__pycache__/shadow_checker.py", "def shadow_checker(context):\n    return True\n");
+
+    await expect(runCheck(projectDir)).rejects.toThrow(/new\/unlocked protected files|protected/i);
   });
 
   it("generate, check, and lock honor custom protected globs for user files", async () => {
@@ -417,6 +425,40 @@ describe("stele CLI", () => {
     expect(handlers.lock).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved" });
     expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python" });
   });
+
+  it("CLI exits with code 2 when generated files are tampered", async () => {
+    const projectDir = await createFixtureProject();
+    const stderr = captureStderr();
+    const originalExitCode = process.exitCode;
+
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
+
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+    await runCli(["node", "stele", "check"]);
+
+    expect(process.exitCode).toBe(2);
+    expect(stderr.read()).toContain("Generated files do not match the contract");
+    process.exitCode = originalExitCode;
+  });
+
+  it("CLI exits with code 3 when protected files drift without lock", async () => {
+    const projectDir = await createFixtureProject();
+    const stderr = captureStderr();
+    const originalExitCode = process.exitCode;
+
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
+
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+    await runCli(["node", "stele", "check"]);
+
+    expect(process.exitCode).toBe(3);
+    expect(stderr.read()).toContain("Manifest verification failed");
+    process.exitCode = originalExitCode;
+  });
 });
 
 async function createFixtureProject(configOverrides: Partial<typeof DEFAULT_CONFIG> = {}): Promise<string> {
@@ -527,4 +569,15 @@ async function tryCreateNonRegularEntry(targetDirectory: string, linkPath: strin
 
 function isSymlinkPermissionError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && (error.code === "EPERM" || error.code === "EACCES" || error.code === "UNKNOWN");
+}
+
+function captureStderr(): { read(): string } {
+  const chunks: string[] = [];
+  vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+    return true;
+  }) as typeof process.stderr.write);
+  return {
+    read: () => chunks.join(""),
+  };
 }

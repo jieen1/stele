@@ -1,0 +1,52 @@
+{
+  "version": "1",
+  "generated_at": "2026-05-04T15:56:52.317Z",
+  "stele_version": "0.1.0",
+  "protected_files": {
+    "contract/checker_impls/balance_change_has_transaction.py": {
+      "sha256": "e1f046fd3afd051e7469add1cf4097810ffebe92b328edeedf21ee03a18752fd",
+      "size": 1694
+    },
+    "contract/main.stele": {
+      "sha256": "04ed2a518a155c94e3fd908ac0108286056ceba37d746cc23ff4a4706413145d",
+      "size": 1007
+    },
+    "contract/modules/account.stele": {
+      "sha256": "d76ee34c732c3e430457a8b6a9c412c3750b6fdb66d2b60afcdd88bfa8cc2953",
+      "size": 7626
+    },
+    "contract/modules/checkers.stele": {
+      "sha256": "2c1012f67db640f0dd18483f43513ccfbc7167e19337831d6f8dbf3ffbfb551a",
+      "size": 132
+    },
+    "tests/contract/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "tests/contract/_stele_runtime.py": {
+      "sha256": "4f024414b822957cf8b9364532ea07900674ba7e59d537b4b1ff1eb55bcd63da",
+      "size": 1914
+    },
+    "tests/contract/conftest.py": {
+      "sha256": "69021c392746754e4e862c61663290d39c29d1f97d7ea4e725b74d23197daa88",
+      "size": 4999
+    },
+    "tests/contract/test_account_integrity.py": {
+      "sha256": "29ccd1d4a4ad8abfaf542e4834cd2146b0955b83c06e7c16052ee286d5766c8c",
+      "size": 1434
+    },
+    "tests/contract/test_contract.py": {
+      "sha256": "2e562f9fe001e064d633906b32fa427244bef8e87404c6b4838fee9d18776f96",
+      "size": 577
+    },
+    "tests/contract/test_operations_integrity.py": {
+      "sha256": "906262cde2996f278a61b46907a68da5b3d7c6b9978d4742d7f5a454667e78c7",
+      "size": 2507
+    },
+    "tests/contract/test_position_integrity.py": {
+      "sha256": "8f9ea5d3d0eb44d1a34d2a9f0e36c2f5e7c371eb0ddf5cf83e3d1fa84809297b",
+      "size": 1409
+    }
+  },
+  "contract_hash": "bb7434908e7286939cf2239abfffeb98025e4e0dce0001e47572c7b6ecd6344e"
+}

@@ -1,0 +1,29 @@
+(import "./modules/account.stele")
+(import "./modules/checkers.stele")
+
+(invariant APP_001
+  (severity high)
+  (category application)
+  (description "Brokerage accounts admitted to contract checks stay active.")
+  (rationale "Inactive accounts use a different lifecycle and must not share this contract surface.")
+  (assert (eq (path account status) "active")))
+
+(invariant APP_002
+  (severity critical)
+  (category identity)
+  (description "The primary account carries a persistent identifier.")
+  (assert (not-null (path account id))))
+
+(invariant APP_003
+  (severity medium)
+  (category application)
+  (description "The fixture exercises the USD brokerage flow used by the application.")
+  (assert (eq (path account currency) "USD")))
+
+(invariant APP_004
+  (severity medium)
+  (category operations)
+  (description "The withdrawal queue always exposes at least one pending request for operator review.")
+  (assert
+    (exists request (collection withdrawals)
+      (eq (path request status) "pending"))))

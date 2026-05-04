@@ -1,0 +1,229 @@
+(group account-integrity
+  (description "Core account-level accounting and referential integrity.")
+
+  (invariant ACCT_001
+    (severity critical)
+    (category data-integrity)
+    (description "Account total value equals position market value plus cash.")
+    (rationale "Keeps the customer statement and internal ledger aligned.")
+    (since "0.1.0")
+    (assert
+      (eq (path account total-value)
+          (add (sum (collection positions) (path market-value))
+               (path account cash)))))
+
+  (invariant ACCT_002
+    (severity critical)
+    (category referential)
+    (description "Every transaction resolves to a known account identifier.")
+    (rationale "Prevents orphaned ledger entries during reconciliation.")
+    (since "0.1.0")
+    (assert
+      (forall txn (collection transactions)
+        (exists-in (path txn account-id) (collection accounts)))))
+
+  (invariant ACCT_003
+    (severity high)
+    (category business-rule)
+    (description "Balance changes require a matching transaction record.")
+    (rationale "Every movement of funds must remain auditable.")
+    (since "0.1.0")
+    (depends-on ACCT_002)
+    (when (modified (path account balance)))
+    (uses-checker balance-change-has-transaction))
+
+  (invariant ACCT_004
+    (severity high)
+    (category ledger)
+    (description "Settled account balance mirrors settled cash in the fixture.")
+    (assert (eq (path account balance) (path account cash))))
+
+  (invariant ACCT_005
+    (severity high)
+    (category reporting)
+    (description "Reported equity matches the current total account value.")
+    (depends-on ACCT_001)
+    (assert (eq (path account equity) (path account total-value))))
+
+  (invariant ACCT_006
+    (severity medium)
+    (category liquidity)
+    (description "Available withdrawal stays below or equal to cash on hand.")
+    (assert (lte (path account available-withdrawal) (path account cash))))
+
+  (invariant ACCT_007
+    (severity medium)
+    (category margin)
+    (description "Buying power is non-negative for active accounts.")
+    (assert (gte (path account buying-power) 0))))
+
+(group position-integrity
+  (description "Holdings and exposure rules that map to production portfolio data.")
+
+  (invariant POS_001
+    (severity critical)
+    (category holdings)
+    (description "Every open position has a positive quantity.")
+    (assert
+      (forall position (collection positions)
+        (gt (path position quantity) 0))))
+
+  (invariant POS_002
+    (severity critical)
+    (category holdings)
+    (description "Every open position carries a positive market value.")
+    (assert
+      (forall position (collection positions)
+        (gt (path position market-value) 0))))
+
+  (invariant POS_003
+    (severity high)
+    (category limits)
+    (description "Open position count stays within the configured ceiling.")
+    (assert
+      (lte (count (collection positions))
+           (path limits max-open-positions))))
+
+  (invariant POS_004
+    (severity medium)
+    (category concentration)
+    (description "No single position exceeds the total account value.")
+    (assert
+      (lt (max (collection positions) (path market-value))
+          (path account total-value))))
+
+  (invariant POS_005
+    (severity medium)
+    (category portfolio)
+    (description "Average position size stays above the smoke-test threshold.")
+    (assert
+      (gt (avg (collection positions) (path market-value)) 1000)))
+
+  (invariant POS_006
+    (severity medium)
+    (category portfolio)
+    (description "The smallest position remains economically meaningful.")
+    (assert
+      (gt (min (collection positions) (path market-value)) 100)))
+
+  (invariant POS_007
+    (severity medium)
+    (category pnl)
+    (description "Net unrealized P&L stays within the tolerance band used by the app.")
+    (assert
+      (lt (abs (sum (collection positions) (path unrealized-pnl))) 1000)))
+
+  (invariant POS_008
+    (severity low)
+    (category holdings)
+    (description "Every position belongs to an approved asset class for this workflow.")
+    (assert
+      (forall position (collection positions)
+        (or (eq (path position asset-class) "equity")
+            (eq (path position asset-class) "etf"))))))
+
+(group operations-integrity
+  (description "Operational, risk, and workflow assertions used in CI.")
+
+  (invariant OPS_001
+    (severity high)
+    (category margin)
+    (description "Maintenance margin usage never exceeds account equity.")
+    (assert
+      (lte (path risk maintenance-margin-used)
+           (path account equity))))
+
+  (invariant OPS_002
+    (severity high)
+    (category risk)
+    (description "Daily loss remains inside the configured loss guardrail.")
+    (assert
+      (lt (path risk daily-loss)
+          (path limits max-daily-loss))))
+
+  (invariant OPS_003
+    (severity high)
+    (category orders)
+    (description "Each order notional stays below the per-order limit.")
+    (assert
+      (forall order (collection orders)
+        (lte (path order notional)
+             (path limits max-order-notional)))))
+
+  (invariant OPS_004
+    (severity medium)
+    (category orders)
+    (description "Order submission timestamps precede the fixture review checkpoint.")
+    (assert
+      (forall order (collection orders)
+        (before (path order submitted-at)
+                (path account last-reviewed-at)))))
+
+  (invariant OPS_005
+    (severity medium)
+    (category settlement)
+    (description "Transactions post before their settlement timestamp.")
+    (assert
+      (forall txn (collection transactions)
+        (before (path txn posted-at)
+                (path txn settlement-at)))))
+
+  (invariant OPS_006
+    (severity medium)
+    (category settlement)
+    (description "Trade dates never occur after settlement.")
+    (assert
+      (forall txn (collection transactions)
+        (before (path txn trade-date)
+                (path txn settlement-at)))))
+
+  (invariant OPS_007
+    (severity medium)
+    (category alerts)
+    (description "No critical alert remains unresolved in the checked state.")
+    (assert
+      (none alert (collection alerts)
+        (and (eq (path alert severity) "critical")
+             (neq (path alert status) "resolved")))))
+
+  (invariant OPS_008
+    (severity medium)
+    (category withdrawals)
+    (description "Every withdrawal request stays below the configured withdrawal cap.")
+    (assert
+      (forall request (collection withdrawals)
+        (lte (path request amount)
+             (path limits max-withdrawal)))))
+
+  (invariant OPS_009
+    (severity medium)
+    (category concentration)
+    (description "Largest position weight stays within the configured concentration threshold.")
+    (assert
+      (lte (div (max (collection positions) (path market-value))
+                (path account total-value))
+           (path limits max-single-position-weight))))
+
+  (invariant OPS_010
+    (severity low)
+    (category workflow)
+    (description "Open orders imply positive buying power remains available.")
+    (assert
+      (implies (gt (count (collection orders)) 0)
+               (gt (path account buying-power) 0))))
+
+  (invariant OPS_011
+    (severity low)
+    (category workflow)
+    (description "Active account status agrees with positive buying power in this fixture.")
+    (assert
+      (iff (eq (path account status) "active")
+           (gt (path account buying-power) 0))))
+
+  (invariant OPS_012
+    (severity low)
+    (category workflow)
+    (description "Day-trade buying power follows the active-account branch of the rule.")
+    (assert
+      (eq (path account day-trade-buying-power)
+          (if (eq (path account status) "active") 8000 0)))))
