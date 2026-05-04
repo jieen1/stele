@@ -88,6 +88,18 @@ describe("stele CLI", () => {
     ]);
   });
 
+  it("generate preserves manifest content when nothing changed", async () => {
+    const projectDir = await createFixtureProject();
+
+    await runGenerate(projectDir, { force: false });
+    const manifestPath = join(projectDir, "contract", ".manifest.json");
+    const manifestBefore = await readFile(manifestPath, "utf8");
+
+    await runGenerate(projectDir, { force: false });
+
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
+  });
+
   it("generate rejects an entry path outside the project root and writes nothing", async () => {
     const projectDir = await createFixtureProject();
     const externalDir = await createTempDir();
@@ -193,6 +205,24 @@ describe("stele CLI", () => {
 
     await writeProjectFile(projectDir, "tests/contract/extra.py", "# extra\n");
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
+  });
+
+  it("generate does not ignore protected source files just because they live in __pycache__ directories", async () => {
+    const projectDir = await createFixtureProject({
+      protected: ["contract/**", "tests/contract/**/*"],
+    });
+    await writeProjectFile(projectDir, "contract/__pycache__/evil.py", "print('tracked source')\n");
+    await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/evil.py", "print('tracked checker source')\n");
+    await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/ignored.pyc", "pyc");
+    await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/ignored.pyo", "pyo");
+
+    await runGenerate(projectDir, { force: false });
+
+    const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
+    expect(Object.keys(manifest.protected_files)).toContain("contract/__pycache__/evil.py");
+    expect(Object.keys(manifest.protected_files)).toContain("contract/checker_impls/__pycache__/evil.py");
+    expect(Object.keys(manifest.protected_files)).not.toContain("contract/checker_impls/__pycache__/ignored.pyc");
+    expect(Object.keys(manifest.protected_files)).not.toContain("contract/checker_impls/__pycache__/ignored.pyo");
   });
 
   it("check does not ignore source directories whose names merely contain __pycache__", async () => {
@@ -346,6 +376,18 @@ describe("stele CLI", () => {
 
     const manifestAfter = await readFile(manifestPath, "utf8");
     expect(manifestAfter).not.toBe(manifestBefore);
+  });
+
+  it("lock preserves manifest content when nothing changed", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+
+    const manifestPath = join(projectDir, "contract", ".manifest.json");
+    const manifestBefore = await readFile(manifestPath, "utf8");
+
+    await runLock(projectDir, { reason: "no-op refresh" });
+
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
   });
 
   it("generate --force does not lock Python cache artifacts from generated or checker directories", async () => {

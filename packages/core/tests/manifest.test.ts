@@ -108,6 +108,43 @@ describe("manifest", () => {
     });
   });
 
+  it("preserves existing manifest content on no-op writes and refreshes generated_at only after real changes", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant STABLE_MANIFEST_RULE",
+        "  (severity medium)",
+        '  (description "Manifest writes should be no-ops when hashes stay stable.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+      "protected/check.py": "print('alpha')\n",
+    });
+    const manifestPath = join(project.directory, "contract", ".manifest.json");
+    const protectedPath = join(project.directory, "protected", "check.py");
+    const contractHash = sha256(normalizeContract(await loadContract(project.rootPath)));
+
+    await writeManifest([protectedPath], manifestPath, contractHash);
+    const initialManifest = await readManifest(manifestPath);
+    const pinnedGeneratedAt = "2026-05-04T00:00:00.000Z";
+    await writeManifestFixture(manifestPath, initialManifest.protected_files, {
+      contractHash,
+      generatedAt: pinnedGeneratedAt,
+    });
+
+    await writeManifest([protectedPath], manifestPath, contractHash);
+    await expect(readManifest(manifestPath)).resolves.toMatchObject({
+      generated_at: pinnedGeneratedAt,
+      contract_hash: contractHash,
+      protected_files: initialManifest.protected_files,
+    });
+
+    await writeFile(protectedPath, "print('beta')\n", "utf8");
+    await writeManifest([protectedPath], manifestPath, contractHash);
+
+    const updatedManifest = await readManifest(manifestPath);
+    expect(updatedManifest.generated_at).not.toBe(pinnedGeneratedAt);
+    expect(updatedManifest.protected_files["protected/check.py"].sha256).toBe(sha256("print('beta')\n"));
+  });
+
   it("rejects manifest protected paths that traverse outside the manifest directory", async () => {
     const project = await createTempProject({});
     const manifestPath = join(project.directory, "contract", ".manifest.json");
@@ -202,6 +239,10 @@ async function readManifest(manifestPath: string): Promise<{
 async function writeManifestFixture(
   manifestPath: string,
   protectedFiles: Record<string, { sha256: string; size: number }>,
+  options: {
+    contractHash?: string;
+    generatedAt?: string;
+  } = {},
 ): Promise<void> {
   await mkdir(dirname(manifestPath), { recursive: true });
   await writeFile(
@@ -209,10 +250,10 @@ async function writeManifestFixture(
     JSON.stringify(
       {
         version: "1",
-        generated_at: "2026-05-04T00:00:00.000Z",
+        generated_at: options.generatedAt ?? "2026-05-04T00:00:00.000Z",
         stele_version: "0.1.0",
         protected_files: protectedFiles,
-        contract_hash: "fixed-contract-hash",
+        contract_hash: options.contractHash ?? "fixed-contract-hash",
       },
       null,
       2,

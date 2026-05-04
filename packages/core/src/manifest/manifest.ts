@@ -62,6 +62,18 @@ export async function writeManifest(paths: string[], manifestPath: string, contr
     };
   }
 
+  const existingManifest = await tryReadManifestDocument(absoluteManifestPath);
+
+  if (
+    existingManifest !== undefined &&
+    existingManifest.version === MANIFEST_VERSION &&
+    existingManifest.stele_version === STELE_VERSION &&
+    existingManifest.contract_hash === contractHash &&
+    sameProtectedFiles(existingManifest.protected_files, protectedFiles)
+  ) {
+    return;
+  }
+
   const manifest: ContractManifest = {
     version: MANIFEST_VERSION,
     generated_at: new Date().toISOString(),
@@ -168,6 +180,18 @@ async function readManifestDocument(manifestPath: string): Promise<ContractManif
   return parsed;
 }
 
+async function tryReadManifestDocument(manifestPath: string): Promise<ContractManifest | undefined> {
+  try {
+    return await readManifestDocument(manifestPath);
+  } catch (error) {
+    if (isReadManifestFallbackError(error)) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
 async function readProtectedFile(filePath: string): Promise<ManifestProtectedFile> {
   const buffer = await readFile(filePath);
 
@@ -201,6 +225,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function sameProtectedFiles(
+  left: Record<string, ManifestProtectedFile>,
+  right: Record<string, ManifestProtectedFile>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+    return rightEntry !== undefined && leftEntry.sha256 === rightEntry.sha256 && leftEntry.size === rightEntry.size;
+  });
+}
+
 function validateManifestProtectedPath(path: string): void {
   const segments = path.split("/");
 
@@ -224,6 +266,13 @@ function validateManifestProtectedPath(path: string): void {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+function isReadManifestFallbackError(error: unknown): boolean {
+  return (
+    isMissingFileError(error) ||
+    (error instanceof SteleError && (error.code === "E0402" || error.code === "E0401"))
+  );
 }
 
 function normalizeManifestPath(value: string): string {

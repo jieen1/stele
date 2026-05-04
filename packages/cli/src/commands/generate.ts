@@ -348,7 +348,7 @@ function isIgnoredPythonCacheArtifact(path: string): boolean {
   const segments = normalizedPath.split("/").filter((segment) => segment.length > 0);
   const basename = segments[segments.length - 1] ?? "";
 
-  return segments.includes("__pycache__") || basename.endsWith(".pyc") || basename.endsWith(".pyo");
+  return basename.endsWith(".pyc") || basename.endsWith(".pyo");
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
