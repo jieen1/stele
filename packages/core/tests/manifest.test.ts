@@ -193,6 +193,38 @@ describe("manifest", () => {
     await expect(readFile(manifestPath, "utf8")).resolves.toBe("{bad json\n");
   });
 
+  it("rejects invalid manifest shapes instead of silently overwriting them", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant INVALID_MANIFEST_SHAPE_RULE",
+        "  (severity medium)",
+        '  (description "Invalid manifest shapes must fail closed.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+      "protected/check.py": "print('alpha')\n",
+    });
+    const manifestPath = join(project.directory, "contract", ".manifest.json");
+    const protectedPath = join(project.directory, "protected", "check.py");
+    const contractHash = sha256(normalizeContract(await loadContract(project.rootPath)));
+    const malformedShape = JSON.stringify(
+      {
+        version: "1",
+        generated_at: "2026-05-04T00:00:00.000Z",
+        stele_version: "0.1.0",
+        protected_files: [],
+        contract_hash: contractHash,
+      },
+      null,
+      2,
+    );
+
+    await mkdir(dirname(manifestPath), { recursive: true });
+    await writeFile(manifestPath, malformedShape, "utf8");
+
+    await expect(writeManifest([protectedPath], manifestPath, contractHash)).rejects.toThrowError(SteleError);
+    await expect(readFile(manifestPath, "utf8")).resolves.toBe(malformedShape);
+  });
+
   it("rejects manifest protected paths that traverse outside the manifest directory", async () => {
     const project = await createTempProject({});
     const manifestPath = join(project.directory, "contract", ".manifest.json");

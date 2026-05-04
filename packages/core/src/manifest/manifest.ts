@@ -215,7 +215,7 @@ async function readProtectedFile(filePath: string): Promise<ManifestProtectedFil
 }
 
 function isManifestDocument(value: unknown): value is ContractManifest {
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     return false;
   }
 
@@ -224,18 +224,18 @@ function isManifestDocument(value: unknown): value is ContractManifest {
     typeof value.generated_at !== "string" ||
     typeof value.stele_version !== "string" ||
     typeof value.contract_hash !== "string" ||
-    !isRecord(value.protected_files)
+    !isPlainRecord(value.protected_files)
   ) {
     return false;
   }
 
   return Object.values(value.protected_files).every(
-    (entry) => isRecord(entry) && typeof entry.sha256 === "string" && typeof entry.size === "number",
+    (entry) => isPlainRecord(entry) && typeof entry.sha256 === "string" && typeof entry.size === "number",
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function sameProtectedFiles(

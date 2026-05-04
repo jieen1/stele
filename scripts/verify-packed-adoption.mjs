@@ -15,6 +15,7 @@ const pnpmTool = resolveTool("pnpm", ["node_modules", "pnpm", "bin", "pnpm.cjs"]
 const npmTool = resolveTool("npm", ["node_modules", "npm", "bin", "npm-cli.js"]);
 const npxTool = resolveTool("npx", ["node_modules", "npm", "bin", "npx-cli.js"]);
 const pythonCommand = "python";
+const npmWarningPatterns = [/npm warn Unknown env config/i];
 
 async function main() {
   const tempRoot = await mkdtemp(join(tmpdir(), "stele packed adoption "));
@@ -33,9 +34,9 @@ async function main() {
 
     await mkdir(projectDir, { recursive: true });
 
-    await runTool(npmTool, ["init", "-y"], { cwd: projectDir });
-    await runTool(npmTool, ["install", "--save-dev", ...tarballs], { cwd: projectDir });
-    await runTool(npxTool, ["stele", "init", "--language", "python"], { cwd: projectDir });
+    await runTool(npmTool, ["init", "-y"], sanitizedNpmOptions({ cwd: projectDir }));
+    await runTool(npmTool, ["install", "--save-dev", ...tarballs], sanitizedNpmOptions({ cwd: projectDir }));
+    await runTool(npxTool, ["stele", "init", "--language", "python"], sanitizedNpmOptions({ cwd: projectDir }));
 
     await writeProjectFile(
       projectDir,
@@ -69,9 +70,9 @@ async function main() {
       ].join("\n") + "\n",
     );
 
-    await runTool(npxTool, ["stele", "generate"], { cwd: projectDir });
+    await runTool(npxTool, ["stele", "generate"], sanitizedNpmOptions({ cwd: projectDir }));
     await run(pythonCommand, ["-m", "pytest", "tests/contract", "-q"], { cwd: projectDir });
-    await runTool(npxTool, ["stele", "check"], { cwd: projectDir });
+    await runTool(npxTool, ["stele", "check"], sanitizedNpmOptions({ cwd: projectDir }));
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -133,6 +134,20 @@ function runTool(tool, args, options) {
   return run(tool.command, [...tool.argsPrefix, ...args], options);
 }
 
+function sanitizedNpmOptions(options) {
+  return {
+    ...options,
+    env: sanitizeNpmEnv(process.env),
+    forbiddenStderrPatterns: npmWarningPatterns,
+  };
+}
+
+function sanitizeNpmEnv(env) {
+  return Object.fromEntries(
+    Object.entries(env).filter(([key]) => !/^npm_config_/i.test(key)),
+  );
+}
+
 async function run(command, args, options) {
   const printable = [command, ...args].join(" ");
   process.stdout.write(`$ ${printable}\n`);
@@ -140,6 +155,7 @@ async function run(command, args, options) {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
+      env: options.env ?? process.env,
       windowsHide: true,
     });
     let stdout = "";
@@ -162,6 +178,11 @@ async function run(command, args, options) {
 
     child.on("error", rejectPromise);
     child.on("exit", (code) => {
+      if (code === 0 && options.forbiddenStderrPatterns?.some((pattern) => pattern.test(stderr))) {
+        rejectPromise(new Error(`Command emitted forbidden stderr output: ${printable}\n${stderr}`));
+        return;
+      }
+
       if (code === 0) {
         resolvePromise({ stdout, stderr });
         return;
