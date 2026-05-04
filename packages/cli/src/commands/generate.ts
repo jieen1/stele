@@ -127,6 +127,22 @@ export async function collectProtectedPaths(
   return uniqueSortedPaths(protectedPaths);
 }
 
+export async function collectProtectedManifestPaths(
+  projectDir: string,
+  paths: {
+    contractDir: string;
+    checkerImplDir: string;
+    generatedDir: string;
+  },
+): Promise<string[]> {
+  const protectedPaths = await collectProtectedPaths(projectDir, paths);
+  const normalizedProjectRoot = resolve(projectDir);
+
+  return protectedPaths
+    .map((path) => normalizeProjectRelativePath(normalizedProjectRoot, path))
+    .sort((left, right) => left.localeCompare(right));
+}
+
 export async function verifyManagedGeneratedFiles(
   projectDir: string,
   generatedDir: string,
@@ -207,6 +223,10 @@ function uniqueSortedPaths(paths: string[]): string[] {
 
 function normalizeForSort(path: string): string {
   return path.replaceAll("\\", "/").toLowerCase();
+}
+
+function normalizeProjectRelativePath(projectDir: string, absolutePath: string): string {
+  return relative(projectDir, absolutePath).replaceAll("\\", "/");
 }
 
 function isIgnoredGeneratedArtifact(projectRelativePath: string, generatedDir: string): boolean {

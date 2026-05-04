@@ -111,11 +111,40 @@ describe("stele CLI", () => {
     await runGenerate(projectDir, { force: false });
     await writeProjectFile(projectDir, "tests/contract/__pycache__/test_contract.cpython-313-pytest-9.0.2.pyc", "pyc");
     await writeProjectFile(projectDir, "tests/contract/__pycache__/conftest.cpython-313-pytest-9.0.2.pyc", "pyc");
+    await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/custom_checker.cpython-313.pyc", "pyc");
 
     await expect(runCheck(projectDir)).resolves.toBeUndefined();
 
     await writeProjectFile(projectDir, "tests/contract/extra.py", "# extra\n");
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
+  });
+
+  it("check fails on a new protected checker file until lock refreshes the manifest", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "contract/checker_impls/new_checker.py", "def new_checker(context):\n    return True\n");
+
+    await expect(runCheck(projectDir)).rejects.toThrow(/new\/unlocked protected files|protected/i);
+
+    await runLock(projectDir, { reason: "approved checker addition" });
+    await expect(runCheck(projectDir)).resolves.toBeUndefined();
+  });
+
+  it("check fails on a new protected cdl file before lock", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(
+      projectDir,
+      "contract/extra.stele",
+      [
+        "(invariant EXTRA_RULE",
+        "  (severity high)",
+        '  (description "Additional protected contract file.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    );
+
+    await expect(runCheck(projectDir)).rejects.toThrow(/new\/unlocked protected files|protected/i);
   });
 
   it("check fails when a manifest-protected file changes", async () => {
