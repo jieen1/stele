@@ -24,7 +24,11 @@ importers:
         specifier: ^1.4.0
         version: 1.6.1(@types/node@20.19.39)
 
-  packages/backend-python: {}
+  packages/backend-python:
+    dependencies:
+      '@stele/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/claude-code-plugin: {}
 

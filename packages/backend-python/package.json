@@ -9,9 +9,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "node --eval \"console.log('Scaffold build placeholder for @stele/backend-python: source files arrive in later tasks.')\"",
-    "test": "vitest run --passWithNoTests",
-    "typecheck": "node --eval \"console.log('Scaffold typecheck placeholder for @stele/backend-python: no TypeScript sources yet.')\"",
-    "lint": "node --eval \"console.log('Scaffold lint placeholder for @stele/backend-python: no lintable sources yet.')\""
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run --dir tests",
+    "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
+    "lint": "tsc --project tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@stele/core": "workspace:*"
   }
 }
