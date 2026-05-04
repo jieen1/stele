@@ -106,6 +106,18 @@ describe("stele CLI", () => {
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
   });
 
+  it("check ignores Python cache artifacts under generated output but still fails on undeclared source files", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "tests/contract/__pycache__/test_contract.cpython-313-pytest-9.0.2.pyc", "pyc");
+    await writeProjectFile(projectDir, "tests/contract/__pycache__/conftest.cpython-313-pytest-9.0.2.pyc", "pyc");
+
+    await expect(runCheck(projectDir)).resolves.toBeUndefined();
+
+    await writeProjectFile(projectDir, "tests/contract/extra.py", "# extra\n");
+    await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
+  });
+
   it("check fails when a manifest-protected file changes", async () => {
     const projectDir = await createFixtureProject();
     await runGenerate(projectDir, { force: false });
@@ -133,6 +145,43 @@ describe("stele CLI", () => {
 
     const manifestAfter = await readFile(manifestPath, "utf8");
     expect(manifestAfter).not.toBe(manifestBefore);
+  });
+
+  it("generate --force does not lock Python cache artifacts from generated or checker directories", async () => {
+    const projectDir = await createFixtureProject();
+    await writeProjectFile(projectDir, "tests/contract/__pycache__/test_contract.cpython-313-pytest-9.0.2.pyc", "pyc");
+    await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/custom_checker.cpython-313.pyc", "pyc");
+
+    await runGenerate(projectDir, { force: true });
+
+    const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
+    expect(Object.keys(manifest.protected_files)).toEqual([
+      "contract/checker_impls/custom_checker.py",
+      "contract/main.stele",
+      "tests/contract/__init__.py",
+      "tests/contract/_stele_runtime.py",
+      "tests/contract/conftest.py",
+      "tests/contract/test_contract.py",
+    ]);
+  });
+
+  it("lock does not add Python cache artifacts to the manifest when they already exist", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "tests/contract/__pycache__/test_contract.cpython-313-pytest-9.0.2.pyc", "pyc");
+    await writeProjectFile(projectDir, "contract/checker_impls/__pycache__/custom_checker.cpython-313.pyc", "pyc");
+
+    await runLock(projectDir, { reason: "refresh manifest" });
+
+    const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
+    expect(Object.keys(manifest.protected_files)).toEqual([
+      "contract/checker_impls/custom_checker.py",
+      "contract/main.stele",
+      "tests/contract/__init__.py",
+      "tests/contract/_stele_runtime.py",
+      "tests/contract/conftest.py",
+      "tests/contract/test_contract.py",
+    ]);
   });
 
   it("CLI entry parses commands and forwards cwd and options", async () => {

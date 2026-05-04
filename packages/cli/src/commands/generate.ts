@@ -120,8 +120,8 @@ export async function collectProtectedPaths(
 ): Promise<string[]> {
   const protectedPaths = [
     ...(await collectFiles(resolve(projectDir, paths.contractDir), (path) => path.endsWith(".stele"))),
-    ...(await collectFiles(resolve(projectDir, paths.checkerImplDir))),
-    ...(await collectFiles(resolve(projectDir, paths.generatedDir))),
+    ...(await collectFiles(resolve(projectDir, paths.checkerImplDir), (path) => !isIgnoredPythonCacheArtifact(path))),
+    ...(await collectFiles(resolve(projectDir, paths.generatedDir), (path) => !isIgnoredPythonCacheArtifact(path))),
   ];
 
   return uniqueSortedPaths(protectedPaths);
@@ -139,8 +139,10 @@ export async function verifyManagedGeneratedFiles(
     outputDir: generatedDir,
   });
   const allowedExtras = new Set([posix.join(generatedDir, "conftest.py")]);
-  const files = verification.files.filter((file) => !(file.status === "extra" && allowedExtras.has(file.path)));
-  const extra = verification.extra.filter((path) => !allowedExtras.has(path));
+  const files = verification.files.filter(
+    (file) => !(file.status === "extra" && (allowedExtras.has(file.path) || isIgnoredGeneratedArtifact(file.path, generatedDir))),
+  );
+  const extra = verification.extra.filter((path) => !allowedExtras.has(path) && !isIgnoredGeneratedArtifact(path, generatedDir));
   const changed = files.filter((file) => file.status === "changed").map((file) => file.path);
   const missing = files.filter((file) => file.status === "missing").map((file) => file.path);
   const unchanged = files.filter((file) => file.status === "unchanged").map((file) => file.path);
@@ -205,4 +207,23 @@ function uniqueSortedPaths(paths: string[]): string[] {
 
 function normalizeForSort(path: string): string {
   return path.replaceAll("\\", "/").toLowerCase();
+}
+
+function isIgnoredGeneratedArtifact(projectRelativePath: string, generatedDir: string): boolean {
+  const normalizedPath = projectRelativePath.replaceAll("\\", "/");
+  const normalizedGeneratedDir = generatedDir.replaceAll("\\", "/");
+
+  if (!normalizedPath.startsWith(`${normalizedGeneratedDir}/`)) {
+    return false;
+  }
+
+  return isIgnoredPythonCacheArtifact(normalizedPath.slice(normalizedGeneratedDir.length + 1));
+}
+
+function isIgnoredPythonCacheArtifact(path: string): boolean {
+  const normalizedPath = path.replaceAll("\\", "/");
+  const segments = normalizedPath.split("/").filter((segment) => segment.length > 0);
+  const basename = segments[segments.length - 1] ?? "";
+
+  return segments.includes("__pycache__") || basename.endsWith(".pyc") || basename.endsWith(".pyo");
 }
