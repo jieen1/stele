@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
+import { posix as pathPosix } from "node:path";
 import { SteleError } from "../errors/SteleError.js";
 
 const MANIFEST_VERSION = "1";
@@ -41,11 +42,12 @@ export type VerificationResult = {
 export async function writeManifest(paths: string[], manifestPath: string, contractHash: string): Promise<void> {
   const absoluteManifestPath = resolve(manifestPath);
   const manifestDirectory = dirname(absoluteManifestPath);
+  const manifestBaseDirectory = getManifestBaseDirectory(absoluteManifestPath);
   const files = await Promise.all(
     paths.map(async (path) => {
       const absolutePath = resolve(path);
       return {
-        path: normalizeManifestPath(relative(manifestDirectory, absolutePath)),
+        path: normalizeManifestPath(relative(manifestBaseDirectory, absolutePath)),
         ...(await readProtectedFile(absolutePath)),
       };
     }),
@@ -74,13 +76,14 @@ export async function writeManifest(paths: string[], manifestPath: string, contr
 
 export async function verifyManifest(manifestPath: string): Promise<VerificationResult> {
   const absoluteManifestPath = resolve(manifestPath);
-  const manifestDirectory = dirname(absoluteManifestPath);
+  const manifestBaseDirectory = getManifestBaseDirectory(absoluteManifestPath);
   const manifest = await readManifestDocument(absoluteManifestPath);
   const files: VerifiedProtectedFile[] = [];
 
   for (const path of Object.keys(manifest.protected_files).sort((left, right) => left.localeCompare(right))) {
     const expected = manifest.protected_files[path]!;
-    const absolutePath = resolve(manifestDirectory, path);
+    validateManifestProtectedPath(path);
+    const absolutePath = resolve(manifestBaseDirectory, path);
 
     try {
       const actual = await readProtectedFile(absolutePath);
@@ -194,8 +197,29 @@ function isManifestDocument(value: unknown): value is ContractManifest {
   );
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function validateManifestProtectedPath(path: string): void {
+  const segments = path.split("/");
+
+  if (
+    path.length === 0 ||
+    path.includes("\\") ||
+    pathPosix.isAbsolute(path) ||
+    /^[A-Za-z]:\//.test(path) ||
+    segments.includes("..")
+  ) {
+    throw new SteleError(
+      "E0404",
+      "Manifest Error",
+      `Manifest contains an invalid protected path "${path}".`,
+      undefined,
+      "Protected paths must be POSIX-style relative paths inside the manifest directory.",
+      "Regenerate the manifest with Stele or remove the invalid path entry.",
+    );
+  }
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
@@ -204,6 +228,10 @@ function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
 
 function normalizeManifestPath(value: string): string {
   return value.replaceAll("\\", "/");
+}
+
+function getManifestBaseDirectory(manifestPath: string): string {
+  return resolve(dirname(manifestPath), "..");
 }
 
 function toManifestError(code: string, message: string, error: unknown, hint: string): SteleError {

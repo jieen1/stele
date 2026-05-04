@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -127,6 +127,32 @@ describe("normalizeContract", () => {
       "  (tags :ledger :critical-path)",
       "  (applies-to (scope :account :customer)))",
     ].join("\n"));
+  });
+
+  it("preserves string-literal severities so normalized output can be reloaded", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant STRING_SEVERITY",
+        '  (severity "1")',
+        '  (description "String literal severities must stay valid after normalization.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    });
+    const normalizedPath = join(project.directory, "normalized.stele");
+    const normalized = normalizeContract(await loadContract(project.rootPath));
+
+    expect(normalized).toContain('(severity "1")');
+
+    await writeFile(normalizedPath, normalized, "utf8");
+
+    const reloaded = await loadContract(normalizedPath);
+    const normalizedSource = await readFile(normalizedPath, "utf8");
+
+    expect(reloaded.invariants[0]).toMatchObject({
+      id: "STRING_SEVERITY",
+      severity: "1",
+    });
+    expect(normalizedSource).toContain('(severity "1")');
   });
 });
 

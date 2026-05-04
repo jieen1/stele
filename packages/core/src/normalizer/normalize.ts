@@ -1,4 +1,4 @@
-import type { AstNode } from "../ast/types.js";
+import type { AstNode, ListNode } from "../ast/types.js";
 import type {
   Contract,
   ContractFile,
@@ -59,7 +59,7 @@ function renderGroup(group: GroupDeclaration, indent = 0): string {
 
 function renderInvariant(invariant: InvariantDeclaration, indent = 0): string {
   const items = [
-    renderList("severity", [renderText(invariant.severity)], indent + 1),
+    renderList("severity", [renderSeverityValue(invariant)], indent + 1),
     renderList("description", [renderString(invariant.description)], indent + 1),
     invariant.assertExpression === undefined
       ? renderList(
@@ -79,6 +79,18 @@ function renderInvariant(invariant: InvariantDeclaration, indent = 0): string {
   ].filter((item): item is string => item !== undefined);
 
   return wrapBlock(`(invariant ${invariant.id}`, items, indent);
+}
+
+function renderSeverityValue(invariant: InvariantDeclaration): string {
+  const severityField = invariant.node.items.find(
+    (item): item is ListNode => item.kind === "list" && item.head === "severity",
+  );
+
+  if (severityField?.items[0] !== undefined) {
+    return renderNode(severityField.items[0]);
+  }
+
+  return renderText(invariant.severity);
 }
 
 function renderOptionalInvariantField(name: string, value: AstNode | undefined, indent: number): string | undefined {

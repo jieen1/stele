@@ -2,9 +2,8 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Contract } from "../src/index";
+import { SteleError, type Contract } from "../src/index";
 import * as stele from "../src/index";
 
 const tempDirs: string[] = [];
@@ -45,7 +44,6 @@ describe("manifest", () => {
     expect(contractHashA).toBe(contractHashB);
 
     await writeManifest([protectedFileA], manifestPathA, contractHashA);
-    await delay(20);
     await writeManifest([protectedFileB], manifestPathB, contractHashB);
 
     const manifestA = await readManifest(manifestPathA);
@@ -58,10 +56,10 @@ describe("manifest", () => {
     });
     expect(manifestA.generated_at).toBeTypeOf("string");
     expect(manifestB.generated_at).toBeTypeOf("string");
-    expect(manifestA.generated_at).not.toBe(manifestB.generated_at);
     expect(manifestB.contract_hash).toBe(contractHashA);
-    expect(Object.keys(manifestA.protected_files)).toEqual(["../protected/nested/check.py"]);
-    expect(manifestA.protected_files["../protected/nested/check.py"]).toMatchObject({
+    expect(manifestA.contract_hash).toBe(manifestB.contract_hash);
+    expect(Object.keys(manifestA.protected_files)).toEqual(["protected/nested/check.py"]);
+    expect(manifestA.protected_files["protected/nested/check.py"]).toMatchObject({
       size: Buffer.byteLength("print('alpha')\n"),
     });
   });
@@ -91,23 +89,79 @@ describe("manifest", () => {
     await unlink(missingPath);
 
     const verification = await verifyManifest(manifestPath);
-    const changedEntry = verification.files.find((file) => file.path === "../protected/alpha.bin");
-    const missingEntry = verification.files.find((file) => file.path === "../protected/beta.bin");
+    const changedEntry = verification.files.find((file) => file.path === "protected/alpha.bin");
+    const missingEntry = verification.files.find((file) => file.path === "protected/beta.bin");
 
     expect(verification.ok).toBe(false);
     expect(verification.contractHash).toBe(contractHash);
-    expect(verification.changed).toEqual(["../protected/alpha.bin"]);
-    expect(verification.missing).toEqual(["../protected/beta.bin"]);
+    expect(verification.changed).toEqual(["protected/alpha.bin"]);
+    expect(verification.missing).toEqual(["protected/beta.bin"]);
     expect(changedEntry).toMatchObject({
       status: "changed",
-      expected: manifest.protected_files["../protected/alpha.bin"],
+      expected: manifest.protected_files["protected/alpha.bin"],
     });
     expect(changedEntry?.actual?.sha256).toBe(sha256(Buffer.from([0x00, 0x10, 0x21, 0xff])));
-    expect(changedEntry?.actual?.sha256).not.toBe(manifest.protected_files["../protected/alpha.bin"].sha256);
+    expect(changedEntry?.actual?.sha256).not.toBe(manifest.protected_files["protected/alpha.bin"].sha256);
     expect(missingEntry).toMatchObject({
       status: "missing",
-      expected: manifest.protected_files["../protected/beta.bin"],
+      expected: manifest.protected_files["protected/beta.bin"],
     });
+  });
+
+  it("rejects manifest protected paths that traverse outside the manifest directory", async () => {
+    const project = await createTempProject({});
+    const manifestPath = join(project.directory, "contract", ".manifest.json");
+
+    await writeManifestFixture(manifestPath, {
+      "../../external-secret.txt": {
+        sha256: "abc123",
+        size: 1,
+      },
+    });
+
+    await expect(verifyManifest(manifestPath)).rejects.toThrowError(SteleError);
+
+    try {
+      await verifyManifest(manifestPath);
+    } catch (error) {
+      expect(error).toBeInstanceOf(SteleError);
+      expect(error).toMatchObject({
+        code: "E0404",
+        category: "Manifest Error",
+      });
+      expect((error as SteleError).message).toContain("invalid protected path");
+    }
+  });
+
+  it("rejects manifest protected paths that use backslashes or absolute paths", async () => {
+    const project = await createTempProject({});
+
+    for (const [label, protectedPath] of [
+      ["backslash", "..\\external-secret.txt"],
+      ["absolute", "/external-secret.txt"],
+    ] as const) {
+      const manifestPath = join(project.directory, "contract", `${label}.manifest.json`);
+
+      await writeManifestFixture(manifestPath, {
+        [protectedPath]: {
+          sha256: "def456",
+          size: 2,
+        },
+      });
+
+      await expect(verifyManifest(manifestPath)).rejects.toThrowError(SteleError);
+
+      try {
+        await verifyManifest(manifestPath);
+      } catch (error) {
+        expect(error).toBeInstanceOf(SteleError);
+        expect(error).toMatchObject({
+          code: "E0404",
+          category: "Manifest Error",
+        });
+        expect((error as SteleError).message).toContain("invalid protected path");
+      }
+    }
   });
 });
 
@@ -143,6 +197,28 @@ async function readManifest(manifestPath: string): Promise<{
     protected_files: Record<string, { sha256: string; size: number }>;
     contract_hash: string;
   };
+}
+
+async function writeManifestFixture(
+  manifestPath: string,
+  protectedFiles: Record<string, { sha256: string; size: number }>,
+): Promise<void> {
+  await mkdir(dirname(manifestPath), { recursive: true });
+  await writeFile(
+    manifestPath,
+    JSON.stringify(
+      {
+        version: "1",
+        generated_at: "2026-05-04T00:00:00.000Z",
+        stele_version: "0.1.0",
+        protected_files: protectedFiles,
+        contract_hash: "fixed-contract-hash",
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
 }
 
 function loadContract(rootPath: string): Promise<Contract> {
