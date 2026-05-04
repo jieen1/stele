@@ -197,9 +197,9 @@ const CORE_OPERATOR_SPECS: OperatorSpec[] = [
   }),
   defineOperator({
     name: "count",
-    parameters: [required("Collection"), optional("Path")],
+    parameters: [required("Collection")],
     returnType: "Number",
-    description: "Count items in a collection, optionally by a path.",
+    description: "Count items in a collection.",
   }),
   defineOperator({
     name: "avg",

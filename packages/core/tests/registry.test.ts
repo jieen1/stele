@@ -34,7 +34,7 @@ const EXPECTED_SIGNATURES: ExpectedSignature[] = [
   signature("neg", 1, 1, ["Number"], parameters(required("Number")), "Number"),
   signature("abs", 1, 1, ["Number"], parameters(required("Number")), "Number"),
   signature("sum", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Number"),
-  signature("count", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Number"),
+  signature("count", 1, 1, ["Collection"], parameters(required("Collection")), "Number"),
   signature("avg", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Number"),
   signature("min", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Number"),
   signature("max", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Number"),
