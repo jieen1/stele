@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "command": "node scripts/pre-tool-protect.js"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "node scripts/stop-validate.js"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "stele",
+  "version": "0.1.0",
+  "description": "Contract management for AI-assisted development",
+  "license": "MIT",
+  "requirements": {
+    "stele-cli": "^0.1.0"
+  }
+}

@@ -6,12 +6,18 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    ".claude-plugin",
+    "agents",
+    "commands",
+    "hooks",
+    "scripts",
+    "skills"
   ],
   "scripts": {
-    "build": "node --eval \"console.log('Scaffold build placeholder for @stele/claude-code-plugin: source files arrive in later tasks.')\"",
-    "test": "vitest run --passWithNoTests",
-    "typecheck": "node --eval \"console.log('Scaffold typecheck placeholder for @stele/claude-code-plugin: no TypeScript sources yet.')\"",
-    "lint": "node --eval \"console.log('Scaffold lint placeholder for @stele/claude-code-plugin: no lintable sources yet.')\""
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run --dir tests",
+    "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
+    "lint": "tsc --project tsconfig.json --noEmit --pretty false"
   }
 }
