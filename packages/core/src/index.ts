@@ -1,5 +1,18 @@
 export type { AstNode, AtomNode, ListNode, SourceSpan, SteleType } from "./ast/types.js";
 export { SteleError } from "./errors/SteleError.js";
+export type {
+  GeneratedFile,
+  GeneratedVerificationFile,
+  GeneratedVerificationResult,
+  GeneratedVerificationStatus,
+  GenerationConfig,
+  LanguageBackend,
+} from "./generator/coordinator.js";
+export {
+  coordinateGeneration,
+  DEFAULT_GENERATED_OUTPUT_DIR,
+  verifyGenerated,
+} from "./generator/coordinator.js";
 export { lex } from "./lexer/lexer.js";
 export type { Token } from "./lexer/token.js";
 export { loadContract, validateContract } from "./loader/loadContract.js";
