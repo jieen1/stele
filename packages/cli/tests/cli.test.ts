@@ -223,6 +223,20 @@ describe("stele CLI", () => {
     expect(Object.keys(manifest.protected_files)).toContain("docs/other/readme.txt");
   });
 
+  it("explicit empty protected config intentionally allows generate, lock, and check with no protected file entries", async () => {
+    const projectDir = await createFixtureProject({
+      protected: [],
+    });
+    await writeProjectFile(projectDir, "docs/guide.md", "# guide\n");
+
+    await runGenerate(projectDir, { force: false });
+    await runLock(projectDir, { reason: "empty protected baseline" });
+    await expect(runCheck(projectDir)).resolves.toBeUndefined();
+
+    const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
+    expect(Object.keys(manifest.protected_files)).toEqual([]);
+  });
+
   it("check fails after generate until the manifest is explicitly locked", async () => {
     const projectDir = await createFixtureProject();
 

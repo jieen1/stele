@@ -37,7 +37,7 @@ The hook loads the `protected` array from `stele.config.json` when present. If t
 
 The protected-glob parser is intentionally conservative:
 
-- patterns must be strings
+- patterns must be non-empty, non-blank strings
 - patterns must stay project-relative
 - bracket globs such as `docs/[a-z].md` are rejected
 
@@ -167,7 +167,7 @@ Read the CLI output. Exit code `2` means generated-file drift; exit code `3` mea
 
 Validate `stele.config.json`:
 
-- `protected` must be an array of strings
+- `protected` must be an array of non-empty, non-blank project-relative glob strings
 - protected globs must be project-relative
 - bracket glob syntax is not supported
 
