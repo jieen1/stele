@@ -1,5 +1,9 @@
 export type { AstNode, AtomNode, ListNode, SourceSpan, SteleType } from "./ast/types.js";
 export { SteleError } from "./errors/SteleError.js";
+export { lex } from "./lexer/lexer.js";
+export type { Token } from "./lexer/token.js";
+export { parseFile } from "./parser/parser.js";
+export type { ParsedFile } from "./parser/parser.js";
 export type {
   OperatorParameterOccurrence,
   OperatorParameterSpec,
