@@ -33,6 +33,7 @@ describe("stele CLI", () => {
     expect(conftest).toContain("def stele_default(value, fallback):");
     expect(conftest).toContain("def stele_context_or_skip(**values):");
     expect(conftest).toContain("@pytest.fixture\ndef stele_context():\n    return {}\n");
+    expect(conftest).toContain("@pytest.fixture\ndef stele_sandbox():\n    return nullcontext()\n");
   });
 
   it("init does not overwrite existing user files", async () => {
@@ -68,6 +69,52 @@ describe("stele CLI", () => {
 
     await expect(runInit(projectDir, { language: "python" })).rejects.toThrow(/EISDIR|illegal operation on a directory/i);
     await expect(pathExists(join(projectDir, "contract", "main.stele"))).resolves.toBe(false);
+  });
+
+  it("init scaffold supports scenario-backed pytest generation and execution out of the box", async () => {
+    const projectDir = await createTempDir();
+
+    await runInit(projectDir, { language: "python" });
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund"',
+        '      (body (object (name (gen unique-name "fund")))))',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_VALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL remains valid.")',
+        "  (assert (gt (path pnl value) 0)))",
+      ].join("\n"),
+    );
+    await writeProjectFile(projectDir, "tests/__init__.py", "");
+    await writeProjectFile(
+      projectDir,
+      "tests/contract_scenarios.py",
+      [
+        "def create_fund(body, stele_context):",
+        '    return {"id": "fund-123", "name": body["name"]}',
+        "",
+        "",
+        "def get_pnl(body, stele_context):",
+        '    assert body["fund-id"] == "fund-123"',
+        '    return {"value": 5}',
+      ].join("\n"),
+    );
+
+    await runGenerate(projectDir, { force: false });
+    const result = await runContractPytest(projectDir);
+
+    expect(result.stdout).toContain("1 passed");
   });
 
   it("generate writes canonical Python files without writing a manifest", async () => {
@@ -1047,6 +1094,13 @@ async function initializeGitRepo(projectDir: string): Promise<void> {
 async function git(projectDir: string, ...args: string[]): Promise<string> {
   const { stdout } = await execFileAsync("git", args, { cwd: projectDir });
   return stdout.trim();
+}
+
+async function runContractPytest(projectDir: string): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync("python", ["-m", "pytest", "tests/contract", "-q"], {
+    cwd: projectDir,
+    windowsHide: true,
+  });
 }
 
 function captureStderr(): { read(): string } {
