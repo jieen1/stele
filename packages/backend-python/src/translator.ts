@@ -1,4 +1,12 @@
-import { SteleError, type AstNode, type Contract, type InvariantDeclaration, type ListNode } from "@stele/core";
+import {
+  SteleError,
+  type AstNode,
+  type Contract,
+  type InvariantDeclaration,
+  type ListNode,
+  type ScenarioDeclaration,
+  type ScenarioOperation,
+} from "@stele/core";
 import { getPythonRuntimeSource, PYTEST_RUNTIME_PATH } from "./runtime.js";
 import { arithmeticOperatorHandlers } from "./templates/arithmetic.js";
 import { collectionOperatorHandlers } from "./templates/collection.js";
@@ -24,13 +32,15 @@ export type PythonOperatorHandler = (
 
 export type TranslationContext = {
   readonly bindings: ReadonlyMap<string, string>;
+  readonly rootContextName: string;
   readonly usedNames: ReadonlySet<string>;
   bind(identifier: string): { name: string; context: TranslationContext };
   resolve(identifier: string): string | undefined;
 };
 
 const INDENT = "    ";
-const PYTEST_IMPORT_LINE = "from ._stele_runtime import stele_call_checker, stele_get_path, stele_is_modified, stele_sum";
+const BASE_RUNTIME_HELPERS = ["stele_call_checker", "stele_get_path", "stele_is_modified", "stele_sum"];
+const SCENARIO_RUNTIME_HELPERS = ["stele_merge_contexts", "stele_run_scenario"];
 const PYTHON_RESERVED_WORDS = new Set([
   "False",
   "None",
@@ -101,14 +111,15 @@ export function generatePytestFiles(contract: Contract): GeneratedPytestFile[] {
 }
 
 export function generatePytestSource(contract: Contract): string {
-  const lines = [PYTEST_IMPORT_LINE, "", ""];
+  const lines = [buildPytestImportLine(contract), "", ""];
   const invariants = contract.invariants.slice().sort(compareInvariants);
+  const scenariosById = new Map(contract.scenarios.map((scenario) => [scenario.id, scenario] as const));
   const usedTestNames = new Set<string>();
 
   invariants.forEach((invariant, index) => {
     const testName = allocateUniquePythonName(`test_${sanitizePythonIdentifier(invariant.id, "invariant")}`, usedTestNames);
     usedTestNames.add(testName);
-    lines.push(...renderInvariantTest(invariant, testName));
+    lines.push(...renderInvariantTest(invariant, testName, scenariosById));
     lines.push(index === invariants.length - 1 ? "" : "");
 
     if (index !== invariants.length - 1) {
@@ -181,11 +192,42 @@ export function sanitizePythonIdentifier(identifier: string, fallbackPrefix = "v
   return /^[0-9]/.test(withPrefix) ? `${fallbackPrefix}_${withPrefix}` : withPrefix;
 }
 
-function renderInvariantTest(invariant: InvariantDeclaration, testName: string): string[] {
-  const lines = [`def ${testName}(stele_context):`];
+function renderInvariantTest(
+  invariant: InvariantDeclaration,
+  testName: string,
+  scenariosById: ReadonlyMap<string, ScenarioDeclaration>,
+): string[] {
+  const usesScenario = invariant.usesScenario !== undefined;
+  const assertionContextName = usesScenario ? "stele_assert_context" : "stele_context";
+  const checkerContextName = usesScenario ? "stele_assert_context" : "stele_context";
+  const expressionContext = createTranslationContext(new Map(), new Set(), assertionContextName);
+  const lines = [`def ${testName}(${usesScenario ? "stele_context, stele_sandbox" : "stele_context"}):`];
+
+  if (invariant.usesScenario !== undefined) {
+    const scenario = scenariosById.get(invariant.usesScenario.scenarioId);
+
+    if (scenario === undefined) {
+      throw new SteleError(
+        "E0605",
+        "Backend Error",
+        `Invariant "${invariant.id}" references an unknown scenario "${invariant.usesScenario.scenarioId}".`,
+        invariant.usesScenario.span,
+        "Scenario references should have been validated by @stele/core before backend generation.",
+        "Fix the contract or re-run generation after scenario validation passes.",
+      );
+    }
+
+    const scenarioLiteralLines = renderPythonValue(serializeScenario(scenario), 2);
+    lines.push(`${INDENT}stele_scenario_context = stele_run_scenario(`);
+    lines.push(...scenarioLiteralLines);
+    lines.push(`${INDENT}${INDENT}stele_context,`);
+    lines.push(`${INDENT}${INDENT}stele_sandbox,`);
+    lines.push(`${INDENT})`);
+    lines.push(`${INDENT}stele_assert_context = stele_merge_contexts(stele_context, stele_scenario_context)`);
+  }
 
   if (invariant.whenExpression !== undefined) {
-    lines.push(`${INDENT}if not (${translateExpression(invariant.whenExpression)}):`);
+    lines.push(`${INDENT}if not (${translateExpression(invariant.whenExpression, expressionContext)}):`);
     lines.push(`${INDENT}${INDENT}return`);
   }
 
@@ -202,7 +244,7 @@ function renderInvariantTest(invariant: InvariantDeclaration, testName: string):
     }
 
     lines.push(
-      `${INDENT}result = stele_call_checker(${toPythonString(invariant.usesChecker.checkerId)}, stele_context, {})`,
+      `${INDENT}result = stele_call_checker(${toPythonString(invariant.usesChecker.checkerId)}, ${checkerContextName}, {})`,
     );
     lines.push(
       `${INDENT}assert result["passed"], result.get("message") or ${toPythonString(`Checker failed: ${invariant.usesChecker.checkerId}`)}`,
@@ -210,27 +252,27 @@ function renderInvariantTest(invariant: InvariantDeclaration, testName: string):
     return lines;
   }
 
-  lines.push(...renderAssertionLines(invariant.assertExpression!));
+  lines.push(...renderAssertionLines(invariant.assertExpression!, expressionContext));
   return lines;
 }
 
-function renderAssertionLines(node: AstNode): string[] {
+function renderAssertionLines(node: AstNode, context: TranslationContext): string[] {
   if (node.kind === "list" && node.head === "eq" && node.items.length === 2 && isMultilineArithmetic(node.items[1])) {
     return [
-      `${INDENT}assert ${translateExpression(node.items[0]!)} == (`,
-      ...renderArithmeticExpressionLines(node.items[1] as ListNode, 2),
+      `${INDENT}assert ${translateExpression(node.items[0]!, context)} == (`,
+      ...renderArithmeticExpressionLines(node.items[1] as ListNode, 2, context),
       `${INDENT})`,
     ];
   }
 
   if (node.kind === "list" && node.head === "forall" && node.items.length === 3) {
-    return renderForallAssertionLines(node);
+    return renderForallAssertionLines(node, context);
   }
 
-  return [`${INDENT}assert ${translateExpression(node)}`];
+  return [`${INDENT}assert ${translateExpression(node, context)}`];
 }
 
-function renderForallAssertionLines(node: ListNode): string[] {
+function renderForallAssertionLines(node: ListNode, context: TranslationContext): string[] {
   const binding = node.items[0];
 
   if (binding?.kind !== "identifier") {
@@ -244,7 +286,6 @@ function renderForallAssertionLines(node: ListNode): string[] {
     );
   }
 
-  const context = createTranslationContext();
   const bound = context.bind(binding.value);
   const collection = translateExpression(node.items[1]!, context);
   const predicate = translateExpression(node.items[2]!, bound.context);
@@ -257,11 +298,11 @@ function renderForallAssertionLines(node: ListNode): string[] {
   ];
 }
 
-function renderArithmeticExpressionLines(node: ListNode, indentLevel: number): string[] {
+function renderArithmeticExpressionLines(node: ListNode, indentLevel: number, context: TranslationContext): string[] {
   const symbol = arithmeticSymbol(node.head);
   const prefix = INDENT.repeat(indentLevel);
 
-  return node.items.map((item, index) => `${prefix}${index === 0 ? "" : `${symbol} `}${translateExpression(item)}`);
+  return node.items.map((item, index) => `${prefix}${index === 0 ? "" : `${symbol} `}${translateExpression(item, context)}`);
 }
 
 function arithmeticSymbol(operator: string): string {
@@ -317,10 +358,10 @@ function translatePath(node: ListNode, context: TranslationContext): string {
   }
 
   if (parts.length === 0) {
-    return `stele_get_path(stele_context, ${JSON.stringify([rootKey])})`;
+    return `stele_get_path(${context.rootContextName}, ${JSON.stringify([rootKey])})`;
   }
 
-  return `stele_get_path(stele_context[${toPythonString(rootKey)}], ${JSON.stringify(pathParts)})`;
+  return `stele_get_path(${context.rootContextName}[${toPythonString(rootKey)}], ${JSON.stringify(pathParts)})`;
 }
 
 function translateField(node: ListNode, context: TranslationContext): string {
@@ -391,12 +432,297 @@ function compareInvariants(left: InvariantDeclaration, right: InvariantDeclarati
   );
 }
 
+function buildPytestImportLine(contract: Contract): string {
+  const helpers = contract.invariants.some((invariant) => invariant.usesScenario !== undefined)
+    ? [...BASE_RUNTIME_HELPERS.slice(0, 3), ...SCENARIO_RUNTIME_HELPERS, BASE_RUNTIME_HELPERS[3]!]
+    : BASE_RUNTIME_HELPERS;
+
+  return `from ._stele_runtime import ${helpers.join(", ")}`;
+}
+
+function serializeScenario(scenario: ScenarioDeclaration): Record<string, unknown> {
+  return {
+    id: scenario.id,
+    executor: scenario.executor,
+    sandbox: scenario.sandbox,
+    steps: scenario.steps.map((step) => serializeScenarioOperation(step)),
+  };
+}
+
+function serializeScenarioOperation(step: ScenarioOperation): Record<string, unknown> {
+  if (step.kind === "step") {
+    return {
+      kind: step.kind,
+      id: step.id,
+      capture: step.capture,
+      call: serializeScenarioCall(step.call.target, step.call.body),
+    };
+  }
+
+  return {
+    kind: step.kind,
+    capture: step.capture,
+    call: serializeScenarioCall(step.call.target, step.call.body),
+  };
+}
+
+function serializeScenarioCall(target: string, body: AstNode | undefined): Record<string, unknown> {
+  return {
+    target,
+    ...(body === undefined ? {} : { body: serializeScenarioValue(body) }),
+  };
+}
+
+function serializeScenarioValue(node: AstNode): unknown {
+  if (node.kind === "number") {
+    return node.value;
+  }
+
+  if (node.kind === "string") {
+    return node.value;
+  }
+
+  if (node.kind === "keyword") {
+    return `:${node.value}`;
+  }
+
+  if (node.kind === "identifier") {
+    switch (node.value) {
+      case "true":
+        return true;
+      case "false":
+        return false;
+      case "null":
+      case "none":
+        return null;
+      default:
+        throw new SteleError(
+          "E0606",
+          "Backend Error",
+          `Unsupported bare identifier "${node.value}" in scenario body.`,
+          node.span,
+          "Scenario bodies currently support object, ref, gen, booleans, and null-like identifiers.",
+          "Wrap the value in a supported scenario expression or quote it as a string literal.",
+        );
+    }
+  }
+
+  if (node.head === "object") {
+    return Object.fromEntries(node.items.map((item) => serializeScenarioObjectField(item)));
+  }
+
+  if (node.head === "ref") {
+    return {
+      $ref: serializeScenarioRef(node),
+    };
+  }
+
+  if (node.head === "gen") {
+    return {
+      $gen: serializeScenarioGenerator(node),
+    };
+  }
+
+  throw new SteleError(
+    "E0606",
+    "Backend Error",
+    `Unsupported scenario body operator "${node.head}".`,
+    node.span,
+    "The Python scenario slice supports object, ref, and gen forms inside scenario call bodies.",
+    "Rewrite this body using the supported scenario expression forms.",
+  );
+}
+
+function serializeScenarioObjectField(node: AstNode): [string, unknown] {
+  if (node.kind !== "list") {
+    throw new SteleError(
+      "E0606",
+      "Backend Error",
+      "Scenario object fields must be list entries.",
+      node.span,
+      "Each object field should look like (key expr).",
+      "Rewrite this object entry as a single-field list.",
+    );
+  }
+
+  if (node.items.length !== 1) {
+    throw new SteleError(
+      "E0606",
+      "Backend Error",
+      `Scenario object field "${node.head}" expects exactly one value.`,
+      node.span,
+      `Found ${node.items.length} value(s).`,
+      "Keep a single value for each object key.",
+    );
+  }
+
+  return [node.head, serializeScenarioValue(node.items[0]!)];
+}
+
+function serializeScenarioRef(node: ListNode): string[] {
+  const [captureNode, ...fieldNodes] = node.items;
+
+  if (captureNode?.kind !== "identifier") {
+    throw new SteleError(
+      "E0606",
+      "Backend Error",
+      "Scenario ref expressions must start with a captured identifier.",
+      captureNode?.span ?? node.span,
+      `Found ${captureNode === undefined ? "nothing" : captureNode.kind} where the capture name should be.`,
+      "Use a form like (ref fund id).",
+    );
+  }
+
+  return [captureNode.value, ...fieldNodes.map(readPathPart)];
+}
+
+function serializeScenarioGenerator(node: ListNode): Record<string, unknown> {
+  const [kindNode, prefixNode] = node.items;
+
+  if (kindNode?.kind !== "identifier" || kindNode.value !== "unique-name") {
+    throw new SteleError(
+      "E0606",
+      "Backend Error",
+      "Scenario gen expressions currently support only unique-name.",
+      kindNode?.span ?? node.span,
+      `Found ${kindNode === undefined ? "nothing" : describeScenarioNode(kindNode)} instead.`,
+      'Use a form like (gen unique-name "fund").',
+    );
+  }
+
+  if (prefixNode?.kind !== "string" || node.items.length !== 2) {
+    throw new SteleError(
+      "E0606",
+      "Backend Error",
+      'Scenario gen unique-name expects exactly one string prefix.',
+      prefixNode?.span ?? node.span,
+      `Found ${node.items.length - 1} generator argument(s).`,
+      'Use a form like (gen unique-name "fund").',
+    );
+  }
+
+  return {
+    kind: "unique-name",
+    prefix: prefixNode.value,
+  };
+}
+
+function renderPythonValue(value: unknown, indentLevel: number): string[] {
+  const prefix = INDENT.repeat(indentLevel);
+
+  if (value === null) {
+    return [`${prefix}None,`];
+  }
+
+  if (typeof value === "string") {
+    return [`${prefix}${toPythonString(value)},`];
+  }
+
+  if (typeof value === "number") {
+    return [`${prefix}${String(value)},`];
+  }
+
+  if (typeof value === "boolean") {
+    return [`${prefix}${value ? "True" : "False"},`];
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return [`${prefix}[],`];
+    }
+
+    const lines = [`${prefix}[`];
+
+    for (const item of value) {
+      lines.push(...renderPythonValue(item, indentLevel + 1));
+    }
+
+    lines.push(`${prefix}],`);
+    return lines;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+
+  if (entries.length === 0) {
+    return [`${prefix}{},`];
+  }
+
+  const lines = [`${prefix}{`];
+
+  for (const [key, entryValue] of entries) {
+    const renderedInline = renderInlinePythonValue(entryValue);
+
+    if (renderedInline !== undefined) {
+      lines.push(`${INDENT.repeat(indentLevel + 1)}${toPythonString(key)}: ${renderedInline},`);
+      continue;
+    }
+
+    lines.push(`${INDENT.repeat(indentLevel + 1)}${toPythonString(key)}:`);
+    lines.push(...renderPythonValue(entryValue, indentLevel + 2));
+  }
+
+  lines.push(`${prefix}},`);
+  return lines;
+}
+
+function renderInlinePythonValue(value: unknown): string | undefined {
+  if (value === null) {
+    return "None";
+  }
+
+  if (typeof value === "string") {
+    return toPythonString(value);
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "True" : "False";
+  }
+
+  if (Array.isArray(value)) {
+    if (value.every((item) => typeof item === "string")) {
+      return `[${value.map((item) => toPythonString(item)).join(", ")}]`;
+    }
+
+    return undefined;
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+
+    if (entries.length === 0) {
+      return "{}";
+    }
+
+    if (entries.every(([, entryValue]) => renderInlinePythonValue(entryValue) !== undefined)) {
+      return `{${entries
+        .map(([key, entryValue]) => `${toPythonString(key)}: ${renderInlinePythonValue(entryValue)}`)
+        .join(", ")}}`;
+    }
+  }
+
+  return undefined;
+}
+
+function describeScenarioNode(node: AstNode): string {
+  if (node.kind === "list") {
+    return `list "${node.head}"`;
+  }
+
+  return `${node.kind} "${node.value}"`;
+}
+
 function createTranslationContext(
   bindings = new Map<string, string>(),
   usedNames = new Set<string>(),
+  rootContextName = "stele_context",
 ): TranslationContext {
   return {
     bindings,
+    rootContextName,
     usedNames,
     bind(identifier: string) {
       const name = allocateUniquePythonName(sanitizePythonIdentifier(identifier, "item"), usedNames);
@@ -406,7 +732,7 @@ function createTranslationContext(
       nextUsedNames.add(name);
       return {
         name,
-        context: createTranslationContext(nextBindings, nextUsedNames),
+        context: createTranslationContext(nextBindings, nextUsedNames, rootContextName),
       };
     },
     resolve(identifier: string) {

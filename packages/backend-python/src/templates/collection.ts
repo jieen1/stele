@@ -16,7 +16,7 @@ export const collectionOperatorHandlers: Record<string, PythonOperatorHandler> =
   "not-null": (node, context, translate) => `${translate(node.items[0]!, context)} is not None`,
 } as Record<string, PythonOperatorHandler>;
 
-function translateCollection(node: ListNode): string {
+function translateCollection(node: ListNode, context: TranslationContext): string {
   const target = node.items[0];
 
   if (target?.kind !== "identifier") {
@@ -30,7 +30,7 @@ function translateCollection(node: ListNode): string {
     );
   }
 
-  return `stele_context[${JSON.stringify(target.value)}]`;
+  return `${context.rootContextName}[${JSON.stringify(target.value)}]`;
 }
 
 function translateSum(node: ListNode, context: TranslationContext, translate: PythonExpressionTranslator): string {

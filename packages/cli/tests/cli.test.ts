@@ -86,6 +86,37 @@ describe("stele CLI", () => {
     });
   });
 
+  it("generate includes scenario runtime calls and sandbox fixture dependencies for scenario-backed invariants", async () => {
+    const projectDir = await createFixtureProject();
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund")',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_VALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL remains valid.")',
+        "  (assert (gt (path pnl value) 0)))",
+      ].join("\n"),
+    );
+
+    await runGenerate(projectDir, { force: false });
+
+    const generated = await readFile(join(projectDir, "tests", "contract", "test_contract.py"), "utf8");
+    expect(generated).toContain("def test_FUND_PNL_VALID(stele_context, stele_sandbox):");
+    expect(generated).toContain("stele_scenario_context = stele_run_scenario(");
+    expect(generated).toContain('stele_assert_context = stele_merge_contexts(stele_context, stele_scenario_context)');
+  });
+
   it("generate stays manifest-neutral when nothing changed", async () => {
     const projectDir = await createFixtureProject();
 

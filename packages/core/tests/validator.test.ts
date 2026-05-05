@@ -125,6 +125,158 @@ describe("loadContract validation", () => {
     expect(invariant.appliesTo?.valueNode.span).toEqual({ file: project.rootPath, line: 10, column: 15 });
   });
 
+  it("parses top-level scenarios and attaches uses-scenario metadata to invariants", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund"',
+        '      (body (object (name (gen unique-name "fund")))))',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_VALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL remains valid.")',
+        "  (assert (gt (path pnl value) 0)))",
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+
+    expect(contract.scenarios).toHaveLength(1);
+    expect(contract.scenarios[0]).toMatchObject({
+      id: "fund-pnl-flow",
+      sandbox: "transactional",
+      executor: "python-import",
+      steps: [
+        {
+          kind: "step",
+          id: "setup-fund",
+          capture: "fund",
+          call: {
+            target: "tests.contract_scenarios:create_fund",
+            body: {
+              kind: "list",
+              head: "object",
+            },
+          },
+        },
+        {
+          kind: "capture-state",
+          capture: "pnl",
+          call: {
+            target: "tests.contract_scenarios:get_pnl",
+            body: {
+              kind: "list",
+              head: "object",
+            },
+          },
+        },
+      ],
+    });
+    expect(contract.invariants[0]).toMatchObject({
+      id: "FUND_PNL_VALID",
+      usesScenario: {
+        scenarioId: "fund-pnl-flow",
+      },
+    });
+  });
+
+  it("rejects duplicate scenario ids across loaded files", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(import "modules/secondary.stele")',
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund")',
+        "    (capture fund)))",
+      ].join("\n"),
+      "modules/secondary.stele": [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund")',
+        "    (capture fund)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0315",
+      file: join(project.directory, "modules", "secondary.stele"),
+      line: 1,
+      column: 1,
+      messageIncludes: 'Scenario id "fund-pnl-flow" is already defined',
+    });
+  });
+
+  it("rejects uses-scenario references that do not resolve to a known scenario", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant BROKEN_SCENARIO",
+        "  (uses-scenario missing-flow)",
+        "  (severity high)",
+        '  (description "References a scenario that does not exist.")',
+        "  (assert (eq 1 1)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0316",
+      file: project.rootPath,
+      line: 2,
+      column: 18,
+      messageIncludes: 'Unknown scenario "missing-flow"',
+    });
+  });
+
+  it("rejects unsupported scenario executors and malformed scenario calls with source spans", async () => {
+    const unsupportedExecutorProject = await createTempProject({
+      "main.stele": [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor http)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund")',
+        "    (capture fund)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(unsupportedExecutorProject.rootPath), {
+      code: "E0317",
+      file: unsupportedExecutorProject.rootPath,
+      line: 3,
+      column: 13,
+      messageIncludes: 'Scenario "fund-pnl-flow" executor "http" is not supported',
+    });
+
+    const malformedCallProject = await createTempProject({
+      "main.stele": [
+        "(scenario broken-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        "    (call 42)",
+        "    (capture fund)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(malformedCallProject.rootPath), {
+      code: "E0317",
+      file: malformedCallProject.rootPath,
+      line: 5,
+      column: 11,
+      messageIncludes: 'Scenario step "setup-fund" call target must be a string literal',
+    });
+  });
+
   it("rejects duplicate checker ids", async () => {
     const project = await createTempProject({
       "main.stele": [

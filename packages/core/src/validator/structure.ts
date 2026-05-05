@@ -3,12 +3,13 @@ import type { AstNode, ListNode, SourceSpan } from "../ast/types.js";
 import { SteleError } from "../errors/SteleError.js";
 import type { ParsedFile } from "../parser/parser.js";
 
-const TOP_LEVEL_DECLARATIONS = new Set(["metadata", "import", "operator", "checker", "group", "invariant"]);
+const TOP_LEVEL_DECLARATIONS = new Set(["metadata", "import", "operator", "checker", "group", "invariant", "scenario"]);
 const ALLOWED_INVARIANT_FIELDS = new Set([
   "severity",
   "description",
   "assert",
   "uses-checker",
+  "uses-scenario",
   "category",
   "tags",
   "when",
@@ -64,6 +65,12 @@ export type CheckerUse = {
   node: ListNode;
 };
 
+export type ScenarioUse = {
+  scenarioId: string;
+  span: SourceSpan;
+  node: ListNode;
+};
+
 export type InvariantDependency = {
   id: string;
   span: SourceSpan;
@@ -98,6 +105,7 @@ export type InvariantDeclaration = {
   description: string;
   assertExpression?: AstNode;
   usesChecker?: CheckerUse;
+  usesScenario?: ScenarioUse;
   whenExpression?: AstNode;
   dependsOn: InvariantDependency[];
   category?: InvariantSingleValueField;
@@ -118,6 +126,49 @@ export type GroupDeclaration = {
   invariants: InvariantDeclaration[];
 };
 
+export type ScenarioSandbox = "transactional";
+
+export type ScenarioExecutor = "python-import";
+
+export type ScenarioCall = {
+  node: ListNode;
+  span: SourceSpan;
+  target: string;
+  body?: AstNode;
+};
+
+export type ScenarioStepDeclaration = {
+  kind: "step";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  call: ScenarioCall;
+  capture?: string;
+};
+
+export type ScenarioCaptureStateDeclaration = {
+  kind: "capture-state";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  capture: string;
+  call: ScenarioCall;
+};
+
+export type ScenarioOperation = ScenarioStepDeclaration | ScenarioCaptureStateDeclaration;
+
+export type ScenarioDeclaration = {
+  kind: "scenario";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  sandbox: ScenarioSandbox;
+  executor: ScenarioExecutor;
+  steps: ScenarioOperation[];
+};
+
 export type ContractFile = {
   path: string;
   parsed: ParsedFile;
@@ -125,6 +176,7 @@ export type ContractFile = {
   imports: ImportDeclaration[];
   operators: OperatorDeclaration[];
   checkers: CheckerDeclaration[];
+  scenarios: ScenarioDeclaration[];
   groups: GroupDeclaration[];
   invariants: InvariantDeclaration[];
 };
@@ -136,6 +188,7 @@ export type Contract = {
   imports: ImportDeclaration[];
   operators: OperatorDeclaration[];
   checkers: CheckerDeclaration[];
+  scenarios: ScenarioDeclaration[];
   groups: GroupDeclaration[];
   invariants: InvariantDeclaration[];
 };
@@ -150,6 +203,7 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     imports: contractFiles.flatMap((file) => file.imports),
     operators: contractFiles.flatMap((file) => file.operators),
     checkers: contractFiles.flatMap((file) => file.checkers),
+    scenarios: contractFiles.flatMap((file) => file.scenarios),
     groups: contractFiles.flatMap((file) => file.groups),
     invariants: contractFiles.flatMap((file) => file.invariants),
   };
@@ -170,6 +224,7 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   const imports: ImportDeclaration[] = [];
   const operators: OperatorDeclaration[] = [];
   const checkers: CheckerDeclaration[] = [];
+  const scenarios: ScenarioDeclaration[] = [];
   const groups: GroupDeclaration[] = [];
   const invariants: InvariantDeclaration[] = [];
 
@@ -224,6 +279,9 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
       case "checker":
         checkers.push(parseCheckerDeclaration(file.path, node));
         break;
+      case "scenario":
+        scenarios.push(parseScenarioDeclaration(file.path, node));
+        break;
       case "group": {
         const group = parseGroupDeclaration(file.path, node);
         groups.push(group);
@@ -243,6 +301,7 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
     imports,
     operators,
     checkers,
+    scenarios,
     groups,
     invariants,
   };
@@ -382,6 +441,102 @@ function parseGroupDeclaration(filePath: string, node: ListNode): GroupDeclarati
   };
 }
 
+function parseScenarioDeclaration(filePath: string, node: ListNode): ScenarioDeclaration {
+  const idNode = node.items[0];
+
+  if (idNode?.kind !== "identifier") {
+    throw validationError(
+      "E0317",
+      "Scenario declarations must start with an identifier.",
+      node.span,
+      "The first scenario item should be the scenario id.",
+      'Use a form like (scenario fund-pnl-flow ...).',
+    );
+  }
+
+  let sandbox: ScenarioSandbox | undefined;
+  let executor: ScenarioExecutor | undefined;
+  const steps: ScenarioOperation[] = [];
+
+  for (const field of node.items.slice(1)) {
+    if (field.kind !== "list") {
+      throw validationError(
+        "E0317",
+        `Scenario "${idNode.value}" contains an unsupported field entry.`,
+        field.span,
+        "Scenario fields must be nested list forms such as (sandbox transactional) or (step ...).",
+        "Wrap this field in a supported list declaration.",
+      );
+    }
+
+    switch (field.head) {
+      case "sandbox":
+        ensureFieldUnset(sandbox, field, `Scenario "${idNode.value}" sandbox`);
+        sandbox = parseScenarioSandbox(field, idNode.value);
+        break;
+      case "executor":
+        ensureFieldUnset(executor, field, `Scenario "${idNode.value}" executor`);
+        executor = parseScenarioExecutor(field, idNode.value);
+        break;
+      case "step":
+        steps.push(parseScenarioStep(filePath, field, idNode.value));
+        break;
+      case "capture-state":
+        steps.push(parseScenarioCaptureState(filePath, field, idNode.value));
+        break;
+      default:
+        throw validationError(
+          "E0317",
+          `Scenario "${idNode.value}" has an unknown field "${field.head}".`,
+          field.span,
+          'Supported scenario fields are: sandbox, executor, step, capture-state.',
+          "Rename or remove this field.",
+        );
+    }
+  }
+
+  if (sandbox === undefined) {
+    throw validationError(
+      "E0317",
+      `Scenario "${idNode.value}" is missing a sandbox field.`,
+      node.span,
+      "Scenarios must declare which sandbox mode they require.",
+      "Add a field such as (sandbox transactional).",
+    );
+  }
+
+  if (executor === undefined) {
+    throw validationError(
+      "E0317",
+      `Scenario "${idNode.value}" is missing an executor field.`,
+      node.span,
+      "Scenarios must declare which executor will run their calls.",
+      "Add a field such as (executor python-import).",
+    );
+  }
+
+  if (steps.length === 0) {
+    throw validationError(
+      "E0317",
+      `Scenario "${idNode.value}" must declare at least one step.`,
+      node.span,
+      "A scenario without steps cannot produce captured state for invariants.",
+      "Add one or more (step ...) or (capture-state ...) forms.",
+    );
+  }
+
+  return {
+    kind: "scenario",
+    filePath,
+    node,
+    span: node.span,
+    id: idNode.value,
+    sandbox,
+    executor,
+    steps,
+  };
+}
+
 function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: string): InvariantDeclaration {
   const idNode = node.items[0];
 
@@ -399,6 +554,7 @@ function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: s
   let description: string | undefined;
   let assertExpression: AstNode | undefined;
   let usesChecker: CheckerUse | undefined;
+  let usesScenario: ScenarioUse | undefined;
   let whenExpression: AstNode | undefined;
   let dependsOn: InvariantDependency[] = [];
   let category: InvariantSingleValueField | undefined;
@@ -460,6 +616,37 @@ function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: s
           checkerId: checkerIdNode.value,
           span: checkerIdNode.span,
           args: field.items.slice(1),
+          node: field,
+        };
+        break;
+      }
+      case "uses-scenario": {
+        ensureFieldUnset(usesScenario, field, `Invariant "${idNode.value}" uses-scenario`);
+        const scenarioIdNode = field.items[0];
+
+        if (scenarioIdNode?.kind !== "identifier") {
+          throw validationError(
+            "E0305",
+            `Invariant "${idNode.value}" must reference a scenario id.`,
+            field.span,
+            "uses-scenario expects an identifier as its first argument.",
+            'Use a form like (uses-scenario fund-pnl-flow).',
+          );
+        }
+
+        if (field.items.length !== 1) {
+          throw validationError(
+            "E0305",
+            `Invariant "${idNode.value}" uses-scenario expects exactly one scenario id.`,
+            field.span,
+            `Found ${field.items.length} value(s).`,
+            "Keep a single scenario id inside uses-scenario.",
+          );
+        }
+
+        usesScenario = {
+          scenarioId: scenarioIdNode.value,
+          span: scenarioIdNode.span,
           node: field,
         };
         break;
@@ -552,6 +739,7 @@ function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: s
     description,
     assertExpression,
     usesChecker,
+    usesScenario,
     whenExpression,
     dependsOn,
     category,
@@ -561,6 +749,243 @@ function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: s
     since,
     appliesTo,
   };
+}
+
+function parseScenarioSandbox(node: ListNode, scenarioId: string): ScenarioSandbox {
+  const sandboxNode = readSingleExpression(node, `Scenario "${scenarioId}" sandbox`);
+
+  if (sandboxNode.kind !== "identifier") {
+    throw validationError(
+      "E0317",
+      `Scenario "${scenarioId}" sandbox must be an identifier.`,
+      sandboxNode.span,
+      `Found ${describeNode(sandboxNode)} instead.`,
+      "Use transactional for the v0.1 sandbox mode.",
+    );
+  }
+
+  if (sandboxNode.value !== "transactional") {
+    throw validationError(
+      "E0317",
+      `Scenario "${scenarioId}" sandbox "${sandboxNode.value}" is not supported.`,
+      sandboxNode.span,
+      'The Python vertical slice currently supports only (sandbox transactional).',
+      "Change the sandbox to transactional for this version.",
+    );
+  }
+
+  return sandboxNode.value;
+}
+
+function parseScenarioExecutor(node: ListNode, scenarioId: string): ScenarioExecutor {
+  const executorNode = readSingleExpression(node, `Scenario "${scenarioId}" executor`);
+
+  if (executorNode.kind !== "identifier") {
+    throw validationError(
+      "E0317",
+      `Scenario "${scenarioId}" executor must be an identifier.`,
+      executorNode.span,
+      `Found ${describeNode(executorNode)} instead.`,
+      "Use python-import for the v0.1 executor.",
+    );
+  }
+
+  if (executorNode.value !== "python-import") {
+    throw validationError(
+      "E0317",
+      `Scenario "${scenarioId}" executor "${executorNode.value}" is not supported.`,
+      executorNode.span,
+      "The Python vertical slice currently supports only the python-import executor.",
+      "Change the executor to python-import for this version.",
+    );
+  }
+
+  return executorNode.value;
+}
+
+function parseScenarioStep(filePath: string, node: ListNode, scenarioId: string): ScenarioStepDeclaration {
+  const idNode = node.items[0];
+
+  if (idNode?.kind !== "identifier") {
+    throw validationError(
+      "E0317",
+      `Scenario "${scenarioId}" step declarations must start with an identifier.`,
+      node.span,
+      "The first step item should be the step id.",
+      'Use a form like (step setup-fund ...).',
+    );
+  }
+
+  let call: ScenarioCall | undefined;
+  let capture: string | undefined;
+
+  for (const field of node.items.slice(1)) {
+    if (field.kind !== "list") {
+      throw validationError(
+        "E0317",
+        `Scenario step "${idNode.value}" contains an unsupported field entry.`,
+        field.span,
+        "Scenario steps may contain call and capture forms.",
+        "Replace this item with (call ...) or (capture ...).",
+      );
+    }
+
+    if (field.head === "call") {
+      ensureFieldUnset(call, field, `Scenario step "${idNode.value}" call`);
+      call = parseScenarioCall(field, `Scenario step "${idNode.value}"`);
+      continue;
+    }
+
+    if (field.head === "capture") {
+      if (capture !== undefined) {
+        ensureFieldUnset(capture, field, `Scenario step "${idNode.value}" capture`);
+      }
+      capture = parseScenarioCaptureName(field, `Scenario step "${idNode.value}" capture`);
+      continue;
+    }
+
+    throw validationError(
+      "E0317",
+      `Scenario step "${idNode.value}" has an unknown field "${field.head}".`,
+      field.span,
+      "Scenario steps may contain call and capture forms in v0.1.",
+      "Rename or remove this field.",
+    );
+  }
+
+  if (call === undefined) {
+    throw validationError(
+      "E0317",
+      `Scenario step "${idNode.value}" is missing a call field.`,
+      node.span,
+      "Each scenario step must describe which function to execute.",
+      "Add a field such as (call \"tests.contract_scenarios:create_fund\").",
+    );
+  }
+
+  return {
+    kind: "step",
+    filePath,
+    node,
+    span: node.span,
+    id: idNode.value,
+    call,
+    capture,
+  };
+}
+
+function parseScenarioCaptureState(filePath: string, node: ListNode, scenarioId: string): ScenarioCaptureStateDeclaration {
+  const captureNode = node.items[0];
+
+  if (captureNode?.kind !== "identifier") {
+    throw validationError(
+      "E0317",
+      `Scenario "${scenarioId}" capture-state declarations must start with an identifier.`,
+      node.span,
+      "The first capture-state item should be the capture id.",
+      'Use a form like (capture-state pnl ...).',
+    );
+  }
+
+  let call: ScenarioCall | undefined;
+
+  for (const field of node.items.slice(1)) {
+    if (field.kind !== "list") {
+      throw validationError(
+        "E0317",
+        `Scenario capture-state "${captureNode.value}" contains an unsupported field entry.`,
+        field.span,
+        "capture-state may only contain a call form in v0.1.",
+        "Replace this item with (call ...).",
+      );
+    }
+
+    if (field.head !== "call") {
+      throw validationError(
+        "E0317",
+        `Scenario capture-state "${captureNode.value}" has an unknown field "${field.head}".`,
+        field.span,
+        "capture-state may only contain a call form in v0.1.",
+        "Rename or remove this field.",
+      );
+    }
+
+    ensureFieldUnset(call, field, `Scenario capture-state "${captureNode.value}" call`);
+    call = parseScenarioCall(field, `Scenario capture-state "${captureNode.value}"`);
+  }
+
+  if (call === undefined) {
+    throw validationError(
+      "E0317",
+      `Scenario capture-state "${captureNode.value}" is missing a call field.`,
+      node.span,
+      "capture-state must invoke a Python function that returns the captured state.",
+      "Add a field such as (call \"tests.contract_scenarios:get_pnl\" ...).",
+    );
+  }
+
+  return {
+    kind: "capture-state",
+    filePath,
+    node,
+    span: node.span,
+    capture: captureNode.value,
+    call,
+  };
+}
+
+function parseScenarioCall(node: ListNode, label: string): ScenarioCall {
+  const targetNode = node.items[0];
+
+  if (targetNode?.kind !== "string") {
+    throw validationError(
+      "E0317",
+      `${label} call target must be a string literal.`,
+      targetNode?.span ?? node.span,
+      `Found ${targetNode === undefined ? "nothing" : describeNode(targetNode)} instead of a string literal target.`,
+      'Use a form like (call "tests.contract_scenarios:create_fund" ...).',
+    );
+  }
+
+  let body: AstNode | undefined;
+
+  for (const field of node.items.slice(1)) {
+    if (field.kind !== "list" || field.head !== "body") {
+      throw validationError(
+        "E0317",
+        `${label} call has an unsupported field.`,
+        field.span,
+        "Scenario calls may contain an optional body form after the target string.",
+        "Replace this item with (body ...), or remove it.",
+      );
+    }
+
+    ensureFieldUnset(body, field, `${label} call body`);
+    body = readSingleExpression(field, `${label} call body`);
+  }
+
+  return {
+    node,
+    span: node.span,
+    target: targetNode.value,
+    body,
+  };
+}
+
+function parseScenarioCaptureName(node: ListNode, label: string): string {
+  const captureNode = readSingleExpression(node, label);
+
+  if (captureNode.kind !== "identifier") {
+    throw validationError(
+      "E0317",
+      `${label} must be an identifier.`,
+      captureNode.span,
+      `Found ${describeNode(captureNode)} instead.`,
+      "Use a simple identifier such as fund or pnl.",
+    );
+  }
+
+  return captureNode.value;
 }
 
 function readSingleString(node: ListNode, label: string): string {

@@ -21,6 +21,12 @@ export function validateUniqueness(contract: Contract): Contract {
     "Use a globally unique group id across the loaded contract files.",
   );
   validateDuplicateIds(
+    contract.scenarios,
+    "E0315",
+    "Scenario",
+    "Use a globally unique scenario id across the loaded contract files.",
+  );
+  validateDuplicateIds(
     contract.operators,
     "E0314",
     "Operator",
@@ -33,7 +39,7 @@ export function validateUniqueness(contract: Contract): Contract {
 function validateDuplicateIds<T extends { id: string; span: { file: string; line: number; column: number }; filePath: string }>(
   items: T[],
   code: string,
-  label: "Invariant" | "Checker" | "Group" | "Operator",
+  label: "Invariant" | "Checker" | "Group" | "Scenario" | "Operator",
   hint: string,
 ): void {
   const seen = new Map<string, { filePath: string }>();

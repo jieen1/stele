@@ -69,4 +69,12 @@ export type {
   LoadedContractFile,
   MetadataDeclaration,
   OperatorDeclaration,
+  ScenarioCall,
+  ScenarioCaptureStateDeclaration,
+  ScenarioDeclaration,
+  ScenarioExecutor,
+  ScenarioOperation,
+  ScenarioSandbox,
+  ScenarioStepDeclaration,
+  ScenarioUse,
 } from "./validator/structure.js";
