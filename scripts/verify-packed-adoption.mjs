@@ -1,11 +1,12 @@
 import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const dependencyManifestFields = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 const publishPackageDirs = [
   join(repoRoot, "packages", "core"),
   join(repoRoot, "packages", "backend-python"),
@@ -32,11 +33,23 @@ async function main() {
       await verifyNpmReleasePack(packageDir);
     }
 
-    const tarballs = [];
+    const packedTarballs = new Map();
 
-    for (const packageDir of adoptionPackageDirs) {
-      tarballs.push(await packPackage(packageDir, packDir));
+    for (const packageDir of publishPackageDirs) {
+      const tarballPath = await packPackage(packageDir, packDir);
+      await verifyPackedPackageManifest(tarballPath);
+      packedTarballs.set(packageDir, tarballPath);
     }
+
+    const tarballs = adoptionPackageDirs.map((packageDir) => {
+      const tarballPath = packedTarballs.get(packageDir);
+
+      if (!tarballPath) {
+        throw new Error(`Missing packed tarball for ${packageDir}.`);
+      }
+
+      return tarballPath;
+    });
 
     await mkdir(projectDir, { recursive: true });
 
@@ -129,6 +142,29 @@ async function packPackage(packageDir, packDir) {
   }
 
   return isAbsolute(tarballName) ? tarballName : join(packDir, tarballName);
+}
+
+async function verifyPackedPackageManifest(tarballPath) {
+  const { stdout } = await run("tar", ["-xOf", tarballPath, "package/package.json"], {
+    cwd: repoRoot,
+    capture: true,
+  });
+  const manifest = JSON.parse(stdout);
+  const workspaceDependencies = [];
+
+  for (const field of dependencyManifestFields) {
+    for (const [dependencyName, dependencyVersion] of Object.entries(manifest[field] ?? {})) {
+      if (typeof dependencyVersion === "string" && dependencyVersion.startsWith("workspace:")) {
+        workspaceDependencies.push(`${field}.${dependencyName}=${dependencyVersion}`);
+      }
+    }
+  }
+
+  if (workspaceDependencies.length > 0) {
+    throw new Error(
+      `Packed manifest ${basename(tarballPath)} still contains workspace protocol dependencies: ${workspaceDependencies.join(", ")}`,
+    );
+  }
 }
 
 async function verifyNpmReleasePack(packageDir) {

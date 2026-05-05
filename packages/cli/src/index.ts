@@ -10,6 +10,8 @@ import { runList } from "./commands/list.js";
 import { lockProject, type LockOptions, type LockSummary } from "./commands/lock.js";
 import { getExitCode } from "./errors.js";
 
+const STELE_CLI_VERSION = "0.1.0";
+
 type ProgramDependencies = {
   cwd?: () => string;
   runCheck?: (projectDir: string) => Promise<CheckSummary | void>;
@@ -32,8 +34,23 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   const addChecker = dependencies.runAddChecker ?? runAddChecker;
   const program = new Command();
 
-  program.name("stele").description("Contract management for AI-assisted development").version("0.1.0");
+  program
+    .name("stele")
+    .description("Contract management for AI-assisted development")
+    .version(STELE_CLI_VERSION)
+    .option("--stele-version", "print Stele CLI version")
+    .action((options: { steleVersion?: boolean }) => {
+      if (options.steleVersion) {
+        process.stdout.write(formatVersion());
+        return;
+      }
 
+      program.help();
+    });
+
+  program.command("version").description("Print Stele CLI version.").action(() => {
+    process.stdout.write(formatVersion());
+  });
   program.command("check").action(async () => {
     const result = await check(cwd());
     if (isCheckSummary(result)) {
@@ -78,6 +95,10 @@ function formatLockSummary(summary: LockSummary): string {
 
 function formatGenerateSummary(summary: GenerateSummary): string {
   return `OK generated ${summary.generatedFileCount} file${summary.generatedFileCount === 1 ? "" : "s"} in ${summary.generatedDir}.\n`;
+}
+
+function formatVersion(): string {
+  return `${STELE_CLI_VERSION}\n`;
 }
 
 function isCheckSummary(value: CheckSummary | void): value is CheckSummary {

@@ -119,9 +119,18 @@ fi
 }
 
 function Assert-SteleCliWorks {
-  $npxResult = Invoke-LocalCommand -Command "npx" -Arguments @("stele", "--version")
-  if ($npxResult.ExitCode -ne 0 -or $npxResult.Output.Trim() -ne $expectedVersion) {
-    throw "npx stele --version did not resolve the local Stele CLI. Expected $expectedVersion, got exit $($npxResult.ExitCode): $($npxResult.Output)"
+  $versionChecks = @(
+    [pscustomobject]@{ Label = "npx stele --version"; Command = "npx"; Arguments = @("stele", "--version") },
+    [pscustomobject]@{ Label = "npx -- stele --version"; Command = "npx"; Arguments = @("--", "stele", "--version") },
+    [pscustomobject]@{ Label = "npx stele version"; Command = "npx"; Arguments = @("stele", "version") },
+    [pscustomobject]@{ Label = "npm exec -- stele --version"; Command = "npm"; Arguments = @("exec", "--", "stele", "--version") }
+  )
+
+  foreach ($check in $versionChecks) {
+    $result = Invoke-LocalCommand -Command $check.Command -Arguments $check.Arguments
+    if ($result.ExitCode -ne 0 -or $result.Output.Trim() -ne $expectedVersion) {
+      throw "$($check.Label) did not resolve the local Stele CLI. Expected $expectedVersion, got exit $($result.ExitCode): $($result.Output)"
+    }
   }
 
   $npmScriptResult = Invoke-LocalCommand -Command "npm" -Arguments @("run", "stele", "--", "--version")
@@ -187,6 +196,9 @@ Assert-SteleCliWorks
 Write-Host ""
 Write-Host "Stele local packages installed."
 Write-Host "Verified: npx stele --version -> $expectedVersion"
+Write-Host "Verified: npx -- stele --version -> $expectedVersion"
+Write-Host "Verified: npx stele version -> $expectedVersion"
+Write-Host "Verified: npm exec -- stele --version -> $expectedVersion"
 Write-Host "Next:"
 Write-Host "  npm run stele:init"
 Write-Host "  npm run stele:generate"

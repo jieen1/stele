@@ -29,6 +29,18 @@ E:\project\stele\local-packages\install-stele-local.ps1
 
 It installs the packed packages and writes `npm run stele:init`, `npm run stele:generate`, `npm run stele:lock`, and `npm run stele:check` scripts.
 
+To verify the installed CLI, use one of the Stele-facing forms:
+
+```bash
+npx stele --version
+npx -- stele --version
+npx stele version
+npm exec -- stele --version
+npm run stele -- --version
+```
+
+Avoid `npm exec stele --version`; npm parses that as npm's own version flag instead of passing `--version` to Stele.
+
 That creates:
 
 - `stele.config.json`

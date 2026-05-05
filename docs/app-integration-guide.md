@@ -14,6 +14,8 @@ npx stele init --language python
 
 For local development from this repository, `local-packages/install-stele-local.ps1` installs the packed CLI, core, Python backend, and Claude Code plugin tarballs into the current application. It also writes npm scripts such as `stele:init`, `stele:generate`, `stele:lock`, and `stele:check` so operators can use `npm run stele:check` without remembering the `npx` form.
 
+Use `npx stele --version`, `npx -- stele --version`, `npx stele version`, `npm exec -- stele --version`, or `npm run stele -- --version` to verify the CLI. Do not use `npm exec stele --version`; npm treats that as npm's own version flag.
+
 After `stele init`, your repository has:
 
 - `stele.config.json`

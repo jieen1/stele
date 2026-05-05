@@ -616,6 +616,15 @@ describe("stele CLI", () => {
     process.exitCode = originalExitCode;
   });
 
+  it("CLI prints the package version through npm-safe version entry points", async () => {
+    const stdout = captureStdout();
+
+    await createProgram().exitOverride().parseAsync(["node", "stele", "version"]);
+    await createProgram().exitOverride().parseAsync(["node", "stele", "--stele-version"]);
+
+    expect(stdout.read()).toBe("0.1.0\n0.1.0\n");
+  });
+
   it("CLI exits with code 2 when generated files are tampered", async () => {
     const projectDir = await createFixtureProject();
     const stderr = captureStderr();

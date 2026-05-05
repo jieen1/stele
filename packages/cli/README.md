@@ -13,12 +13,15 @@ This package installs the `stele` executable.
 ## Commands
 
 - `stele init --language python`
+- `stele version`
 - `stele generate [--force]`
 - `stele check`
 - `stele lock [--reason "..."]`
 - `stele list [--severity ...] [--category ...] [--tag ...]`
 - `stele explain <invariant-id>`
 - `stele add-checker <checker-id>`
+
+Version checks can use `stele --version`, `stele version`, or `stele --stele-version`. When invoking through npm, use `npm exec -- stele --version`; `npm exec stele --version` is parsed by npm as npm's own `--version` flag.
 
 `checker-id` is the canonical CDL checker id. Hyphenated ids such as `balance-change-has-transaction` stay hyphenated in the emitted `(checker ...)` block and are written to underscore-safe Python filenames such as `balance_change_has_transaction.py`.
 
