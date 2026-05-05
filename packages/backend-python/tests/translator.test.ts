@@ -335,6 +335,29 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
+  it("uses stele_assert_context for temporal expressions in scenario-backed invariants", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(scenario account-balance-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (capture-state state-before",
+        '    (call "tests.contract_scenarios:get_state_before"))',
+        "  (capture-state state-after",
+        '    (call "tests.contract_scenarios:get_state_after")))',
+        "(invariant BALANCE_MODIFIED_FROM_SCENARIO",
+        "  (uses-scenario account-balance-flow)",
+        "  (severity high)",
+        '  (description "Scenario-provided state snapshots drive modified checks.")',
+        "  (assert (modified (path account balance))))",
+      ].join("\n"),
+    });
+
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain('assert stele_is_modified(stele_assert_context, ["account","balance"])');
+  });
+
   it("executes python-import scenarios end to end with sandbox fixtures and captured state", async () => {
     const contract = await createContract({
       "main.stele": [
@@ -380,6 +403,56 @@ describe("@stele/backend-python translator", () => {
           "def get_pnl(body, stele_context):",
           '    assert body["fund-id"] == "fund-123"',
           '    return {"value": 5}',
+        ].join("\n"),
+      },
+    );
+
+    const result = await runGeneratedPytest(projectDir);
+
+    expect(result.stdout).toContain("1 passed");
+  });
+
+  it("executes scenario-backed temporal assertions against merged scenario state", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(scenario account-balance-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (capture-state state-before",
+        '    (call "tests.contract_scenarios:get_state_before"))',
+        "  (capture-state state-after",
+        '    (call "tests.contract_scenarios:get_state_after")))',
+        "(invariant BALANCE_MODIFIED_FROM_SCENARIO",
+        "  (uses-scenario account-balance-flow)",
+        "  (severity high)",
+        '  (description "Scenario-provided state snapshots drive modified checks.")',
+        "  (assert (modified (path account balance))))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "from contextlib import nullcontext",
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        '    return {"state-before": {"account": {"balance": 1}}, "state-after": {"account": {"balance": 1}}}',
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_sandbox():",
+        "    return nullcontext()",
+      ],
+      {
+        "tests/contract_scenarios.py": [
+          "def get_state_before(body, stele_context):",
+          '    return {"account": {"balance": 10}}',
+          "",
+          "",
+          "def get_state_after(body, stele_context):",
+          '    return {"account": {"balance": 12}}',
         ].join("\n"),
       },
     );
@@ -535,6 +608,8 @@ describe("@stele/backend-python translator", () => {
     expect(translateExpression(parseExpression("(modified (path account balance))"))).toBe(
       "stele_is_modified(stele_context, [\"account\",\"balance\"])",
     );
+    expect(translateExpression(parseExpression("(state-before)"))).toBe('stele_context["state-before"]');
+    expect(translateExpression(parseExpression("(state-after)"))).toBe('stele_context["state-after"]');
   });
 
   it("rejects unsupported operators with backend error context", () => {

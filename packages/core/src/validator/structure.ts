@@ -949,6 +949,16 @@ function parseScenarioCall(node: ListNode, label: string): ScenarioCall {
 
   let body: AstNode | undefined;
 
+  if (!isValidPythonImportTarget(targetNode.value)) {
+    throw validationError(
+      "E0317",
+      `${label} call target must use "module:function" with non-empty parts.`,
+      targetNode.span,
+      `Found "${targetNode.value}", which cannot be imported by the python-import executor.`,
+      'Use a string like "tests.contract_scenarios:create_fund".',
+    );
+  }
+
   for (const field of node.items.slice(1)) {
     if (field.kind !== "list" || field.head !== "body") {
       throw validationError(
@@ -970,6 +980,16 @@ function parseScenarioCall(node: ListNode, label: string): ScenarioCall {
     target: targetNode.value,
     body,
   };
+}
+
+function isValidPythonImportTarget(target: string): boolean {
+  const separatorIndex = target.indexOf(":");
+
+  if (separatorIndex <= 0 || separatorIndex !== target.lastIndexOf(":")) {
+    return false;
+  }
+
+  return separatorIndex < target.length - 1;
 }
 
 function parseScenarioCaptureName(node: ListNode, label: string): string {

@@ -275,6 +275,25 @@ describe("loadContract validation", () => {
       column: 11,
       messageIncludes: 'Scenario step "setup-fund" call target must be a string literal',
     });
+
+    const malformedPythonImportTargetProject = await createTempProject({
+      "main.stele": [
+        "(scenario broken-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios")',
+        "    (capture fund)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(malformedPythonImportTargetProject.rootPath), {
+      code: "E0317",
+      file: malformedPythonImportTargetProject.rootPath,
+      line: 5,
+      column: 11,
+      messageIncludes: 'Scenario step "setup-fund" call target must use "module:function"',
+    });
   });
 
   it("rejects duplicate checker ids", async () => {
