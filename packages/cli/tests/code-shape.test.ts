@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { createViolationReport, formatViolationReportJson, loadContract } from "@stele/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runBaselineInit } from "../src/commands/baseline.js";
-import { checkProject, formatCheckReportHuman, runCheck } from "../src/commands/check.js";
+import { checkProject, formatCheckReportHuman, isCheckCommandError, runCheck } from "../src/commands/check.js";
 import { runGenerate } from "../src/commands/generate.js";
 import { runLock } from "../src/commands/lock.js";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
@@ -96,6 +96,206 @@ describe("code-shape evaluation", () => {
     expect(humanReport).toContain("fix:");
     expect(jsonReport).toContain('"rule_id": "api_boundary"');
     expect(jsonReport).toContain('"path": "src/api/handlers.py"');
+  });
+
+  it("evaluates advanced Python code-shapes through the integrated evaluator", async () => {
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(class-shape contract_model_shape",
+        "  (lang python)",
+        '  (target "src/models.py::ContractModel")',
+        '  (must-have-field id "UUID")',
+        '  (must-have-field "created_at")',
+        '  (must-have-field "status")',
+        "  (must-have-method save)",
+        "  (must-extend BaseModel))",
+        "(function-shape route_shape",
+        "  (lang python)",
+        '  (target "src/routes.py::[fastapi-route]")',
+        "  (must-have-parameter request))",
+        "(function-shape reconcile_shape",
+        "  (lang python)",
+        '  (target "src/service.py::reconcile_contract")',
+        '  (must-have-call "db.session.commit")',
+        '  (must-have-call "audit.*")',
+        "  (must-have-parameter request))",
+        "(type-policy no_float_annotations",
+        "  (lang python)",
+        '  (target "src/**/*.py")',
+        '  (deny-type "float"))',
+        "(type-policy require_decimal_annotations",
+        "  (lang python)",
+        '  (target "src/**/*.py")',
+        '  (require-type "Decimal"))',
+      ].join("\n"),
+      files: {
+        "src/models.py": [
+          "class ServiceBase:",
+          "    pass",
+          "",
+          "class ContractModel(ServiceBase):",
+          "    id: str",
+          "",
+          "    def __init__(self) -> None:",
+          "        self.created_at = 1",
+          '        self.name = "draft"',
+          "",
+        ].join("\n"),
+        "src/routes.py": [
+          "from fastapi import APIRouter",
+          "",
+          "router = APIRouter()",
+          "",
+          "@router.post('/orders')",
+          "async def create_order(payload: dict[str, str]) -> dict[str, str]:",
+          "    return payload",
+          "",
+        ].join("\n"),
+        "src/service.py": [
+          "def reconcile_contract(payload: dict[str, str], request: object) -> None:",
+          "    db.session.commit()",
+          "    audit.emit_event('contracts.reconciled')",
+          "",
+        ].join("\n"),
+        "src/types.py": "def cast_amount(amount: float) -> float:\n    return amount\n",
+      },
+    });
+
+    const contract = await loadContract(join(projectDir, "contract", "main.stele"));
+    const violations = await evaluateCodeShapes(projectDir, contract, "check");
+    const contractModelViolations = violations.filter((violation) => violation.rule_id === "contract_model_shape");
+    const reconcileViolations = violations.filter((violation) => violation.rule_id === "reconcile_shape");
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "contract_model_shape",
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('field "status"'),
+          }),
+        }),
+        expect.objectContaining({
+          rule_id: "contract_model_shape",
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('field "id"'),
+            detail: expect.stringContaining("str"),
+          }),
+        }),
+        expect.objectContaining({
+          rule_id: "contract_model_shape",
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('method "save"'),
+          }),
+        }),
+        expect.objectContaining({
+          rule_id: "contract_model_shape",
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('extend "BaseModel"'),
+          }),
+        }),
+        expect.objectContaining({
+          rule_id: "route_shape",
+          location: expect.objectContaining({
+            path: "src/routes.py",
+            line: 6,
+          }),
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('parameter "request"'),
+          }),
+        }),
+        expect.objectContaining({
+          rule_id: "no_float_annotations",
+          location: expect.objectContaining({
+            path: "src/types.py",
+            line: 1,
+          }),
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('"float"'),
+          }),
+        }),
+        expect.objectContaining({
+          rule_id: "require_decimal_annotations",
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('requires annotation "Decimal"'),
+          }),
+          scope_paths: expect.arrayContaining(["contract/main.stele", "src/models.py"]),
+        }),
+      ]),
+    );
+    expect(contractModelViolations).toHaveLength(4);
+    expect(contractModelViolations).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          cause: expect.objectContaining({
+            summary: expect.stringContaining('field "created_at"'),
+          }),
+        }),
+      ]),
+    );
+    expect(reconcileViolations).toEqual([]);
+  });
+
+  it("surfaces Python syntax errors as execution_error violations and does not baseline-suppress them", async () => {
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(type-policy syntax_probe",
+        "  (lang python)",
+        '  (target "src/**/*.py"))',
+      ].join("\n"),
+      files: {
+        "src/bad.py": "def broken(:\n    pass\n",
+      },
+    });
+
+    const contract = await loadContract(join(projectDir, "contract", "main.stele"));
+    const violations = await evaluateCodeShapes(projectDir, contract, "check");
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "stele.check.execution_error",
+          rule_kind: "execution_error",
+          location: expect.objectContaining({
+            path: "src/bad.py",
+            line: 1,
+          }),
+          cause: expect.objectContaining({
+            summary: expect.stringContaining("Python AST analysis failed"),
+          }),
+          fix: expect.objectContaining({
+            summary: expect.stringContaining("Fix the Python analysis error"),
+          }),
+        }),
+      ]),
+    );
+
+    await runGenerateAndLock(projectDir, "syntax error check");
+    await expect(runBaselineInit(projectDir, { reason: "try to suppress syntax error" })).rejects.toThrow(
+      /Baseline files only support contract\/check violations/i,
+    );
+
+    let thrown: unknown;
+    try {
+      await checkProject(projectDir);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(isCheckCommandError(thrown)).toBe(true);
+    if (!isCheckCommandError(thrown)) {
+      throw thrown;
+    }
+
+    expect(thrown.report.violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "stele.check.execution_error",
+          rule_kind: "execution_error",
+          status: "active",
+          suppressed_by: undefined,
+        }),
+      ]),
+    );
   });
 
   it("baseline-init suppresses existing code-shape violations but generated drift still fails check", async () => {
