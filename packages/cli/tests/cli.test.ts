@@ -366,18 +366,6 @@ describe("stele CLI", () => {
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
   });
 
-  it("baseline-init suppresses an approved generated drift and keeps later new violations active", async () => {
-    const projectDir = await createFixtureProject();
-    await runGenerateAndLock(projectDir, "initial contract baseline");
-    await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
-
-    await runBaselineInit(projectDir, { reason: "initial legacy adoption" });
-    await expect(runCheck(projectDir)).resolves.toBeUndefined();
-
-    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
-    await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
-  });
-
   it("baseline-update requires a non-empty reason", async () => {
     const projectDir = await createFixtureProject();
     await runGenerateAndLock(projectDir, "initial contract baseline");
@@ -396,36 +384,6 @@ describe("stele CLI", () => {
     await writeProjectFile(projectDir, "contract/.baseline.json", `${JSON.stringify(baseline, null, 2)}\n`);
 
     await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
-  });
-
-  it("check --diff-from only fails protected drift that intersects the current git scope", async () => {
-    const projectDir = await createFixtureProject();
-    await runGenerateAndLock(projectDir, "initial contract baseline");
-    await initializeGitRepo(projectDir);
-
-    await git(projectDir, "add", ".");
-    await git(projectDir, "commit", "-m", "clean baseline");
-
-    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
-    await git(projectDir, "add", "contract/checker_impls/custom_checker.py");
-    await git(projectDir, "commit", "-m", "legacy protected drift");
-
-    await writeProjectFile(projectDir, "notes.md", "# branch note\n");
-    await git(projectDir, "add", "notes.md");
-    await git(projectDir, "commit", "-m", "unrelated note");
-
-    await expect(checkProject(projectDir, { diffFrom: "HEAD~1" })).resolves.toMatchObject({
-      report: {
-        ok: true,
-        summary: {
-          active_violation_count: 0,
-          out_of_scope_violation_count: 1,
-        },
-      },
-    });
-
-    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return {\"passed\": False}\n");
-    await expect(runCheck(projectDir, { diffFrom: "HEAD~1" })).rejects.toThrow(/manifest|protected/i);
   });
 
   it("check fails when a generated file is missing", async () => {
@@ -835,58 +793,6 @@ describe("stele CLI", () => {
       },
     });
     expect(report.violations[0]!.fingerprint).toMatch(/^[a-f0-9]{64}$/);
-    process.exitCode = originalExitCode;
-  });
-
-  it("CLI check --json and --report-file include suppressed baseline metadata", async () => {
-    const projectDir = await createFixtureProject();
-    const stdout = captureStdout();
-    const stderr = captureStderr();
-    const originalExitCode = process.exitCode;
-
-    await runGenerateAndLock(projectDir, "initial contract baseline");
-    await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
-    await runBaselineInit(projectDir, { reason: "initial legacy adoption" });
-
-    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
-    process.exitCode = 0;
-    await runCli(["node", "stele", "check", "--json", "--report-file", ".stele/reports/last.json"]);
-
-    const report = JSON.parse(stdout.read()) as {
-      ok: boolean;
-      summary: {
-        violation_count: number;
-        active_violation_count: number;
-        suppressed_violation_count: number;
-        out_of_scope_violation_count: number;
-      };
-      violations: Array<{
-        rule_id: string;
-        status: string;
-        suppressed_by?: string;
-      }>;
-    };
-    const fileReport = await readJson(join(projectDir, ".stele", "reports", "last.json"));
-
-    expect(process.exitCode).toBe(0);
-    expect(stderr.read()).toBe("");
-    expect(report).toMatchObject({
-      ok: true,
-      summary: {
-        violation_count: 1,
-        active_violation_count: 0,
-        suppressed_violation_count: 1,
-        out_of_scope_violation_count: 0,
-      },
-      violations: [
-        {
-          rule_id: "stele.check.generated_drift",
-          status: "suppressed",
-          suppressed_by: "baseline",
-        },
-      ],
-    });
-    expect(fileReport).toMatchObject(report);
     process.exitCode = originalExitCode;
   });
 

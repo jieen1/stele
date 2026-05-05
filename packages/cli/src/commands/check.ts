@@ -161,7 +161,11 @@ export function isCheckCommandError(error: unknown): error is CheckCommandError 
 }
 
 export function isBaselineEligibleViolation(violation: Violation): boolean {
-  return violation.rule_kind !== "execution_error";
+  return (
+    violation.source.kind === "rule" &&
+    violation.rule_kind === "rule_violation" &&
+    !violation.rule_id.startsWith("stele.check.")
+  );
 }
 
 export function formatCheckSummary(summary: CheckSummary, report?: ViolationReport): string {
