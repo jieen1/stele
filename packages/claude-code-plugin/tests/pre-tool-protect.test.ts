@@ -373,6 +373,183 @@ describe("pre-tool-protect hook", () => {
     expectAllowed(result);
   });
 
+  it("denies protected Bash write targets across common redirect shapes", async () => {
+    const projectDir = await createProject();
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cat > contract/main.stele <<'EOF'\ncontent\nEOF",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cat <<'EOF' > tests/contract/test_contract.py\ncontent\nEOF",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "printf 'x' > contract/checker_impls/custom_checker.py",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "echo x >> contract/.manifest.json",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "tee contract/main.stele",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "tee -a contract/main.stele",
+        },
+      }),
+    );
+  });
+
+  it("denies protected Bash write targets when the path is quoted", async () => {
+    const projectDir = await createProject();
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: 'cat > "contract/main.stele" <<\'EOF\'\ncontent\nEOF',
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "tee 'tests/contract/test_contract.py'",
+        },
+      }),
+    );
+  });
+
+  it("denies protected Bash write targets when redirection has no separating whitespace", async () => {
+    const projectDir = await createProject();
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cat >contract/main.stele <<'EOF'\ncontent\nEOF",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "echo x >>contract/.manifest.json",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cat 1>contract/main.stele <<'EOF'\ncontent\nEOF",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "echo err 2>>tests/contract/test_contract.py",
+        },
+      }),
+    );
+  });
+
+  it("ignores comment text that mentions protected write targets", async () => {
+    const projectDir = await createProject();
+
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "echo ok # > contract/main.stele",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "grep x README.md # tee contract/main.stele",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "printf '# not a comment' > src/app.py",
+        },
+      }),
+    );
+  });
+
+  it("does not deny Bash commands that do not write protected files", async () => {
+    const projectDir = await createProject();
+
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cat contract/main.stele",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "grep contract/main.stele README.md",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "echo x > src/app.py",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "printf '%s' contract/main.stele",
+        },
+      }),
+    );
+  });
+
   it("allows sibling prefixes outside protected directory roots", async () => {
     const projectDir = await createProject();
 
