@@ -4,7 +4,7 @@ import { Command, Option } from "commander";
 import { runAddChecker } from "./commands/addChecker.js";
 import { checkProject, type CheckSummary } from "./commands/check.js";
 import { runExplain } from "./commands/explain.js";
-import { runGenerate } from "./commands/generate.js";
+import { runGenerate, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { lockProject, type LockOptions, type LockSummary } from "./commands/lock.js";
@@ -13,7 +13,7 @@ import { getExitCode } from "./errors.js";
 type ProgramDependencies = {
   cwd?: () => string;
   runCheck?: (projectDir: string) => Promise<CheckSummary | void>;
-  runGenerate?: typeof runGenerate;
+  runGenerate?: (projectDir: string, options: GenerateOptions) => Promise<GenerateSummary | void>;
   runLock?: (projectDir: string, options: LockOptions) => Promise<LockSummary | void>;
   runInit?: typeof runInit;
   runList?: typeof runList;
@@ -40,7 +40,12 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       process.stdout.write(formatCheckSummary(result));
     }
   });
-  program.command("generate").option("--force").action((options) => generate(cwd(), options));
+  program.command("generate").option("--force").action(async (options) => {
+    const result = await generate(cwd(), options);
+    if (isGenerateSummary(result)) {
+      process.stdout.write(formatGenerateSummary(result));
+    }
+  });
   program.command("lock").option("--reason <reason>").action(async (options) => {
     const result = await lock(cwd(), options);
     if (isLockSummary(result)) {
@@ -71,12 +76,20 @@ function formatLockSummary(summary: LockSummary): string {
   return `OK manifest locked: ${summary.manifestPath} (${summary.invariantCount} invariant${summary.invariantCount === 1 ? "" : "s"}, ${summary.protectedFileCount} protected file${summary.protectedFileCount === 1 ? "" : "s"}).\n`;
 }
 
+function formatGenerateSummary(summary: GenerateSummary): string {
+  return `OK generated ${summary.generatedFileCount} file${summary.generatedFileCount === 1 ? "" : "s"} in ${summary.generatedDir}.\n`;
+}
+
 function isCheckSummary(value: CheckSummary | void): value is CheckSummary {
   return typeof value === "object" && value !== null && "invariantCount" in value && "generatedFileCount" in value;
 }
 
 function isLockSummary(value: LockSummary | void): value is LockSummary {
   return typeof value === "object" && value !== null && "manifestPath" in value && "protectedFileCount" in value;
+}
+
+function isGenerateSummary(value: GenerateSummary | void): value is GenerateSummary {
+  return typeof value === "object" && value !== null && "generatedDir" in value && "generatedFileCount" in value;
 }
 
 export async function runCli(argv = process.argv): Promise<void> {

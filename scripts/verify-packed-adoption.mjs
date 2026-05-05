@@ -55,6 +55,17 @@ async function main() {
         "    (eq (path account total-value)",
         "        (add (sum (collection positions) (path market-value))",
         "             (path account cash)))))",
+        "(invariant BUDGET_TOTALS_WITHIN_LIMIT",
+        "  (severity high)",
+        '  (description "Budget totals are derived from related transaction rows.")',
+        "  (assert",
+        "    (forall budget (collection budgets)",
+        "      (lte",
+        "        (sum",
+        "          (where txn (collection transactions)",
+        "            (eq (path txn budget-id) (path budget id)))",
+        "          (path amount))",
+        "        (path budget limit)))))",
       ].join("\n") + "\n",
     );
     await writeProjectFile(
@@ -72,14 +83,31 @@ async function main() {
         '            {"market-value": 2000},',
         '            {"market-value": 2500},',
         "        ],",
+        '        "budgets": [',
+        '            {"id": "ops", "limit": 100},',
+        '            {"id": "rd", "limit": 80},',
+        "        ],",
+        '        "transactions": [',
+        '            {"budget-id": "ops", "amount": 40},',
+        '            {"budget-id": "ops", "amount": 55},',
+        '            {"budget-id": "rd", "amount": 30},',
+        '            {"budget-id": "rd", "amount": 45},',
+        "        ],",
         "    }",
       ].join("\n") + "\n",
     );
 
-    await runTool(npxTool, ["stele", "generate"], sanitizedNpmOptions({ cwd: projectDir }));
+    const generateResult = await runTool(npxTool, ["stele", "generate"], sanitizedNpmOptions({ cwd: projectDir, capture: true }));
+    assertIncludes(generateResult.stdout, "OK generated 3 files in tests/contract.", "generate success summary");
     await run(pythonCommand, ["-m", "pytest", "tests/contract", "-q"], { cwd: projectDir });
-    await runTool(npxTool, ["stele", "lock", "--reason", "initial adoption baseline"], sanitizedNpmOptions({ cwd: projectDir }));
-    await runTool(npxTool, ["stele", "check"], sanitizedNpmOptions({ cwd: projectDir }));
+    const lockResult = await runTool(
+      npxTool,
+      ["stele", "lock", "--reason", "initial adoption baseline"],
+      sanitizedNpmOptions({ cwd: projectDir, capture: true }),
+    );
+    assertIncludes(lockResult.stdout, "OK manifest locked:", "lock success summary");
+    const checkResult = await runTool(npxTool, ["stele", "check"], sanitizedNpmOptions({ cwd: projectDir, capture: true }));
+    assertIncludes(checkResult.stdout, "OK 2 invariants checked;", "check success summary");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -177,6 +205,12 @@ function sanitizedNpmOptions(options) {
     env: sanitizeNpmEnv(process.env),
     forbiddenStderrPatterns: npmWarningPatterns,
   };
+}
+
+function assertIncludes(value, expected, label) {
+  if (!value.includes(expected)) {
+    throw new Error(`Expected ${label} to include ${JSON.stringify(expected)}, received:\n${value}`);
+  }
 }
 
 function sanitizeNpmEnv(env) {

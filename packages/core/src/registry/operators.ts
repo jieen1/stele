@@ -226,6 +226,12 @@ const CORE_OPERATOR_SPECS: OperatorSpec[] = [
     description: "Remove duplicate values from a collection, optionally by a path.",
   }),
   defineOperator({
+    name: "where",
+    parameters: [required("Symbol"), required("Collection"), required("Predicate")],
+    returnType: "Collection",
+    description: "Filter a collection by a predicate evaluated against each bound item.",
+  }),
+  defineOperator({
     name: "forall",
     parameters: [required("Symbol"), required("Collection"), required("Predicate")],
     returnType: "Boolean",

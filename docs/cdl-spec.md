@@ -268,6 +268,7 @@ Because `path` has `Unknown` value type, it is valid in value slots such as `eq`
 - `min(Collection, Path?) -> Number`
 - `max(Collection, Path?) -> Number`
 - `distinct(Collection, Path?) -> Collection`
+- `where(Symbol, Collection, Predicate) -> Collection`
 - `unique(Collection, Path?) -> Boolean`
 
 #### Quantifiers
@@ -295,6 +296,29 @@ Write it like this instead:
 ```
 
 Inside the predicate, the bound variable becomes the root for item fields. In the example above, `(path p market-value)` reads `p["market-value"]` or `p.market_value` for each item in `positions`.
+
+#### Filtered collections
+
+`where` binds an item name, evaluates a predicate for each item in a collection, and returns the matching items as a collection:
+
+```lisp
+(where txn (collection transactions)
+  (eq (path txn budget-id) (path budget id)))
+```
+
+The bound item is only available inside the `where` predicate. Outer bindings remain visible, so `where` can express common cross-table constraints without precomputing booleans in `conftest.py`:
+
+```lisp
+(forall budget (collection budgets)
+  (lte
+    (sum
+      (where txn (collection transactions)
+        (eq (path txn budget-id) (path budget id)))
+      (path amount))
+    (path budget limit)))
+```
+
+The filtered collection can be used anywhere a `Collection` is expected by the core type checker. The Python backend currently supports it in `sum`, `avg`, `min`, `max`, `count`, and nested quantifiers.
 
 #### Boolean and control-flow operators
 

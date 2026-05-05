@@ -40,6 +40,7 @@ const EXPECTED_SIGNATURES: ExpectedSignature[] = [
   signature("min", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Number"),
   signature("max", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Number"),
   signature("distinct", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Collection"),
+  signature("where", 3, 3, ["Symbol", "Collection", "Predicate"], parameters(required("Symbol"), required("Collection"), required("Predicate")), "Collection"),
   signature("forall", 3, 3, ["Symbol", "Collection", "Predicate"], parameters(required("Symbol"), required("Collection"), required("Predicate")), "Boolean"),
   signature("exists", 3, 3, ["Symbol", "Collection", "Predicate"], parameters(required("Symbol"), required("Collection"), required("Predicate")), "Boolean"),
   signature("none", 3, 3, ["Symbol", "Collection", "Predicate"], parameters(required("Symbol"), required("Collection"), required("Predicate")), "Boolean"),

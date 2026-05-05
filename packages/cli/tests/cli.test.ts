@@ -69,7 +69,7 @@ describe("stele CLI", () => {
   it("generate writes canonical Python files without writing a manifest", async () => {
     const projectDir = await createFixtureProject();
 
-    await runGenerate(projectDir, { force: false });
+    const summary = await runGenerate(projectDir, { force: false });
 
     await expect(readFile(join(projectDir, "tests", "contract", "__init__.py"), "utf8")).resolves.toBe("");
     await expect(readFile(join(projectDir, "tests", "contract", "_stele_runtime.py"), "utf8")).resolves.toContain(
@@ -80,6 +80,10 @@ describe("stele CLI", () => {
     );
 
     await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
+    expect(summary).toEqual({
+      generatedDir: "tests/contract",
+      generatedFileCount: 3,
+    });
   });
 
   it("generate stays manifest-neutral when nothing changed", async () => {
@@ -88,6 +92,18 @@ describe("stele CLI", () => {
     await runGenerate(projectDir, { force: false });
     await runGenerate(projectDir, { force: false });
     await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
+  });
+
+  it("generate stale-layout errors name the changed and extra generated files", async () => {
+    const projectDir = await createFixtureProject();
+
+    await runGenerate(projectDir, { force: false });
+    await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
+    await writeProjectFile(projectDir, "tests/contract/extra.py", "# extra\n");
+
+    await expect(runGenerate(projectDir, { force: false })).rejects.toThrow(
+      /Changed: tests\/contract\/test_contract\.py\. Extra: tests\/contract\/extra\.py\./,
+    );
   });
 
   it("generate rejects an entry path outside the project root and writes nothing", async () => {
@@ -443,7 +459,10 @@ describe("stele CLI", () => {
       "import pytest\n\n@pytest.fixture\ndef stele_context():\n    return {}\n",
     );
 
-    await expect(runGenerate(projectDir, { force: false })).resolves.toBeUndefined();
+    await expect(runGenerate(projectDir, { force: false })).resolves.toMatchObject({
+      generatedDir: "tests/contract",
+      generatedFileCount: 3,
+    });
     await runLock(projectDir, { reason: "windows case-insensitive import baseline" });
 
     const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
@@ -580,6 +599,20 @@ describe("stele CLI", () => {
     expect(process.exitCode).toBe(0);
     expect(stdout.read()).toContain("OK manifest locked: contract/.manifest.json (1 invariant, 6 protected files).");
     expect(stdout.read()).toContain("OK 1 invariant checked; 3 generated files and 6 protected files verified.");
+    process.exitCode = originalExitCode;
+  });
+
+  it("CLI generate prints a success summary for operators", async () => {
+    const projectDir = await createFixtureProject();
+    const stdout = captureStdout();
+    const originalExitCode = process.exitCode;
+
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+    await runCli(["node", "stele", "generate"]);
+
+    expect(process.exitCode).toBe(0);
+    expect(stdout.read()).toContain("OK generated 3 files in tests/contract.");
     process.exitCode = originalExitCode;
   });
 

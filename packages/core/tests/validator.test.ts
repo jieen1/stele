@@ -312,9 +312,9 @@ describe("loadContract validation", () => {
         "  (severity high)",
         '  (description "Quantifiers require a real collection expression.")',
         "  (assert",
-        "    (forall txn",
-        "      (path account total)",
-        "      (gt (path txn amount) 0))))",
+        "    (forall p",
+        "      (path positions)",
+        "      (gt (path p amount) 0))))",
       ].join("\n"),
     });
 
@@ -323,7 +323,33 @@ describe("loadContract validation", () => {
       file: project.rootPath,
       line: 6,
       column: 7,
-      messageIncludes: 'Expected Collection but found Path',
+      messageIncludes: 'Use (collection positions) instead of (path positions)',
+    });
+  });
+
+  it("accepts filtered collections for cross-table numeric aggregation", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant BUDGETS_RESPECT_POSTED_TRANSACTIONS",
+        "  (severity high)",
+        '  (description "Each budget total is computed from matching transaction rows.")',
+        "  (assert",
+        "    (forall budget (collection budgets)",
+        "      (lte",
+        "        (sum",
+        "          (where txn (collection transactions)",
+        "            (eq (path txn budget-id) (path budget id)))",
+        "          (path amount))",
+        "        (path budget limit)))))",
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+
+    expect(contract.invariants).toHaveLength(1);
+    expect(contract.invariants[0]).toMatchObject({
+      id: "BUDGETS_RESPECT_POSTED_TRANSACTIONS",
+      severity: "high",
     });
   });
 

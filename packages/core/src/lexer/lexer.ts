@@ -28,6 +28,11 @@ class Lexer {
     while (!this.#isAtEnd()) {
       const char = this.#peek();
 
+      if (char === "\uFEFF" && this.#offset === 0) {
+        this.#advance();
+        continue;
+      }
+
       if (char === " " || char === "\t" || char === "\r") {
         this.#advance();
         continue;

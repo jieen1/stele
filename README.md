@@ -21,6 +21,14 @@ python -m pytest --version
 npx stele init --language python
 ```
 
+For local adoption from this checkout on Windows, run the installer from the target application directory:
+
+```powershell
+E:\project\stele\local-packages\install-stele-local.ps1
+```
+
+It installs the packed packages and writes `npm run stele:init`, `npm run stele:generate`, `npm run stele:lock`, and `npm run stele:check` scripts.
+
 That creates:
 
 - `stele.config.json`

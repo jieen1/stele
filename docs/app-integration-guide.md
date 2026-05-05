@@ -104,6 +104,35 @@ def stele_context():
 
 This keeps missing-data handling in the app-owned fixture instead of repeating `(when ...)` guards on every invariant. Use invariant-level `when` only when the condition is part of the business rule itself.
 
+## Cross-table numeric rules
+
+For constraints that aggregate one table through a relationship to another table, keep the raw rows in `stele_context` and express the relationship in CDL with `where`:
+
+```python
+@pytest.fixture
+def stele_context():
+    return {
+        "budgets": load_budget_rows(),
+        "transactions": load_transaction_rows(),
+    }
+```
+
+```lisp
+(invariant BUDGETS_WITHIN_LIMIT
+  (severity high)
+  (description "Posted transaction totals stay inside each budget.")
+  (assert
+    (forall budget (collection budgets)
+      (lte
+        (sum
+          (where txn (collection transactions)
+            (eq (path txn budget-id) (path budget id)))
+          (path amount))
+        (path budget limit)))))
+```
+
+The same filtered collection form works with `avg`, `min`, `max`, `count`, and nested quantifiers in the Python backend. Use Python checker implementations when the rule needs domain code that is not naturally a collection filter or aggregate.
+
 ## Temporal helpers
 
 If your contract uses temporal helpers such as `(modified (path account balance))`, expose both snapshots:

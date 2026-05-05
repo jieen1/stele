@@ -14,9 +14,15 @@ import { generatePytestSource, getPythonRuntimeSource, sanitizePythonIdentifier 
 import globParent from "glob-parent";
 import { minimatch } from "minimatch";
 import { loadConfig } from "../config/loadConfig.js";
+import { CliCommandError } from "../errors.js";
 
 export type GenerateOptions = {
   force?: boolean;
+};
+
+export type GenerateSummary = {
+  generatedDir: string;
+  generatedFileCount: number;
 };
 
 type ProtectedPathOptions = {
@@ -27,7 +33,7 @@ type ProtectedPathOptions = {
   entry: string;
 };
 
-export async function runGenerate(projectDir: string, options: GenerateOptions): Promise<void> {
+export async function runGenerate(projectDir: string, options: GenerateOptions): Promise<GenerateSummary> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
   const preGeneratedProtectedPaths = await collectProtectedPaths(projectDir, config);
@@ -38,7 +44,7 @@ export async function runGenerate(projectDir: string, options: GenerateOptions):
   const verification = await verifyManagedGeneratedFiles(projectDir, config.generatedDir, contract, backend);
 
   if (!options.force && (verification.changed.length > 0 || verification.extra.length > 0)) {
-    throw new Error("Generated files differ from the canonical layout. Re-run stele generate --force to replace them.");
+    throw new CliCommandError(formatGeneratedDriftMessage(verification), 2);
   }
 
   if (options.force) {
@@ -58,6 +64,10 @@ export async function runGenerate(projectDir: string, options: GenerateOptions):
     }),
   );
 
+  return {
+    generatedDir: config.generatedDir,
+    generatedFileCount: generatedFiles.length,
+  };
 }
 
 export function createLanguageBackend(generatedDir: string, targetLanguage: string, testFramework: string): LanguageBackend {
@@ -347,6 +357,16 @@ function isIgnoredPythonCacheArtifact(path: string): boolean {
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function formatGeneratedDriftMessage(verification: GeneratedVerificationResult): string {
+  return [
+    "Generated files differ from the canonical layout.",
+    `Missing: ${verification.missing.join(", ") || "<none>"}.`,
+    `Changed: ${verification.changed.join(", ") || "<none>"}.`,
+    `Extra: ${verification.extra.join(", ") || "<none>"}.`,
+    "Re-run stele generate --force to replace them.",
+  ].join(" ");
 }
 
 async function canonicalizeContractPath(path: string): Promise<string> {

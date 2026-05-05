@@ -8,6 +8,7 @@ export const collectionOperatorHandlers: Record<string, PythonOperatorHandler> =
   avg: (node, context, translate) => translateAverage(node, context, translate),
   min: (node, context, translate) => translateExtremum(node, context, translate, "min"),
   max: (node, context, translate) => translateExtremum(node, context, translate, "max"),
+  where: (node, context, translate) => translateWhere(node, context, translate),
   forall: (node, context, translate) => translateQuantifier(node, context, translate, "all"),
   exists: (node, context, translate) => translateQuantifier(node, context, translate, "any"),
   none: (node, context, translate) => `not ${wrapExpression(translateQuantifier(node, context, translate, "any"))}`,
@@ -59,6 +60,27 @@ function translateExtremum(
 
   const pathParts = JSON.stringify(readProjectionPath(projection));
   return `${operator}(stele_get_path(item, ${pathParts}) for item in ${collection})`;
+}
+
+function translateWhere(node: ListNode, context: TranslationContext, translate: PythonExpressionTranslator): string {
+  const binding = node.items[0];
+
+  if (binding?.kind !== "identifier") {
+    throw new SteleError(
+      "E0602",
+      "Backend Error",
+      'Operator "where" must bind an identifier.',
+      node.span,
+      "The first where argument becomes the Python list-comprehension variable.",
+      'Use a form like (where txn (collection transactions) ...).',
+    );
+  }
+
+  const bound = context.bind(binding.value);
+  const collection = translate(node.items[1]!, context);
+  const predicate = translate(node.items[2]!, bound.context);
+
+  return `[${bound.name} for ${bound.name} in ${collection} if ${predicate}]`;
 }
 
 function translateQuantifier(

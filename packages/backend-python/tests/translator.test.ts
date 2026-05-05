@@ -138,6 +138,73 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
+  it("runs cross-table filtered sum, avg, min, and max aggregations", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(invariant BUDGETS_MATCH_TRANSACTIONS",
+        "  (severity high)",
+        '  (description "Budget aggregates are derived from related transaction rows.")',
+        "  (assert",
+        "    (forall budget (collection budgets)",
+        "      (and",
+        "        (lte",
+        "          (sum",
+        "            (where txn (collection transactions)",
+        "              (eq (path txn budget-id) (path budget id)))",
+        "            (path amount))",
+        "          (path budget limit))",
+        "        (lte",
+        "          (avg",
+        "            (where txn (collection transactions)",
+        "              (eq (path txn budget-id) (path budget id)))",
+        "            (path amount))",
+        "          (path budget avg-limit))",
+        "        (gte",
+        "          (min",
+        "            (where txn (collection transactions)",
+        "              (eq (path txn budget-id) (path budget id)))",
+        "            (path amount))",
+        "          (path budget min-amount))",
+        "        (lte",
+        "          (max",
+        "            (where txn (collection transactions)",
+        "              (eq (path txn budget-id) (path budget id)))",
+        "            (path amount))",
+        "          (path budget max-amount))))))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {",
+        "        \"budgets\": [",
+        "            {\"id\": \"ops\", \"limit\": 100, \"avg-limit\": 50, \"min-amount\": 10, \"max-amount\": 60},",
+        "            {\"id\": \"rd\", \"limit\": 90, \"avg-limit\": 45, \"min-amount\": 15, \"max-amount\": 45},",
+        "        ],",
+        "        \"transactions\": [",
+        "            {\"budget-id\": \"ops\", \"amount\": 20},",
+        "            {\"budget-id\": \"ops\", \"amount\": 55},",
+        "            {\"budget-id\": \"rd\", \"amount\": 15},",
+        "            {\"budget-id\": \"rd\", \"amount\": 45},",
+        "        ],",
+        "    }",
+      ],
+    );
+
+    const result = await runGeneratedPytest(projectDir);
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain('[txn for txn in stele_context["transactions"] if');
+    expect(testSource).toContain('stele_get_path(txn, ["budget-id"])');
+    expect(testSource).toContain('stele_get_path(budget, ["id"])');
+    expect(result.stdout).toContain("1 passed");
+  });
+
   it("disambiguates sanitized sibling invariant ids so pytest collects both tests", async () => {
     const contract = await createContract({
       "main.stele": [
@@ -310,6 +377,15 @@ describe("@stele/backend-python translator", () => {
     );
     expect(translateExpression(parseExpression("(forall txn (collection transactions) (gt (path txn amount) 0))"))).toBe(
       "all((stele_get_path(txn, [\"amount\"])) > (0) for txn in stele_context[\"transactions\"])",
+    );
+    expect(
+      translateExpression(
+        parseExpression(
+          "(where txn (collection transactions) (eq (path txn budget-id) (path budget id)))",
+        ),
+      ),
+    ).toBe(
+      "[txn for txn in stele_context[\"transactions\"] if (stele_get_path(txn, [\"budget-id\"])) == (stele_get_path(stele_context[\"budget\"], [\"id\"]))]",
     );
     expect(translateExpression(parseExpression("(modified (path account balance))"))).toBe(
       "stele_is_modified(stele_context, [\"account\",\"balance\"])",

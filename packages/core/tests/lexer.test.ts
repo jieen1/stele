@@ -34,6 +34,18 @@ describe("lex", () => {
     });
   });
 
+  it("treats a leading UTF-8 BOM as whitespace", () => {
+    const tokens = lex("\uFEFF(invariant RULE)", "bom.stele");
+
+    expect(summarize(tokens)).toEqual([
+      ["lparen", undefined, "(", 1, 2],
+      ["identifier", "invariant", "invariant", 1, 3],
+      ["identifier", "RULE", "RULE", 1, 13],
+      ["rparen", undefined, ")", 1, 17],
+      ["eof", undefined, "", 1, 18],
+    ]);
+  });
+
   it("rejects single-quoted strings as invalid characters", () => {
     expectLexError("'nope'", {
       code: "E0001",

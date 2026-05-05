@@ -76,8 +76,8 @@ function inferListType(
 
   validateArity(spec, node);
 
-  if (isQuantifier(spec.name)) {
-    return inferQuantifierType(node, context, registry);
+  if (isBindingCollectionPredicateOperator(spec.name)) {
+    return inferBindingCollectionPredicateType(node, context, registry, spec);
   }
 
   const argumentTypes = node.items.map((argument) => inferExpressionType(argument, context, registry));
@@ -98,28 +98,30 @@ function inferListType(
   };
 }
 
-function inferQuantifierType(
+function inferBindingCollectionPredicateType(
   node: ListNode,
   context: TypeContext,
   registry: ReturnType<typeof createCoreOperatorRegistry>,
+  spec: OperatorSpec,
 ): InferredType {
   const binding = node.items[0]!;
   const collection = node.items[1]!;
   const predicate = node.items[2]!;
+  const operatorLabel = spec.name === "where" ? 'Operator "where"' : `Quantifier "${node.head}"`;
 
   if (binding.kind !== "identifier") {
     throw new SteleError(
       "E0310",
       "Validation Error",
-      `Quantifier "${node.head}" must bind an identifier symbol.`,
+      `${operatorLabel} must bind an identifier symbol.`,
       binding.span,
-      "The first quantifier argument names the element available inside the predicate body.",
+      `The first ${spec.name === "where" ? "where" : "quantifier"} argument names the element available inside the predicate body.`,
       "Replace the binding with an identifier such as txn or item.",
     );
   }
 
   const collectionType = inferExpressionType(collection, context, registry);
-  assertTypeAssignable("Collection", collectionType, collection, node.head, undefined, 1);
+  assertCollectionArgument(node.head, collectionType, collection);
 
   const nextContext: TypeContext = {
     boundNames: new Set(context.boundNames).add(binding.value),
@@ -128,7 +130,7 @@ function inferQuantifierType(
   const predicateType = inferExpressionType(predicate, nextContext, registry);
   assertTypeAssignable("Predicate", predicateType, predicate, node.head, undefined, 2);
 
-  return { structuralType: "Boolean" };
+  return { structuralType: spec.returnType, valueType: spec.valueType };
 }
 
 function validateArity(spec: OperatorSpec, node: ListNode): void {
@@ -206,6 +208,25 @@ function assertTypeAssignable(
   );
 }
 
+function assertCollectionArgument(operatorName: string, actualType: InferredType, node: AstNode): void {
+  if (isTypeAssignable("Collection", actualType)) {
+    return;
+  }
+
+  if (actualType.structuralType === "Path" && node.kind === "list" && node.head === "path") {
+    throw new SteleError(
+      "E0310",
+      "Validation Error",
+      `Argument 2 of "${operatorName}": Expected Collection but found Path. ${formatPathAsCollectionHint(node)}`,
+      node.span,
+      "The collection operand iterates over a named collection from stele_context. A path expression reads a scalar/value path.",
+      "Use (collection name) for collection operands, and keep (path ...) for item fields and scalar values.",
+    );
+  }
+
+  assertTypeAssignable("Collection", actualType, node, operatorName, undefined, 1);
+}
+
 function isTypeAssignable(expectedType: SteleType, actualType: InferredType): boolean {
   if (expectedType === actualType.structuralType) {
     return true;
@@ -230,8 +251,35 @@ function isTypeAssignable(expectedType: SteleType, actualType: InferredType): bo
   return false;
 }
 
-function isQuantifier(name: string): boolean {
-  return name === "forall" || name === "exists" || name === "none";
+function isBindingCollectionPredicateOperator(name: string): boolean {
+  return name === "forall" || name === "exists" || name === "none" || name === "where";
+}
+
+function formatPathAsCollectionHint(node: ListNode): string {
+  const pathText = formatSimplePathExpression(node);
+  const first = node.items[0];
+
+  if (node.items.length === 1 && first?.kind === "identifier") {
+    return `Use (collection ${first.value}) instead of ${pathText}.`;
+  }
+
+  return `Use (collection name) for a top-level collection instead of ${pathText}.`;
+}
+
+function formatSimplePathExpression(node: ListNode): string {
+  const parts = node.items.map((item) => {
+    if (item.kind === "identifier") {
+      return item.value;
+    }
+
+    if (item.kind === "keyword") {
+      return `:${item.value}`;
+    }
+
+    return item.kind;
+  });
+
+  return `(path ${parts.join(" ")})`;
 }
 
 function assertEqualityOperandCompatibility(
