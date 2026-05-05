@@ -13,7 +13,17 @@ export type LockOptions = {
   reason?: string;
 };
 
+export type LockSummary = {
+  invariantCount: number;
+  protectedFileCount: number;
+  manifestPath: string;
+};
+
 export async function runLock(projectDir: string, _options: LockOptions): Promise<void> {
+  await lockProject(projectDir, _options);
+}
+
+export async function lockProject(projectDir: string, _options: LockOptions): Promise<LockSummary> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
   const backend = createLanguageBackend(config.generatedDir, config.targetLanguage, config.testFramework);
@@ -27,4 +37,10 @@ export async function runLock(projectDir: string, _options: LockOptions): Promis
   await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
   await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
+
+  return {
+    invariantCount: contract.invariants.length,
+    protectedFileCount: protectedPaths.length,
+    manifestPath: config.manifestPath,
+  };
 }

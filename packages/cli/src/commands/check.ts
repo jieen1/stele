@@ -12,7 +12,17 @@ import {
 } from "./generate.js";
 import { loadContract, normalizeContract } from "@stele/core";
 
+export type CheckSummary = {
+  invariantCount: number;
+  generatedFileCount: number;
+  protectedFileCount: number;
+};
+
 export async function runCheck(projectDir: string): Promise<void> {
+  await checkProject(projectDir);
+}
+
+export async function checkProject(projectDir: string): Promise<CheckSummary> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
   const backend = createLanguageBackend(config.generatedDir, config.targetLanguage, config.testFramework);
@@ -55,6 +65,12 @@ export async function runCheck(projectDir: string): Promise<void> {
     if (manifest.contractHash !== contractHash) {
       throw new CliCommandError("Manifest contract hash does not match the current contract.", 3);
     }
+
+    return {
+      invariantCount: contract.invariants.length,
+      generatedFileCount: generated.files.length,
+      protectedFileCount: currentProtectedPaths.length,
+    };
   } catch (error) {
     if (error instanceof CliCommandError) {
       throw error;

@@ -12,6 +12,8 @@ python -m pytest --version
 npx stele init --language python
 ```
 
+For local development from this repository, `local-packages/install-stele-local.ps1` installs the packed CLI, core, Python backend, and Claude Code plugin tarballs into the current application. It also writes npm scripts such as `stele:init`, `stele:generate`, `stele:lock`, and `stele:check` so operators can use `npm run stele:check` without remembering the `npx` form.
+
 After `stele init`, your repository has:
 
 - `stele.config.json`
@@ -59,6 +61,48 @@ Generated tests can traverse dictionaries and Python objects. The generated runt
 3. underscore-normalized attributes for CDL names that contain `-`
 
 That means `(path account total-value)` can resolve either `account["total-value"]` or `account.total_value`.
+
+### Optional or empty app data
+
+The default `tests/contract/conftest.py` scaffold includes two small fixture helpers:
+
+```python
+def stele_default(value, fallback):
+    return fallback if value is None else value
+
+
+def stele_context_or_skip(**values):
+    missing = sorted(name for name, value in values.items() if value is None)
+    if missing:
+        pytest.skip("Stele context unavailable: " + ", ".join(missing))
+    return values
+```
+
+Use `stele_default` when `None` should mean an empty collection or other safe domain default:
+
+```python
+@pytest.fixture
+def stele_context():
+    return {
+        "account": real_account_snapshot(),
+        "positions": stele_default(load_open_positions(), []),
+        "_stele_checkers": {},
+    }
+```
+
+Use `stele_context_or_skip` when the contract cannot be evaluated responsibly without the value:
+
+```python
+@pytest.fixture
+def stele_context():
+    return stele_context_or_skip(
+        account=real_account_snapshot(),
+        positions=stele_default(load_open_positions(), []),
+        _stele_checkers={},
+    )
+```
+
+This keeps missing-data handling in the app-owned fixture instead of repeating `(when ...)` guards on every invariant. Use invariant-level `when` only when the condition is part of the business rule itself.
 
 ## Temporal helpers
 

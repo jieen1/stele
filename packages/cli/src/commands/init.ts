@@ -17,7 +17,26 @@ const DEFAULT_CONTRACT_SOURCE = [
   "",
 ].join("\n");
 
-const DEFAULT_CONFTEST_SOURCE = "import pytest\n\n@pytest.fixture\ndef stele_context():\n    return {}\n";
+const DEFAULT_CONFTEST_SOURCE = [
+  "import pytest",
+  "",
+  "",
+  "def stele_default(value, fallback):",
+  "    return fallback if value is None else value",
+  "",
+  "",
+  "def stele_context_or_skip(**values):",
+  "    missing = sorted(name for name, value in values.items() if value is None)",
+  "    if missing:",
+  "        pytest.skip(\"Stele context unavailable: \" + \", \".join(missing))",
+  "    return values",
+  "",
+  "",
+  "@pytest.fixture",
+  "def stele_context():",
+  "    return {}",
+  "",
+].join("\n");
 
 export async function runInit(projectDir: string, options: InitOptions): Promise<void> {
   if (!supportedLanguageSet.has(options.language)) {

@@ -278,6 +278,24 @@ Because `path` has `Unknown` value type, it is valid in value slots such as `eq`
 
 The first argument must be an identifier. The second argument must type-check as `Collection`. The bound identifier is only in scope inside the predicate body.
 
+Use `(collection name)` for the collection operand. A data path is a scalar/value path, not a collection reference, so this is invalid:
+
+```lisp
+; Invalid: (path positions) is a Path, not a Collection.
+(forall p (path positions)
+  (gt (path p market-value) 0))
+```
+
+Write it like this instead:
+
+```lisp
+; Valid: positions is read from stele_context["positions"].
+(forall p (collection positions)
+  (gt (path p market-value) 0))
+```
+
+Inside the predicate, the bound variable becomes the root for item fields. In the example above, `(path p market-value)` reads `p["market-value"]` or `p.market_value` for each item in `positions`.
+
 #### Boolean and control-flow operators
 
 - `and(Predicate, ...Predicate) -> Boolean`

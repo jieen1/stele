@@ -13,6 +13,7 @@ const tempDirs: string[] = [];
 
 describe("stele CLI", () => {
   afterEach(async () => {
+    vi.restoreAllMocks();
     await Promise.allSettled(tempDirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
@@ -24,9 +25,10 @@ describe("stele CLI", () => {
     await expect(readJson(join(projectDir, STELE_CONFIG_FILE))).resolves.toEqual(DEFAULT_CONFIG);
     await expect(readFile(join(projectDir, "contract", "main.stele"), "utf8")).resolves.toContain("(invariant");
     await expect(readFile(join(projectDir, "contract", "checker_impls", ".gitkeep"), "utf8")).resolves.toBe("");
-    await expect(readFile(join(projectDir, "tests", "contract", "conftest.py"), "utf8")).resolves.toBe(
-      "import pytest\n\n@pytest.fixture\ndef stele_context():\n    return {}\n",
-    );
+    const conftest = await readFile(join(projectDir, "tests", "contract", "conftest.py"), "utf8");
+    expect(conftest).toContain("def stele_default(value, fallback):");
+    expect(conftest).toContain("def stele_context_or_skip(**values):");
+    expect(conftest).toContain("@pytest.fixture\ndef stele_context():\n    return {}\n");
   });
 
   it("init does not overwrite existing user files", async () => {
@@ -563,6 +565,24 @@ describe("stele CLI", () => {
     expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python" });
   });
 
+  it("CLI lock and check print success summaries for operators", async () => {
+    const projectDir = await createFixtureProject();
+    const stdout = captureStdout();
+    const originalExitCode = process.exitCode;
+
+    await runGenerate(projectDir, { force: false });
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+
+    await runCli(["node", "stele", "lock", "--reason", "initial baseline"]);
+    await runCli(["node", "stele", "check"]);
+
+    expect(process.exitCode).toBe(0);
+    expect(stdout.read()).toContain("OK manifest locked: contract/.manifest.json (1 invariant, 6 protected files).");
+    expect(stdout.read()).toContain("OK 1 invariant checked; 3 generated files and 6 protected files verified.");
+    process.exitCode = originalExitCode;
+  });
+
   it("CLI exits with code 2 when generated files are tampered", async () => {
     const projectDir = await createFixtureProject();
     const stderr = captureStderr();
@@ -749,6 +769,17 @@ function captureStderr(): { read(): string } {
     chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
     return true;
   }) as typeof process.stderr.write);
+  return {
+    read: () => chunks.join(""),
+  };
+}
+
+function captureStdout(): { read(): string } {
+  const chunks: string[] = [];
+  vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+    return true;
+  }) as typeof process.stdout.write);
   return {
     read: () => chunks.join(""),
   };

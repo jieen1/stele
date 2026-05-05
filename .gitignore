@@ -10,6 +10,7 @@ __pycache__/
 *.log
 *.tmp
 *.temp
+local-packages/*.tgz
 *.pyc
 *.tsbuildinfo
 pnpm-debug.log*
