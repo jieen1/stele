@@ -14,6 +14,8 @@ export type ViolationLocation = {
   path?: string;
   manifest_path?: string;
   generated_dir?: string;
+  line?: number;
+  column?: number;
 };
 
 export type ViolationCause = {
