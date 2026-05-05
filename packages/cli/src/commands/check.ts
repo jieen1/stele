@@ -21,6 +21,7 @@ import {
 } from "@stele/core";
 import { STELE_BASELINE_FILE, STELE_CONFIG_FILE, type SteleConfig } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
+import { evaluateCodeShapes } from "../code-shape/evaluate.js";
 import { CliCommandError } from "../errors.js";
 import {
   assertProtectedContractFilesReachable,
@@ -84,7 +85,8 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
 
   const protectedState = await collectProtectedCheckState(projectDir, context.config, context.contract, context.generated);
   const protectedReport = applyFiltersToReport(await buildProtectedStageReport(context, protectedState, "check"), filters);
-  const report = mergeCheckReports([generatedReport, protectedReport]);
+  const codeShapeReport = applyFiltersToReport(await buildCodeShapeStageReport(context, protectedState, "check"), filters);
+  const report = mergeCheckReports([generatedReport, protectedReport, codeShapeReport]);
 
   if (!report.ok) {
     throw new CheckCommandError(getCheckExitCode(report), report);
@@ -140,7 +142,11 @@ export async function buildRawCheckReport(context: PreparedCheckContext, command
 
   try {
     const protectedState = await collectProtectedCheckState(context.projectDir, context.config, context.contract, context.generated);
-    return mergeCheckReports([generatedReport, await buildProtectedStageReport(context, protectedState, command)]);
+    return mergeCheckReports([
+      generatedReport,
+      await buildProtectedStageReport(context, protectedState, command),
+      await buildCodeShapeStageReport(context, protectedState, command),
+    ]);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -332,6 +338,27 @@ async function buildProtectedStageReport(
       violations: [createExecutionViolation(error, context.config.entry, command)],
     });
   }
+}
+
+async function buildCodeShapeStageReport(
+  context: PreparedCheckContext,
+  protectedState: ProtectedCheckState,
+  command: string,
+): Promise<ViolationReport> {
+  const violations = await evaluateCodeShapes(context.projectDir, context.contract, command);
+
+  return createViolationReport({
+    tool: "stele",
+    command,
+    ok: violations.length === 0,
+    summary: {
+      invariant_count: protectedState.summary.invariantCount,
+      generated_file_count: protectedState.summary.generatedFileCount,
+      protected_file_count: protectedState.summary.protectedFileCount,
+      violation_count: violations.length,
+    },
+    violations,
+  });
 }
 
 function withCheckSummary(report: ViolationReport, summary: CheckSummary): ViolationReport {
