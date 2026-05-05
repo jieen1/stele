@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
 import { runBaselineInit, runBaselineUpdate } from "../src/commands/baseline.js";
-import { checkProject, runCheck } from "../src/commands/check.js";
+import { runCheck } from "../src/commands/check.js";
 import { runGenerate } from "../src/commands/generate.js";
 import { runInit } from "../src/commands/init.js";
 import { runLock } from "../src/commands/lock.js";
@@ -989,17 +989,6 @@ async function tryCreateNonRegularEntry(targetDirectory: string, linkPath: strin
 
 function isSymlinkPermissionError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && (error.code === "EPERM" || error.code === "EACCES" || error.code === "UNKNOWN");
-}
-
-async function initializeGitRepo(projectDir: string): Promise<void> {
-  await git(projectDir, "init", "--initial-branch=main");
-  await git(projectDir, "config", "user.name", "Stele Test");
-  await git(projectDir, "config", "user.email", "stele@example.com");
-}
-
-async function git(projectDir: string, ...args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync("git", args, { cwd: projectDir });
-  return stdout.trim();
 }
 
 async function runContractPytest(projectDir: string): Promise<{ stdout: string; stderr: string }> {
