@@ -573,12 +573,15 @@ describe("stele CLI", () => {
       runInit: handlers.init,
     });
 
-    await program.parseAsync(["node", "stele", "check"]);
+    await program.parseAsync(["node", "stele", "check", "--json", "--report-file", ".stele/reports/last.json"]);
     await program.parseAsync(["node", "stele", "generate", "--force"]);
     await program.parseAsync(["node", "stele", "lock", "--reason", "approved"]);
     await program.parseAsync(["node", "stele", "init", "--language", "python"]);
 
-    expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project");
+    expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project", {
+      json: true,
+      reportFile: ".stele/reports/last.json",
+    });
     expect(handlers.generate).toHaveBeenCalledWith("E:/tmp/project", { force: true });
     expect(handlers.lock).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved" });
     expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python" });
@@ -642,6 +645,46 @@ describe("stele CLI", () => {
     process.exitCode = originalExitCode;
   });
 
+  it("CLI check --json prints a structured violation report to stdout on generated drift", async () => {
+    const projectDir = await createFixtureProject();
+    const stdout = captureStdout();
+    const stderr = captureStderr();
+    const originalExitCode = process.exitCode;
+
+    await runGenerateAndLock(projectDir);
+    await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
+
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+    await runCli(["node", "stele", "check", "--json"]);
+
+    const report = JSON.parse(stdout.read()) as {
+      ok: boolean;
+      command: string;
+      violations: Array<{
+        rule_id: string;
+        rule_kind: string;
+        fingerprint: string;
+        cause: { changed?: string[] };
+      }>;
+    };
+
+    expect(process.exitCode).toBe(2);
+    expect(stderr.read()).toBe("");
+    expect(report.ok).toBe(false);
+    expect(report.command).toBe("check");
+    expect(report.violations).toHaveLength(1);
+    expect(report.violations[0]).toMatchObject({
+      rule_id: "stele.check.generated_drift",
+      rule_kind: "generated_drift",
+      cause: {
+        changed: ["tests/contract/test_contract.py"],
+      },
+    });
+    expect(report.violations[0]!.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    process.exitCode = originalExitCode;
+  });
+
   it("CLI exits with code 3 when protected files drift without lock", async () => {
     const projectDir = await createFixtureProject();
     const stderr = captureStderr();
@@ -656,6 +699,38 @@ describe("stele CLI", () => {
 
     expect(process.exitCode).toBe(3);
     expect(stderr.read()).toContain("Manifest verification failed");
+    process.exitCode = originalExitCode;
+  });
+
+  it("CLI check writes a JSON report file even when protected files drift", async () => {
+    const projectDir = await createFixtureProject();
+    const stderr = captureStderr();
+    const originalExitCode = process.exitCode;
+
+    await runGenerateAndLock(projectDir);
+    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
+
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+    await runCli(["node", "stele", "check", "--report-file", ".stele/reports/last.json"]);
+
+    const report = await readJson(join(projectDir, ".stele", "reports", "last.json"));
+
+    expect(process.exitCode).toBe(3);
+    expect(stderr.read()).toContain("Manifest verification failed");
+    expect(report).toMatchObject({
+      ok: false,
+      command: "check",
+      violations: [
+        {
+          rule_id: "stele.check.manifest_drift",
+          rule_kind: "manifest_drift",
+          cause: {
+            changed: ["contract/checker_impls/custom_checker.py"],
+          },
+        },
+      ],
+    });
     process.exitCode = originalExitCode;
   });
 

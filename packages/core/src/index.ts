@@ -27,6 +27,26 @@ export { verifyManifest, writeManifest } from "./manifest/manifest.js";
 export { normalizeContract } from "./normalizer/normalize.js";
 export { parseFile } from "./parser/parser.js";
 export type { ParsedFile } from "./parser/parser.js";
+export {
+  formatViolationReportHuman,
+  formatViolationReportJson,
+} from "./report/format.js";
+export type {
+  Violation,
+  ViolationCause,
+  ViolationFix,
+  ViolationInput,
+  ViolationLocation,
+  ViolationReport,
+  ViolationReportSummary,
+  ViolationSeverity,
+  ViolationSource,
+} from "./report/types.js";
+export {
+  buildViolationFingerprint,
+  createViolation,
+  createViolationReport,
+} from "./report/types.js";
 export type {
   OperatorParameterOccurrence,
   OperatorParameterSpec,
