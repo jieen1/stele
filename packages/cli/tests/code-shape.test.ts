@@ -298,6 +298,43 @@ describe("code-shape evaluation", () => {
     );
   });
 
+  it("treats UTF-8 BOM Python files as normal source during boundary evaluation", async () => {
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(boundary api_boundary",
+        "  (lang python)",
+        '  (target "src/api/**/*.py")',
+        '  (deny-import "app.infrastructure"))',
+      ].join("\n"),
+      files: {
+        "src/api/handlers.py": "\uFEFFimport app.infrastructure.db\n",
+      },
+    });
+
+    const contract = await loadContract(join(projectDir, "contract", "main.stele"));
+    const violations = await evaluateCodeShapes(projectDir, contract, "check");
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "api_boundary",
+          rule_kind: "rule_violation",
+          location: expect.objectContaining({
+            path: "src/api/handlers.py",
+            line: 1,
+          }),
+        }),
+      ]),
+    );
+    expect(violations).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "stele.check.execution_error",
+        }),
+      ]),
+    );
+  });
+
   it("does not AST-parse syntax-invalid Python files when only file-policy applies", async () => {
     const projectDir = await createCodeShapeProject({
       contractSource: [

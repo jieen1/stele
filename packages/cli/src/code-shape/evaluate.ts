@@ -1263,7 +1263,7 @@ const PYTHON_ANALYZER_SCRIPT = [
   "    return imports",
   "",
   "def analyze_file(entry):",
-  "    source = Path(entry['absolute_path']).read_text(encoding='utf-8')",
+  "    source = Path(entry['absolute_path']).read_text(encoding='utf-8-sig')",
   "    tree = ast.parse(source, filename=entry['relative_path'])",
   "    classes = []",
   "    functions = []",
