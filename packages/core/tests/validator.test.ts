@@ -296,6 +296,178 @@ describe("loadContract validation", () => {
     });
   });
 
+  it("parses Python-only code-shape declarations and preserves their fields", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(boundary api_boundary",
+        "  (lang python)",
+        '  (target "src/api/*.py")',
+        '  (deny-import "requests" "urllib3")',
+        '  (deny-call "eval")',
+        '  (allow-target "src/api/safe.py"))',
+        "(class-shape service_class",
+        "  (lang python)",
+        '  (target "src/services.py::Service")',
+        '  (must-have-field id "UUID")',
+        '  (must-have-field "created_at")',
+        "  (must-have-method save)",
+        "  (must-extend BaseService))",
+        "(function-shape handler_fn",
+        "  (lang python)",
+        '  (target "src/handlers.py::handle")',
+        '  (must-have-call "transaction.atomic")',
+        "  (must-have-decorator login_required)",
+        "  (must-have-parameter request))",
+        "(type-policy typing_rules",
+        "  (lang python)",
+        '  (target "src/**/*.py")',
+        '  (deny-type "Any")',
+        '  (require-type "Decimal"))',
+        "(file-policy formatting_rules",
+        "  (lang python)",
+        '  (target "src/settings.py")',
+        '  (must-contain "from __future__ import annotations")',
+        '  (must-end-with "\\n"))',
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+
+    expect(contract.codeShapes).toHaveLength(5);
+    expect(contract.codeShapes).toMatchObject([
+      {
+        kind: "boundary",
+        id: "api_boundary",
+        lang: "python",
+        target: "src/api/*.py",
+        denyImports: ["requests", "urllib3"],
+        denyCalls: ["eval"],
+        allowTargets: ["src/api/safe.py"],
+      },
+      {
+        kind: "class-shape",
+        id: "service_class",
+        lang: "python",
+        target: "src/services.py::Service",
+        mustHaveFields: [
+          { name: "id", type: "UUID" },
+          { name: "created_at" },
+        ],
+        mustHaveMethods: ["save"],
+        mustExtend: ["BaseService"],
+      },
+      {
+        kind: "function-shape",
+        id: "handler_fn",
+        lang: "python",
+        target: "src/handlers.py::handle",
+        mustHaveCalls: ["transaction.atomic"],
+        mustHaveDecorators: ["login_required"],
+        mustHaveParameters: ["request"],
+      },
+      {
+        kind: "type-policy",
+        id: "typing_rules",
+        lang: "python",
+        target: "src/**/*.py",
+        denyTypes: ["Any"],
+        requireTypes: ["Decimal"],
+      },
+      {
+        kind: "file-policy",
+        id: "formatting_rules",
+        lang: "python",
+        target: "src/settings.py",
+        mustContain: ["from __future__ import annotations"],
+        mustEndWith: ["\n"],
+      },
+    ]);
+    expect(contract.files[0]?.codeShapes).toHaveLength(5);
+  });
+
+  it("rejects unknown fields inside code-shape declarations", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(boundary api_boundary",
+        "  (lang python)",
+        '  (target "src/api/*.py")',
+        '  (must-have-call "eval"))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0318",
+      messageIncludes: 'Boundary "api_boundary" has an unknown field "must-have-call"',
+    });
+  });
+
+  it("rejects code-shape declarations that are missing target", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(file-policy formatting_rules",
+        "  (lang python)",
+        '  (must-contain "from __future__ import annotations"))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0318",
+      messageIncludes: 'File policy "formatting_rules" is missing a target field',
+    });
+  });
+
+  it("rejects non-Python code-shape languages", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(function-shape handler_fn",
+        "  (lang typescript)",
+        '  (target "src/handlers.ts::handle")',
+        "  (must-have-parameter request))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0318",
+      messageIncludes: 'Function shape "handler_fn" lang "typescript" is not supported',
+    });
+  });
+
+  it("rejects duplicate code-shape ids across different code-shape primitives", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(boundary shared_rule",
+        "  (lang python)",
+        '  (target "src/api/*.py")',
+        '  (deny-import "requests"))',
+        "(class-shape shared_rule",
+        "  (lang python)",
+        '  (target "src/services.py::Service")',
+        "  (must-have-method save))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0319",
+      messageIncludes: 'Code-shape id "shared_rule" is already defined',
+    });
+  });
+
+  it("rejects class-shape must-have-field types that are not strings", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(class-shape service_class",
+        "  (lang python)",
+        '  (target "src/services.py::Service")',
+        "  (must-have-field id 42))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0318",
+      messageIncludes: 'Class shape "service_class" must-have-field type must be a string literal',
+    });
+  });
+
   it("rejects duplicate checker ids", async () => {
     const project = await createTempProject({
       "main.stele": [
@@ -555,9 +727,9 @@ async function expectSteleError(
   promise: Promise<unknown>,
   expectation: {
     code: string;
-    file: string;
-    line: number;
-    column: number;
+    file?: string;
+    line?: number;
+    column?: number;
     messageIncludes: string;
   },
 ): Promise<void> {
@@ -567,14 +739,18 @@ async function expectSteleError(
     await promise;
   } catch (error) {
     expect(error).toBeInstanceOf(SteleError);
-    expect(error).toMatchObject({
-      code: expectation.code,
-      span: {
-        file: expectation.file,
-        line: expectation.line,
-        column: expectation.column,
-      },
-    });
+    expect(error).toMatchObject({ code: expectation.code });
+
+    if (expectation.file !== undefined || expectation.line !== undefined || expectation.column !== undefined) {
+      expect(error).toMatchObject({
+        span: {
+          file: expectation.file,
+          line: expectation.line,
+          column: expectation.column,
+        },
+      });
+    }
+
     expect((error as SteleError).message).toContain(expectation.messageIncludes);
   }
 }

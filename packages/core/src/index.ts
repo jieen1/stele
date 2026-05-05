@@ -72,10 +72,17 @@ export type {
 } from "./registry/operators.js";
 export { createCoreOperatorRegistry, createOperatorRegistry } from "./registry/operators.js";
 export type {
+  BoundaryDeclaration,
   CheckerDeclaration,
   CheckerUse,
+  ClassShapeDeclaration,
+  ClassShapeFieldRequirement,
+  CodeShapeDeclaration,
+  CodeShapeLang,
   Contract,
   ContractFile,
+  FilePolicyDeclaration,
+  FunctionShapeDeclaration,
   GroupDeclaration,
   ImportDeclaration,
   InvariantDeclaration,
@@ -94,4 +101,5 @@ export type {
   ScenarioSandbox,
   ScenarioStepDeclaration,
   ScenarioUse,
+  TypePolicyDeclaration,
 } from "./validator/structure.js";

@@ -32,6 +32,12 @@ export function validateUniqueness(contract: Contract): Contract {
     "Operator",
     "Use a globally unique operator id across the loaded contract files.",
   );
+  validateDuplicateIds(
+    contract.codeShapes,
+    "E0319",
+    "Code-shape",
+    "Use a globally unique id across boundary, class-shape, function-shape, type-policy, and file-policy declarations.",
+  );
 
   return contract;
 }
@@ -39,7 +45,7 @@ export function validateUniqueness(contract: Contract): Contract {
 function validateDuplicateIds<T extends { id: string; span: { file: string; line: number; column: number }; filePath: string }>(
   items: T[],
   code: string,
-  label: "Invariant" | "Checker" | "Group" | "Scenario" | "Operator",
+  label: "Invariant" | "Checker" | "Group" | "Scenario" | "Operator" | "Code-shape",
   hint: string,
 ): void {
   const seen = new Map<string, { filePath: string }>();

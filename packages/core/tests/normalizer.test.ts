@@ -201,5 +201,6 @@ function createSingleFileContract(contract: Contract, file: Contract["files"][nu
     scenarios: [...(file.scenarios ?? [])],
     groups: [...file.groups],
     invariants: [...file.invariants],
+    codeShapes: [...file.codeShapes],
   };
 }
