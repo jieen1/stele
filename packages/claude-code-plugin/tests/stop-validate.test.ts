@@ -59,6 +59,7 @@ describe("stop-validate hook", () => {
     expect(result.stdout).toContain("failing stele stdout");
     expect(result.stderr).toContain("failing stele stderr");
     expect(result.stderr).toContain("stele check failed");
+    expectContractRecoveryGuidance(result.stderr);
   });
 
   it("blocks Stop with a clear reason when stele cannot be started", async () => {
@@ -88,6 +89,7 @@ describe("stop-validate hook", () => {
     expect(result.stdout).toContain("pytest stdout");
     expect(result.stderr).toContain("pytest stderr");
     expect(result.stderr).toContain("pytest tests/contract failed");
+    expectContractRecoveryGuidance(result.stderr);
   });
 
   it("does not run pytest when stele check fails", async () => {
@@ -359,6 +361,16 @@ function projectVenvBinDir(projectDir: string, nestedDir?: string): string {
   }
 
   return nestedDir ? join(projectDir, nestedDir, ".venv", "bin") : join(projectDir, ".venv", "bin");
+}
+
+function expectContractRecoveryGuidance(stderr: string): void {
+  expect(stderr).toContain("Before editing contract-protected files");
+  expect(stderr).toContain("first assume the existing contract is still correct");
+  expect(stderr).toContain("Try to repair ordinary source code or fixtures first");
+  expect(stderr).toContain("Did my recent source-code change violate an existing invariant?");
+  expect(stderr).toContain("Can I fix this without editing contract/, tests/contract/, baseline, or manifest?");
+  expect(stderr).toContain("If the requested behavior truly changes the contract, stop and ask the user to review");
+  expect(stderr).toContain("Do not bypass Stele");
 }
 
 function escapeBatchText(value: string): string {

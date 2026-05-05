@@ -5,6 +5,23 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 const STOP_BLOCK_EXIT_CODE = 2;
+const CONTRACT_RECOVERY_GUIDANCE = [
+  "",
+  "Stele guidance for this failure:",
+  "Before editing contract-protected files, first assume the existing contract is still correct.",
+  "Try to repair ordinary source code or fixtures first, then re-run the check.",
+  "",
+  "Ask yourself:",
+  "- Did my recent source-code change violate an existing invariant?",
+  "- Can I fix this without editing contract/, tests/contract/, baseline, or manifest?",
+  "- Did I accidentally modify generated Stele files, baseline, or manifest?",
+  "- Does the user request truly change the project contract, or did my implementation drift?",
+  "",
+  "If the requested behavior truly changes the contract, stop and ask the user to review.",
+  "Explain which protected files need to change, why source-code-only repair is not enough, and what new invariant or baseline update is proposed.",
+  "Do not bypass Stele by editing hooks, config, manifest, baseline, or generated tests to make the failure disappear.",
+  "",
+].join("\n");
 const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
 const steleLocalCommandNames = process.platform === "win32" ? ["stele.cmd", "stele.bat"] : ["stele"];
 const stelePathCommandNames = process.platform === "win32" ? ["stele.cmd", "stele.bat"] : ["stele"];
@@ -48,7 +65,7 @@ async function main() {
   });
 
   if (steleResult.code !== 0) {
-    blockStop(`stele check failed with exit code ${steleResult.code}.\n`);
+    blockStopWithContractRecovery(`stele check failed with exit code ${steleResult.code}.\n`);
     return;
   }
 
@@ -76,7 +93,7 @@ async function main() {
       return;
     }
 
-    blockStop(`pytest tests/contract failed with exit code ${pytestResult.code}.\n`);
+    blockStopWithContractRecovery(`pytest tests/contract failed with exit code ${pytestResult.code}.\n`);
     return;
   }
 
@@ -272,4 +289,8 @@ async function findNestedVenvCommandDirectories(rootDir) {
 function blockStop(message) {
   process.stderr.write(message);
   process.exit(STOP_BLOCK_EXIT_CODE);
+}
+
+function blockStopWithContractRecovery(message) {
+  blockStop(`${message}${CONTRACT_RECOVERY_GUIDANCE}`);
 }
