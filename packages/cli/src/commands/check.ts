@@ -1,19 +1,25 @@
+import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve, win32 } from "node:path";
+import { promisify } from "node:util";
 import {
   createViolation,
   createViolationReport,
+  filterViolationReport,
   formatViolationReportHuman,
   formatViolationReportJson,
   loadContract,
   normalizeContract,
+  tryReadViolationBaseline,
+  verifyManifest,
+  type Contract,
   type GeneratedVerificationResult,
   type VerificationResult,
   type Violation,
+  type ViolationBaseline,
   type ViolationReport,
-  verifyManifest,
 } from "@stele/core";
-import { STELE_CONFIG_FILE } from "../config/defaults.js";
+import { STELE_BASELINE_FILE, STELE_CONFIG_FILE, type SteleConfig } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { CliCommandError } from "../errors.js";
 import {
@@ -25,6 +31,8 @@ import {
   verifyManagedGeneratedFiles,
 } from "./generate.js";
 
+const execFileAsync = promisify(execFile);
+
 export type CheckSummary = {
   invariantCount: number;
   generatedFileCount: number;
@@ -32,6 +40,7 @@ export type CheckSummary = {
 };
 
 export type CheckCommandOptions = {
+  diffFrom?: string;
   json?: boolean;
   reportFile?: string;
 };
@@ -41,130 +50,109 @@ export type CheckCommandResult = {
   report: ViolationReport;
 };
 
-export async function runCheck(projectDir: string): Promise<void> {
-  await checkProject(projectDir);
+export type PreparedCheckContext = {
+  projectDir: string;
+  config: SteleConfig;
+  contract: Contract;
+  generated: GeneratedVerificationResult;
+  invariantCount: number;
+};
+
+export type ProtectedCheckState = {
+  protectedPaths: string[];
+  contractHash: string;
+  summary: CheckSummary;
+};
+
+type CheckFilters = {
+  baseline?: ViolationBaseline;
+  diffScopePaths?: string[];
+};
+
+export async function runCheck(projectDir: string, options: CheckCommandOptions = {}): Promise<void> {
+  await checkProject(projectDir, options);
 }
 
-export async function checkProject(projectDir: string, _options: CheckCommandOptions = {}): Promise<CheckCommandResult> {
+export async function checkProject(projectDir: string, options: CheckCommandOptions = {}): Promise<CheckCommandResult> {
+  const context = await prepareCheckContext(projectDir);
+  const filters = await prepareCheckFilters(context, options);
+  const generatedReport = applyFiltersToReport(buildGeneratedStageReport(context, "check"), filters);
+
+  if (!generatedReport.ok) {
+    throw new CheckCommandError(getCheckExitCode(generatedReport), generatedReport);
+  }
+
+  const protectedState = await collectProtectedCheckState(projectDir, context.config, context.contract, context.generated);
+  const protectedReport = applyFiltersToReport(await buildProtectedStageReport(context, protectedState, "check"), filters);
+  const report = mergeCheckReports([generatedReport, protectedReport]);
+
+  if (!report.ok) {
+    throw new CheckCommandError(getCheckExitCode(report), report);
+  }
+
+  return {
+    summary: protectedState.summary,
+    report: withCheckSummary(report, protectedState.summary),
+  };
+}
+
+export async function prepareCheckContext(projectDir: string): Promise<PreparedCheckContext> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
   const backend = createLanguageBackend(config.generatedDir, config.targetLanguage, config.testFramework);
   const generated = await verifyManagedGeneratedFiles(projectDir, config.generatedDir, contract, backend);
-  const invariantCount = contract.invariants.length;
 
-  if (!generated.ok) {
-    const violation = createGeneratedDriftViolation(config.entry, config.generatedDir, generated);
+  return {
+    projectDir,
+    config,
+    contract,
+    generated,
+    invariantCount: contract.invariants.length,
+  };
+}
 
-    throw new CheckCommandError(
-      2,
-      createViolationReport({
-        tool: "stele",
-        command: "check",
-        ok: false,
-        summary: {
-          invariant_count: invariantCount,
-          generated_file_count: generated.files.length,
-          violation_count: 1,
-        },
-        violations: [violation],
-      }),
-    );
+export async function collectProtectedCheckState(
+  projectDir: string,
+  config: SteleConfig,
+  contract: Contract,
+  generated: GeneratedVerificationResult,
+): Promise<ProtectedCheckState> {
+  const protectedPaths = await collectProtectedPaths(projectDir, config);
+  await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
+
+  return {
+    protectedPaths,
+    contractHash: sha256(normalizeContract(contract)),
+    summary: {
+      invariantCount: contract.invariants.length,
+      generatedFileCount: generated.files.length,
+      protectedFileCount: toManifestPaths(projectDir, protectedPaths).length,
+    },
+  };
+}
+
+export async function buildRawCheckReport(context: PreparedCheckContext, command = "check"): Promise<ViolationReport> {
+  const generatedReport = buildGeneratedStageReport(context, command);
+
+  if (!context.generated.ok) {
+    return generatedReport;
   }
 
   try {
-    const protectedPaths = await collectProtectedPaths(projectDir, config);
-    await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
-
-    const manifest = await verifyManifest(resolve(projectDir, config.manifestPath));
-    const currentProtectedPaths = toManifestPaths(projectDir, protectedPaths);
-    const summary: CheckSummary = {
-      invariantCount,
-      generatedFileCount: generated.files.length,
-      protectedFileCount: currentProtectedPaths.length,
-    };
-    const manifestProtectedPathSet = new Set(manifest.files.map((file) => file.path));
-    const newProtectedPaths = currentProtectedPaths.filter((path) => !manifestProtectedPathSet.has(path));
-    const manifestViolations = [
-      ...(!manifest.ok ? [createManifestDriftViolation(config.manifestPath, manifest)] : []),
-      ...(newProtectedPaths.length > 0 ? [createProtectedFileDriftViolation(config.manifestPath, newProtectedPaths)] : []),
-    ];
-
-    if (manifestViolations.length > 0) {
-      throw new CheckCommandError(
-        3,
-        createViolationReport({
-          tool: "stele",
-          command: "check",
-          ok: false,
-          summary: {
-            invariant_count: summary.invariantCount,
-            generated_file_count: summary.generatedFileCount,
-            protected_file_count: summary.protectedFileCount,
-            violation_count: manifestViolations.length,
-          },
-          violations: manifestViolations,
-        }),
-      );
-    }
-
-    const contractHash = sha256(normalizeContract(contract));
-
-    if (manifest.contractHash !== contractHash) {
-      const violation = createContractHashMismatchViolation(config.entry, config.manifestPath, manifest.contractHash, contractHash);
-
-      throw new CheckCommandError(
-        3,
-        createViolationReport({
-          tool: "stele",
-          command: "check",
-          ok: false,
-          summary: {
-            invariant_count: summary.invariantCount,
-            generated_file_count: summary.generatedFileCount,
-            protected_file_count: summary.protectedFileCount,
-            violation_count: 1,
-          },
-          violations: [violation],
-        }),
-      );
-    }
-
-    return {
-      summary,
-      report: createViolationReport({
-        tool: "stele",
-        command: "check",
-        ok: true,
-        summary: {
-          message: formatCheckSummary(summary).trimEnd(),
-          invariant_count: summary.invariantCount,
-          generated_file_count: summary.generatedFileCount,
-          protected_file_count: summary.protectedFileCount,
-          violation_count: 0,
-        },
-        violations: [],
-      }),
-    };
+    const protectedState = await collectProtectedCheckState(context.projectDir, context.config, context.contract, context.generated);
+    return mergeCheckReports([generatedReport, await buildProtectedStageReport(context, protectedState, command)]);
   } catch (error) {
-    if (error instanceof CheckCommandError) {
-      throw error;
-    }
-
-    throw new CheckCommandError(
-      3,
-      createViolationReport({
-        tool: "stele",
-        command: "check",
-        ok: false,
-        summary: {
-          invariant_count: invariantCount,
-          generated_file_count: generated.files.length,
-          violation_count: 1,
-        },
-        violations: [createExecutionViolation(error, config.entry)],
-      }),
-      error,
-    );
+    return createViolationReport({
+      tool: "stele",
+      command,
+      ok: false,
+      summary: {
+        invariant_count: context.invariantCount,
+        generated_file_count: context.generated.files.length,
+        violation_count: 1,
+      },
+      violations: [createExecutionViolation(error, context.config.entry, command)],
+    });
   }
 }
 
@@ -172,8 +160,24 @@ export function isCheckCommandError(error: unknown): error is CheckCommandError 
   return error instanceof CheckCommandError;
 }
 
-export function formatCheckSummary(summary: CheckSummary): string {
-  return `OK ${summary.invariantCount} invariant${summary.invariantCount === 1 ? "" : "s"} checked; ${summary.generatedFileCount} generated file${summary.generatedFileCount === 1 ? "" : "s"} and ${summary.protectedFileCount} protected file${summary.protectedFileCount === 1 ? "" : "s"} verified.\n`;
+export function isBaselineEligibleViolation(violation: Violation): boolean {
+  return violation.rule_kind !== "execution_error";
+}
+
+export function formatCheckSummary(summary: CheckSummary, report?: ViolationReport): string {
+  const suffixes: string[] = [];
+  const suppressedCount = report?.summary.suppressed_violation_count ?? 0;
+  const outOfScopeCount = report?.summary.out_of_scope_violation_count ?? 0;
+
+  if (suppressedCount > 0) {
+    suffixes.push(`${suppressedCount} baseline violation${suppressedCount === 1 ? "" : "s"} suppressed`);
+  }
+
+  if (outOfScopeCount > 0) {
+    suffixes.push(`${outOfScopeCount} out-of-scope violation${outOfScopeCount === 1 ? "" : "s"} ignored`);
+  }
+
+  return `OK ${summary.invariantCount} invariant${summary.invariantCount === 1 ? "" : "s"} checked; ${summary.generatedFileCount} generated file${summary.generatedFileCount === 1 ? "" : "s"} and ${summary.protectedFileCount} protected file${summary.protectedFileCount === 1 ? "" : "s"} verified${suffixes.length > 0 ? ` (${suffixes.join(", ")})` : ""}.\n`;
 }
 
 export function formatCheckReportHuman(report: ViolationReport): string {
@@ -201,10 +205,216 @@ class CheckCommandError extends CliCommandError {
   }
 }
 
+async function prepareCheckFilters(context: PreparedCheckContext, options: CheckCommandOptions): Promise<CheckFilters> {
+  return {
+    baseline: await tryReadViolationBaseline(resolve(context.projectDir, STELE_BASELINE_FILE)),
+    diffScopePaths: options.diffFrom === undefined ? undefined : await collectGitDiffScope(context.projectDir, options.diffFrom),
+  };
+}
+
+function applyFiltersToReport(report: ViolationReport, filters: CheckFilters): ViolationReport {
+  return filterViolationReport(report, {
+    baseline: report.violations.some((violation) => violation.scope_paths.includes(STELE_BASELINE_FILE)) ? undefined : filters.baseline,
+    diffScopePaths: filters.diffScopePaths,
+    isSuppressible: isCheckSuppressibleViolation,
+  });
+}
+
+function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
+  const violations = reports.flatMap((report) => report.violations);
+  const activeViolationCount = violations.filter((violation) => (violation.status ?? "active") === "active").length;
+  const suppressedViolationCount = violations.filter((violation) => violation.status === "suppressed").length;
+  const outOfScopeViolationCount = violations.filter((violation) => violation.status === "out_of_scope").length;
+  const lastSummary = [...reports]
+    .reverse()
+    .find((report) => report.summary.invariant_count !== undefined)?.summary;
+
+  return createViolationReport({
+    tool: reports[reports.length - 1]?.tool ?? "stele",
+    command: reports[reports.length - 1]?.command ?? "check",
+    ok: activeViolationCount === 0,
+    summary: {
+      invariant_count: lastSummary?.invariant_count,
+      generated_file_count: lastSummary?.generated_file_count,
+      protected_file_count: lastSummary?.protected_file_count,
+      violation_count: violations.length,
+      active_violation_count: activeViolationCount,
+      suppressed_violation_count: suppressedViolationCount,
+      out_of_scope_violation_count: outOfScopeViolationCount,
+    },
+    violations,
+  });
+}
+
+function buildGeneratedStageReport(context: PreparedCheckContext, command: string): ViolationReport {
+  if (!context.generated.ok) {
+    return createViolationReport({
+      tool: "stele",
+      command,
+      ok: false,
+      summary: {
+        invariant_count: context.invariantCount,
+        generated_file_count: context.generated.files.length,
+        violation_count: 1,
+      },
+      violations: [createGeneratedDriftViolation(context.config.entry, context.config.generatedDir, context.generated, command)],
+    });
+  }
+
+  return createViolationReport({
+    tool: "stele",
+    command,
+    ok: true,
+    summary: {
+      invariant_count: context.invariantCount,
+      generated_file_count: context.generated.files.length,
+      violation_count: 0,
+    },
+    violations: [],
+  });
+}
+
+async function buildProtectedStageReport(
+  context: PreparedCheckContext,
+  protectedState: ProtectedCheckState,
+  command: string,
+): Promise<ViolationReport> {
+  try {
+    const manifest = await verifyManifest(resolve(context.projectDir, context.config.manifestPath));
+    const currentProtectedPaths = toManifestPaths(context.projectDir, protectedState.protectedPaths);
+    const manifestProtectedPathSet = new Set(manifest.files.map((file) => file.path));
+    const violations = [
+      ...(!manifest.ok ? [createManifestDriftViolation(context.config.manifestPath, manifest, command)] : []),
+      ...currentProtectedPaths
+        .filter((path) => !manifestProtectedPathSet.has(path))
+        .map((path) => createProtectedFileDriftViolation(context.config.manifestPath, [path], command)),
+    ];
+
+    if (manifest.contractHash !== protectedState.contractHash) {
+      violations.push(
+        createContractHashMismatchViolation(
+          context.config.entry,
+          context.config.manifestPath,
+          manifest.contractHash,
+          protectedState.contractHash,
+          command,
+        ),
+      );
+    }
+
+    return createViolationReport({
+      tool: "stele",
+      command,
+      ok: violations.length === 0,
+      summary: {
+        invariant_count: protectedState.summary.invariantCount,
+        generated_file_count: protectedState.summary.generatedFileCount,
+        protected_file_count: protectedState.summary.protectedFileCount,
+        violation_count: violations.length,
+      },
+      violations,
+    });
+  } catch (error) {
+    return createViolationReport({
+      tool: "stele",
+      command,
+      ok: false,
+      summary: {
+        invariant_count: protectedState.summary.invariantCount,
+        generated_file_count: protectedState.summary.generatedFileCount,
+        protected_file_count: protectedState.summary.protectedFileCount,
+        violation_count: 1,
+      },
+      violations: [createExecutionViolation(error, context.config.entry, command)],
+    });
+  }
+}
+
+function withCheckSummary(report: ViolationReport, summary: CheckSummary): ViolationReport {
+  return {
+    ...report,
+    ok: true,
+    summary: {
+      ...report.summary,
+      message: formatCheckSummary(summary, report).trimEnd(),
+      invariant_count: summary.invariantCount,
+      generated_file_count: summary.generatedFileCount,
+      protected_file_count: summary.protectedFileCount,
+    },
+  };
+}
+
+function getCheckExitCode(report: ViolationReport): number {
+  const activeViolations = report.violations.filter((violation) => (violation.status ?? "active") === "active");
+  return activeViolations.length > 0 && activeViolations.every((violation) => violation.rule_kind === "generated_drift") ? 2 : 3;
+}
+
+function isCheckSuppressibleViolation(violation: Violation): boolean {
+  return isBaselineEligibleViolation(violation) && violation.scope_paths.length > 0;
+}
+
+async function collectGitDiffScope(projectDir: string, baseRef: string): Promise<string[]> {
+  const repoRoot = await runGit(
+    projectDir,
+    ["rev-parse", "--show-toplevel"],
+    `Git is required for --diff-from ${baseRef}, but no repository root was found.`,
+  );
+  await runGit(
+    repoRoot,
+    ["rev-parse", "--verify", `${baseRef}^{commit}`],
+    `Git base "${baseRef}" was not found. Choose an existing branch, tag, or commit for --diff-from.`,
+  );
+
+  const outputs = await Promise.all([
+    runGit(repoRoot, ["diff", "--name-only", "--diff-filter=ACMRTUXB", `${baseRef}...HEAD`], "Unable to compute the branch diff."),
+    runGit(repoRoot, ["diff", "--name-only", "--diff-filter=ACMRTUXB"], "Unable to compute unstaged diff scope."),
+    runGit(repoRoot, ["diff", "--name-only", "--diff-filter=ACMRTUXB", "--cached"], "Unable to compute staged diff scope."),
+    runGit(repoRoot, ["ls-files", "--others", "--exclude-standard"], "Unable to list untracked files for diff scope."),
+  ]);
+  const projectRoot = resolve(projectDir);
+  const diffPaths = new Set<string>();
+
+  for (const output of outputs) {
+    for (const line of output.split(/\r?\n/)) {
+      const candidate = line.trim();
+
+      if (candidate.length === 0) {
+        continue;
+      }
+
+      const absolutePath = resolve(repoRoot, candidate);
+      const relativePath = relative(projectRoot, absolutePath).replaceAll("\\", "/");
+
+      if (relativePath.length === 0 || isOutsideProject(relativePath)) {
+        continue;
+      }
+
+      diffPaths.add(relativePath);
+    }
+  }
+
+  return [...diffPaths].sort((left, right) => left.localeCompare(right));
+}
+
+async function runGit(cwd: string, args: string[], errorMessage: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync("git", args, { cwd });
+    return stdout.trim();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${errorMessage} ${detail}`.trim());
+  }
+}
+
+function isOutsideProject(relativePath: string): boolean {
+  return relativePath.startsWith("../") || relativePath === ".." || win32.isAbsolute(relativePath);
+}
+
 function createGeneratedDriftViolation(
   entryPath: string,
   generatedDir: string,
   generated: GeneratedVerificationResult,
+  command: string,
 ): Violation {
   return createViolation({
     rule_id: "stele.check.generated_drift",
@@ -212,7 +422,7 @@ function createGeneratedDriftViolation(
     severity: "error",
     source: {
       tool: "stele",
-      command: "check",
+      command,
       kind: "generated",
     },
     location: {
@@ -232,14 +442,14 @@ function createGeneratedDriftViolation(
   });
 }
 
-function createManifestDriftViolation(manifestPath: string, manifest: VerificationResult): Violation {
+function createManifestDriftViolation(manifestPath: string, manifest: VerificationResult, command: string): Violation {
   return createViolation({
     rule_id: "stele.check.manifest_drift",
     rule_kind: "manifest_drift",
     severity: "error",
     source: {
       tool: "stele",
-      command: "check",
+      command,
       kind: "manifest",
     },
     location: {
@@ -258,14 +468,14 @@ function createManifestDriftViolation(manifestPath: string, manifest: Verificati
   });
 }
 
-function createProtectedFileDriftViolation(manifestPath: string, newProtectedPaths: string[]): Violation {
+function createProtectedFileDriftViolation(manifestPath: string, newProtectedPaths: string[], command: string): Violation {
   return createViolation({
     rule_id: "stele.check.protected_file_drift",
     rule_kind: "protected_file_drift",
     severity: "error",
     source: {
       tool: "stele",
-      command: "check",
+      command,
       kind: "protected",
     },
     location: {
@@ -288,6 +498,7 @@ function createContractHashMismatchViolation(
   manifestPath: string,
   expectedHash: string,
   actualHash: string,
+  command: string,
 ): Violation {
   return createViolation({
     rule_id: "stele.check.contract_hash_mismatch",
@@ -295,7 +506,7 @@ function createContractHashMismatchViolation(
     severity: "error",
     source: {
       tool: "stele",
-      command: "check",
+      command,
       kind: "contract",
     },
     location: {
@@ -315,7 +526,7 @@ function createContractHashMismatchViolation(
   });
 }
 
-function createExecutionViolation(error: unknown, entryPath?: string): Violation {
+function createExecutionViolation(error: unknown, entryPath: string | undefined, command: string): Violation {
   const message = error instanceof Error ? error.message : String(error);
 
   return createViolation({
@@ -324,7 +535,7 @@ function createExecutionViolation(error: unknown, entryPath?: string): Violation
     severity: "error",
     source: {
       tool: "stele",
-      command: "check",
+      command,
       kind: "execution",
     },
     location: {

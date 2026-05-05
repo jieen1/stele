@@ -3,6 +3,13 @@ import { pathToFileURL } from "node:url";
 import { Command, Option } from "commander";
 import { runAddChecker } from "./commands/addChecker.js";
 import {
+  formatBaselineSummary,
+  runBaselineInit,
+  runBaselineUpdate,
+  type BaselineCommandOptions,
+  type BaselineCommandSummary,
+} from "./commands/baseline.js";
+import {
   checkProject,
   formatCheckReportHuman,
   formatCheckReportJson,
@@ -23,6 +30,8 @@ const STELE_CLI_VERSION = "0.1.0";
 
 type ProgramDependencies = {
   cwd?: () => string;
+  runBaselineInit?: (projectDir: string, options: BaselineCommandOptions) => Promise<BaselineCommandSummary | void>;
+  runBaselineUpdate?: (projectDir: string, options: BaselineCommandOptions) => Promise<BaselineCommandSummary | void>;
   runCheck?: (projectDir: string, options: CheckCommandOptions) => Promise<CheckCommandResult | void>;
   runGenerate?: (projectDir: string, options: GenerateOptions) => Promise<GenerateSummary | void>;
   runLock?: (projectDir: string, options: LockOptions) => Promise<LockSummary | void>;
@@ -34,6 +43,8 @@ type ProgramDependencies = {
 
 export function createProgram(dependencies: ProgramDependencies = {}): Command {
   const cwd = dependencies.cwd ?? (() => process.cwd());
+  const baselineInit = dependencies.runBaselineInit ?? runBaselineInit;
+  const baselineUpdate = dependencies.runBaselineUpdate ?? runBaselineUpdate;
   const check = dependencies.runCheck ?? checkProject;
   const generate = dependencies.runGenerate ?? runGenerate;
   const lock = dependencies.runLock ?? lockProject;
@@ -60,8 +71,21 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   program.command("version").description("Print Stele CLI version.").action(() => {
     process.stdout.write(formatVersion());
   });
+  program.command("baseline-init").requiredOption("--reason <reason>").action(async (options: BaselineCommandOptions) => {
+    const result = await baselineInit(cwd(), options);
+    if (isBaselineSummary(result)) {
+      process.stdout.write(formatBaselineSummary("initialized", result));
+    }
+  });
+  program.command("baseline-update").requiredOption("--reason <reason>").action(async (options: BaselineCommandOptions) => {
+    const result = await baselineUpdate(cwd(), options);
+    if (isBaselineSummary(result)) {
+      process.stdout.write(formatBaselineSummary("updated", result));
+    }
+  });
   program
     .command("check")
+    .option("--diff-from <base>", "limit failures to files changed since the given git base")
     .option("--json", "emit the check report as JSON")
     .option("--report-file <path>", "write the JSON check report to a file")
     .action(async (options: CheckCommandOptions) => {
@@ -139,6 +163,10 @@ function formatVersion(): string {
 
 function isCheckCommandResult(value: CheckCommandResult | void): value is CheckCommandResult {
   return typeof value === "object" && value !== null && "summary" in value && "report" in value;
+}
+
+function isBaselineSummary(value: BaselineCommandSummary | void): value is BaselineCommandSummary {
+  return typeof value === "object" && value !== null && "baselinePath" in value && "violationCount" in value;
 }
 
 function isLockSummary(value: LockSummary | void): value is LockSummary {

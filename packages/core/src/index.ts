@@ -1,4 +1,19 @@
 export type { AstNode, AtomNode, ListNode, SourceSpan, SteleType } from "./ast/types.js";
+export type {
+  BaselineViolation,
+  CreateViolationBaselineOptions,
+  FilterViolationReportOptions,
+  ViolationBaseline,
+} from "./baseline/types.js";
+export {
+  createViolationBaseline,
+  filterViolationReport,
+} from "./baseline/types.js";
+export {
+  readViolationBaseline,
+  tryReadViolationBaseline,
+  writeViolationBaseline,
+} from "./baseline/io.js";
 export { SteleError } from "./errors/SteleError.js";
 export type {
   GeneratedFile,
@@ -40,6 +55,8 @@ export type {
   ViolationReport,
   ViolationReportSummary,
   ViolationSeverity,
+  ViolationStatus,
+  ViolationSuppressionReason,
   ViolationSource,
 } from "./report/types.js";
 export {

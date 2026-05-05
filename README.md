@@ -66,6 +66,15 @@ npx stele lock --reason "initial contract baseline"
 npx stele check
 ```
 
+When you need to adopt an existing codebase with known legacy contract drift, initialize a baseline after the first lock:
+
+```bash
+npx stele baseline-init --reason "initial legacy adoption"
+npx stele check
+```
+
+That writes `contract/.baseline.json`, locks it into the manifest, suppresses only matching legacy check violations, and still fails newly introduced drift.
+
 ## First Python app integration
 
 Stele does not invent fake runtime objects. Generated tests read whatever your application returns from `stele_context`.
@@ -120,6 +129,14 @@ npx stele check
 ```
 
 When you are bootstrapping a repository or approving a contract change, insert `npx stele lock --reason "..."` between pytest and `stele check`. `stele check` is the enforcement step. It exits `2` when generated files drift and `3` when the protected manifest or protected file set is out of date.
+
+For focused branch checks, scope failures to your current change set:
+
+```bash
+npx stele check --diff-from main
+```
+
+Stele compares `main...HEAD` plus staged, unstaged, and untracked files. Out-of-scope violations stay in the JSON report with `out_of_scope` status and summary counts, but they do not block the check.
 
 ## Claude Code plugin
 

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 
 export type ViolationSeverity = "error" | "warning" | "info";
+export type ViolationStatus = "active" | "suppressed" | "out_of_scope";
+export type ViolationSuppressionReason = "baseline";
 
 export type ViolationSource = {
   tool: string;
@@ -39,6 +41,8 @@ export type Violation = {
   cause: ViolationCause;
   fingerprint: string;
   scope_paths: string[];
+  status?: ViolationStatus;
+  suppressed_by?: ViolationSuppressionReason;
   fix?: ViolationFix;
   introduced_in?: string;
 };
@@ -51,6 +55,9 @@ export type ViolationReportSummary = {
   generated_file_count?: number;
   protected_file_count?: number;
   violation_count: number;
+  active_violation_count?: number;
+  suppressed_violation_count?: number;
+  out_of_scope_violation_count?: number;
 };
 
 export type ViolationReport = {
@@ -77,6 +84,8 @@ export function createViolation(input: ViolationInput): Violation {
     },
     cause: normalizeCause(input.cause),
     scope_paths: uniqueSortedStrings(input.scope_paths),
+    status: input.status ?? "active",
+    suppressed_by: input.suppressed_by,
     fix: input.fix === undefined ? undefined : { ...input.fix },
   };
 
@@ -98,7 +107,7 @@ export function createViolationReport(input: ViolationReportInput): ViolationRep
   };
 }
 
-export function buildViolationFingerprint(violation: Omit<Violation, "fingerprint">): string {
+export function buildViolationFingerprint(violation: Omit<Violation, "fingerprint" | "status" | "suppressed_by">): string {
   const payload = {
     rule_id: violation.rule_id,
     rule_kind: violation.rule_kind,
@@ -138,6 +147,8 @@ function cloneViolation(violation: Violation): Violation {
     },
     cause: normalizeCause(violation.cause),
     scope_paths: uniqueSortedStrings(violation.scope_paths),
+    status: violation.status ?? "active",
+    suppressed_by: violation.suppressed_by,
     fix: violation.fix === undefined ? undefined : { ...violation.fix },
   };
 }
