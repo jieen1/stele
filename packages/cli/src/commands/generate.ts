@@ -13,6 +13,7 @@ import {
 import { generatePytestSource, getPythonRuntimeSource, sanitizePythonIdentifier } from "@stele/backend-python";
 import globParent from "glob-parent";
 import { minimatch } from "minimatch";
+import { STELE_BASELINE_FILE } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { CliCommandError } from "../errors.js";
 
@@ -150,6 +151,8 @@ export async function collectProtectedPaths(projectDir: string, options: Protect
     }
   }
 
+  await includeRequiredProtectedFile(normalizedProjectRoot, normalizedManifestPath, STELE_BASELINE_FILE, matchedPaths);
+
   return uniqueSortedPaths([...matchedPaths]);
 }
 
@@ -274,6 +277,40 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
   );
 
   return results.flat();
+}
+
+async function includeRequiredProtectedFile(
+  projectDir: string,
+  manifestPath: string,
+  projectRelativePath: string,
+  matchedPaths: Set<string>,
+): Promise<void> {
+  const absolutePath = resolve(projectDir, projectRelativePath);
+
+  if (absolutePath === manifestPath) {
+    return;
+  }
+
+  try {
+    const entryStats = await lstat(absolutePath);
+    const normalizedPath = normalizeProjectRelativePath(projectDir, absolutePath);
+
+    if (entryStats.isSymbolicLink()) {
+      throw new Error(`Protected file scanning does not allow symbolic links or other non-regular entries: ${normalizedPath}.`);
+    }
+
+    if (!entryStats.isFile()) {
+      throw new Error(`Protected file scanning does not allow non-regular entries: ${normalizedPath}.`);
+    }
+
+    matchedPaths.add(absolutePath);
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return;
+    }
+
+    throw error;
+  }
 }
 
 function uniqueSortedPaths(paths: string[]): string[] {

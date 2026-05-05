@@ -50,6 +50,8 @@ describe("@stele/backend-python translator", () => {
     expect(runtimeFile?.content).toContain("def stele_sum(items, parts):");
     expect(runtimeFile?.content).toContain("def stele_call_checker(name, stele_context, kwargs):");
     expect(runtimeFile?.content).toContain("def stele_is_modified(stele_context, parts):");
+    expect(runtimeFile?.content).toContain("def stele_merge_contexts(*contexts):");
+    expect(runtimeFile?.content).toContain("def stele_run_scenario(scenario, stele_context, stele_sandbox):");
     expect(getRuntimeSource()()).toBe(runtimeFile?.content);
   });
 
@@ -268,6 +270,41 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
+  it("generates pytest that runs python-import scenarios before asserting on merged scenario state", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund"',
+        '      (body (object (name (gen unique-name "fund")))))',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_VALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL remains valid.")',
+        "  (assert (gt (path pnl value) 0)))",
+      ].join("\n"),
+    });
+
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain(
+      "from ._stele_runtime import stele_call_checker, stele_get_path, stele_is_modified, stele_merge_contexts, stele_run_scenario, stele_sum",
+    );
+    expect(testSource).toContain("def test_FUND_PNL_VALID(stele_context, stele_sandbox):");
+    expect(testSource).toContain("stele_scenario_context = stele_run_scenario(");
+    expect(testSource).toContain('"target": "tests.contract_scenarios:create_fund"');
+    expect(testSource).toContain('"name": {"$gen": {"kind": "unique-name", "prefix": "fund"}}');
+    expect(testSource).toContain('"fund-id": {"$ref": ["fund", "id"]}');
+    expect(testSource).toContain('stele_assert_context = stele_merge_contexts(stele_context, stele_scenario_context)');
+    expect(testSource).toContain('assert (stele_get_path(stele_assert_context["pnl"], ["value"])) > (0)');
+  });
+
   it("runs modified assertions against state-before/state-after through the generated runtime", async () => {
     const contract = await createContract({
       "main.stele": [
@@ -296,6 +333,187 @@ describe("@stele/backend-python translator", () => {
 
     expect(testSource).toContain('assert stele_is_modified(stele_context, ["account","balance"])');
     expect(result.stdout).toContain("1 passed");
+  });
+
+  it("uses stele_assert_context for temporal expressions in scenario-backed invariants", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(scenario account-balance-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (capture-state state-before",
+        '    (call "tests.contract_scenarios:get_state_before"))',
+        "  (capture-state state-after",
+        '    (call "tests.contract_scenarios:get_state_after")))',
+        "(invariant BALANCE_MODIFIED_FROM_SCENARIO",
+        "  (uses-scenario account-balance-flow)",
+        "  (severity high)",
+        '  (description "Scenario-provided state snapshots drive modified checks.")',
+        "  (assert (modified (path account balance))))",
+      ].join("\n"),
+    });
+
+    const testSource = getGeneratedTestFile(contract);
+
+    expect(testSource).toContain('assert stele_is_modified(stele_assert_context, ["account","balance"])');
+  });
+
+  it("executes python-import scenarios end to end with sandbox fixtures and captured state", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund"',
+        '      (body (object (name (gen unique-name "fund")))))',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_VALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL remains valid.")',
+        "  (assert (gt (path pnl value) 0)))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "from contextlib import nullcontext",
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {}",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_sandbox():",
+        "    return nullcontext()",
+      ],
+      {
+        "tests/contract_scenarios.py": [
+          "def create_fund(body, stele_context):",
+          '    return {"id": "fund-123", "name": body["name"]}',
+          "",
+          "",
+          "def get_pnl(body, stele_context):",
+          '    assert body["fund-id"] == "fund-123"',
+          '    return {"value": 5}',
+        ].join("\n"),
+      },
+    );
+
+    const result = await runGeneratedPytest(projectDir);
+
+    expect(result.stdout).toContain("1 passed");
+  });
+
+  it("executes scenario-backed temporal assertions against merged scenario state", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(scenario account-balance-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (capture-state state-before",
+        '    (call "tests.contract_scenarios:get_state_before"))',
+        "  (capture-state state-after",
+        '    (call "tests.contract_scenarios:get_state_after")))',
+        "(invariant BALANCE_MODIFIED_FROM_SCENARIO",
+        "  (uses-scenario account-balance-flow)",
+        "  (severity high)",
+        '  (description "Scenario-provided state snapshots drive modified checks.")',
+        "  (assert (modified (path account balance))))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "from contextlib import nullcontext",
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        '    return {"state-before": {"account": {"balance": 1}}, "state-after": {"account": {"balance": 1}}}',
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_sandbox():",
+        "    return nullcontext()",
+      ],
+      {
+        "tests/contract_scenarios.py": [
+          "def get_state_before(body, stele_context):",
+          '    return {"account": {"balance": 10}}',
+          "",
+          "",
+          "def get_state_after(body, stele_context):",
+          '    return {"account": {"balance": 12}}',
+        ].join("\n"),
+      },
+    );
+
+    const result = await runGeneratedPytest(projectDir);
+
+    expect(result.stdout).toContain("1 passed");
+  });
+
+  it("fails generated pytest when scenario-backed assertions are false", async () => {
+    const contract = await createContract({
+      "main.stele": [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund"',
+        '      (body (object (name (gen unique-name "fund")))))',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_INVALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL must exceed an impossible threshold.")',
+        "  (assert (gt (path pnl value) 10)))",
+      ].join("\n"),
+    });
+    const projectDir = await writeGeneratedPytestProject(
+      contract,
+      [
+        "from contextlib import nullcontext",
+        "import pytest",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_context():",
+        "    return {}",
+        "",
+        "",
+        "@pytest.fixture",
+        "def stele_sandbox():",
+        "    return nullcontext()",
+      ],
+      {
+        "tests/contract_scenarios.py": [
+          "def create_fund(body, stele_context):",
+          '    return {"id": "fund-123", "name": body["name"]}',
+          "",
+          "",
+          "def get_pnl(body, stele_context):",
+          '    return {"value": 5}',
+        ].join("\n"),
+      },
+    );
+
+    const result = await runGeneratedPytestAllowFailure(projectDir);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("1 failed");
   });
 
   it("allocates scope-unique nested quantifier bindings when sanitized names collide", async () => {
@@ -390,6 +608,8 @@ describe("@stele/backend-python translator", () => {
     expect(translateExpression(parseExpression("(modified (path account balance))"))).toBe(
       "stele_is_modified(stele_context, [\"account\",\"balance\"])",
     );
+    expect(translateExpression(parseExpression("(state-before)"))).toBe('stele_context["state-before"]');
+    expect(translateExpression(parseExpression("(state-after)"))).toBe('stele_context["state-after"]');
   });
 
   it("rejects unsupported operators with backend error context", () => {
@@ -475,7 +695,11 @@ function getGeneratedTestFile(contract: Contract): string {
   return testFile!.content;
 }
 
-async function writeGeneratedPytestProject(contract: Contract, conftestLines: string[]): Promise<string> {
+async function writeGeneratedPytestProject(
+  contract: Contract,
+  conftestLines: string[],
+  extraFiles: Record<string, string> = {},
+): Promise<string> {
   const projectDir = await mkdtemp(join(tmpdir(), "stele-backend-python-smoke-"));
   tempDirs.push(projectDir);
   const generatedFiles = getGeneratePytestFiles()(contract);
@@ -489,6 +713,14 @@ async function writeGeneratedPytestProject(contract: Contract, conftestLines: st
   );
 
   await writeFile(join(projectDir, "tests", "contract", "conftest.py"), conftestLines.join("\n"), "utf8");
+  await writeFile(join(projectDir, "tests", "__init__.py"), "", "utf8");
+  await Promise.all(
+    Object.entries(extraFiles).map(async ([relativePath, content]) => {
+      const fullPath = join(projectDir, relativePath);
+      await mkdir(dirname(fullPath), { recursive: true });
+      await writeFile(fullPath, content, "utf8");
+    }),
+  );
 
   return projectDir;
 }

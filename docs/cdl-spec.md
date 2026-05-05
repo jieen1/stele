@@ -4,7 +4,7 @@ This document describes the Stele Contract Definition Language (CDL) implemented
 
 ## Status and scope
 
-CDL v0.1 is an s-expression language for declaring invariants, checker-backed rules, imports, groups, and metadata. The shipped backend target is Python + pytest.
+CDL v0.1 is an s-expression language for declaring invariants, checker-backed rules, scenario setup flows, imports, groups, and metadata. The shipped backend target is Python + pytest.
 
 The toolchain currently consists of:
 
@@ -67,6 +67,7 @@ Only these top-level declarations are valid in v0.1:
 - `checker`
 - `group`
 - `invariant`
+- `scenario`
 
 Any other top-level declaration fails validation with `E0301`.
 
@@ -162,6 +163,7 @@ Allowed fields:
 - `description`
 - `assert`
 - `uses-checker`
+- `uses-scenario`
 - `category`
 - `tags`
 - `when`
@@ -211,6 +213,47 @@ without additional arguments.
 ### Dependency requirements
 
 `depends-on` entries must reference known invariant ids. Unknown dependencies fail with `E0308`.
+
+### Scenario requirements
+
+`uses-scenario` must reference a declared scenario id. Unknown scenario references fail with `E0316`.
+
+### `scenario`
+
+Form:
+
+```lisp
+(scenario fund-pnl-flow
+  (sandbox transactional)
+  (executor python-import)
+  (step setup-fund
+    (call "tests.contract_scenarios:create_fund"
+      (body (object (name (gen unique-name "fund")))))
+    (capture fund))
+  (capture-state pnl
+    (call "tests.contract_scenarios:get_pnl"
+      (body (object (fund-id (ref fund id)))))))
+```
+
+Rules in the current Python vertical slice:
+
+- the first item must be an identifier
+- `sandbox` is required and only `transactional` is accepted
+- `executor` is required and only `python-import` is accepted
+- at least one `step` or `capture-state` form is required
+- scenario ids must be unique across the loaded contract graph
+
+`step` forms may contain one `call` and an optional `capture`. `capture-state` forms must start with the capture id and contain exactly one `call`.
+
+`python-import` call targets must use `module:function` text. The generated runtime imports that module, calls `function(body, stele_context)`, and stores any captured return values in scenario context before the invariant assertion runs.
+
+Supported scenario body expressions in v0.1:
+
+- `(object (key expr) ...)`
+- `(ref capture field...)`
+- `(gen unique-name "prefix")`
+
+The lexer does not support `$`-prefixed interpolation syntax in v0.1, so scenario references are always explicit forms such as `(ref fund id)`.
 
 ## Expressions and operator semantics
 
@@ -428,7 +471,7 @@ For the Python backend, Stele manages these files:
 - `tests/contract/test_contract.py` for top-level invariants, when any exist
 - `tests/contract/test_<sanitized-group-id>.py` for each group
 
-The generated runtime helper implements path traversal, sum helpers, checker invocation, and modified-state comparison. `tests/contract/conftest.py` is application-owned and is allowed to remain alongside the generated files.
+The generated runtime helper implements path traversal, sum helpers, checker invocation, modified-state comparison, and scenario execution helpers. `tests/contract/conftest.py` is application-owned and is allowed to remain alongside the generated files.
 
 ## Errors and exit codes
 
@@ -437,9 +480,9 @@ The generated runtime helper implements path traversal, sum helpers, checker inv
 - `E0001`-`E0003`: lexical errors
 - `E0101`-`E0102`: parser errors
 - `E0201`-`E0203`: loader errors
-- `E0301`-`E0314`: validation errors
+- `E0301`-`E0317`: validation errors
 - `E0401`-`E0404`: manifest errors
-- `E0601`-`E0604`: Python backend errors
+- `E0601`-`E0606`: Python backend errors
 
 All core diagnostics carry a category and, when available, file/line/column span information.
 

@@ -39,6 +39,36 @@ Stele's default repository layout is:
 
 The generated output directory is `tests/contract/`, but `conftest.py` remains user-owned and is allowed to live alongside the generated files.
 
+## Scenario-backed invariants
+
+The Python slice now supports a narrow `scenario` primitive for setup flows that must run before an invariant asserts on generated state. Scenario-backed invariants add two runtime expectations:
+
+- the invariant uses `(uses-scenario scenario-id)`
+- the generated pytest test function requires a `stele_sandbox` fixture in addition to `stele_context`
+
+Example:
+
+```lisp
+(scenario fund-pnl-flow
+  (sandbox transactional)
+  (executor python-import)
+  (step setup-fund
+    (call "tests.contract_scenarios:create_fund"
+      (body (object (name (gen unique-name "fund")))))
+    (capture fund))
+  (capture-state pnl
+    (call "tests.contract_scenarios:get_pnl"
+      (body (object (fund-id (ref fund id)))))))
+
+(invariant FUND_PNL_VALID
+  (uses-scenario fund-pnl-flow)
+  (severity high)
+  (description "Generated fund PnL remains valid.")
+  (assert (gt (path pnl value) 0)))
+```
+
+The generated runtime imports `tests.contract_scenarios`, calls each `module:function` target as `function(body, stele_context)`, merges captured scenario state into the assertion context, and then evaluates the invariant.
+
 ## The `stele_context` fixture
 
 Your application owns the contract runtime surface by returning a dictionary from `stele_context`:
@@ -105,6 +135,24 @@ def stele_context():
 ```
 
 This keeps missing-data handling in the app-owned fixture instead of repeating `(when ...)` guards on every invariant. Use invariant-level `when` only when the condition is part of the business rule itself.
+
+### The `stele_sandbox` fixture
+
+Scenario-backed invariants require a `stele_sandbox` fixture. In v0.1 Stele does not create or roll back transactions itself; it only depends on this fixture so your app can do that work.
+
+The simplest no-op shape is:
+
+```python
+from contextlib import nullcontext
+import pytest
+
+
+@pytest.fixture
+def stele_sandbox():
+    return nullcontext()
+```
+
+For real application tests, return a context manager or fixture value that starts the transactional scope your app wants around scenario execution.
 
 ## Cross-table numeric rules
 

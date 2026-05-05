@@ -1,8 +1,11 @@
+import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
+import { runBaselineInit, runBaselineUpdate } from "../src/commands/baseline.js";
 import { runCheck } from "../src/commands/check.js";
 import { runGenerate } from "../src/commands/generate.js";
 import { runInit } from "../src/commands/init.js";
@@ -10,6 +13,7 @@ import { runLock } from "../src/commands/lock.js";
 import { createProgram, runCli } from "../src/index.js";
 
 const tempDirs: string[] = [];
+const execFileAsync = promisify(execFile);
 
 describe("stele CLI", () => {
   afterEach(async () => {
@@ -29,6 +33,7 @@ describe("stele CLI", () => {
     expect(conftest).toContain("def stele_default(value, fallback):");
     expect(conftest).toContain("def stele_context_or_skip(**values):");
     expect(conftest).toContain("@pytest.fixture\ndef stele_context():\n    return {}\n");
+    expect(conftest).toContain("@pytest.fixture\ndef stele_sandbox():\n    return nullcontext()\n");
   });
 
   it("init does not overwrite existing user files", async () => {
@@ -66,6 +71,52 @@ describe("stele CLI", () => {
     await expect(pathExists(join(projectDir, "contract", "main.stele"))).resolves.toBe(false);
   });
 
+  it("init scaffold supports scenario-backed pytest generation and execution out of the box", async () => {
+    const projectDir = await createTempDir();
+
+    await runInit(projectDir, { language: "python" });
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund"',
+        '      (body (object (name (gen unique-name "fund")))))',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_VALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL remains valid.")',
+        "  (assert (gt (path pnl value) 0)))",
+      ].join("\n"),
+    );
+    await writeProjectFile(projectDir, "tests/__init__.py", "");
+    await writeProjectFile(
+      projectDir,
+      "tests/contract_scenarios.py",
+      [
+        "def create_fund(body, stele_context):",
+        '    return {"id": "fund-123", "name": body["name"]}',
+        "",
+        "",
+        "def get_pnl(body, stele_context):",
+        '    assert body["fund-id"] == "fund-123"',
+        '    return {"value": 5}',
+      ].join("\n"),
+    );
+
+    await runGenerate(projectDir, { force: false });
+    const result = await runContractPytest(projectDir);
+
+    expect(result.stdout).toContain("1 passed");
+  });
+
   it("generate writes canonical Python files without writing a manifest", async () => {
     const projectDir = await createFixtureProject();
 
@@ -84,6 +135,37 @@ describe("stele CLI", () => {
       generatedDir: "tests/contract",
       generatedFileCount: 3,
     });
+  });
+
+  it("generate includes scenario runtime calls and sandbox fixture dependencies for scenario-backed invariants", async () => {
+    const projectDir = await createFixtureProject();
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      [
+        "(scenario fund-pnl-flow",
+        "  (sandbox transactional)",
+        "  (executor python-import)",
+        "  (step setup-fund",
+        '    (call "tests.contract_scenarios:create_fund")',
+        "    (capture fund))",
+        "  (capture-state pnl",
+        '    (call "tests.contract_scenarios:get_pnl"',
+        "      (body (object (fund-id (ref fund id)))))))",
+        "(invariant FUND_PNL_VALID",
+        "  (uses-scenario fund-pnl-flow)",
+        "  (severity high)",
+        '  (description "Generated fund PnL remains valid.")',
+        "  (assert (gt (path pnl value) 0)))",
+      ].join("\n"),
+    );
+
+    await runGenerate(projectDir, { force: false });
+
+    const generated = await readFile(join(projectDir, "tests", "contract", "test_contract.py"), "utf8");
+    expect(generated).toContain("def test_FUND_PNL_VALID(stele_context, stele_sandbox):");
+    expect(generated).toContain("stele_scenario_context = stele_run_scenario(");
+    expect(generated).toContain('stele_assert_context = stele_merge_contexts(stele_context, stele_scenario_context)');
   });
 
   it("generate stays manifest-neutral when nothing changed", async () => {
@@ -282,6 +364,26 @@ describe("stele CLI", () => {
     await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
 
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
+  });
+
+  it("baseline-update requires a non-empty reason", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerateAndLock(projectDir, "initial contract baseline");
+
+    await expect(runBaselineUpdate(projectDir, { reason: "" })).rejects.toThrow(/reason/i);
+    await expect(runBaselineUpdate(projectDir, { reason: "   " })).rejects.toThrow(/reason/i);
+  });
+
+  it("check fails with manifest drift after the baseline file is edited directly", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerateAndLock(projectDir, "initial contract baseline");
+    await runBaselineInit(projectDir, { reason: "initial legacy adoption" });
+
+    const baseline = await readJson(join(projectDir, "contract", ".baseline.json"));
+    baseline.reason = "manually edited";
+    await writeProjectFile(projectDir, "contract/.baseline.json", `${JSON.stringify(baseline, null, 2)}\n`);
+
+    await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
   });
 
   it("check fails when a generated file is missing", async () => {
@@ -561,6 +663,8 @@ describe("stele CLI", () => {
   it("CLI entry parses commands and forwards cwd and options", async () => {
     const handlers = {
       check: vi.fn(async () => undefined),
+      baselineInit: vi.fn(async () => undefined),
+      baselineUpdate: vi.fn(async () => undefined),
       generate: vi.fn(async () => undefined),
       lock: vi.fn(async () => undefined),
       init: vi.fn(async () => undefined),
@@ -568,17 +672,27 @@ describe("stele CLI", () => {
     const program = createProgram({
       cwd: () => "E:/tmp/project",
       runCheck: handlers.check,
+      runBaselineInit: handlers.baselineInit,
+      runBaselineUpdate: handlers.baselineUpdate,
       runGenerate: handlers.generate,
       runLock: handlers.lock,
       runInit: handlers.init,
     });
 
-    await program.parseAsync(["node", "stele", "check"]);
+    await program.parseAsync(["node", "stele", "check", "--json", "--report-file", ".stele/reports/last.json", "--diff-from", "main"]);
+    await program.parseAsync(["node", "stele", "baseline-init", "--reason", "initial legacy adoption"]);
+    await program.parseAsync(["node", "stele", "baseline-update", "--reason", "approved legacy fix"]);
     await program.parseAsync(["node", "stele", "generate", "--force"]);
     await program.parseAsync(["node", "stele", "lock", "--reason", "approved"]);
     await program.parseAsync(["node", "stele", "init", "--language", "python"]);
 
-    expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project");
+    expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project", {
+      diffFrom: "main",
+      json: true,
+      reportFile: ".stele/reports/last.json",
+    });
+    expect(handlers.baselineInit).toHaveBeenCalledWith("E:/tmp/project", { reason: "initial legacy adoption" });
+    expect(handlers.baselineUpdate).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved legacy fix" });
     expect(handlers.generate).toHaveBeenCalledWith("E:/tmp/project", { force: true });
     expect(handlers.lock).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved" });
     expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python" });
@@ -642,6 +756,46 @@ describe("stele CLI", () => {
     process.exitCode = originalExitCode;
   });
 
+  it("CLI check --json prints a structured violation report to stdout on generated drift", async () => {
+    const projectDir = await createFixtureProject();
+    const stdout = captureStdout();
+    const stderr = captureStderr();
+    const originalExitCode = process.exitCode;
+
+    await runGenerateAndLock(projectDir);
+    await writeProjectFile(projectDir, "tests/contract/test_contract.py", "# tampered\n");
+
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+    await runCli(["node", "stele", "check", "--json"]);
+
+    const report = JSON.parse(stdout.read()) as {
+      ok: boolean;
+      command: string;
+      violations: Array<{
+        rule_id: string;
+        rule_kind: string;
+        fingerprint: string;
+        cause: { changed?: string[] };
+      }>;
+    };
+
+    expect(process.exitCode).toBe(2);
+    expect(stderr.read()).toBe("");
+    expect(report.ok).toBe(false);
+    expect(report.command).toBe("check");
+    expect(report.violations).toHaveLength(1);
+    expect(report.violations[0]).toMatchObject({
+      rule_id: "stele.check.generated_drift",
+      rule_kind: "generated_drift",
+      cause: {
+        changed: ["tests/contract/test_contract.py"],
+      },
+    });
+    expect(report.violations[0]!.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    process.exitCode = originalExitCode;
+  });
+
   it("CLI exits with code 3 when protected files drift without lock", async () => {
     const projectDir = await createFixtureProject();
     const stderr = captureStderr();
@@ -656,6 +810,38 @@ describe("stele CLI", () => {
 
     expect(process.exitCode).toBe(3);
     expect(stderr.read()).toContain("Manifest verification failed");
+    process.exitCode = originalExitCode;
+  });
+
+  it("CLI check writes a JSON report file even when protected files drift", async () => {
+    const projectDir = await createFixtureProject();
+    const stderr = captureStderr();
+    const originalExitCode = process.exitCode;
+
+    await runGenerateAndLock(projectDir);
+    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return False\n");
+
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    process.exitCode = 0;
+    await runCli(["node", "stele", "check", "--report-file", ".stele/reports/last.json"]);
+
+    const report = await readJson(join(projectDir, ".stele", "reports", "last.json"));
+
+    expect(process.exitCode).toBe(3);
+    expect(stderr.read()).toContain("Manifest verification failed");
+    expect(report).toMatchObject({
+      ok: false,
+      command: "check",
+      violations: [
+        {
+          rule_id: "stele.check.manifest_drift",
+          rule_kind: "manifest_drift",
+          cause: {
+            changed: ["contract/checker_impls/custom_checker.py"],
+          },
+        },
+      ],
+    });
     process.exitCode = originalExitCode;
   });
 
@@ -803,6 +989,13 @@ async function tryCreateNonRegularEntry(targetDirectory: string, linkPath: strin
 
 function isSymlinkPermissionError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && (error.code === "EPERM" || error.code === "EACCES" || error.code === "UNKNOWN");
+}
+
+async function runContractPytest(projectDir: string): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync("python", ["-m", "pytest", "tests/contract", "-q"], {
+    cwd: projectDir,
+    windowsHide: true,
+  });
 }
 
 function captureStderr(): { read(): string } {

@@ -4,9 +4,9 @@ import type { PythonExpressionTranslator, PythonOperatorHandler, TranslationCont
 export const temporalOperatorHandlers: Record<string, PythonOperatorHandler> = {
   before: (node, context, translate) => `${translate(node.items[0]!, context)} < ${translate(node.items[1]!, context)}`,
   after: (node, context, translate) => `${translate(node.items[0]!, context)} > ${translate(node.items[1]!, context)}`,
-  modified: (node) => `stele_is_modified(stele_context, ${JSON.stringify(readModifiedPath(node.items[0], node))})`,
-  "state-before": () => 'stele_context["state-before"]',
-  "state-after": () => 'stele_context["state-after"]',
+  modified: (node, context) => `stele_is_modified(${context.rootContextName}, ${JSON.stringify(readModifiedPath(node.items[0], node))})`,
+  "state-before": (_node, context) => `${context.rootContextName}["state-before"]`,
+  "state-after": (_node, context) => `${context.rootContextName}["state-after"]`,
 } as Record<string, PythonOperatorHandler>;
 
 function readModifiedPath(node: AstNode | undefined, owner: ListNode): string[] {

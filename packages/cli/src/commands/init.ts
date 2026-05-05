@@ -18,6 +18,7 @@ const DEFAULT_CONTRACT_SOURCE = [
 ].join("\n");
 
 const DEFAULT_CONFTEST_SOURCE = [
+  "from contextlib import nullcontext",
   "import pytest",
   "",
   "",
@@ -35,6 +36,11 @@ const DEFAULT_CONFTEST_SOURCE = [
   "@pytest.fixture",
   "def stele_context():",
   "    return {}",
+  "",
+  "",
+  "@pytest.fixture",
+  "def stele_sandbox():",
+  "    return nullcontext()",
   "",
 ].join("\n");
 

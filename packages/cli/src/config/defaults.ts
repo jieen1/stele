@@ -1,4 +1,5 @@
 export const STELE_CONFIG_FILE = "stele.config.json";
+export const STELE_BASELINE_FILE = "contract/.baseline.json";
 
 export type SteleConfig = {
   version: string;
@@ -26,6 +27,7 @@ export const DEFAULT_CONFIG: SteleConfig = {
   protected: [
     "contract/**/*.stele",
     "contract/checker_impls/**/*",
+    STELE_BASELINE_FILE,
     "contract/.manifest.json",
     "tests/contract/**/*",
   ],
