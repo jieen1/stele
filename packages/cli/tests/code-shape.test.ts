@@ -298,6 +298,131 @@ describe("code-shape evaluation", () => {
     );
   });
 
+  it("does not AST-parse syntax-invalid Python files when only file-policy applies", async () => {
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(file-policy module_footer",
+        "  (lang python)",
+        '  (target "src/bad.py")',
+        '  (must-contain "LICENSED = True")',
+        '  (must-end-with "\\n"))',
+      ].join("\n"),
+      files: {
+        "src/bad.py": "LICENSED = True\ndef broken(:\n",
+      },
+    });
+
+    const contract = await loadContract(join(projectDir, "contract", "main.stele"));
+    const violations = await evaluateCodeShapes(projectDir, contract, "check");
+
+    expect(violations).toEqual([]);
+  });
+
+  it("rejects relative code-shape targets outside the project root as execution errors", async () => {
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(boundary outside_boundary",
+        "  (lang python)",
+        '  (target "../outside.py")',
+        '  (deny-import "app.infrastructure"))',
+      ].join("\n"),
+      files: {
+        "src/handlers.py": "def handle() -> None:\n    return None\n",
+      },
+    });
+
+    const contract = await loadContract(join(projectDir, "contract", "main.stele"));
+    const violations = await evaluateCodeShapes(projectDir, contract, "check");
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "stele.check.execution_error",
+          rule_kind: "execution_error",
+          source: expect.objectContaining({
+            kind: "execution",
+          }),
+          location: expect.objectContaining({
+            path: "contract/main.stele",
+          }),
+          cause: expect.objectContaining({
+            summary: expect.stringContaining("../outside.py"),
+          }),
+        }),
+      ]),
+    );
+    expect(violations).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "outside_boundary",
+          rule_kind: "rule_violation",
+        }),
+      ]),
+    );
+  });
+
+  it("rejects absolute code-shape targets during check and baseline init", async () => {
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(boundary absolute_boundary",
+        "  (lang python)",
+        '  (target "src/placeholder.py")',
+        '  (deny-import "app.infrastructure"))',
+      ].join("\n"),
+      files: {
+        "src/handlers.py": "def handle() -> None:\n    return None\n",
+      },
+    });
+    const absoluteTarget = join(projectDir, "src", "handlers.py").replaceAll("\\", "/");
+
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      [
+        "(invariant ROOT_RULE",
+        "  (severity high)",
+        '  (description "Root rules should generate pytest output.")',
+        "  (assert (eq 1 1)))",
+        "",
+        "(boundary absolute_boundary",
+        "  (lang python)",
+        `  (target "${absoluteTarget}")`,
+        '  (deny-import "app.infrastructure"))',
+      ].join("\n"),
+    );
+
+    await runGenerateAndLock(projectDir, "absolute target check");
+    await expect(runBaselineInit(projectDir, { reason: "try to suppress absolute target error" })).rejects.toThrow(
+      /Baseline files only support contract\/check violations/i,
+    );
+
+    let thrown: unknown;
+    try {
+      await checkProject(projectDir);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(isCheckCommandError(thrown)).toBe(true);
+    if (!isCheckCommandError(thrown)) {
+      throw thrown;
+    }
+
+    expect(thrown.report.violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "stele.check.execution_error",
+          rule_kind: "execution_error",
+          status: "active",
+          suppressed_by: undefined,
+          cause: expect.objectContaining({
+            summary: expect.stringContaining(absoluteTarget),
+          }),
+        }),
+      ]),
+    );
+  });
+
   it("baseline-init suppresses existing code-shape violations but generated drift still fails check", async () => {
     const projectDir = await createCodeShapeProject({
       contractSource: [

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import globParent from "glob-parent";
 import { minimatch } from "minimatch";
-import { relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   createViolation,
@@ -131,17 +131,33 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
     contract.files.map((file) => [file.path, toProjectRelativePath(projectDir, file.path)] as const),
   );
   const targetMap = new Map<string, string[]>();
+  const pythonFiles = new Set<string>();
+  const violations: Violation[] = [];
 
   for (const declaration of contract.codeShapes) {
     const parsedTarget = parseTarget(declaration.target);
+    const contractPath = relativeContractPaths.get(declaration.filePath) ?? declaration.filePath;
+    const targetError = validateTargetPathPattern(projectDir, parsedTarget.pathPattern);
+
+    if (targetError !== undefined) {
+      targetMap.set(declaration.id, []);
+      violations.push(createConfigurationViolation(contractPath, declaration.id, targetError, command));
+      continue;
+    }
+
     const matchedFiles = (await expandTargetPattern(projectDir, parsedTarget.pathPattern)).filter(isPythonFilePath);
     targetMap.set(declaration.id, matchedFiles);
+
+    if (requiresPythonAnalysis(declaration)) {
+      for (const filePath of matchedFiles) {
+        pythonFiles.add(filePath);
+      }
+    }
   }
 
-  const pythonFiles = [...new Set([...targetMap.values()].flat())];
-  const analysis = await analyzePythonFiles(projectDir, pythonFiles, command, relativeContractPaths);
+  const analysis = await analyzePythonFiles(projectDir, [...pythonFiles], command, relativeContractPaths);
   const fileAnalyses = new Map(analysis.files.map((file) => [file.path, file] as const));
-  const violations = analysis.errors.map((error) => createExecutionErrorViolation(projectDir, error, command));
+  violations.push(...analysis.errors.map((error) => createExecutionErrorViolation(projectDir, error, command)));
 
   for (const declaration of contract.codeShapes) {
     const contractPath = relativeContractPaths.get(declaration.filePath) ?? declaration.filePath;
@@ -167,6 +183,10 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
   }
 
   return violations;
+}
+
+function requiresPythonAnalysis(declaration: CodeShapeDeclaration): boolean {
+  return declaration.kind !== "file-policy";
 }
 
 async function analyzePythonFiles(
@@ -936,8 +956,31 @@ function normalizeRelativePath(path: string): string {
   return path.replaceAll("\\", "/");
 }
 
+function validateTargetPathPattern(projectDir: string, pathPattern: string): string | undefined {
+  const normalizedPattern = normalizeRelativePath(pathPattern);
+
+  if (isAbsolute(normalizedPattern)) {
+    return `Code-shape target "${normalizedPattern}" must stay within the project root and cannot be absolute.`;
+  }
+
+  const rootPattern = normalizeRelativePath(globParent(normalizedPattern));
+  const rootDirectory = rootPattern === "." ? resolve(projectDir) : resolve(projectDir, rootPattern);
+
+  if (!isWithinProjectRoot(projectDir, rootDirectory)) {
+    return `Code-shape target "${normalizedPattern}" must stay within the project root.`;
+  }
+
+  return undefined;
+}
+
 function isPythonFilePath(path: string): boolean {
   return normalizeRelativePath(path).endsWith(".py");
+}
+
+function isWithinProjectRoot(projectDir: string, candidatePath: string): boolean {
+  const relativePath = normalizeRelativePath(relative(resolve(projectDir), resolve(candidatePath)));
+
+  return relativePath === "." || (relativePath !== ".." && !relativePath.startsWith("../") && !isAbsolute(relativePath));
 }
 
 function normalizePath(path: string, projectDir: string): string {
