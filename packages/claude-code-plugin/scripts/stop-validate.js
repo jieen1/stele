@@ -1,23 +1,42 @@
 #!/usr/bin/env node
 import { constants } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, readdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 
 const STOP_BLOCK_EXIT_CODE = 2;
 const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
-const steleCommandName = process.platform === "win32" ? "stele.cmd" : "stele";
-const pythonCommandNames =
-  process.platform === "win32" ? ["python.exe", "python.cmd", "python.bat"] : ["python"];
+const steleLocalCommandNames = process.platform === "win32" ? ["stele.cmd", "stele.bat"] : ["stele"];
+const stelePathCommandNames = process.platform === "win32" ? ["stele.cmd", "stele.bat"] : ["stele"];
+const pythonLocalCommandNames =
+  process.platform === "win32" ? ["python.exe", "python.cmd", "python.bat"] : ["python", "python3"];
+const pythonPathCommandNames =
+  process.platform === "win32" ? ["python.exe", "python.cmd", "python.bat"] : ["python", "python3"];
+const venvSearchExcludedDirs = new Set([
+  ".git",
+  ".hg",
+  ".svn",
+  ".turbo",
+  ".yarn",
+  "coverage",
+  "dist",
+  "build",
+  "node_modules",
+  "out",
+  "target",
+]);
+const maxNestedVenvSearchDirectories = 250;
 
 await main();
 
 async function main() {
   const pathValue = process.env.PATH ?? "";
-  const steleCommandPath = await resolveCommandOnPath([steleCommandName], pathValue);
+  const steleCommandPath = await resolveSteleCommand(projectDir, pathValue);
 
   if (steleCommandPath === null) {
-    blockStop(`Unable to run "${steleCommandName} check". Ensure the stele CLI is installed and on PATH.\n`);
+    blockStop(
+      'Unable to run "stele check". Checked project-local node_modules/.bin and PATH. Ensure the stele CLI is installed in the project or available on PATH.\n',
+    );
     return;
   }
 
@@ -33,11 +52,11 @@ async function main() {
     return;
   }
 
-  const pythonCommandPath = await resolveCommandOnPath(pythonCommandNames, pathValue);
+  const pythonCommandPath = await resolvePythonCommand(projectDir, pathValue);
 
   if (pythonCommandPath === null) {
     blockStop(
-      'Unable to run "python -m pytest tests/contract -q". Ensure Python is installed, pytest is available, and both are on PATH.\n',
+      'Unable to run "python -m pytest tests/contract -q". Checked project-local .venv, nested **/.venv environments, and PATH. Ensure Python and pytest are available in the project venv or on PATH.\n',
     );
     return;
   }
@@ -52,7 +71,7 @@ async function main() {
   if (pytestResult.code !== 0) {
     if (isPytestUnavailable(pytestResult.stderr)) {
       blockStop(
-        `python -m pytest tests/contract -q could not start the contract tests. Ensure Python is installed, pytest is available, and both are on PATH.\n`,
+        "python -m pytest tests/contract -q could not start the contract tests. Checked project-local .venv, nested **/.venv environments, and PATH. Ensure Python and pytest are available in the project venv or on PATH.\n",
       );
       return;
     }
@@ -157,6 +176,97 @@ async function resolveCommandOnPath(commands, pathValue) {
   }
 
   return null;
+}
+
+async function resolveSteleCommand(cwd, pathValue) {
+  const localCommandPath = await resolveCommandAtLocations(
+    [path.join(cwd, "node_modules", ".bin")],
+    steleLocalCommandNames,
+  );
+
+  if (localCommandPath !== null) {
+    return localCommandPath;
+  }
+
+  return await resolveCommandOnPath(stelePathCommandNames, pathValue);
+}
+
+async function resolvePythonCommand(cwd, pathValue) {
+  const localSearchDirs = [getVenvCommandDirectory(cwd), ...(await findNestedVenvCommandDirectories(cwd))];
+  const localCommandPath = await resolveCommandAtLocations(localSearchDirs, pythonLocalCommandNames);
+
+  if (localCommandPath !== null) {
+    return localCommandPath;
+  }
+
+  return await resolveCommandOnPath(pythonPathCommandNames, pathValue);
+}
+
+async function resolveCommandAtLocations(searchDirs, commands) {
+  for (const searchDir of searchDirs) {
+    for (const command of commands) {
+      const candidate = path.join(searchDir, command);
+
+      try {
+        await access(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK);
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
+}
+
+function getVenvCommandDirectory(dirPath) {
+  return process.platform === "win32"
+    ? path.join(dirPath, ".venv", "Scripts")
+    : path.join(dirPath, ".venv", "bin");
+}
+
+async function findNestedVenvCommandDirectories(rootDir) {
+  const directories = [];
+  const queue = [rootDir];
+  let visited = 0;
+
+  while (queue.length > 0 && visited < maxNestedVenvSearchDirectories) {
+    const currentDir = queue.shift();
+
+    if (!currentDir) {
+      continue;
+    }
+
+    visited += 1;
+
+    let entries;
+    try {
+      entries = await readdir(currentDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const entryPath = path.join(currentDir, entry.name);
+
+      if (entry.name === ".venv") {
+        directories.push(process.platform === "win32" ? path.join(entryPath, "Scripts") : path.join(entryPath, "bin"));
+        continue;
+      }
+
+      if (venvSearchExcludedDirs.has(entry.name)) {
+        continue;
+      }
+
+      queue.push(entryPath);
+    }
+  }
+
+  return directories;
 }
 
 function blockStop(message) {
