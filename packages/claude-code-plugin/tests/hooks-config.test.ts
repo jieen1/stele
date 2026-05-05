@@ -23,7 +23,7 @@ describe("plugin hooks config", () => {
     };
 
     expect(hooksConfig.hooks.PreToolUse).toHaveLength(1);
-    expect(hooksConfig.hooks.PreToolUse[0]?.matcher).toBe("Write|Edit|MultiEdit|NotebookEdit");
+    expect(hooksConfig.hooks.PreToolUse[0]?.matcher).toBe("Write|Edit|MultiEdit|NotebookEdit|Bash");
     expect(hooksConfig.hooks.PreToolUse[0]?.hooks).toHaveLength(1);
     expect(hooksConfig.hooks.PreToolUse[0]?.hooks[0]).toMatchObject({
       type: "command",

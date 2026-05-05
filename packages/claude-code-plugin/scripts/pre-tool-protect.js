@@ -7,6 +7,8 @@ const BLOCK_EXIT_CODE = 2;
 const PROTECTED_REASON =
   "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.";
 const TARGET_KEYS = ["file_path", "path", "target_path", "notebook_path"];
+const BASH_COMMAND_KEYS = ["command"];
+const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", ";"]);
 const PYTHON_CACHE_SUFFIXES = [".pyc", ".pyo"];
 const DEFAULT_PROTECTED = [
   "contract/**/*.stele",
@@ -19,9 +21,9 @@ try {
   const stdin = await readStdin();
   const payload = parseHookInput(stdin);
   const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
-  const targetPath = extractTargetPath(payload);
+  const targetPaths = extractTargetPaths(payload);
 
-  if (targetPath === null) {
+  if (targetPaths.length === 0) {
     process.exit(0);
   }
 
@@ -31,7 +33,7 @@ try {
     process.exit(0);
   }
 
-  const decision = shouldDenyTarget(projectDir, config.protected, targetPath);
+  const decision = targetPaths.some((targetPath) => shouldDenyTarget(projectDir, config.protected, targetPath));
 
   if (decision) {
     process.stdout.write(
@@ -122,7 +124,24 @@ function parseHookInput(stdin) {
   }
 }
 
-function extractTargetPath(payload) {
+function extractTargetPaths(payload) {
+  const targets = [];
+  const structuredTarget = extractStructuredTargetPath(payload);
+
+  if (structuredTarget !== null) {
+    targets.push(structuredTarget);
+  }
+
+  const bashCommand = extractBashCommand(payload);
+
+  if (bashCommand !== null) {
+    targets.push(...extractBashWriteTargets(bashCommand));
+  }
+
+  return [...new Set(targets)];
+}
+
+function extractStructuredTargetPath(payload) {
   return extractFromValue(payload, new Set());
 }
 
@@ -161,6 +180,298 @@ function extractFromValue(value, seen) {
   }
 
   return null;
+}
+
+function extractBashCommand(payload) {
+  if (!isBashPayload(payload)) {
+    return null;
+  }
+
+  return extractCommandFromValue(payload, new Set());
+}
+
+function isBashPayload(payload) {
+  return isObject(payload) && typeof payload.tool_name === "string" && payload.tool_name === "Bash";
+}
+
+function extractCommandFromValue(value, seen) {
+  if (typeof value === "string") {
+    return null;
+  }
+
+  if (!isObject(value) || seen.has(value)) {
+    return null;
+  }
+
+  seen.add(value);
+
+  for (const key of BASH_COMMAND_KEYS) {
+    if (typeof value[key] === "string" && value[key].trim().length > 0) {
+      return value[key];
+    }
+  }
+
+  for (const nestedKey of ["tool_input", "input"]) {
+    const nestedValue = value[nestedKey];
+    const nestedMatch = extractCommandFromValue(nestedValue, seen);
+
+    if (nestedMatch !== null) {
+      return nestedMatch;
+    }
+  }
+
+  return null;
+}
+
+function extractBashWriteTargets(command) {
+  const targets = [];
+  const pendingHeredocs = [];
+  const lines = command.split(/\r?\n/u);
+
+  for (const line of lines) {
+    const activeLine = stripShellComment(line);
+
+    if (pendingHeredocs.length > 0) {
+      if (line.trim() === pendingHeredocs[0]) {
+        pendingHeredocs.shift();
+      }
+
+      continue;
+    }
+
+    targets.push(...extractWriteTargetsFromLine(activeLine));
+    pendingHeredocs.push(...extractHeredocDelimiters(activeLine));
+  }
+
+  return [...new Set(targets)];
+}
+
+function extractWriteTargetsFromLine(line) {
+  if (line.trim().length === 0) {
+    return [];
+  }
+
+  const tokens = tokenizeShellLine(line);
+  return [...extractRedirectTargets(tokens), ...extractTeeTargets(tokens)];
+}
+
+function extractRedirectTargets(tokens) {
+  const targets = [];
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (token.type !== "operator" || (token.value !== ">" && token.value !== ">>")) {
+      continue;
+    }
+
+    const nextToken = tokens[index + 1];
+    const literalPath = nextToken?.type === "word" ? parseLiteralShellPath(nextToken.value) : null;
+
+    if (literalPath !== null) {
+      targets.push(literalPath);
+    }
+  }
+
+  return targets;
+}
+
+function extractTeeTargets(tokens) {
+  const targets = [];
+  let segmentStart = 0;
+
+  for (let index = 0; index <= tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
+      targets.push(...extractTeeTargetsFromSegment(tokens.slice(segmentStart, index)));
+      segmentStart = index + 1;
+    }
+  }
+
+  return targets;
+}
+
+function extractTeeTargetsFromSegment(tokens) {
+  const commandToken = tokens.find((token) => token.type === "word");
+
+  if (!commandToken || path.posix.basename(commandToken.value) !== "tee") {
+    return [];
+  }
+
+  const targets = [];
+  let sawDoubleDash = false;
+
+  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
+    if (token.type !== "word") {
+      continue;
+    }
+
+    if (!sawDoubleDash && token.value === "--") {
+      sawDoubleDash = true;
+      continue;
+    }
+
+    if (!sawDoubleDash && token.value.startsWith("-")) {
+      continue;
+    }
+
+    const literalPath = parseLiteralShellPath(token.value);
+
+    if (literalPath !== null) {
+      targets.push(literalPath);
+    }
+  }
+
+  return targets;
+}
+
+function extractHeredocDelimiters(line) {
+  const delimiters = [];
+  const regex = /<<-?\s*(?:'([^']+)'|"([^"]+)"|([^\s"'`<>|&;()]+))/gu;
+
+  for (const match of line.matchAll(regex)) {
+    const delimiter = match[1] ?? match[2] ?? match[3] ?? "";
+
+    if (delimiter.length > 0) {
+      delimiters.push(delimiter);
+    }
+  }
+
+  return delimiters;
+}
+
+function stripShellComment(line) {
+  let quote = null;
+  let escaped = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (quote === null && char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      if (quote === char) {
+        quote = null;
+      } else if (quote === null) {
+        quote = char;
+      }
+
+      continue;
+    }
+
+    if (quote !== null) {
+      continue;
+    }
+
+    if (char === "#" && startsShellComment(line, index)) {
+      return line.slice(0, index);
+    }
+  }
+
+  return line;
+}
+
+function startsShellComment(line, index) {
+  if (index === 0) {
+    return true;
+  }
+
+  return /[\s;|&()]/u.test(line[index - 1] ?? "");
+}
+
+function tokenizeShellLine(line) {
+  const tokens = [];
+  let current = "";
+  let quote = null;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (quote !== null) {
+      current += char;
+
+      if (char === quote) {
+        quote = null;
+      }
+
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      current += char;
+      quote = char;
+      continue;
+    }
+
+    if (/\s/u.test(char)) {
+      pushWordToken(tokens, current);
+      current = "";
+      continue;
+    }
+
+    const twoChar = line.slice(index, index + 2);
+
+    if (twoChar === ">>" || twoChar === "||" || twoChar === "&&" || twoChar === "<<" || twoChar === "<<") {
+      pushWordToken(tokens, current);
+      current = "";
+      tokens.push({ type: "operator", value: twoChar });
+      index += 1;
+      continue;
+    }
+
+    if (char === ">" || char === "|" || char === ";" || char === "<") {
+      pushWordToken(tokens, current);
+      current = "";
+      tokens.push({ type: "operator", value: char });
+      continue;
+    }
+
+    current += char;
+  }
+
+  pushWordToken(tokens, current);
+  return tokens;
+}
+
+function pushWordToken(tokens, value) {
+  if (value.length > 0) {
+    tokens.push({ type: "word", value });
+  }
+}
+
+function parseLiteralShellPath(token) {
+  if (typeof token !== "string" || token.length === 0) {
+    return null;
+  }
+
+  let candidate = token;
+
+  if (
+    (candidate.startsWith('"') && candidate.endsWith('"')) ||
+    (candidate.startsWith("'") && candidate.endsWith("'"))
+  ) {
+    candidate = candidate.slice(1, -1);
+  }
+
+  if (
+    candidate.length === 0 ||
+    /[$`*?[\]{}()|&;]/u.test(candidate) ||
+    candidate.includes("\n") ||
+    candidate.includes("\r")
+  ) {
+    return null;
+  }
+
+  return candidate;
 }
 
 function shouldDenyTarget(projectDir, patterns, targetPath) {
