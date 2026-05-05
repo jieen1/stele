@@ -70,6 +70,8 @@ describe("stop-validate hook", () => {
     expect(result.status).toBe(2);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain('Unable to run "stele');
+    expect(result.stderr).toContain("node_modules/.bin");
+    expect(result.stderr).toContain("PATH");
   });
 
   it("blocks Stop with exit 2 when pytest exits non-zero after stele check passes", async () => {
@@ -127,7 +129,104 @@ describe("stop-validate hook", () => {
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("No module named pytest");
     expect(result.stderr).toContain("python -m pytest tests/contract -q");
-    expect(result.stderr).toContain("Ensure Python is installed");
+    expect(result.stderr).toContain(".venv");
+    expect(result.stderr).toContain("PATH");
+  });
+
+  it("finds stele in project-local node_modules/.bin when PATH does not include stele", async () => {
+    const projectDir = await createTempDir();
+    await writeToolScript(join(projectDir, "node_modules", ".bin"), steleFileName(), {
+      stdout: "local stele stdout",
+      stderr: "local stele stderr",
+      exitCode: 0,
+      cwdFile: "cwd.txt",
+      argsFile: "args.txt",
+    });
+    const binDir = await createFakePythonCli({
+      stdout: "path python stdout",
+      stderr: "path python stderr",
+      exitCode: 0,
+    });
+
+    const result = runStopHook(projectDir, binDir, { includeSystemPath: false });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("local stele stdout");
+    expect(result.stderr).toContain("local stele stderr");
+  });
+
+  it("finds python in project-local .venv when PATH does not include python", async () => {
+    const projectDir = await createTempDir();
+    const binDir = await createFakeSteleCli({
+      stdout: "path stele stdout",
+      stderr: "path stele stderr",
+      exitCode: 0,
+    });
+    await writeToolScript(projectVenvBinDir(projectDir), pythonFileName(), {
+      stdout: "local python stdout",
+      stderr: "local python stderr",
+      exitCode: 0,
+      cwdFile: "pytest-cwd.txt",
+      argsFile: "pytest-args.txt",
+    });
+
+    const result = runStopHook(projectDir, binDir, { includeSystemPath: false });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("local python stdout");
+    expect(result.stderr).toContain("local python stderr");
+  });
+
+  it("finds python in a nested backend .venv", async () => {
+    const projectDir = await createTempDir();
+    const binDir = await createFakeSteleCli({
+      stdout: "path stele stdout",
+      stderr: "path stele stderr",
+      exitCode: 0,
+    });
+    await writeToolScript(projectVenvBinDir(projectDir, "backend"), pythonFileName(), {
+      stdout: "nested python stdout",
+      stderr: "nested python stderr",
+      exitCode: 0,
+      cwdFile: "pytest-cwd.txt",
+      argsFile: "pytest-args.txt",
+    });
+
+    const result = runStopHook(projectDir, binDir, { includeSystemPath: false });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("nested python stdout");
+    expect(result.stderr).toContain("nested python stderr");
+  });
+
+  it("falls back to PATH when project-local stele and python are absent", async () => {
+    const projectDir = await createTempDir();
+    const binDir = await createFakeToolchain({
+      stele: { stdout: "path stele stdout", stderr: "", exitCode: 0 },
+      python: { stdout: "path python stdout", stderr: "", exitCode: 0 },
+    });
+
+    const result = runStopHook(projectDir, binDir, { includeSystemPath: false });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("path stele stdout");
+    expect(result.stdout).toContain("path python stdout");
+  });
+
+  it("fails closed with local install guidance when python cannot be started", async () => {
+    const projectDir = await createTempDir();
+    const binDir = await createFakeSteleCli({
+      stdout: "stele ok",
+      stderr: "",
+      exitCode: 0,
+    });
+
+    const result = runStopHook(projectDir, binDir, { includeSystemPath: false });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Unable to run "python -m pytest tests/contract -q"');
+    expect(result.stderr).toContain(".venv");
+    expect(result.stderr).toContain("PATH");
   });
 
   windowsOnly("runs a .cmd stele shim on Windows without spawn EINVAL", async () => {
@@ -158,20 +257,31 @@ async function createFakeSteleCli(options: { stdout: string; stderr: string; exi
   return createFakeToolchain({ stele: options });
 }
 
+async function createFakePythonCli(options: { stdout: string; stderr: string; exitCode: number }): Promise<string> {
+  const binDir = await createTempDir();
+  await mkdir(binDir, { recursive: true });
+  await writeToolScript(binDir, pythonFileName(), {
+    ...options,
+    cwdFile: "pytest-cwd.txt",
+    argsFile: "pytest-args.txt",
+  });
+  return binDir;
+}
+
 async function createFakeToolchain(options: {
   stele: { stdout: string; stderr: string; exitCode: number };
   python?: { stdout: string; stderr: string; exitCode: number };
 }): Promise<string> {
   const binDir = await createTempDir();
   await mkdir(binDir, { recursive: true });
-  await writeToolScript(binDir, process.platform === "win32" ? "stele.cmd" : "stele", {
+  await writeToolScript(binDir, steleFileName(), {
     ...options.stele,
     cwdFile: "cwd.txt",
     argsFile: "args.txt",
   });
 
   if (options.python) {
-    await writeToolScript(binDir, process.platform === "win32" ? "python.cmd" : "python", {
+    await writeToolScript(binDir, pythonFileName(), {
       ...options.python,
       cwdFile: "pytest-cwd.txt",
       argsFile: "pytest-args.txt",
@@ -187,6 +297,7 @@ async function writeToolScript(
   options: { stdout: string; stderr: string; exitCode: number; cwdFile: string; argsFile: string },
 ): Promise<void> {
   const filePath = join(binDir, fileName);
+  await mkdir(dirname(filePath), { recursive: true });
   const scriptContent =
     process.platform === "win32"
       ? [
@@ -230,6 +341,24 @@ function runStopHook(projectDir: string, binDir: string, options?: { includeSyst
     },
     encoding: "utf8",
   });
+}
+
+function steleFileName(): string {
+  return process.platform === "win32" ? "stele.cmd" : "stele";
+}
+
+function pythonFileName(): string {
+  return process.platform === "win32" ? "python.cmd" : "python";
+}
+
+function projectVenvBinDir(projectDir: string, nestedDir?: string): string {
+  if (process.platform === "win32") {
+    return nestedDir
+      ? join(projectDir, nestedDir, ".venv", "Scripts")
+      : join(projectDir, ".venv", "Scripts");
+  }
+
+  return nestedDir ? join(projectDir, nestedDir, ".venv", "bin") : join(projectDir, ".venv", "bin");
 }
 
 function escapeBatchText(value: string): string {
