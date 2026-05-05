@@ -134,7 +134,7 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
 
   for (const declaration of contract.codeShapes) {
     const parsedTarget = parseTarget(declaration.target);
-    const matchedFiles = await expandTargetPattern(projectDir, parsedTarget.pathPattern);
+    const matchedFiles = (await expandTargetPattern(projectDir, parsedTarget.pathPattern)).filter(isPythonFilePath);
     targetMap.set(declaration.id, matchedFiles);
   }
 
@@ -934,6 +934,10 @@ async function walkRoot(directory: string, projectDir: string): Promise<string[]
 
 function normalizeRelativePath(path: string): string {
   return path.replaceAll("\\", "/");
+}
+
+function isPythonFilePath(path: string): boolean {
+  return normalizeRelativePath(path).endsWith(".py");
 }
 
 function normalizePath(path: string, projectDir: string): string {
