@@ -4,7 +4,7 @@ Stele is meant to attach to an existing Python application, not replace its doma
 
 ## Install and adopt
 
-Until the npm packages are publicly published, the supported external-adoption path is the packed tarball workflow verified in this repository by `pnpm test:packed-adoption`:
+Before a public npm release is available, the supported external-adoption path is the packed tarball workflow verified in this repository by `pnpm test:packed-adoption`:
 
 ```bash
 npm install --save-dev /absolute/path/to/stele-core-0.1.0.tgz /absolute/path/to/stele-backend-python-0.1.0.tgz /absolute/path/to/stele-cli-0.1.0.tgz
@@ -13,6 +13,12 @@ npx stele init --language python
 ```
 
 For local development from this repository, `local-packages/install-stele-local.ps1` installs the packed CLI, core, Python backend, and Claude Code plugin tarballs into the current application. It also writes npm scripts such as `stele:init`, `stele:generate`, `stele:lock`, and `stele:check` so operators can use `npm run stele:check` without remembering the `npx` form.
+
+After npm publish, install from the registry instead:
+
+```bash
+npm install --save-dev @stele/cli @stele/claude-code-plugin
+```
 
 Use `npx stele --version`, `npx -- stele --version`, `npx stele version`, `npm exec -- stele --version`, or `npm run stele -- --version` to verify the CLI. Do not use `npm exec stele --version`; npm treats that as npm's own version flag.
 

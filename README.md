@@ -13,7 +13,7 @@ The v0.1 runtime target is existing Python applications that already use `pytest
 
 ## Quickstart
 
-Until the packages are publicly published, the supported external-adoption path is the same tarball workflow verified by this repository's `test:packed-adoption` check: install the packed `@stele/core`, `@stele/backend-python`, and `@stele/cli` tarballs into your Python app repository.
+Before a public npm release is available, the supported external-adoption path is the same tarball workflow verified by this repository's `test:packed-adoption` check: install the packed `@stele/core`, `@stele/backend-python`, and `@stele/cli` tarballs into your Python app repository.
 
 ```bash
 npm install --save-dev /absolute/path/to/stele-core-0.1.0.tgz /absolute/path/to/stele-backend-python-0.1.0.tgz /absolute/path/to/stele-cli-0.1.0.tgz
@@ -28,6 +28,28 @@ E:\project\stele\local-packages\install-stele-local.ps1
 ```
 
 It installs the packed packages and writes `npm run stele:init`, `npm run stele:generate`, `npm run stele:lock`, and `npm run stele:check` scripts.
+
+After npm publish, install from the registry instead:
+
+```bash
+npm install --save-dev @stele/cli @stele/claude-code-plugin
+```
+
+## npm release
+
+Run the release preflight:
+
+```bash
+pnpm release:dry-run
+```
+
+The script packs each workspace package, verifies that packed manifests do not contain `workspace:*`, and then runs `npm publish --dry-run` against the tarballs. The real publish command is:
+
+```bash
+pnpm release:publish
+```
+
+See [docs/release.md](docs/release.md) for the npm account, trusted publishing, tag, and verification flow.
 
 To verify the installed CLI, use one of the Stele-facing forms:
 

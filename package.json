@@ -8,6 +8,8 @@
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "test:packed-adoption": "node scripts/verify-packed-adoption.mjs",
+    "release:dry-run": "node scripts/publish-npm.mjs --dry-run",
+    "release:publish": "node scripts/publish-npm.mjs",
     "typecheck": "pnpm --filter @stele/core build && pnpm --filter @stele/backend-python build && pnpm -r run typecheck",
     "lint": "pnpm -r run lint"
   },
