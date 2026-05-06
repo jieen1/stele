@@ -19,11 +19,16 @@ import {
   type CheckSummary,
   writeCheckReportFile,
 } from "./commands/check.js";
-import { runExplain } from "./commands/explain.js";
+import { runAgentContext, type AgentContextOptions } from "./commands/agentContext.js";
+import { runExplain, type ExplainOptions } from "./commands/explain.js";
 import { runGenerate, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { lockProject, type LockOptions, type LockSummary } from "./commands/lock.js";
+import { runMaintenanceSummary, type MaintenanceSummaryOptions } from "./commands/maintenance.js";
+import { runPropose, type ProposeOptions } from "./commands/propose.js";
+import { runRules, type RulesOptions } from "./commands/rules.js";
+import { runWhy, type WhyOptions } from "./commands/why.js";
 import { getExitCode } from "./errors.js";
 
 const STELE_CLI_VERSION = "0.1.0";
@@ -37,8 +42,13 @@ type ProgramDependencies = {
   runLock?: (projectDir: string, options: LockOptions) => Promise<LockSummary | void>;
   runInit?: typeof runInit;
   runList?: typeof runList;
-  runExplain?: typeof runExplain;
+  runExplain?: (projectDir: string, invariantId: string, options?: ExplainOptions) => Promise<void>;
   runAddChecker?: typeof runAddChecker;
+  runRules?: (projectDir: string, options?: RulesOptions) => Promise<void>;
+  runAgentContext?: (projectDir: string, options?: AgentContextOptions) => Promise<void>;
+  runWhy?: (projectDir: string, idOrFingerprint: string, options?: WhyOptions) => Promise<void>;
+  runPropose?: (projectDir: string, options: ProposeOptions) => Promise<void>;
+  runMaintenanceSummary?: (projectDir: string, options?: MaintenanceSummaryOptions) => Promise<void>;
 };
 
 export function createProgram(dependencies: ProgramDependencies = {}): Command {
@@ -52,6 +62,11 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   const list = dependencies.runList ?? runList;
   const explain = dependencies.runExplain ?? runExplain;
   const addChecker = dependencies.runAddChecker ?? runAddChecker;
+  const rules = dependencies.runRules ?? runRules;
+  const agentContext = dependencies.runAgentContext ?? runAgentContext;
+  const why = dependencies.runWhy ?? runWhy;
+  const propose = dependencies.runPropose ?? runPropose;
+  const maintenanceSummary = dependencies.runMaintenanceSummary ?? runMaintenanceSummary;
   const program = new Command();
 
   program
@@ -135,8 +150,43 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--category <category>")
     .option("--tag <tag>")
     .action((options) => list(cwd(), options));
-  program.command("explain <id>").action((id) => explain(cwd(), id));
+  program.command("rules").option("--json", "emit machine-readable rule inventory").action((options: RulesOptions) => rules(cwd(), options));
+  program.command("explain <id>").option("--json", "emit machine-readable rule explanation").action((id, options: ExplainOptions) => explain(cwd(), id, options));
+  program
+    .command("agent-context")
+    .option("--json", "emit machine-readable agent context")
+    .option("--focus <paths...>", "focus context on one or more changed files")
+    .action((options: AgentContextOptions) => agentContext(cwd(), options));
+  program.command("why <id-or-fingerprint>").option("--json", "emit machine-readable why output").action((idOrFingerprint, options: WhyOptions) => why(cwd(), idOrFingerprint, options));
   program.command("add-checker <checker-id>").action((checkerId) => addChecker(cwd(), checkerId));
+  program
+    .command("propose")
+    .description("Add contract knowledge through constrained proposal commands.")
+    .command("invariant")
+    .requiredOption("--id <id>")
+    .requiredOption("--severity <severity>")
+    .requiredOption("--description <description>")
+    .requiredOption("--assert <assert>")
+    .option("--category <category>")
+    .option("--rationale <rationale>")
+    .option("--apply")
+    .action((options) =>
+      propose(cwd(), {
+        kind: "invariant",
+        id: options.id,
+        severity: options.severity,
+        description: options.description,
+        assert: options.assert,
+        category: options.category,
+        rationale: options.rationale,
+        apply: options.apply,
+      }),
+    );
+  program
+    .command("maintenance-summary")
+    .option("--from <git-ref>")
+    .option("--output <path>")
+    .action((options: MaintenanceSummaryOptions) => maintenanceSummary(cwd(), options));
   program
     .command("init")
     .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))

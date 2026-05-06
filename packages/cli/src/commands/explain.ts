@@ -3,8 +3,13 @@ import { posix, relative, resolve } from "node:path";
 import { sanitizePythonIdentifier } from "@stele/backend-python";
 import { loadContract, type AstNode, type InvariantDeclaration, type SourceSpan } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
+import { buildRuleIndex, findIndexedRule } from "./rules.js";
 
-export async function runExplain(projectDir: string, invariantId: string): Promise<void> {
+export type ExplainOptions = {
+  json?: boolean;
+};
+
+export async function runExplain(projectDir: string, invariantId: string, options: ExplainOptions = {}): Promise<void> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
   const invariant = contract.invariants.find((candidate) => candidate.id === invariantId);
@@ -14,6 +19,15 @@ export async function runExplain(projectDir: string, invariantId: string): Promi
   }
 
   const source = await getInvariantSource(invariant);
+
+  if (options.json) {
+    const index = await buildRuleIndex(projectDir);
+    const rule = findIndexedRule(index, invariant.id);
+
+    process.stdout.write(`${JSON.stringify({ rule, source }, null, 2)}\n`);
+    return;
+  }
+
   const generatedTestPath =
     invariant.groupId === undefined
       ? posix.join(config.generatedDir, "test_contract.py")

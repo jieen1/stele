@@ -1,6 +1,6 @@
 # Stele Claude Code Plugin Guide
 
-`@stele/claude-code-plugin` is the editor-side guardrail bundle for Stele repositories. It does not replace the CLI. Instead, it keeps Claude Code agents on the approved path by blocking direct edits to protected files and by running `stele check` before an agent session ends.
+`@stele/claude-code-plugin` is the editor-side guardrail bundle for Stele repositories. It does not replace the CLI. Instead, it keeps Claude Code agents on the approved path by injecting contract context, blocking direct edits to protected files, observing material source edits, running the final contract checks, and nudging agents to add newly learned rules through the add-only proposal flow.
 
 ## Install the CLI and plugin
 
@@ -12,7 +12,7 @@ npm install --save-dev @stele/cli @stele/claude-code-plugin
 
 Until public publish, use the same packed `@stele/core`, `@stele/backend-python`, and `@stele/cli` tarballs that `pnpm test:packed-adoption` verifies for external adoption. The plugin package can be packed from this workspace as well, but editor registration is not part of the packed-adoption automation because the plugin is hosted by Claude Code rather than by the application under test.
 
-The plugin requires the `stele` executable to be available on `PATH`. Its `Stop` hook shells out to `stele check`; if the CLI is missing, the hook blocks completion.
+The hooks first look for project-local installs, including `node_modules/.bin/stele` and common `.venv` Python locations, then fall back to `PATH`. That means normal `npm install --save-dev @stele/cli @stele/claude-code-plugin` installs work without wrapping Claude Code in a custom `PATH`.
 
 After installing the package, register the package directory that contains `.claude-plugin/plugin.json` as a Claude Code plugin root.
 
@@ -20,7 +20,8 @@ After installing the package, register the package directory that contains `.cla
 
 - `.claude-plugin/plugin.json`
 - `hooks/hooks.json`
-- slash-command docs for `/stele:init`, `/stele:check`, `/stele:add`, and `/stele:explain`
+- lifecycle scripts for context injection, edit observation, protected-file protection, and final validation
+- slash-command docs for `/stele:init`, `/stele:check`, `/stele:add`, `/stele:explain`, `/stele:rules`, `/stele:context`, `/stele:why`, and `/stele:maintain`
 - the `contract-author` subagent prompt
 - the `contract-aware-coding` skill
 
@@ -43,9 +44,21 @@ The protected-glob parser is intentionally conservative:
 
 Python cache artifacts inside generated/checker directories are ignored only when they end in `.pyc` or `.pyo`. Ordinary files remain protected even when they live under a `__pycache__` directory.
 
+## Lifecycle behavior
+
+The plugin follows Claude Code's hook lifecycle so rule maintenance does not depend on memory or manual cadence:
+
+- `SessionStart` runs `stele agent-context` and injects the result as hidden session context.
+- `UserPromptSubmit` runs focused context discovery for changed files when available.
+- `PreToolUse` runs before `Read`, `Write`, `Edit`, `MultiEdit`, `NotebookEdit`, and `Bash`; it injects file-specific context and then protects configured paths from direct edits.
+- `PostToolUse` records edited target paths to `.stele/agent/session-observations.jsonl` without surfacing output.
+- `Stop` runs validation and, after material source edits, generates `.stele/maintenance/summary.md` and asks the agent once to decide whether durable new knowledge should be added with `stele propose invariant --apply`.
+
+This is intentionally asymmetric: adding new proposed rules is easy and add-only, while modifying or deleting existing contract state still requires explicit user review.
+
 ## `PreToolUse` behavior
 
-The `PreToolUse` hook runs before Claude Code edit tools such as `Write`, `Edit`, `MultiEdit`, and `NotebookEdit`.
+The protection side of the `PreToolUse` hook runs before Claude Code edit tools such as `Write`, `Edit`, `MultiEdit`, `NotebookEdit`, and write-like `Bash` commands.
 
 When the target path resolves to a protected file, the hook returns a deny decision with this reason:
 
@@ -67,15 +80,27 @@ The `Stop` hook runs:
 
 ```bash
 stele check
+python -m pytest tests/contract -q
 ```
 
-in `CLAUDE_PROJECT_DIR`, forwarding stdout and stderr from the CLI.
+in `CLAUDE_PROJECT_DIR`, forwarding stdout and stderr from the CLI and pytest.
 
-The hook exits successfully only when `stele check` returns `0`. It blocks completion when:
+The hook exits successfully only when both commands return `0`. It blocks completion when:
 
 - the `stele` executable is missing
 - `stele check` exits non-zero
+- Python or pytest is unavailable
+- `python -m pytest tests/contract -q` exits non-zero
 - the spawned process errors or is terminated
+- material source edits happened and the agent has not yet reviewed `.stele/maintenance/summary.md`
+
+On a maintenance-review block, the agent should inspect the summary and either add durable new behavior through:
+
+```bash
+stele propose invariant --id <ID> --severity <level> --description "<text>" --assert "<cdl-assertion>" --apply
+```
+
+or explicitly say no new rule is needed. Existing contract edits still go through the user-approved protected-file flow.
 
 ## Slash commands
 
@@ -112,6 +137,26 @@ Use this when the user explicitly wants to author or extend protected contract m
 
 `/stele:add` is the plugin's entrypoint for contract-authoring work; it is not a separate CLI subcommand.
 
+### `/stele:rules`
+
+Runs:
+
+```bash
+stele rules --json
+```
+
+Use it to discover the full rule inventory before editing contract-sensitive source code. The JSON includes invariants, scenarios, code-shape rules, protected globs, source locations, generated test paths, dependencies, and checker/scenario linkage.
+
+### `/stele:context`
+
+Runs:
+
+```bash
+stele agent-context --focus <changed-file>
+```
+
+Use it before implementation work in a Stele repository. It reminds the agent to repair source or fixtures first, add new knowledge through proposal commands, and ask the user before modifying or deleting existing contract material.
+
 ### `/stele:explain`
 
 Runs:
@@ -120,7 +165,27 @@ Runs:
 stele explain <id>
 ```
 
-Use it to inspect the exact invariant source, generated test path, dependencies, rationale, and checker linkage for a known invariant id.
+Use it to inspect the exact invariant source, generated test path, dependencies, rationale, and checker linkage for a known invariant id. Add `--json` when another agent or tool will consume the result.
+
+### `/stele:why`
+
+Runs:
+
+```bash
+stele why <rule-id-or-fingerprint>
+```
+
+Use it when a rule or check-report fingerprint needs an actionable explanation. The output tells the agent whether to repair source, add a new rule, regenerate after approval, or ask the user to review a contract change.
+
+### `/stele:maintain`
+
+Runs:
+
+```bash
+stele maintenance-summary --from main --output .stele/maintenance/summary.md
+```
+
+Use it manually when you want an explicit review. The plugin also runs this automatically from the `Stop` hook after material source edits. The summary captures recent file changes, contract inventory, check status, and candidate questions for newly learned behavior. Durable new knowledge should be added through `stele propose invariant --apply`.
 
 ## Legal contract-change flow
 
@@ -145,9 +210,9 @@ Why this flow exists:
 The package ships two behavior assets:
 
 - `contract-author`: a subagent prompt for approved contract authoring work
-- `contract-aware-coding`: a skill that reminds agents to avoid casual edits to protected files and to use `stele check`, `stele list`, `stele explain`, and `stele add-checker`
+- `contract-aware-coding`: a skill that reminds agents to avoid casual edits to protected files and to use `stele check`, `stele agent-context`, `stele rules`, `stele why`, `stele explain`, `stele propose invariant`, `stele maintenance-summary`, and `stele add-checker`
 
-These assets are advisory workflow helpers; the hard guardrails are still the hooks plus the CLI.
+These assets are advisory workflow helpers; the hard guardrails and automatic maintenance reminders are still the hooks plus the CLI.
 
 ## Troubleshooting
 
@@ -157,7 +222,11 @@ That is expected until the user approves a contract update. Use the approval flo
 
 ### The session stops with `Unable to run "stele check"`
 
-The CLI is not on `PATH` for the Claude Code host process. Install `@stele/cli` and make sure the `stele` executable is resolvable in that environment.
+The CLI was not found in project-local `node_modules/.bin` or on `PATH`. Install `@stele/cli` in the application repository or make sure the `stele` executable is resolvable in the Claude Code host environment.
+
+### The session stops with a maintenance review
+
+Read `.stele/maintenance/summary.md`. If the session revealed durable project behavior, add a new proposal with `stele propose invariant --apply`. If not, state that no contract addition is needed and continue. The Stop hook only asks once per session to avoid loops.
 
 ### `stele check` fails in `Stop`
 

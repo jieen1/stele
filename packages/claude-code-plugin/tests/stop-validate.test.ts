@@ -45,6 +45,66 @@ describe("stop-validate hook", () => {
     );
   });
 
+  it("after successful validation asks for one maintenance review when material source edits were observed", async () => {
+    const projectDir = await createTempDir();
+    await writeObservation(projectDir, {
+      session_id: "session-1",
+      tool_name: "Edit",
+      target_paths: ["src/payments/service.py"],
+      material_change: true,
+    });
+    const binDir = await createFakeToolchain({
+      stele: {
+        stdout: "fake stele stdout",
+        stderr: "",
+        exitCode: 0,
+      },
+      python: {
+        stdout: "fake pytest stdout",
+        stderr: "",
+        exitCode: 0,
+      },
+    });
+
+    const result = runStopHook(projectDir, binDir, {
+      payload: {
+        session_id: "session-1",
+        hook_event_name: "Stop",
+        stop_hook_active: false,
+      },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("Stele maintenance review required");
+    expect(result.stderr).toContain("stele propose invariant --apply");
+    await expect(readFile(join(projectDir, "args.txt"), "utf8")).resolves.toContain("maintenance-summary");
+  });
+
+  it("does not repeat the maintenance review block after the Stop hook re-enters", async () => {
+    const projectDir = await createTempDir();
+    await writeObservation(projectDir, {
+      session_id: "session-1",
+      tool_name: "Edit",
+      target_paths: ["src/payments/service.py"],
+      material_change: true,
+    });
+    const binDir = await createFakeToolchain({
+      stele: { stdout: "stele ok", stderr: "", exitCode: 0 },
+      python: { stdout: "pytest ok", stderr: "", exitCode: 0 },
+    });
+
+    const result = runStopHook(projectDir, binDir, {
+      payload: {
+        session_id: "session-1",
+        hook_event_name: "Stop",
+        stop_hook_active: true,
+      },
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain("Stele maintenance review required");
+  });
+
   it("blocks Stop with exit 2 when stele check exits non-zero and preserves CLI output", async () => {
     const projectDir = await createTempDir();
     const binDir = await createFakeSteleCli({
@@ -326,7 +386,13 @@ async function writeToolScript(
   }
 }
 
-function runStopHook(projectDir: string, binDir: string, options?: { includeSystemPath?: boolean }) {
+async function writeObservation(projectDir: string, observation: Record<string, unknown>): Promise<void> {
+  const observationPath = join(projectDir, ".stele", "agent", "session-observations.jsonl");
+  await mkdir(dirname(observationPath), { recursive: true });
+  await writeFile(observationPath, `${JSON.stringify(observation)}\n`, "utf8");
+}
+
+function runStopHook(projectDir: string, binDir: string, options?: { includeSystemPath?: boolean; payload?: unknown }) {
   const pathEntries = [binDir];
 
   if (options?.includeSystemPath !== false && process.env.PATH) {
@@ -341,6 +407,7 @@ function runStopHook(projectDir: string, binDir: string, options?: { includeSyst
       PATH: pathEntries.join(process.platform === "win32" ? ";" : ":"),
       Path: pathEntries.join(process.platform === "win32" ? ";" : ":"),
     },
+    input: options?.payload === undefined ? "" : `${JSON.stringify(options.payload)}\n`,
     encoding: "utf8",
   });
 }

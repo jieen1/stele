@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { constants } from "node:fs";
-import { access, readdir } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 
@@ -47,6 +47,7 @@ const maxNestedVenvSearchDirectories = 250;
 await main();
 
 async function main() {
+  const hookPayload = parseHookInput(await readStdin());
   const pathValue = process.env.PATH ?? "";
   const steleCommandPath = await resolveSteleCommand(projectDir, pathValue);
 
@@ -97,6 +98,8 @@ async function main() {
     return;
   }
 
+  await maybeRequestMaintenanceReview(hookPayload, steleCommandPath);
+
   process.exit(0);
 }
 
@@ -123,18 +126,22 @@ function spawnCommand(commandPath, args, cwd) {
   });
 }
 
-async function runCommand({ stageName, commandPath, args, cwd }) {
+async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = true, blockOnSpawnError = true }) {
   const child = spawnCommand(commandPath, args, cwd);
   let stdout = "";
   let stderr = "";
 
   child.stdout?.on("data", (chunk) => {
     stdout += chunk.toString();
-    process.stdout.write(chunk);
+    if (forwardOutput) {
+      process.stdout.write(chunk);
+    }
   });
   child.stderr?.on("data", (chunk) => {
     stderr += chunk.toString();
-    process.stderr.write(chunk);
+    if (forwardOutput) {
+      process.stderr.write(chunk);
+    }
   });
 
   return await new Promise((resolve, reject) => {
@@ -146,7 +153,14 @@ async function runCommand({ stageName, commandPath, args, cwd }) {
       }
 
       finished = true;
-      reject(new Error(`Unable to run ${stageName}: ${error instanceof Error ? error.message : String(error)}`));
+      const message = `Unable to run ${stageName}: ${error instanceof Error ? error.message : String(error)}`;
+
+      if (blockOnSpawnError) {
+        reject(new Error(message));
+        return;
+      }
+
+      resolve({ code: 1, stdout, stderr: `${stderr}${message}` });
     });
 
     child.on("close", (code, signal) => {
@@ -168,8 +182,141 @@ async function runCommand({ stageName, commandPath, args, cwd }) {
   });
 }
 
+async function maybeRequestMaintenanceReview(hookPayload, steleCommandPath) {
+  const materialObservations = await readMaterialObservations(projectDir, resolveSessionId(hookPayload));
+
+  if (materialObservations.length === 0 || isStopHookReentry(hookPayload)) {
+    return;
+  }
+
+  const sessionId = resolveSessionId(hookPayload) ?? "default";
+  const markerPath = path.join(projectDir, ".stele", "agent", `${safeFileName(sessionId)}.maintenance-review.json`);
+
+  if (await fileExists(markerPath)) {
+    return;
+  }
+
+  await runCommand({
+    stageName: "stele maintenance-summary",
+    commandPath: steleCommandPath,
+    args: ["maintenance-summary", "--from", "main", "--output", ".stele/maintenance/summary.md"],
+    cwd: projectDir,
+    forwardOutput: false,
+    blockOnSpawnError: false,
+  });
+  await mkdir(path.dirname(markerPath), { recursive: true });
+  await writeFile(
+    markerPath,
+    `${JSON.stringify({
+      session_id: sessionId,
+      reviewed_at: new Date().toISOString(),
+      material_observations: materialObservations.length,
+    })}\n`,
+    "utf8",
+  );
+
+  blockStop(
+    [
+      "Stele maintenance review required.",
+      "A material source edit was observed, and Stele generated .stele/maintenance/summary.md.",
+      "Before finishing, review the summary. If you learned durable project behavior, add it with stele propose invariant --apply.",
+      "If no new contract rule is needed, say why.",
+      "Modifying or deleting existing contract rules still requires explicit user review.",
+      "",
+    ].join("\n"),
+  );
+}
+
+async function readMaterialObservations(cwd, sessionId) {
+  const observationPath = path.join(cwd, ".stele", "agent", "session-observations.jsonl");
+  let raw;
+
+  try {
+    raw = await readFile(observationPath, "utf8");
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return [];
+    }
+
+    return [];
+  }
+
+  return raw
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map(parseObservationLine)
+    .filter((observation) => observation !== null)
+    .filter((observation) => observation.material_change === true)
+    .filter((observation) => sessionId === null || observation.session_id === sessionId);
+}
+
+function parseObservationLine(line) {
+  try {
+    const parsed = JSON.parse(line);
+    return typeof parsed === "object" && parsed !== null ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readStdin() {
+  const chunks = [];
+
+  for await (const chunk of process.stdin) {
+    chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+  }
+
+  return chunks.join("");
+}
+
+function parseHookInput(stdin) {
+  if (stdin.trim().length === 0) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(stdin);
+  } catch {
+    return {};
+  }
+}
+
+function resolveSessionId(payload) {
+  if (isObject(payload) && typeof payload.session_id === "string" && payload.session_id.trim().length > 0) {
+    return payload.session_id;
+  }
+
+  if (isObject(payload) && typeof payload.sessionId === "string" && payload.sessionId.trim().length > 0) {
+    return payload.sessionId;
+  }
+
+  return null;
+}
+
+function isStopHookReentry(payload) {
+  return isObject(payload) && payload.stop_hook_active === true;
+}
+
+async function fileExists(filePath) {
+  try {
+    await access(filePath, constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeFileName(value) {
+  return value.replace(/[^A-Za-z0-9._-]/gu, "_");
+}
+
 function isPytestUnavailable(stderr) {
   return /no module named pytest|modulenotfounderror:\s*no module named ['"]?pytest['"]?/iu.test(stderr);
+}
+
+function isMissingFileError(error) {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 async function resolveCommandOnPath(commands, pathValue) {
@@ -293,4 +440,8 @@ function blockStop(message) {
 
 function blockStopWithContractRecovery(message) {
   blockStop(`${message}${CONTRACT_RECOVERY_GUIDANCE}`);
+}
+
+function isObject(value) {
+  return typeof value === "object" && value !== null;
 }

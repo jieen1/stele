@@ -75,6 +75,25 @@ npx stele check
 
 That writes `contract/.baseline.json`, locks it into the manifest, suppresses only matching legacy check violations, and still fails newly introduced drift.
 
+## Agent rule maintenance
+
+Stele includes agent-facing commands so rules stay understandable and can grow as the agent learns the project:
+
+```bash
+npx stele rules --json
+npx stele agent-context --focus path/to/changed_file.py
+npx stele why <rule-id-or-fingerprint>
+npx stele maintenance-summary --from main --output .stele/maintenance/summary.md
+```
+
+Agents may add durable new knowledge through an add-only proposal command:
+
+```bash
+npx stele propose invariant --id AGENT_NEW_RULE --severity medium --description "Describe the invariant." --assert "(eq 1 1)" --apply
+```
+
+The proposal flow appends to `contract/proposals/agent-additions.stele` and validates the loaded contract. It does not regenerate tests, refresh manifests, or update baselines. Changing or deleting existing contract rules remains a user-reviewed protected change.
+
 ## First Python app integration
 
 Stele does not invent fake runtime objects. Generated tests read whatever your application returns from `stele_context`.
@@ -144,7 +163,7 @@ Stele compares `main...HEAD` plus staged, unstaged, and untracked files. Out-of-
 
 - blocks direct edits to protected contract and generated-test paths
 - runs `stele check` in the `Stop` hook before the agent finishes
-- documents `/stele:init`, `/stele:check`, `/stele:add`, and `/stele:explain`
+- documents `/stele:init`, `/stele:check`, `/stele:add`, `/stele:explain`, `/stele:rules`, `/stele:context`, `/stele:why`, and `/stele:maintain`
 - ships a `contract-author` subagent and `contract-aware-coding` skill
 
 For production usage details, see:

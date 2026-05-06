@@ -283,6 +283,25 @@ That protection matters for both humans and AI agents:
 
 Python cache artifacts ending in `.pyc` or `.pyo` are intentionally ignored by Stele's protection logic. Ordinary files remain protected even when they live under a `__pycache__` directory.
 
+## Agent rule maintenance
+
+Stele exposes a small agent-facing maintenance workflow so contract knowledge can keep improving without making existing rules easy to weaken. When the Claude Code plugin is installed, most of this is automatic: lifecycle hooks inject rule context at session start and before focused file work, record material edits after tool use, and ask for a one-time maintenance review from `Stop` after source changes.
+
+```bash
+npx stele agent-context --focus path/to/changed_file.py
+npx stele rules --json
+npx stele why <rule-id-or-fingerprint>
+npx stele maintenance-summary --from main --output .stele/maintenance/summary.md
+```
+
+When an agent learns a durable new behavior, it may add a new invariant proposal:
+
+```bash
+npx stele propose invariant --id AGENT_NEW_RULE --severity medium --description "Describe the invariant." --assert "(eq 1 1)" --apply
+```
+
+The proposal command is intentionally add-only. It appends to `contract/proposals/agent-additions.stele`, imports that proposal file when needed, validates the loaded contract, and does not run `generate`, `lock`, `baseline-update`, or any manifest refresh. Modifying or deleting existing contract rules remains a protected, user-reviewed contract change.
+
 ## Controlled contract-change flow
 
 When a contract change is approved, use this sequence:
