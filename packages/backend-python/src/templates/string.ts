@@ -1,4 +1,5 @@
-import type { ListNode, PythonExpressionTranslator, PythonOperatorHandler, TranslationContext } from "../translator.js";
+import { type ListNode } from "@stele/core";
+import type { PythonOperatorHandler } from "../translator.js";
 
 export const stringOperatorHandlers: Record<string, PythonOperatorHandler> = {
   matches: (node, context, translate) => {

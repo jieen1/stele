@@ -298,7 +298,7 @@ describe("inspection commands", () => {
     await runPropose(projectDir, {
       kind: "invariant",
       id: "AGENT_PAYMENT_IDEMPOTENT",
-      severity: "medium",
+      severity: "warning",
       description: "Payment commands remain idempotent.",
       category: "payments",
       rationale: "Learned from recent payment command work.",
@@ -323,7 +323,7 @@ describe("inspection commands", () => {
       runPropose(projectDir, {
         kind: "invariant",
         id: "ROOT_PAYMENT_BALANCE",
-        severity: "medium",
+        severity: "warning",
         description: "Duplicate rule.",
         assert: "(eq 1 1)",
         apply: true,
@@ -565,6 +565,7 @@ describe("inspection commands", () => {
       severity: "critical",
       category: "data-integrity",
       tag: "payment",
+      format: "table",
     });
     expect(handlers.explain).toHaveBeenCalledWith("E:/tmp/project", "ROOT_PAYMENT_BALANCE", { json: true });
     expect(handlers.addChecker).toHaveBeenCalledWith("E:/tmp/project", "fresh_checker");

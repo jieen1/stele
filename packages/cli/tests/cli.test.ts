@@ -30,10 +30,9 @@ describe("stele CLI", () => {
     await expect(readFile(join(projectDir, "contract", "main.stele"), "utf8")).resolves.toContain("(invariant");
     await expect(readFile(join(projectDir, "contract", "checker_impls", ".gitkeep"), "utf8")).resolves.toBe("");
     const conftest = await readFile(join(projectDir, "tests", "contract", "conftest.py"), "utf8");
-    expect(conftest).toContain("def stele_default(value, fallback):");
-    expect(conftest).toContain("def stele_context_or_skip(**values):");
+    expect(conftest).toContain("import pytest");
     expect(conftest).toContain("@pytest.fixture\ndef stele_context():\n    return {}\n");
-    expect(conftest).toContain("@pytest.fixture\ndef stele_sandbox():\n    return nullcontext()\n");
+    expect(conftest).toContain("@pytest.fixture\ndef stele_sandbox():\n    return None\n");
   });
 
   it("init does not overwrite existing user files", async () => {
@@ -739,7 +738,7 @@ describe("stele CLI", () => {
     expect(stdout.read()).toBe("0.1.0\n0.1.0\n");
   });
 
-  it("CLI exits with code 2 when generated files are tampered", async () => {
+  it("CLI exits with code 4 when generated files are tampered", async () => {
     const projectDir = await createFixtureProject();
     const stderr = captureStderr();
     const originalExitCode = process.exitCode;
@@ -751,7 +750,7 @@ describe("stele CLI", () => {
     process.exitCode = 0;
     await runCli(["node", "stele", "check"]);
 
-    expect(process.exitCode).toBe(2);
+    expect(process.exitCode).toBe(4);
     expect(stderr.read()).toContain("Generated files do not match the contract");
     process.exitCode = originalExitCode;
   });
@@ -780,7 +779,7 @@ describe("stele CLI", () => {
       }>;
     };
 
-    expect(process.exitCode).toBe(2);
+    expect(process.exitCode).toBe(4);
     expect(stderr.read()).toBe("");
     expect(report.ok).toBe(false);
     expect(report.command).toBe("check");
