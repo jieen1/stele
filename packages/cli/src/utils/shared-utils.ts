@@ -1,6 +1,8 @@
 import { readFile, mkdir, open } from "node:fs/promises";
 import { dirname, relative } from "node:path";
 
+export { formatAstNode } from "./ast-format.js";
+
 export function compareInvariants(
   left: { filePath: string; span: { line: number; column: number }; id: string },
   right: { filePath: string; span: { line: number; column: number }; id: string },
@@ -11,6 +13,13 @@ export function compareInvariants(
     left.span.column - right.span.column ||
     left.id.localeCompare(right.id)
   );
+}
+
+export function compareBySource(
+  left: { filePath: string; span: { line: number; column: number }; id: string },
+  right: { filePath: string; span: { line: number; column: number }; id: string },
+): number {
+  return compareInvariants(left, right);
 }
 
 export function toProjectRelativePath(projectDir: string, filePath: string): string {
@@ -50,3 +59,25 @@ export async function writeIfMissing(path: string, content: string): Promise<voi
     await handle.close();
   }
 }
+
+export function escapeTsvCell(value: string): string {
+  const result: string[] = []
+  const PUSH_BACKSLASH = String.fromCharCode(92)
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i)
+    if (code === 92) {
+      result.push(PUSH_BACKSLASH, PUSH_BACKSLASH)
+    } else if (code === 9) {
+      result.push(PUSH_BACKSLASH, "t")
+    } else if (code === 13) {
+      result.push(PUSH_BACKSLASH, "r")
+    } else if (code === 10) {
+      result.push(PUSH_BACKSLASH, "n")
+    } else {
+      result.push(value[i])
+    }
+  }
+  return result.join("")
+}
+
+
