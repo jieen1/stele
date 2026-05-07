@@ -1,4 +1,4 @@
-import { type ListNode } from "@stele/core";
+import { wrapExpression } from "../translator.js";
 import type { PythonExpressionTranslator, PythonOperatorHandler, TranslationContext } from "../translator.js";
 
 export const logicOperatorHandlers: Record<string, PythonOperatorHandler> = {
@@ -15,6 +15,3 @@ export const logicOperatorHandlers: Record<string, PythonOperatorHandler> = {
     `(${translate(node.items[1]!, context)} if ${translate(node.items[0]!, context)} else ${translate(node.items[2]!, context)})`,
 } as Record<string, PythonOperatorHandler>;
 
-function wrapExpression(value: string): string {
-  return /^[A-Za-z0-9_.\[\]"]+$/.test(value) ? value : `(${value})`;
-}

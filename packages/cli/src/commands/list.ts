@@ -6,6 +6,7 @@ export type ListOptions = {
   severity?: string;
   category?: string;
   tag?: string;
+  format?: "table" | "json";
 };
 
 const LIST_HEADER = "ID\tSeverity\tCategory\tDescription\tFile Path";
@@ -14,6 +15,13 @@ export async function runList(projectDir: string, options: ListOptions): Promise
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
   const invariants = contract.invariants.slice().sort(compareInvariants).filter((invariant) => matchesFilters(invariant, options));
+
+  if (options.format === "json") {
+    process.stdout.write(JSON.stringify(invariants.map(toInvariantRecord), null, 2));
+    process.stdout.write("\n");
+    return;
+  }
+
   const lines = [
     LIST_HEADER,
     ...invariants.map((invariant) =>
@@ -30,6 +38,23 @@ export async function runList(projectDir: string, options: ListOptions): Promise
   ];
 
   process.stdout.write(`${lines.join("\n")}\n`);
+}
+
+function toInvariantRecord(invariant: InvariantDeclaration): Record<string, unknown> {
+  const record: Record<string, unknown> = {
+    id: invariant.id,
+    severity: invariant.severity,
+    category: invariant.category?.valueNode ? formatAstNode(invariant.category.valueNode) : undefined,
+    description: invariant.description,
+    filePath: invariant.filePath,
+    tags: invariant.tags?.valueNodes?.map(formatAstNode) ?? [],
+  };
+
+  if (invariant.rationale?.valueNode) {
+    record.rationale = formatAstNode(invariant.rationale.valueNode);
+  }
+
+  return record;
 }
 
 function matchesFilters(invariant: InvariantDeclaration, options: ListOptions): boolean {

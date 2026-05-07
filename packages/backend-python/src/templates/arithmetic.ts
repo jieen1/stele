@@ -1,4 +1,5 @@
 import { type ListNode } from "@stele/core";
+import { wrapExpression } from "../translator.js";
 import type { PythonExpressionTranslator, PythonOperatorHandler, TranslationContext } from "../translator.js";
 
 const CHAIN_OPERATORS: Record<string, string> = {
@@ -39,6 +40,3 @@ function translateBinaryArithmetic(
   return `${wrapExpression(translate(left!, context))} ${symbol} ${wrapExpression(translate(right!, context))}`;
 }
 
-function wrapExpression(value: string): string {
-  return /^[A-Za-z0-9_.\[\]"]+$/.test(value) ? value : `(${value})`;
-}

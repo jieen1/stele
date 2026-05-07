@@ -13,6 +13,7 @@ import { collectionOperatorHandlers } from "./templates/collection.js";
 import { comparisonOperatorHandlers } from "./templates/comparison.js";
 import { logicOperatorHandlers } from "./templates/logic.js";
 import { temporalOperatorHandlers } from "./templates/temporal.js";
+import { stringOperatorHandlers } from "./templates/string.js";
 
 export const PYTEST_PACKAGE_INIT_PATH = "tests/contract/__init__.py";
 export const PYTEST_TEST_PATH = "tests/contract/test_contract.py";
@@ -91,6 +92,7 @@ const PYTHON_OPERATOR_HANDLERS: Record<string, PythonOperatorHandler> = {
   ...collectionOperatorHandlers,
   ...logicOperatorHandlers,
   ...temporalOperatorHandlers,
+  ...stringOperatorHandlers,
 };
 
 export function generatePytestFiles(contract: Contract): GeneratedPytestFile[] {
@@ -232,19 +234,9 @@ function renderInvariantTest(
   }
 
   if (invariant.usesChecker !== undefined) {
-    if (invariant.usesChecker.args.length > 0) {
-      throw new SteleError(
-        "E0604",
-        "Backend Error",
-        `Invariant "${invariant.id}" uses-checker arguments are not supported by the Python backend yet.`,
-        invariant.usesChecker.span,
-        `Received ${invariant.usesChecker.args.length} checker argument(s).`,
-        "Remove the checker arguments for v0.1 or extend the backend argument encoder first.",
-      );
-    }
-
+    const checkerArgs = encodeCheckerArgs(invariant.usesChecker.args, expressionContext);
     lines.push(
-      `${INDENT}result = stele_call_checker(${toPythonString(invariant.usesChecker.checkerId)}, ${checkerContextName}, {})`,
+      `${INDENT}result = stele_call_checker(${toPythonString(invariant.usesChecker.checkerId)}, ${checkerContextName}, ${checkerArgs})`,
     );
     lines.push(
       `${INDENT}assert result["passed"], result.get("message") or ${toPythonString(`Checker failed: ${invariant.usesChecker.checkerId}`)}`,
@@ -755,4 +747,41 @@ function allocateUniquePythonName(baseName: string, usedNames: ReadonlySet<strin
 
 function toPythonString(value: string): string {
   return JSON.stringify(value);
+}
+
+export function wrapExpression(value: string): string {
+  return /^[A-Za-z0-9_.\[\]"]+$/.test(value) ? value : `(${value})`;
+}
+
+function encodeCheckerArgs(args: AstNode[], _context: TranslationContext): string {
+  if (args.length === 0) {
+    return "{}";
+  }
+
+  const pairs: string[] = [];
+
+  for (const arg of args) {
+    if (arg.kind !== "list" || arg.items.length !== 2 || arg.items[0]?.kind !== "identifier") {
+      continue;
+    }
+
+    const key = arg.items[0].value;
+    const valueNode = arg.items[1];
+
+    if (valueNode?.kind === "number") {
+      pairs.push(`${toPythonString(key)}: ${valueNode.raw}`);
+    } else if (valueNode?.kind === "string") {
+      pairs.push(`${toPythonString(key)}: ${toPythonString(valueNode.value)}`);
+    } else if (valueNode?.kind === "identifier") {
+      if (valueNode.value === "true") {
+        pairs.push(`${toPythonString(key)}: True`);
+      } else if (valueNode.value === "false") {
+        pairs.push(`${toPythonString(key)}: False`);
+      } else if (valueNode.value === "null" || valueNode.value === "none") {
+        pairs.push(`${toPythonString(key)}: None`);
+      }
+    }
+  }
+
+  return `{${pairs.join(", ")}}`;
 }

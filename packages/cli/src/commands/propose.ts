@@ -5,6 +5,7 @@ import { loadConfig } from "../config/loadConfig.js";
 
 const PROPOSAL_FILE = "contract/proposals/agent-additions.stele";
 const PROPOSAL_IMPORT = '(import "./proposals/agent-additions.stele")';
+const VALID_SEVERITIES = ["error", "warning", "info"] as const;
 
 export type ProposeOptions = {
   kind: "invariant";
@@ -89,8 +90,8 @@ function validateInvariantOptions(options: ProposeOptions): void {
     throw new Error(`Invalid invariant id "${options.id}".`);
   }
 
-  if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(options.severity)) {
-    throw new Error(`Invalid severity "${options.severity}".`);
+  if (!VALID_SEVERITIES.includes(options.severity as (typeof VALID_SEVERITIES)[number])) {
+    throw new Error(`Invalid severity "${options.severity}". Must be one of: ${VALID_SEVERITIES.join(", ")}.`);
   }
 
   if (options.description.trim().length === 0) {

@@ -29,6 +29,9 @@ import { runMaintenanceSummary, type MaintenanceSummaryOptions } from "./command
 import { runPropose, type ProposeOptions } from "./commands/propose.js";
 import { runRules, type RulesOptions } from "./commands/rules.js";
 import { runWhy, type WhyOptions } from "./commands/why.js";
+import { runDev, type DevOptions } from "./commands/dev.js";
+import { runDoc, type DocOptions } from "./commands/doc.js";
+import { unlockProject, type UnlockOptions, type UnlockSummary } from "./commands/unlock.js";
 import { getExitCode } from "./errors.js";
 
 const STELE_CLI_VERSION = "0.1.0";
@@ -86,23 +89,33 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   program.command("version").description("Print Stele CLI version.").action(() => {
     process.stdout.write(formatVersion());
   });
-  program.command("baseline-init").requiredOption("--reason <reason>").action(async (options: BaselineCommandOptions) => {
-    const result = await baselineInit(cwd(), options);
-    if (isBaselineSummary(result)) {
-      process.stdout.write(formatBaselineSummary("initialized", result));
-    }
-  });
-  program.command("baseline-update").requiredOption("--reason <reason>").action(async (options: BaselineCommandOptions) => {
-    const result = await baselineUpdate(cwd(), options);
-    if (isBaselineSummary(result)) {
-      process.stdout.write(formatBaselineSummary("updated", result));
-    }
-  });
+  program
+    .command("baseline-init")
+    .description("Initialize a baseline to suppress known contract violations.")
+    .requiredOption("--reason <reason>", "reason for creating the baseline")
+    .action(async (options: BaselineCommandOptions) => {
+      const result = await baselineInit(cwd(), options);
+      if (isBaselineSummary(result)) {
+        process.stdout.write(formatBaselineSummary("initialized", result));
+      }
+    });
+  program
+    .command("baseline-update")
+    .description("Update an existing baseline with the latest contract state.")
+    .requiredOption("--reason <reason>", "reason for updating the baseline")
+    .action(async (options: BaselineCommandOptions) => {
+      const result = await baselineUpdate(cwd(), options);
+      if (isBaselineSummary(result)) {
+        process.stdout.write(formatBaselineSummary("updated", result));
+      }
+    });
   program
     .command("check")
+    .description("Verify contract invariants against generated tests and protected files.")
     .option("--diff-from <base>", "limit failures to files changed since the given git base")
     .option("--json", "emit the check report as JSON")
     .option("--report-file <path>", "write the JSON check report to a file")
+    .option("--lenient", "skip code-shape checks (faster)")
     .action(async (options: CheckCommandOptions) => {
       try {
         const result = await check(cwd(), options);
@@ -132,44 +145,71 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
         process.exitCode = getExitCode(error) ?? 1;
       }
     });
-  program.command("generate").option("--force").action(async (options) => {
-    const result = await generate(cwd(), options);
-    if (isGenerateSummary(result)) {
-      process.stdout.write(formatGenerateSummary(result));
-    }
-  });
-  program.command("lock").option("--reason <reason>").action(async (options) => {
-    const result = await lock(cwd(), options);
-    if (isLockSummary(result)) {
-      process.stdout.write(formatLockSummary(result));
-    }
-  });
+  program
+    .command("generate")
+    .description("Generate contract test files from the contract source.")
+    .option("--force", "overwrite existing generated files")
+    .action(async (options) => {
+      const result = await generate(cwd(), options);
+      if (isGenerateSummary(result)) {
+        process.stdout.write(formatGenerateSummary(result));
+      }
+    });
+  program
+    .command("lock")
+    .description("Lock the manifest by recording SHA-256 hashes of all protected files.")
+    .option("--reason <reason>", "reason for locking the manifest")
+    .action(async (options) => {
+      const result = await lock(cwd(), options);
+      if (isLockSummary(result)) {
+        process.stdout.write(formatLockSummary(result));
+      }
+    });
   program
     .command("list")
-    .option("--severity <severity>")
-    .option("--category <category>")
-    .option("--tag <tag>")
+    .description("List all contract invariants with their metadata.")
+    .option("--severity <severity>", "filter by severity level")
+    .option("--category <category>", "filter by category")
+    .option("--tag <tag>", "filter by tag")
+    .option("--format <format>", "output format (table|json)", "table")
     .action((options) => list(cwd(), options));
-  program.command("rules").option("--json", "emit machine-readable rule inventory").action((options: RulesOptions) => rules(cwd(), options));
-  program.command("explain <id>").option("--json", "emit machine-readable rule explanation").action((id, options: ExplainOptions) => explain(cwd(), id, options));
+  program
+    .command("rules")
+    .description("Display the contract rule inventory with severity and category details.")
+    .option("--json", "emit machine-readable rule inventory")
+    .action((options: RulesOptions) => rules(cwd(), options));
+  program
+    .command("explain <id>")
+    .description("Explain a specific contract invariant by its ID.")
+    .option("--json", "emit machine-readable rule explanation")
+    .action((id, options: ExplainOptions) => explain(cwd(), id, options));
   program
     .command("agent-context")
+    .description("Generate context for AI agents about the current contract state.")
     .option("--json", "emit machine-readable agent context")
     .option("--focus <paths...>", "focus context on one or more changed files")
     .action((options: AgentContextOptions) => agentContext(cwd(), options));
-  program.command("why <id-or-fingerprint>").option("--json", "emit machine-readable why output").action((idOrFingerprint, options: WhyOptions) => why(cwd(), idOrFingerprint, options));
-  program.command("add-checker <checker-id>").action((checkerId) => addChecker(cwd(), checkerId));
+  program
+    .command("why <id-or-fingerprint>")
+    .description("Show the rationale behind a contract violation.")
+    .option("--json", "emit machine-readable why output")
+    .action((idOrFingerprint, options: WhyOptions) => why(cwd(), idOrFingerprint, options));
+  program
+    .command("add-checker <checker-id>")
+    .description("Add a new checker implementation for external validation.")
+    .action((checkerId) => addChecker(cwd(), checkerId));
   program
     .command("propose")
     .description("Add contract knowledge through constrained proposal commands.")
     .command("invariant")
-    .requiredOption("--id <id>")
-    .requiredOption("--severity <severity>")
-    .requiredOption("--description <description>")
-    .requiredOption("--assert <assert>")
-    .option("--category <category>")
-    .option("--rationale <rationale>")
-    .option("--apply")
+    .description("Propose a new contract invariant.")
+    .requiredOption("--id <id>", "unique invariant identifier")
+    .requiredOption("--severity <severity>", "severity level (error|warning|info)")
+    .requiredOption("--description <description>", "human-readable description of the invariant")
+    .requiredOption("--assert <assert>", "CDL assertion expression")
+    .option("--category <category>", "invariant category")
+    .option("--rationale <rationale>", "rationale explaining why this invariant exists")
+    .option("--apply", "apply the invariant immediately")
     .action((options) =>
       propose(cwd(), {
         kind: "invariant",
@@ -184,13 +224,52 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     );
   program
     .command("maintenance-summary")
-    .option("--from <git-ref>")
-    .option("--output <path>")
+    .description("Summarize contract maintenance activity across changes.")
+    .option("--from <git-ref>", "compare against the given git reference")
+    .option("--output <path>", "write the summary to a file")
     .action((options: MaintenanceSummaryOptions) => maintenanceSummary(cwd(), options));
   program
     .command("init")
+    .description("Initialize Stele in the current project.")
     .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))
     .action((options) => init(cwd(), options));
+  program
+    .command("dev")
+    .description("Watch for contract changes and auto-regenerate")
+    .option("--once", "run once and exit (no watch)")
+    .action(async (options: DevOptions) => {
+      await runDev(cwd(), options);
+    });
+  program
+    .command("unlock")
+    .description("Temporarily remove manifest and baseline locks (emergency only)")
+    .requiredOption("--reason <reason>")
+    .option("--confirm")
+    .action(async (options: UnlockOptions) => {
+      try {
+        const result = await unlockProject(cwd(), options);
+        if (isUnlockSummary(result)) {
+          process.stdout.write(
+            `[stele] Unlocked: removed ${result.manifestPath} and ${result.baselinePath}.\n` +
+              `[stele] Edit contract files manually, then re-run:\n` +
+              `  stele generate --force\n` +
+              `  stele lock --reason "your reason"\n`,
+          );
+        }
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`[stele] ${err}\n`);
+        process.exitCode = 1;
+      }
+    });
+  program
+    .command("doc")
+    .description("Generate contract documentation")
+    .option("--format <format>", "output format (markdown|html)", "markdown")
+    .option("--output <path>", "output directory")
+    .action(async (options: DocOptions) => {
+      await runDoc(cwd(), options);
+    });
 
   return program;
 }
@@ -225,6 +304,10 @@ function isLockSummary(value: LockSummary | void): value is LockSummary {
 
 function isGenerateSummary(value: GenerateSummary | void): value is GenerateSummary {
   return typeof value === "object" && value !== null && "generatedDir" in value && "generatedFileCount" in value;
+}
+
+function isUnlockSummary(value: UnlockSummary | void): value is UnlockSummary {
+  return typeof value === "object" && value !== null && "manifestPath" in value && "baselinePath" in value;
 }
 
 export async function runCli(argv = process.argv): Promise<void> {

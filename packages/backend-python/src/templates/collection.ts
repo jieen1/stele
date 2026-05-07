@@ -1,4 +1,5 @@
 import { SteleError, type AstNode, type ListNode } from "@stele/core";
+import { wrapExpression } from "../translator.js";
 import type { PythonExpressionTranslator, PythonOperatorHandler, TranslationContext } from "../translator.js";
 
 export const collectionOperatorHandlers: Record<string, PythonOperatorHandler> = {
@@ -14,6 +15,8 @@ export const collectionOperatorHandlers: Record<string, PythonOperatorHandler> =
   none: (node, context, translate) => `not ${wrapExpression(translateQuantifier(node, context, translate, "any"))}`,
   "exists-in": (node, context, translate) => `${translate(node.items[0]!, context)} in ${translate(node.items[1]!, context)}`,
   "not-null": (node, context, translate) => `${translate(node.items[0]!, context)} is not None`,
+  distinct: (node, context, translate) => translateDistinct(node, context, translate),
+  unique: (node, context, translate) => translateUnique(node, context, translate),
 } as Record<string, PythonOperatorHandler>;
 
 function translateCollection(node: ListNode, context: TranslationContext): string {
@@ -42,7 +45,7 @@ function translateSum(node: ListNode, context: TranslationContext, translate: Py
 function translateAverage(node: ListNode, context: TranslationContext, translate: PythonExpressionTranslator): string {
   const collection = translate(node.items[0]!, context);
   const pathParts = node.items[1] === undefined ? "[]" : JSON.stringify(readProjectionPath(node.items[1]));
-  return `(stele_sum(${collection}, ${pathParts}) / len(${collection}))`;
+  return `len(${collection}) and (stele_sum(${collection}, ${pathParts}) / len(${collection})) or 0`;
 }
 
 function translateExtremum(
@@ -152,6 +155,27 @@ function readProjectionPath(node: AstNode): string[] {
   });
 }
 
-function wrapExpression(value: string): string {
-  return /^[A-Za-z0-9_.\[\]"]+$/.test(value) ? value : `(${value})`;
+
+function translateDistinct(node: ListNode, context: TranslationContext, translate: PythonExpressionTranslator): string {
+  const collection = translate(node.items[0]!, context);
+  const projection = node.items[1];
+
+  if (projection === undefined) {
+    return `list(dict.fromkeys(${collection}))`;
+  }
+
+  const pathParts = JSON.stringify(readProjectionPath(projection));
+  return `list(dict.fromkeys(stele_get_path(item, ${pathParts}) for item in ${collection}))`;
+}
+
+function translateUnique(node: ListNode, context: TranslationContext, translate: PythonExpressionTranslator): string {
+  const collection = translate(node.items[0]!, context);
+  const projection = node.items[1];
+
+  if (projection === undefined) {
+    return `len(set(${collection})) == len(${collection})`;
+  }
+
+  const pathParts = JSON.stringify(readProjectionPath(projection));
+  return `len(set(stele_get_path(item, ${pathParts}) for item in ${collection})) == len(${collection})`;
 }

@@ -22,7 +22,7 @@ import {
 import { STELE_BASELINE_FILE, STELE_CONFIG_FILE, type SteleConfig } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { evaluateCodeShapes } from "../code-shape/evaluate.js";
-import { CliCommandError } from "../errors.js";
+import { CliCommandError, ExitCode } from "../errors.js";
 import {
   assertProtectedContractFilesReachable,
   collectProtectedPaths,
@@ -44,6 +44,7 @@ export type CheckCommandOptions = {
   diffFrom?: string;
   json?: boolean;
   reportFile?: string;
+  lenient?: boolean;
 };
 
 export type CheckCommandResult = {
@@ -84,9 +85,17 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   }
 
   const protectedState = await collectProtectedCheckState(projectDir, context.config, context.contract, context.generated);
-  const protectedReport = applyFiltersToReport(await buildProtectedStageReport(context, protectedState, "check"), filters);
-  const codeShapeReport = applyFiltersToReport(await buildCodeShapeStageReport(context, protectedState, "check"), filters);
-  const report = mergeCheckReports([generatedReport, protectedReport, codeShapeReport]);
+  const reports: ViolationReport[] = [
+    generatedReport,
+    applyFiltersToReport(await buildProtectedStageReport(context, protectedState, "check"), filters),
+  ];
+
+  // In lenient mode, skip code-shape checks (only check generated + protected)
+  if (!options.lenient) {
+    reports.push(applyFiltersToReport(await buildCodeShapeStageReport(context, protectedState, "check"), filters));
+  }
+
+  const report = mergeCheckReports(reports);
 
   if (!report.ok) {
     throw new CheckCommandError(getCheckExitCode(report), report);
@@ -206,7 +215,7 @@ export async function writeCheckReportFile(projectDir: string, reportFile: strin
 
 class CheckCommandError extends CliCommandError {
   constructor(
-    exitCode: number,
+    exitCode: ExitCode,
     readonly report: ViolationReport,
     cause?: unknown,
   ) {
@@ -375,9 +384,11 @@ function withCheckSummary(report: ViolationReport, summary: CheckSummary): Viola
   };
 }
 
-function getCheckExitCode(report: ViolationReport): number {
+function getCheckExitCode(report: ViolationReport): ExitCode {
   const activeViolations = report.violations.filter((violation) => (violation.status ?? "active") === "active");
-  return activeViolations.length > 0 && activeViolations.every((violation) => violation.rule_kind === "generated_drift") ? 2 : 3;
+  return activeViolations.length > 0 && activeViolations.every((violation) => violation.rule_kind === "generated_drift")
+    ? ExitCode.GENERATION_FAIL
+    : ExitCode.TAMPER_DETECTED;
 }
 
 function isCheckSuppressibleViolation(violation: Violation): boolean {

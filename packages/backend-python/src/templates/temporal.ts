@@ -7,7 +7,19 @@ export const temporalOperatorHandlers: Record<string, PythonOperatorHandler> = {
   modified: (node, context) => `stele_is_modified(${context.rootContextName}, ${JSON.stringify(readModifiedPath(node.items[0], node))})`,
   "state-before": (_node, context) => `${context.rootContextName}["state-before"]`,
   "state-after": (_node, context) => `${context.rootContextName}["state-after"]`,
+  within: (node, context, translate) => translateWithin(node, context, translate),
 } as Record<string, PythonOperatorHandler>;
+
+function translateWithin(node: ListNode, context: TranslationContext, translate: PythonExpressionTranslator): string {
+  const event = translate(node.items[0]!, context);
+  const duration = node.items[1];
+
+  if (duration?.kind === "number") {
+    return `(datetime.datetime.now() - ${event}) < datetime.timedelta(seconds=${duration.raw})`;
+  }
+
+  return `((datetime.datetime.now() - ${event}) < ${translate(duration!, context)})`;
+}
 
 function readModifiedPath(node: AstNode | undefined, owner: ListNode): string[] {
   if (node?.kind !== "list" || node.head !== "path" || node.items.length === 0) {
