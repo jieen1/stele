@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { posix as pathPosix } from "node:path";
+import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
 
 const MANIFEST_VERSION = "1";
@@ -275,10 +276,6 @@ function validateManifestProtectedPath(path: string): void {
       "Regenerate the manifest with Stele or remove the invalid path entry.",
     );
   }
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
 function normalizeManifestPath(value: string): string {

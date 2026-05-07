@@ -3,10 +3,6 @@ import { dirname, relative } from "node:path";
 
 export { formatAstNode } from "./ast-format.js";
 
-export function uniqueSortedStrings(values: string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
-}
-
 export function compareInvariants(
   left: { filePath: string; span: { line: number; column: number }; id: string },
   right: { filePath: string; span: { line: number; column: number }; id: string },
@@ -56,11 +52,18 @@ export async function writeIfMissing(path: string, content: string): Promise<voi
   }
 
   await ensureDirectory(path);
-  const handle = await open(path, "w");
   try {
-    await handle.writeFile(content, "utf8");
-  } finally {
-    await handle.close();
+    const handle = await open(path, "wx");
+    try {
+      await handle.writeFile(content, "utf8");
+    } finally {
+      await handle.close();
+    }
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "EEXIST") {
+      return;
+    }
+    throw error;
   }
 }
 

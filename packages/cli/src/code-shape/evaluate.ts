@@ -16,7 +16,7 @@ import {
   type TypePolicyDeclaration,
   type Violation,
 } from "@stele/core";
-import { uniqueSortedStrings } from "../utils/shared-utils.js";
+import { uniqueSortedStrings } from "@stele/core";
 
 const execFileAsync = promisify(execFile);
 const PYTHON_CANDIDATES: Array<{ command: string; args: string[] }> = [

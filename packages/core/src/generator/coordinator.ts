@@ -1,5 +1,6 @@
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import { posix, relative, resolve, win32 } from "node:path";
+import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
 import type { Contract } from "../validator/structure.js";
 
@@ -502,10 +503,6 @@ function isGeneratedFile(value: unknown): value is GeneratedFile {
     typeof value.path === "string" &&
     typeof value.content === "string"
   );
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function generationError(code: string, message: string, detail: string, hint: string): SteleError {
