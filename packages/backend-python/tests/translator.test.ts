@@ -634,6 +634,35 @@ describe("@stele/backend-python translator", () => {
       expect((error as SteleError).message).toContain("mystery-op");
     }
   });
+
+  it("all core operators have Python backend handlers", async () => {
+    const { createCoreOperatorRegistry } = await import("@stele/core");
+    const registry = createCoreOperatorRegistry();
+    const operatorNames = registry.list().map((spec) => spec.name);
+    const translateExpression = getTranslateExpression();
+    const missing: string[] = [];
+
+    for (const name of operatorNames) {
+      try {
+        let expr: string;
+        if (name === "path") {
+          expr = "(path account value)";
+        } else if (name === "field") {
+          expr = "(field account value)";
+        } else if (name === "value") {
+          expr = "(value 1)";
+        } else {
+          expr = "(path account value)";
+        }
+        translateExpression(parseExpression(`(${name} ${expr})`));
+      } catch (error) {
+        if (error instanceof SteleError && error.code === "E0601") {
+          missing.push(name);
+        }
+      }
+    }
+    expect(missing.length).toBe(0);
+  });
 });
 
 async function createContract(files: Record<string, string>): Promise<Contract> {
