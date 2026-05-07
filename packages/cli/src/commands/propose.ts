@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { loadContract, parseFile } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
+import { readOptionalFile } from "../utils/shared-utils.js";
 
 const PROPOSAL_FILE = "contract/proposals/agent-additions.stele";
 const PROPOSAL_IMPORT = '(import "./proposals/agent-additions.stele")';
@@ -112,14 +113,3 @@ async function proposalTextContainsId(projectDir: string, id: string): Promise<b
   return text?.includes(`(invariant ${id}`) ?? false;
 }
 
-async function readOptionalFile(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      return undefined;
-    }
-
-    throw error;
-  }
-}

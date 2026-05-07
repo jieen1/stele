@@ -1,6 +1,8 @@
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import { loadContract, type AstNode, type InvariantDeclaration } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
+import { compareInvariants, toProjectRelativePath, escapeTsvCell } from "../utils/shared-utils.js";
+import { formatAstNode } from "../utils/ast-format.js";
 
 export type ListOptions = {
   severity?: string;
@@ -101,36 +103,4 @@ function filterVariants(node: AstNode): Set<string> {
   }
 
   return variants;
-}
-
-function formatAstNode(node: AstNode): string {
-  switch (node.kind) {
-    case "identifier":
-      return node.value;
-    case "keyword":
-      return `:${node.value}`;
-    case "string":
-      return JSON.stringify(node.value);
-    case "number":
-      return node.raw;
-    case "list":
-      return `(${node.head}${node.items.length === 0 ? "" : ` ${node.items.map(formatAstNode).join(" ")}`})`;
-  }
-}
-
-function compareInvariants(left: InvariantDeclaration, right: InvariantDeclaration): number {
-  return (
-    left.filePath.localeCompare(right.filePath) ||
-    left.span.line - right.span.line ||
-    left.span.column - right.span.column ||
-    left.id.localeCompare(right.id)
-  );
-}
-
-function toProjectRelativePath(projectDir: string, filePath: string): string {
-  return relative(projectDir, filePath).replaceAll("\\", "/");
-}
-
-function escapeTsvCell(value: string): string {
-  return value.replaceAll("\\", "\\\\").replaceAll("\t", "\\t").replaceAll("\r", "\\r").replaceAll("\n", "\\n");
 }

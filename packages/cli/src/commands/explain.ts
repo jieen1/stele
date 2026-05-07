@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { posix, relative, resolve } from "node:path";
+import { posix, resolve } from "node:path";
 import { sanitizePythonIdentifier } from "@stele/backend-python";
-import { loadContract, type AstNode, type InvariantDeclaration, type SourceSpan } from "@stele/core";
+import { loadContract, type InvariantDeclaration, type SourceSpan } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
 import { buildRuleIndex, findIndexedRule } from "./rules.js";
+import { formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
 
 export type ExplainOptions = {
   json?: boolean;
@@ -140,23 +141,4 @@ function offsetForSpan(source: string, span: SourceSpan): number {
   }
 
   return lineOffset + Math.max(span.column - 1, 0);
-}
-
-function formatAstNode(node: AstNode): string {
-  switch (node.kind) {
-    case "identifier":
-      return node.value;
-    case "keyword":
-      return `:${node.value}`;
-    case "string":
-      return JSON.stringify(node.value);
-    case "number":
-      return node.raw;
-    case "list":
-      return `(${node.head}${node.items.length === 0 ? "" : ` ${node.items.map(formatAstNode).join(" ")}`})`;
-  }
-}
-
-function toProjectRelativePath(projectDir: string, filePath: string): string {
-  return relative(projectDir, filePath).replaceAll("\\", "/");
 }

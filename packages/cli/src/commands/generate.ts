@@ -16,6 +16,7 @@ import { minimatch } from "minimatch";
 import { STELE_BASELINE_FILE } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { CliCommandError } from "../errors.js";
+import { isMissingFileError } from "../utils/shared-utils.js";
 
 export type GenerateOptions = {
   force?: boolean;
@@ -390,10 +391,6 @@ function isIgnoredPythonCacheArtifact(path: string): boolean {
   const basename = segments[segments.length - 1] ?? "";
 
   return basename.endsWith(".pyc") || basename.endsWith(".pyo");
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function formatGeneratedDriftMessage(verification: GeneratedVerificationResult): string {

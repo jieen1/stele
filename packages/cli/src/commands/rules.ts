@@ -1,8 +1,7 @@
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import { sanitizePythonIdentifier } from "@stele/backend-python";
 import {
   loadContract,
-  type AstNode,
   type BoundaryDeclaration,
   type ClassShapeDeclaration,
   type CodeShapeDeclaration,
@@ -11,8 +10,13 @@ import {
   type InvariantDeclaration,
   type ScenarioDeclaration,
   type TypePolicyDeclaration,
+  type AstNode,
 } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
+
+import { compareInvariants, compareBySource, toProjectRelativePath } from "../utils/shared-utils.js";
+
+
 
 export type RulesOptions = {
   json?: boolean;
@@ -150,25 +154,6 @@ export function findIndexedRule(index: RuleIndex, id: string): IndexedRule | und
   return index.rules.find((rule) => rule.id === id);
 }
 
-export function formatAstNode(node: AstNode): string {
-  switch (node.kind) {
-    case "identifier":
-      return node.value;
-    case "keyword":
-      return `:${node.value}`;
-    case "string":
-      return node.value;
-    case "number":
-      return node.raw;
-    case "list":
-      return `(${node.head}${node.items.length === 0 ? "" : ` ${node.items.map(formatAstNode).join(" ")}`})`;
-  }
-}
-
-export function toProjectRelativePath(projectDir: string, filePath: string): string {
-  return relative(projectDir, filePath).replaceAll("\\", "/");
-}
-
 function indexInvariant(projectDir: string, generatedDir: string, invariant: InvariantDeclaration): IndexedRule {
   return {
     id: invariant.id,
@@ -301,15 +286,17 @@ function formatRuleIndexHuman(index: RuleIndex): string {
   return `${lines.join("\n")}\n`;
 }
 
-function compareInvariants(left: InvariantDeclaration, right: InvariantDeclaration): number {
-  return (
-    left.filePath.localeCompare(right.filePath) ||
-    left.span.line - right.span.line ||
-    left.span.column - right.span.column ||
-    left.id.localeCompare(right.id)
-  );
-}
-
-function compareBySource(left: { filePath: string; span: { line: number; column: number }; id: string }, right: { filePath: string; span: { line: number; column: number }; id: string }): number {
-  return left.filePath.localeCompare(right.filePath) || left.span.line - right.span.line || left.span.column - right.span.column || left.id.localeCompare(right.id);
+function formatAstNode(node: AstNode): string {
+  switch (node.kind) {
+    case "identifier":
+      return node.value;
+    case "keyword":
+      return `:${node.value}`;
+    case "string":
+      return node.value;
+    case "number":
+      return node.raw;
+    case "list":
+      return `(${node.head}${node.items.length === 0 ? "" : ` ${node.items.map(formatAstNode).join(" ")}`})`;
+  }
 }

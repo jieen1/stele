@@ -1,7 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../config/defaults.js";
-import { isMissingFileError, readOptionalFile, writeIfMissing } from "../utils/shared-utils.js";
+import { readOptionalFile, writeIfMissing } from "../utils/shared-utils.js";
 
 export type InitOptions = {
   language: string;
