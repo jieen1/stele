@@ -10,7 +10,7 @@ import {
 import { getPythonRuntimeSource, PYTEST_RUNTIME_PATH } from "./runtime.js";
 import { arithmeticOperatorHandlers } from "./templates/arithmetic.js";
 import { collectionOperatorHandlers } from "./templates/collection.js";
-import { comparisonOperatorHandlers } from "./templates/comparison.js";
+import { comparisonOperatorHandlers, extendedComparisonHandlers } from "./templates/comparison.js";
 import { logicOperatorHandlers } from "./templates/logic.js";
 import { temporalOperatorHandlers } from "./templates/temporal.js";
 import { stringOperatorHandlers } from "./templates/string.js";
@@ -88,6 +88,7 @@ const PYTHON_OPERATOR_HANDLERS: Record<string, PythonOperatorHandler> = {
   field: translateField,
   value: translateValue,
   ...comparisonOperatorHandlers,
+  ...extendedComparisonHandlers,
   ...arithmeticOperatorHandlers,
   ...collectionOperatorHandlers,
   ...logicOperatorHandlers,

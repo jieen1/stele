@@ -2,11 +2,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { minimatch } from "minimatch";
+import { TARGET_KEYS } from "./path-utils.js";
 
 const BLOCK_EXIT_CODE = 2;
 const PROTECTED_REASON =
   "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.";
-const TARGET_KEYS = ["file_path", "path", "target_path", "notebook_path"];
 const BASH_COMMAND_KEYS = ["command"];
 const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", ";"]);
 const PYTHON_CACHE_SUFFIXES = [".pyc", ".pyo"];

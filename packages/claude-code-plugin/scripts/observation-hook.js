@@ -2,8 +2,7 @@
 import { readFile, mkdir, appendFile } from "node:fs/promises";
 import path from "node:path";
 import { minimatch } from "minimatch";
-
-const TARGET_KEYS = ["file_path", "path", "target_path", "notebook_path"];
+import { extractPathsFromValue } from "./path-utils.js";
 const BASH_COMMAND_KEYS = ["command"];
 const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", ";"]);
 const DEFAULT_PROTECTED = [
@@ -94,35 +93,6 @@ function extractTargetPaths(payload) {
   return [...new Set(targets)];
 }
 
-function extractPathsFromValue(value, seen) {
-  if (typeof value === "string") {
-    return [];
-  }
-
-  if (!isObject(value) || seen.has(value)) {
-    return [];
-  }
-
-  seen.add(value);
-
-  const targets = [];
-
-  for (const key of TARGET_KEYS) {
-    if (typeof value[key] === "string" && value[key].trim().length > 0) {
-      targets.push(value[key]);
-    }
-  }
-
-  for (const nestedKey of ["tool_input", "input"]) {
-    targets.push(...extractPathsFromValue(value[nestedKey], seen));
-  }
-
-  for (const nestedValue of Object.values(value)) {
-    targets.push(...extractPathsFromValue(nestedValue, seen));
-  }
-
-  return targets;
-}
 
 function extractBashCommand(payload) {
   if (!isObject(payload) || payload.tool_name !== "Bash") {

@@ -60,6 +60,13 @@ const EXPECTED_SIGNATURES: ExpectedSignature[] = [
   signature("exists-in", 2, 2, ["Unknown", "Collection"], parameters(required("Unknown"), required("Collection")), "Boolean"),
   signature("unique", 1, 2, ["Collection", "Path"], parameters(required("Collection"), optional("Path")), "Boolean"),
   signature("not-null", 1, 1, ["Path"], parameters(required("Path")), "Boolean"),
+  signature("between", 3, 3, ["Number", "Number", "Number"], parameters(required("Number"), required("Number"), required("Number")), "Boolean"),
+  signature("approx-eq", 3, 3, ["Number", "Number", "Number"], parameters(required("Number"), required("Number"), required("Number")), "Boolean"),
+  signature("contains", 2, 2, ["String", "String"], parameters(required("String"), required("String")), "Boolean"),
+  signature("is-empty", 1, 1, ["Collection"], parameters(required("Collection")), "Boolean"),
+  signature("starts-with", 2, 2, ["String", "String"], parameters(required("String"), required("String")), "Boolean"),
+  signature("ends-with", 2, 2, ["String", "String"], parameters(required("String"), required("String")), "Boolean"),
+  signature("has-length", 2, 2, ["Collection", "Number"], parameters(required("Collection"), required("Number")), "Boolean"),
 ];
 
 describe("createCoreOperatorRegistry", () => {

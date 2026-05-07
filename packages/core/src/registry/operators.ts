@@ -345,6 +345,48 @@ const CORE_OPERATOR_SPECS: OperatorSpec[] = [
     returnType: "Boolean",
     description: "Check whether a path resolves to a non-null value.",
   }),
+  defineOperator({
+    name: "between",
+    parameters: [required("Number"), required("Number"), required("Number")],
+    returnType: "Boolean",
+    description: "Check whether a number falls within an inclusive range [low, high].",
+  }),
+  defineOperator({
+    name: "approx-eq",
+    parameters: [required("Number"), required("Number"), required("Number")],
+    returnType: "Boolean",
+    description: "Check whether two numbers are equal within an absolute tolerance.",
+  }),
+  defineOperator({
+    name: "contains",
+    parameters: [required("String"), required("String")],
+    returnType: "Boolean",
+    description: "Check whether a string contains a substring.",
+  }),
+  defineOperator({
+    name: "is-empty",
+    parameters: [required("Collection")],
+    returnType: "Boolean",
+    description: "Check whether a collection is empty.",
+  }),
+  defineOperator({
+    name: "starts-with",
+    parameters: [required("String"), required("String")],
+    returnType: "Boolean",
+    description: "Check whether a string starts with a prefix.",
+  }),
+  defineOperator({
+    name: "ends-with",
+    parameters: [required("String"), required("String")],
+    returnType: "Boolean",
+    description: "Check whether a string ends with a suffix.",
+  }),
+  defineOperator({
+    name: "has-length",
+    parameters: [required("Collection"), required("Number")],
+    returnType: "Boolean",
+    description: "Check whether a collection has the expected length.",
+  }),
 ];
 
 type DefineOperatorInput = {

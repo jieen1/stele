@@ -232,6 +232,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .command("init")
     .description("Initialize Stele in the current project.")
     .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))
+    .option("--dry-run", "show what files would be created without writing")
     .action((options) => init(cwd(), options));
   program
     .command("dev")

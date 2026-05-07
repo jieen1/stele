@@ -11,6 +11,21 @@ const COMPARISON_OPERATORS: Record<string, string> = {
   in: "in",
 };
 
+export const extendedComparisonHandlers: Record<string, PythonOperatorHandler> = {
+  between: (node, context, translate) => {
+    const value = translate(node.items[0]!, context);
+    const low = translate(node.items[1]!, context);
+    const high = translate(node.items[2]!, context);
+    return `(${low} <= ${value} <= ${high})`;
+  },
+  "approx-eq": (node, context, translate) => {
+    const left = translate(node.items[0]!, context);
+    const right = translate(node.items[1]!, context);
+    const tol = translate(node.items[2]!, context);
+    return `abs(${left} - ${right}) <= ${tol}`;
+  },
+};
+
 export const comparisonOperatorHandlers: Record<string, PythonOperatorHandler> = Object.fromEntries(
   Object.entries(COMPARISON_OPERATORS).map(([operator, symbol]) => [
     operator,

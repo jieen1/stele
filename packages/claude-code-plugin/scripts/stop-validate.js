@@ -110,7 +110,7 @@ function spawnCommand(commandPath, args, cwd) {
   };
 
   if (process.platform === "win32") {
-    const command = [`"${commandPath}"`, ...args].join(" ");
+    const command = [quoteWindowsShellArg(commandPath), ...args.map(quoteWindowsShellArg)].join(" ");
     return spawn(command, {
       cwd,
       env,
@@ -124,6 +124,14 @@ function spawnCommand(commandPath, args, cwd) {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
+}
+
+function quoteWindowsShellArg(value) {
+  if (!/[\s"]/u.test(value)) {
+    return value;
+  }
+
+  return `"${value.replaceAll('"', '\\"')}"`;
 }
 
 async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = true, blockOnSpawnError = true }) {

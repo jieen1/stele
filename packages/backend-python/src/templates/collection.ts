@@ -17,6 +17,8 @@ export const collectionOperatorHandlers: Record<string, PythonOperatorHandler> =
   "not-null": (node, context, translate) => `${translate(node.items[0]!, context)} is not None`,
   distinct: (node, context, translate) => translateDistinct(node, context, translate),
   unique: (node, context, translate) => translateUnique(node, context, translate),
+  "is-empty": (node, context, translate) => `len(${translate(node.items[0]!, context)}) == 0`,
+  "has-length": (node, context, translate) => `len(${translate(node.items[0]!, context)}) == ${translate(node.items[1]!, context)}`,
 } as Record<string, PythonOperatorHandler>;
 
 function translateCollection(node: ListNode, context: TranslationContext): string {

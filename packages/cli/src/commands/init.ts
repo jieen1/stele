@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../config/defaults.js";
 
 export type InitOptions = {
   language: string;
+  dryRun?: boolean;
 };
 
 export const SUPPORTED_LANGUAGES = ["python"] as const;
@@ -19,22 +20,42 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
     targetLanguage: options.language,
   };
 
-  await writeIfMissing(join(projectDir, STELE_CONFIG_FILE), `${JSON.stringify(config, null, 2)}\n`);
-  await writeIfMissing(join(projectDir, "contract", "main.stele"), DEFAULT_CONTRACT_SOURCE);
-  await writeIfMissing(join(projectDir, "contract", "checker_impls", ".gitkeep"), "");
-
   const projectInfo = await detectProject(projectDir);
+  const files = buildFilesToCreate(projectDir, config, projectInfo);
 
-  if (projectInfo.framework !== "unknown") {
-    const frameworkContract = getFrameworkContractSource(projectInfo);
-    await writeIfMissing(join(projectDir, "contract", "main.stele"), frameworkContract);
+  if (options.dryRun) {
+    printDryRun(files);
+    return;
   }
 
-  await writeIfMissing(join(projectDir, "tests", "contract", "conftest.py"), projectInfo.conftestSource);
-  await writeIfMissing(join(projectDir, "tests", "contract", "__init__.py"), "");
-  await writeIfMissing(join(projectDir, ".gitignore"), buildGitignoreContent());
+  for (const file of files) {
+    await writeIfMissing(file.path, file.content);
+  }
 
   printInitSummary(projectInfo);
+}
+
+function buildFilesToCreate(projectDir: string, config: Record<string, unknown>, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
+  const files: Array<{ path: string; content: string }> = [
+    { path: join(projectDir, STELE_CONFIG_FILE), content: `${JSON.stringify(config, null, 2)}\n` },
+    { path: join(projectDir, "contract", "main.stele"), content: projectInfo.framework !== "unknown" ? getFrameworkContractSource(projectInfo) : DEFAULT_CONTRACT_SOURCE },
+    { path: join(projectDir, "contract", "checker_impls", ".gitkeep"), content: "" },
+    { path: join(projectDir, "tests", "contract", "conftest.py"), content: projectInfo.conftestSource },
+    { path: join(projectDir, "tests", "contract", "__init__.py"), content: "" },
+    { path: join(projectDir, ".gitignore"), content: buildGitignoreContent() },
+  ];
+
+  return files;
+}
+
+function printDryRun(files: Array<{ path: string; content: string }>): void {
+  process.stdout.write("[stele] Dry run — files that would be created:\n\n");
+  for (const file of files) {
+    const rel = file.path.replace(process.cwd() + "/", "");
+    const exists = file.content.length === 0 ? "(empty)" : `${file.content.split("\n").length} lines`;
+    process.stdout.write(`  ${rel} — ${exists}\n`);
+  }
+  process.stdout.write("\n");
 }
 
 function printInitSummary(projectInfo: DetectedProject): void {

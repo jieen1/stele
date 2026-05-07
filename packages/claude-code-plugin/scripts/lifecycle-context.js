@@ -3,8 +3,7 @@ import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
-
-const TARGET_KEYS = ["file_path", "path", "target_path", "notebook_path"];
+import { extractTargetPaths } from "./path-utils.js";
 const steleLocalCommandNames = process.platform === "win32" ? ["stele.cmd", "stele.bat"] : ["stele"];
 const stelePathCommandNames = process.platform === "win32" ? ["stele.cmd", "stele.bat"] : ["stele"];
 
@@ -108,40 +107,7 @@ function getHookEventName(payload) {
   return "SessionStart";
 }
 
-function extractTargetPaths(payload) {
-  return [...new Set(extractPathsFromValue(payload, new Set()))];
-}
-
-function extractPathsFromValue(value, seen) {
-  if (typeof value === "string") {
-    return [];
-  }
-
-  if (!isObject(value) || seen.has(value)) {
-    return [];
-  }
-
-  seen.add(value);
-
-  const targets = [];
-
-  for (const key of TARGET_KEYS) {
-    if (typeof value[key] === "string" && value[key].trim().length > 0) {
-      targets.push(value[key]);
-    }
-  }
-
-  for (const nestedKey of ["tool_input", "input"]) {
-    targets.push(...extractPathsFromValue(value[nestedKey], seen));
-  }
-
-  for (const nestedValue of Object.values(value)) {
-    targets.push(...extractPathsFromValue(nestedValue, seen));
-  }
-
-  return targets;
-}
-
+// extractTargetPaths and extractPathsFromValue imported from path-utils.js
 async function collectGitDiffFiles(projectDir) {
   const result = await runCommand({
     commandPath: "git",
