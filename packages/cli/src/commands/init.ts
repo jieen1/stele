@@ -1,6 +1,7 @@
-import { mkdir, open, readFile, readdir, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { join } from "node:path";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../config/defaults.js";
+import { isMissingFileError, readOptionalFile, writeIfMissing } from "../utils/shared-utils.js";
 
 export type InitOptions = {
   language: string;
@@ -329,46 +330,11 @@ function buildEnhancedConftest(modelFiles: string[], frameworkInfo: FrameworkDet
   return lines.join("\n");
 }
 
-async function writeIfMissing(path: string, content: string): Promise<void> {
-  try {
-    await readFile(path, "utf8");
-    return;
-  } catch (error) {
-    if (!isMissingFileError(error)) {
-      throw error;
-    }
-  }
-
-  await mkdir(dirname(path), { recursive: true });
-  const handle = await open(path, "w");
-
-  try {
-    await handle.writeFile(content, "utf8");
-  } finally {
-    await handle.close();
-  }
-}
-
-function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
-}
-
 async function fileExists(path: string): Promise<boolean> {
   try {
     await stat(path);
     return true;
   } catch {
     return false;
-  }
-}
-
-async function readOptionalFile(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      return undefined;
-    }
-    throw error;
   }
 }
