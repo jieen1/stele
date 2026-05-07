@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { uniqueSortedStrings } from "../util/array.js";
 
 export type ViolationSeverity = "error" | "warning" | "info";
 export type ViolationStatus = "active" | "suppressed" | "out_of_scope";
@@ -134,9 +135,6 @@ function normalizeCause(cause: ViolationCause): ViolationCause {
   };
 }
 
-function uniqueSortedStrings(values: string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
-}
 
 function cloneViolation(violation: Violation): Violation {
   return {

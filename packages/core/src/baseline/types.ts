@@ -1,4 +1,5 @@
 import type { Violation, ViolationLocation, ViolationReport, ViolationSource } from "../report/types.js";
+import { uniqueSortedStrings } from "../util/array.js";
 
 export type BaselineVersion = "1";
 
@@ -130,6 +131,3 @@ function normalizePath(path: string): string {
   return path.replaceAll("\\", "/");
 }
 
-function uniqueSortedStrings(values: string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
-}

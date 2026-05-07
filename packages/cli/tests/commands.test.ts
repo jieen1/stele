@@ -192,7 +192,7 @@ describe("inspection commands", () => {
       kind: "invariant",
       severity: "critical",
       category: "data-integrity",
-      tags: ["payment", ":priority", "batch window"],
+      tags: ["payment", ":priority", '"batch window"'],
       file_path: "contract/main.stele",
       line: 9,
       generated_test_path: "tests/contract/test_contract.py",

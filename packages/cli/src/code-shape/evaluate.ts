@@ -16,6 +16,7 @@ import {
   type TypePolicyDeclaration,
   type Violation,
 } from "@stele/core";
+import { uniqueSortedStrings } from "../utils/shared-utils.js";
 
 const execFileAsync = promisify(execFile);
 const PYTHON_CANDIDATES: Array<{ command: string; args: string[] }> = [
@@ -1015,9 +1016,7 @@ function createScopePaths(contractPath: string, matchedFiles: string[], fallback
   return uniqueSortedStrings([contractPath, ...(matchedFiles.length === 0 ? [fallbackPath] : matchedFiles)]);
 }
 
-function uniqueSortedStrings(values: string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
-}
+
 
 function computeFileEndingLocation(content: string): { line: number; column: number } {
   const lines = content.split("\n");

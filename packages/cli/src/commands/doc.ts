@@ -74,11 +74,15 @@ function generateMarkdown(contract: Contract): string {
   return lines.join("\n");
 }
 
+function escapeHtml(s: string): string {
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
 function generateHtml(contract: Contract): string {
   const rows = contract.invariants
     .map(
       (inv) =>
-        `<tr><td>${inv.id}</td><td>${inv.severity}</td><td>${inv.description ?? ""}</td></tr>`,
+        `<tr><td>${escapeHtml(inv.id)}</td><td>${escapeHtml(inv.severity)}</td><td>${escapeHtml(inv.description ?? "")}</td></tr>`,
     )
     .join("\n");
 

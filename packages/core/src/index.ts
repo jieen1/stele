@@ -71,6 +71,7 @@ export type {
   OperatorSpec,
 } from "./registry/operators.js";
 export { createCoreOperatorRegistry, createOperatorRegistry } from "./registry/operators.js";
+export { uniqueSortedStrings } from "./util/array.js";
 export type {
   BoundaryDeclaration,
   CheckerDeclaration,

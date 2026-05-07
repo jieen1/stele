@@ -14,7 +14,7 @@ import {
 } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
 
-import { compareInvariants, compareBySource, toProjectRelativePath } from "../utils/shared-utils.js";
+import { compareInvariants, compareBySource, formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
 
 
 
@@ -286,17 +286,3 @@ function formatRuleIndexHuman(index: RuleIndex): string {
   return `${lines.join("\n")}\n`;
 }
 
-function formatAstNode(node: AstNode): string {
-  switch (node.kind) {
-    case "identifier":
-      return node.value;
-    case "keyword":
-      return `:${node.value}`;
-    case "string":
-      return node.value;
-    case "number":
-      return node.raw;
-    case "list":
-      return `(${node.head}${node.items.length === 0 ? "" : ` ${node.items.map(formatAstNode).join(" ")}`})`;
-  }
-}

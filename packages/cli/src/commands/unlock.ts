@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { STELE_BASELINE_FILE } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
+import { isMissingFileError } from "../utils/shared-utils.js";
 
 export type UnlockOptions = {
   reason: string;
@@ -34,7 +35,7 @@ export async function unlockProject(projectDir: string, options: UnlockOptions):
     await rm(manifestPath);
     removed.push(config.manifestPath);
   } catch (error: unknown) {
-    if (!isNotFound(error)) {
+    if (!isMissingFileError(error)) {
       throw error;
     }
   }
@@ -43,7 +44,7 @@ export async function unlockProject(projectDir: string, options: UnlockOptions):
     await rm(baselinePath);
     removed.push(STELE_BASELINE_FILE);
   } catch (error: unknown) {
-    if (!isNotFound(error)) {
+    if (!isMissingFileError(error)) {
       throw error;
     }
   }
@@ -60,9 +61,6 @@ export async function unlockProject(projectDir: string, options: UnlockOptions):
   };
 }
 
-function isNotFound(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
-}
 
 async function writeUnlockLog(projectDir: string, entry: UnlockLogEntry): Promise<void> {
   const logDir = resolve(projectDir, "contract");
@@ -75,7 +73,7 @@ async function writeUnlockLog(projectDir: string, entry: UnlockLogEntry): Promis
     const existing = await readFile(logFile, "utf8");
     await writeFile(logFile, existing + line);
   } catch (error: unknown) {
-    if (!isNotFound(error)) {
+    if (!isMissingFileError(error)) {
       throw error;
     }
     await writeFile(logFile, line);

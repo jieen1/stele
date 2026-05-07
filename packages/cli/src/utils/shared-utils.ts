@@ -3,6 +3,10 @@ import { dirname, relative } from "node:path";
 
 export { formatAstNode } from "./ast-format.js";
 
+export function uniqueSortedStrings(values: string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
 export function compareInvariants(
   left: { filePath: string; span: { line: number; column: number }; id: string },
   right: { filePath: string; span: { line: number; column: number }; id: string },

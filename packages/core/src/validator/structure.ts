@@ -423,6 +423,21 @@ function parseImportDeclaration(filePath: string, node: ListNode): ImportDeclara
   }
 
   const value = node.items[0].value;
+  const resolvedPath = resolve(dirname(filePath), value);
+
+  const contractDir = dirname(filePath);
+  const projectRoot = resolve(contractDir, "..");
+
+  if (!resolvedPath.startsWith(contractDir) && !resolvedPath.startsWith(projectRoot)) {
+    throw new SteleError(
+      "E0202",
+      "Loader Error",
+      'Import path escapes the contract directory and project root.',
+      node.span,
+      `Import "${value}" resolves to "${resolvedPath}", which is outside of "${contractDir}".`,
+      "Only import files within the same contract directory or project root.",
+    );
+  }
 
   return {
     kind: "import",
@@ -430,7 +445,7 @@ function parseImportDeclaration(filePath: string, node: ListNode): ImportDeclara
     node,
     span: node.span,
     value,
-    resolvedPath: resolve(dirname(filePath), value),
+    resolvedPath,
   };
 }
 

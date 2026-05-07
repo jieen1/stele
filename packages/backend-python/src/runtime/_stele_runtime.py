@@ -1,9 +1,13 @@
 import contextlib
 import importlib
+import logging
+import re
 import uuid
 
 
 _STELE_MISSING = object()
+_STELE_MODULE_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$")
+_stele_logger = logging.getLogger(__name__)
 
 
 def stele_get_path(root, parts):
@@ -90,6 +94,9 @@ def stele_run_scenario(scenario, stele_context, stele_sandbox):
 
 def _stele_call_python_import(target, body, stele_context):
     module_name, function_name = _stele_parse_python_import_target(target)
+    if not _STELE_MODULE_RE.match(module_name):
+        _stele_logger.warning("Rejected unsafe python-import module name: %r", module_name)
+        raise ValueError(f"Unsafe module name in python-import target: {module_name!r}")
     module = importlib.import_module(module_name)
     function = getattr(module, function_name, None)
     if function is None or not callable(function):
