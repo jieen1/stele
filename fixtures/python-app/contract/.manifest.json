@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-04T15:56:52.317Z",
+  "generated_at": "2026-05-07T07:55:51.967Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/balance_change_has_transaction.py": {
@@ -24,12 +24,12 @@
       "size": 0
     },
     "tests/contract/_stele_runtime.py": {
-      "sha256": "4f024414b822957cf8b9364532ea07900674ba7e59d537b4b1ff1eb55bcd63da",
-      "size": 1914
+      "sha256": "630336187c99c2e4fb85e367dc293487991c116fecc00e94655debbb12b6e697",
+      "size": 5494
     },
     "tests/contract/conftest.py": {
-      "sha256": "69021c392746754e4e862c61663290d39c29d1f97d7ea4e725b74d23197daa88",
-      "size": 4999
+      "sha256": "ecb56c01b2b4509adbae3a6bb5efb2e2906ba9d4e9509601d1759c455af5dc78",
+      "size": 5196
     },
     "tests/contract/test_account_integrity.py": {
       "sha256": "29ccd1d4a4ad8abfaf542e4834cd2146b0955b83c06e7c16052ee286d5766c8c",
@@ -44,8 +44,8 @@
       "size": 2507
     },
     "tests/contract/test_position_integrity.py": {
-      "sha256": "8f9ea5d3d0eb44d1a34d2a9f0e36c2f5e7c371eb0ddf5cf83e3d1fa84809297b",
-      "size": 1409
+      "sha256": "7e1760108fc390078ec2d4b832215aaa2197fbebcbed4e2a0883e05a62e78a0c",
+      "size": 1450
     }
   },
   "contract_hash": "bb7434908e7286939cf2239abfffeb98025e4e0dce0001e47572c7b6ecd6344e"

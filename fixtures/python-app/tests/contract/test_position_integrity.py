@@ -24,7 +24,7 @@ def test_POS_004(stele_context):
 
 
 def test_POS_005(stele_context):
-    assert ((stele_sum(stele_context["positions"], ["market-value"]) / len(stele_context["positions"]))) > (1000)
+    assert (len(stele_context["positions"]) and (stele_sum(stele_context["positions"], ["market-value"]) / len(stele_context["positions"])) or 0) > (1000)
 
 
 def test_POS_006(stele_context):

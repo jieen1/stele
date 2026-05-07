@@ -19,7 +19,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "tsup src/index.ts --format esm --dts --clean && node -e \"import('fs').then(f=>f.default.cpSync('src/runtime','dist/runtime',{recursive:true}))\"",
     "prepack": "npm run build",
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",

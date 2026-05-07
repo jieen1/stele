@@ -340,7 +340,7 @@ async function writeIfMissing(path: string, content: string): Promise<void> {
   }
 
   await mkdir(dirname(path), { recursive: true });
-  const handle = await open(path, "wx");
+  const handle = await open(path, "w");
 
   try {
     await handle.writeFile(content, "utf8");

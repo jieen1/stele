@@ -1,0 +1,14 @@
+[project]
+name = "finance-guard"
+version = "0.1.0"
+description = "Demo: Stele contract protection for a brokerage account service"
+requires-python = ">=3.10"
+dependencies = [
+    "pytest>=8.0",
+]
+
+[project.optional-dependencies]
+server = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]

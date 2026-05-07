@@ -1,0 +1,79 @@
+;; Finance Guard — Brokerage Account Invariants
+;;
+;; These contracts enforce business rules on account objects without
+;; requiring any code changes in the application layer.
+
+;; ── Status Rules ─────────────────────────────────────────────────
+
+(invariant FG_STATUS_001
+  (severity critical)
+  (description "Account must be active for contract checks.")
+  (assert (eq (path account status) "active")))
+
+(invariant FG_STATUS_002
+  (severity high)
+  (description "Account status must contain active state indicator.")
+  (assert (contains (path account status) "active")))
+
+(invariant FG_STATUS_003
+  (severity medium)
+  (description "Account status must start with 'a'.")
+  (assert (starts-with (path account status) "a")))
+
+;; ── Balance Rules ────────────────────────────────────────────────
+
+(invariant FG_BALANCE_001
+  (severity critical)
+  (description "Account balance must be non-negative.")
+  (assert (gte (path account balance) 0)))
+
+(invariant FG_BALANCE_002
+  (severity high)
+  (description "Balance must be between 0 and 1000000.")
+  (assert (between (path account balance) 0 1000000)))
+
+(invariant FG_BALANCE_003
+  (severity medium)
+  (description "Total equity must approximately equal positions_plus_cash.")
+  (assert (approx-eq (path account total_equity) (path account positions_plus_cash) 0.01)))
+
+;; ── Currency Rules ───────────────────────────────────────────────
+
+(invariant FG_CURRENCY_001
+  (severity high)
+  (description "Account currency must be USD.")
+  (assert (eq (path account currency) "USD")))
+
+(invariant FG_CURRENCY_002
+  (severity low)
+  (description "Currency code must end with D.")
+  (assert (ends-with (path account currency) "D")))
+
+;; ── Transaction Rules ────────────────────────────────────────────
+
+(invariant FG_TXN_001
+  (severity high)
+  (description "Active accounts must have at least one transaction.")
+  (assert (not (is-empty (collection transactions)))))
+
+(invariant FG_TXN_002
+  (severity medium)
+  (description "Account must have at least 1 recorded transaction.")
+  (assert (has-length (collection transactions) 1)))
+
+;; ── Composite Rules ─────────────────────────────────────────────
+
+(invariant FG_COMPOSITE_001
+  (severity critical)
+  (description "Active account with positive balance and valid currency.")
+  (assert (and
+    (eq (path account status) "active")
+    (gte (path account balance) 0)
+    (eq (path account currency) "USD"))))
+
+(invariant FG_COMPOSITE_002
+  (severity high)
+  (description "Account must have non-null ID and non-empty transactions.")
+  (assert (and
+    (not-null (path account id))
+    (not (is-empty (collection transactions))))))
