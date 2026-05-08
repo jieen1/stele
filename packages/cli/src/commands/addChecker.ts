@@ -1,7 +1,7 @@
 import { lstat, mkdir, readdir, realpath, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { loadConfig } from "../config/loadConfig.js";
-import { isMissingFileError } from "../utils/shared-utils.js";
+import { isMissingFileError, isAbsoluteLikePath } from "../utils/shared-utils.js";
 
 const CHECKER_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 const CHECKER_STUB = `def check(inputs: dict) -> dict:
@@ -112,10 +112,6 @@ async function ensureSafeCheckerImplDirectory(projectDir: string, checkerImplDir
 
 function canonicalizeForComparison(path: string): string {
   return process.platform === "win32" ? path.toLowerCase() : path;
-}
-
-function isAbsoluteLikePath(path: string): boolean {
-  return path.startsWith("/") || path.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path);
 }
 
 function buildAncestorChain(projectDir: string, checkerImplDir: string): string[] {

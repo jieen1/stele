@@ -14,7 +14,7 @@ import {
 } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
 
-import { compareInvariants, compareBySource, formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
+import { compareInvariants, formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
 
 
 
@@ -145,8 +145,8 @@ export async function buildRuleIndex(projectDir: string): Promise<RuleIndex> {
       code_shape_count: contract.codeShapes.length,
     },
     rules: contract.invariants.slice().sort(compareInvariants).map((invariant) => indexInvariant(projectDir, config.generatedDir, invariant)),
-    scenarios: contract.scenarios.slice().sort(compareBySource).map((scenario) => indexScenario(projectDir, scenario)),
-    code_shapes: contract.codeShapes.slice().sort(compareBySource).map((shape) => indexCodeShape(projectDir, shape)),
+    scenarios: contract.scenarios.slice().sort(compareInvariants).map((scenario) => indexScenario(projectDir, scenario)),
+    code_shapes: contract.codeShapes.slice().sort(compareInvariants).map((shape) => indexCodeShape(projectDir, shape)),
   };
 }
 

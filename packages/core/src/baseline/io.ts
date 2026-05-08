@@ -77,7 +77,7 @@ function isBaselineViolation(fingerprint: string, value: unknown): value is Base
   );
 }
 
-function isPlainRecord(value: unknown): value is Record<string, any> {
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

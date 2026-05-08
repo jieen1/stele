@@ -3,6 +3,7 @@ import { watch, type FSWatcher } from "node:fs";
 import { mkdir, readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { PYTHON_CANDIDATES, resolvePythonRuntime } from "../utils/shared-utils.js";
 import { runGenerate } from "./generate.js";
 import { checkProject } from "./check.js";
 
@@ -13,11 +14,6 @@ export type DevOptions = {
 };
 
 const DEBOUNCE_MS = 500;
-const PYTHON_CANDIDATES: Array<{ command: string; args: string[] }> = [
-  { command: "python", args: [] },
-  { command: "py", args: ["-3"] },
-  { command: "python3", args: [] },
-];
 
 export async function runDev(projectDir: string, options: DevOptions): Promise<void> {
   const contractDir = join(projectDir, "contract");
@@ -148,14 +144,3 @@ async function dirExists(path: string): Promise<boolean> {
   }
 }
 
-async function resolvePythonRuntime(): Promise<{ command: string; args: string[] } | undefined> {
-  for (const candidate of PYTHON_CANDIDATES) {
-    try {
-      await execFileAsync(candidate.command, [...candidate.args, "--version"], { windowsHide: true });
-      return candidate;
-    } catch {
-      continue;
-    }
-  }
-  return undefined;
-}

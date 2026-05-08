@@ -550,6 +550,122 @@ describe("pre-tool-protect hook", () => {
     );
   });
 
+  it("denies protected Bash write targets via cp, mv, and install commands", async () => {
+    const projectDir = await createProject();
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cp source_file contract/main.stele",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "mv source_file contract/main.stele",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "install source_file contract/main.stele",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cp a b contract/checker_impls/",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cp -f source_file contract/.manifest.json",
+        },
+      }),
+    );
+  });
+
+  it("denies protected Bash write targets via dd of=file", async () => {
+    const projectDir = await createProject();
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "dd if=input of=contract/main.stele",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "dd of=tests/contract/test_contract.py if=/dev/zero",
+        },
+      }),
+    );
+  });
+
+  it("denies protected Bash write targets via backslash line continuation", async () => {
+    const projectDir = await createProject();
+
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "echo data \\\n> contract/main.stele",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "echo data \\\n  >> contract/.manifest.json",
+        },
+      }),
+    );
+  });
+
+  it("allows cp, mv, and dd to non-protected paths", async () => {
+    const projectDir = await createProject();
+
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "cp source_file src/app.py",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "mv old_name src/app.py",
+        },
+      }),
+    );
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "dd of=src/output.bin if=input",
+        },
+      }),
+    );
+  });
+
   it("allows sibling prefixes outside protected directory roots", async () => {
     const projectDir = await createProject();
 

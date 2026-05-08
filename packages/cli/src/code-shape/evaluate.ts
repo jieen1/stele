@@ -5,6 +5,7 @@ import globParent from "glob-parent";
 import { minimatch } from "minimatch";
 import { isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
+import { resolvePythonRuntime as resolvePythonRuntimeUncached } from "../utils/shared-utils.js";
 import {
   createViolation,
   type BoundaryDeclaration,
@@ -19,11 +20,6 @@ import {
 import { uniqueSortedStrings } from "@stele/core";
 
 const execFileAsync = promisify(execFile);
-const PYTHON_CANDIDATES: Array<{ command: string; args: string[] }> = [
-  { command: "python", args: [] },
-  { command: "py", args: ["-3"] },
-  { command: "python3", args: [] },
-];
 
 type PythonAnalysisResult = {
   files: PythonFileAnalysis[];
@@ -258,21 +254,7 @@ async function analyzePythonFiles(
 }
 
 async function resolvePythonRuntime(): Promise<PythonRuntime | undefined> {
-  cachedPythonRuntime ??= (async () => {
-    for (const candidate of PYTHON_CANDIDATES) {
-      try {
-        await execFileAsync(candidate.command, [...candidate.args, "--version"], {
-          windowsHide: true,
-        });
-        return candidate;
-      } catch {
-        continue;
-      }
-    }
-
-    return undefined;
-  })();
-
+  cachedPythonRuntime ??= resolvePythonRuntimeUncached();
   return cachedPythonRuntime;
 }
 
@@ -1026,7 +1008,14 @@ function computeFileEndingLocation(content: string): { line: number; column: num
 }
 
 function sanitizePythonExecutionDetail(detail: string, command: string): string {
-  return detail.replace(/\s+/g, " ").replaceAll(command, "stele check").trim();
+  let sanitized = detail
+    .replace(/\s+/g, " ")
+    .trim();
+  sanitized = sanitized
+    .replace(/File "[^"]*"/g, 'File "[redacted]"')
+    .replace(/File '[^']*'/g, "File '[redacted]'")
+    .replaceAll(command, "stele check");
+  return sanitized;
 }
 
 const PYTHON_ANALYZER_SCRIPT = [

@@ -6,6 +6,20 @@ import uuid
 
 
 _STELE_MISSING = object()
+# Security allowlist: only these module prefixes may be dynamically imported.
+_STELE_ALLOWED_MODULES = frozenset({
+    "tests.contract_scenarios",
+    "tests.contract",
+    "app",
+})
+
+# Security blocklist: these modules are never permitted, regardless of allowlist.
+_STELE_BLOCKED_MODULES = frozenset({
+    "os", "sys", "subprocess", "shutil", "ctypes", "socket",
+    "http.server", "http", "socketserver", "threading", "thread",
+    "multiprocessing", "pty", "pexpect", "signal", "fcntl",
+})
+
 _STELE_MODULE_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$")
 _stele_logger = logging.getLogger(__name__)
 
@@ -64,7 +78,7 @@ def stele_merge_contexts(*contexts):
             continue
         if not isinstance(context, dict):
             raise TypeError("Stele contexts must be dict-like mappings for the Python runtime")
-        merged.update(context)
+        merged = {**merged, **context}
     return merged
 
 
@@ -92,8 +106,31 @@ def stele_run_scenario(scenario, stele_context, stele_sandbox):
         return scenario_context
 
 
+def _is_module_allowed(module_name: str) -> bool:
+    """Check if a module name is in the security allowlist."""
+    for allowed in _STELE_ALLOWED_MODULES:
+        if module_name == allowed or module_name.startswith(allowed + "."):
+            return True
+    return False
+
+
+def _is_module_blocked(module_name: str) -> bool:
+    """Check if any component of the module path hits the security blocklist."""
+    parts = module_name.split(".")
+    for part in parts:
+        if part in _STELE_BLOCKED_MODULES:
+            return True
+    return False
+
+
 def _stele_call_python_import(target, body, stele_context):
     module_name, function_name = _stele_parse_python_import_target(target)
+    if _is_module_blocked(module_name):
+        _stele_logger.warning("Rejected blocked python-import module: %r", module_name)
+        raise ValueError(f"Blocked module in python-import target: {module_name!r}")
+    if not _is_module_allowed(module_name):
+        _stele_logger.warning("Rejected unlisted python-import module: %r", module_name)
+        raise ValueError(f"Module not in allowlist: {module_name!r}")
     if not _STELE_MODULE_RE.match(module_name):
         _stele_logger.warning("Rejected unsafe python-import module name: %r", module_name)
         raise ValueError(f"Unsafe module name in python-import target: {module_name!r}")
@@ -128,6 +165,8 @@ def _stele_resolve_scenario_value(value, stele_context, scenario_context):
     if isinstance(value, dict):
         if "$ref" in value:
             ref_parts = value["$ref"]
+            if not isinstance(ref_parts, (list, tuple)) or len(ref_parts) == 0:
+                raise KeyError(f"$ref must be a non-empty list, got {ref_parts!r}")
             base = scenario_context[ref_parts[0]]
             return base if len(ref_parts) == 1 else stele_get_path(base, ref_parts[1:])
         if "$gen" in value:

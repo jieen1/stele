@@ -1,5 +1,7 @@
+import { execFile } from "node:child_process";
 import { readFile, mkdir, open } from "node:fs/promises";
-import { dirname, relative } from "node:path";
+import { dirname, posix, relative, win32 } from "node:path";
+import { promisify } from "node:util";
 
 export { formatAstNode } from "./ast-format.js";
 
@@ -13,13 +15,6 @@ export function compareInvariants(
     left.span.column - right.span.column ||
     left.id.localeCompare(right.id)
   );
-}
-
-export function compareBySource(
-  left: { filePath: string; span: { line: number; column: number }; id: string },
-  right: { filePath: string; span: { line: number; column: number }; id: string },
-): number {
-  return compareInvariants(left, right);
 }
 
 export function toProjectRelativePath(projectDir: string, filePath: string): string {
@@ -68,23 +63,47 @@ export async function writeIfMissing(path: string, content: string): Promise<voi
 }
 
 export function escapeTsvCell(value: string): string {
-  const result: string[] = []
-  const PUSH_BACKSLASH = String.fromCharCode(92)
+  const result: string[] = [];
   for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i)
+    const code = value.charCodeAt(i);
     if (code === 92) {
-      result.push(PUSH_BACKSLASH, PUSH_BACKSLASH)
+      result.push("\\", "\\");
     } else if (code === 9) {
-      result.push(PUSH_BACKSLASH, "t")
+      result.push("\\", "t");
     } else if (code === 13) {
-      result.push(PUSH_BACKSLASH, "r")
+      result.push("\\", "r");
     } else if (code === 10) {
-      result.push(PUSH_BACKSLASH, "n")
+      result.push("\\", "n");
     } else {
-      result.push(value[i])
+      result.push(value[i]);
     }
   }
-  return result.join("")
+  return result.join("");
 }
+
+export function isAbsoluteLikePath(value: string): boolean {
+  return posix.isAbsolute(value) || win32.isAbsolute(value) || /^[A-Za-z]:(?![\\/])/.test(value);
+}
+
+const execFileAsync = promisify(execFile);
+
+export const PYTHON_CANDIDATES: Array<{ command: string; args: string[] }> = [
+  { command: "python", args: [] },
+  { command: "py", args: ["-3"] },
+  { command: "python3", args: [] },
+];
+
+export async function resolvePythonRuntime(): Promise<{ command: string; args: string[] } | undefined> {
+  for (const candidate of PYTHON_CANDIDATES) {
+    try {
+      await execFileAsync(candidate.command, [...candidate.args, "--version"], { windowsHide: true });
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
 
 

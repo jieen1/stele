@@ -8,7 +8,7 @@ const BLOCK_EXIT_CODE = 2;
 const PROTECTED_REASON =
   "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.";
 const BASH_COMMAND_KEYS = ["command"];
-const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", ";"]);
+const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
 const PYTHON_CACHE_SUFFIXES = [".pyc", ".pyo"];
 const DEFAULT_PROTECTED = [
   "contract/**/*.stele",
@@ -226,7 +226,7 @@ function extractCommandFromValue(value, seen) {
 function extractBashWriteTargets(command) {
   const targets = [];
   const pendingHeredocs = [];
-  const lines = command.split(/\r?\n/u);
+  const lines = joinContinuationLines(command.split(/\r?\n/u));
 
   for (const line of lines) {
     const activeLine = stripShellComment(line);
@@ -252,7 +252,12 @@ function extractWriteTargetsFromLine(line) {
   }
 
   const tokens = tokenizeShellLine(line);
-  return [...extractRedirectTargets(tokens), ...extractTeeTargets(tokens)];
+  return [
+    ...extractRedirectTargets(tokens),
+    ...extractTeeTargets(tokens),
+    ...extractFileOperationTargets(tokens),
+    ...extractDdTargets(tokens),
+  ];
 }
 
 function extractRedirectTargets(tokens) {
@@ -326,6 +331,119 @@ function extractTeeTargetsFromSegment(tokens) {
   return targets;
 }
 
+function extractFileOperationTargets(tokens) {
+  const targets = [];
+  const commands = new Set(["cp", "mv", "install"]);
+  let segmentStart = 0;
+
+  for (let index = 0; index <= tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
+      targets.push(...extractFileOperationTargetsFromSegment(tokens.slice(segmentStart, index), commands));
+      segmentStart = index + 1;
+    }
+  }
+
+  return targets;
+}
+
+function extractFileOperationTargetsFromSegment(tokens, commands) {
+  const commandToken = tokens.find((token) => token.type === "word");
+
+  if (!commandToken || !commands.has(path.posix.basename(commandToken.value))) {
+    return [];
+  }
+
+  const targets = [];
+  const wordTokens = [];
+  let sawDoubleDash = false;
+
+  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
+    if (token.type !== "word") {
+      continue;
+    }
+
+    if (!sawDoubleDash && token.value === "--") {
+      sawDoubleDash = true;
+      continue;
+    }
+
+    if (!sawDoubleDash && token.value.startsWith("-")) {
+      continue;
+    }
+
+    wordTokens.push(token);
+  }
+
+  if (wordTokens.length > 0) {
+    const lastToken = wordTokens[wordTokens.length - 1];
+    const literalPath = parseLiteralShellPath(lastToken.value);
+
+    if (literalPath !== null) {
+      targets.push(literalPath);
+    }
+  }
+
+  return targets;
+}
+
+function extractDdTargets(tokens) {
+  const targets = [];
+  let segmentStart = 0;
+
+  for (let index = 0; index <= tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
+      targets.push(...extractDdTargetsFromSegment(tokens.slice(segmentStart, index)));
+      segmentStart = index + 1;
+    }
+  }
+
+  return targets;
+}
+
+function extractDdTargetsFromSegment(tokens) {
+  const wordTokens = [];
+
+  for (const token of tokens) {
+    if (token.type === "word") {
+      wordTokens.push(token);
+    }
+  }
+
+  if (wordTokens.length === 0) {
+    return [];
+  }
+
+  const commandToken = wordTokens[0];
+
+  if (path.posix.basename(commandToken.value) !== "dd") {
+    return [];
+  }
+
+  const targets = [];
+
+  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
+    if (token.type !== "word") {
+      continue;
+    }
+
+    const ofMatch = token.value.match(/^of=(.+)$/u);
+
+    if (ofMatch) {
+      const literalPath = parseLiteralShellPath(ofMatch[1]);
+
+      if (literalPath !== null) {
+        targets.push(literalPath);
+      }
+    }
+  }
+
+  return targets;
+}
+
 function extractHeredocDelimiters(line) {
   const delimiters = [];
   const regex = /<<-?\s*(?:'([^']+)'|"([^"]+)"|([^\s"'`<>|&;()]+))/gu;
@@ -339,6 +457,66 @@ function extractHeredocDelimiters(line) {
   }
 
   return delimiters;
+}
+
+function joinContinuationLines(lines) {
+  const joined = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+
+    if (joined.length > 0 && shouldContinueLine(joined[joined.length - 1], line)) {
+      joined[joined.length - 1] += line;
+    } else {
+      joined.push(line);
+    }
+  }
+
+  return joined;
+}
+
+function shouldContinueLine(previous, current) {
+  let quote = null;
+  let escaped = false;
+
+  for (let index = 0; index < previous.length; index += 1) {
+    const char = previous[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      if (quote !== null) {
+        escaped = true;
+      } else {
+        return shouldStartNewLine(current);
+      }
+
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      if (quote === char) {
+        quote = null;
+      } else if (quote === null) {
+        quote = char;
+      }
+
+      continue;
+    }
+
+    if (char === "#") {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+function shouldStartNewLine(line) {
+  return line.trim().length > 0;
 }
 
 function stripShellComment(line) {
@@ -420,7 +598,7 @@ function tokenizeShellLine(line) {
 
     const twoChar = line.slice(index, index + 2);
 
-    if (twoChar === ">>" || twoChar === "||" || twoChar === "&&" || twoChar === "<<" || twoChar === "<<") {
+    if (twoChar === ">>" || twoChar === "||" || twoChar === "&&" || twoChar === "<<") {
       pushWordToken(tokens, current);
       current = "";
       tokens.push({ type: "operator", value: twoChar });
@@ -428,7 +606,7 @@ function tokenizeShellLine(line) {
       continue;
     }
 
-    if (char === ">" || char === "|" || char === ";" || char === "<") {
+    if (char === ">" || char === "|" || char === ";" || char === "<" || char === "&") {
       pushWordToken(tokens, current);
       current = "";
       tokens.push({ type: "operator", value: char });

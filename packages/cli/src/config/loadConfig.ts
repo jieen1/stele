@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { posix, resolve, win32 } from "node:path";
+import { isAbsoluteLikePath } from "../utils/shared-utils.js";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE, type SteleConfig } from "./defaults.js";
 
 type PartialConfig = Partial<Omit<SteleConfig, "protected">> & {
@@ -111,10 +112,6 @@ function validateProjectRelativePath(
   }
 
   return normalizedPath;
-}
-
-function isAbsoluteLikePath(value: string): boolean {
-  return posix.isAbsolute(value) || win32.isAbsolute(value) || /^[A-Za-z]:(?![\\/])/.test(value);
 }
 
 function normalizeGlobPattern(value: string): string {

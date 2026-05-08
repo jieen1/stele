@@ -16,7 +16,7 @@ import { minimatch } from "minimatch";
 import { STELE_BASELINE_FILE } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { CliCommandError } from "../errors.js";
-import { isMissingFileError } from "../utils/shared-utils.js";
+import { isMissingFileError, isAbsoluteLikePath } from "../utils/shared-utils.js";
 
 export type GenerateOptions = {
   force?: boolean;
@@ -331,7 +331,7 @@ function normalizeProtectedPattern(pattern: string): string {
     throw new Error("Protected patterns must be non-empty project-relative globs.");
   }
 
-  if (isAbsoluteLikePattern(pattern)) {
+  if (isAbsoluteLikePath(pattern)) {
     throw new Error(`Protected pattern "${pattern}" must stay project-relative.`);
   }
 
@@ -347,10 +347,6 @@ function normalizeProtectedPattern(pattern: string): string {
   }
 
   return normalizedPattern;
-}
-
-function isAbsoluteLikePattern(pattern: string): boolean {
-  return posix.isAbsolute(pattern) || win32.isAbsolute(pattern) || /^[A-Za-z]:(?![\\/])/.test(pattern);
 }
 
 function isIgnoredProtectedArtifact(projectRelativePath: string, generatedDir: string, checkerImplDir: string): boolean {

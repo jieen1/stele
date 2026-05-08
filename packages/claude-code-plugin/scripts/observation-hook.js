@@ -4,7 +4,7 @@ import path from "node:path";
 import { minimatch } from "minimatch";
 import { extractPathsFromValue } from "./path-utils.js";
 const BASH_COMMAND_KEYS = ["command"];
-const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", ";"]);
+const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
 const DEFAULT_PROTECTED = [
   "contract/**/*.stele",
   "contract/checker_impls/**/*",
@@ -133,7 +133,7 @@ function extractCommandFromValue(value, seen) {
 function extractBashWriteTargets(command) {
   const targets = [];
   const pendingHeredocs = [];
-  const lines = command.split(/\r?\n/u);
+  const lines = joinContinuationLines(command.split(/\r?\n/u));
 
   for (const line of lines) {
     const activeLine = stripShellComment(line);
@@ -159,7 +159,12 @@ function extractWriteTargetsFromLine(line) {
   }
 
   const tokens = tokenizeShellLine(line);
-  return [...extractRedirectTargets(tokens), ...extractTeeTargets(tokens)];
+  return [
+    ...extractRedirectTargets(tokens),
+    ...extractTeeTargets(tokens),
+    ...extractFileOperationTargets(tokens),
+    ...extractDdTargets(tokens),
+  ];
 }
 
 function extractRedirectTargets(tokens) {
@@ -233,6 +238,130 @@ function extractTeeTargetsFromSegment(tokens) {
   return targets;
 }
 
+function extractFileOperationTargets(tokens) {
+  const targets = [];
+  let segmentStart = 0;
+
+  for (let index = 0; index <= tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
+      targets.push(...extractFileOperationTargetsFromSegment(tokens.slice(segmentStart, index)));
+      segmentStart = index + 1;
+    }
+  }
+
+  return targets;
+}
+
+function extractFileOperationTargetsFromSegment(tokens) {
+  const wordTokens = [];
+
+  for (const token of tokens) {
+    if (token.type === "word") {
+      wordTokens.push(token);
+    }
+  }
+
+  if (wordTokens.length === 0) {
+    return [];
+  }
+
+  const commandToken = wordTokens[0];
+  const basename = path.posix.basename(commandToken.value);
+
+  if (basename !== "cp" && basename !== "mv" && basename !== "install") {
+    return [];
+  }
+
+  // Find the last non-flag word token (destination)
+  let lastWord = null;
+  let sawDoubleDash = false;
+
+  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
+    if (token.type !== "word") {
+      continue;
+    }
+
+    if (!sawDoubleDash && token.value === "--") {
+      sawDoubleDash = true;
+      continue;
+    }
+
+    if (!sawDoubleDash && token.value.startsWith("-")) {
+      continue;
+    }
+
+    lastWord = token;
+  }
+
+  if (lastWord !== null) {
+    const literalPath = parseLiteralShellPath(lastWord.value);
+
+    if (literalPath !== null) {
+      return [literalPath];
+    }
+  }
+
+  return [];
+}
+
+function extractDdTargets(tokens) {
+  const targets = [];
+  let segmentStart = 0;
+
+  for (let index = 0; index <= tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
+      targets.push(...extractDdTargetsFromSegment(tokens.slice(segmentStart, index)));
+      segmentStart = index + 1;
+    }
+  }
+
+  return targets;
+}
+
+function extractDdTargetsFromSegment(tokens) {
+  const wordTokens = [];
+
+  for (const token of tokens) {
+    if (token.type === "word") {
+      wordTokens.push(token);
+    }
+  }
+
+  if (wordTokens.length === 0) {
+    return [];
+  }
+
+  const commandToken = wordTokens[0];
+
+  if (path.posix.basename(commandToken.value) !== "dd") {
+    return [];
+  }
+
+  const targets = [];
+
+  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
+    if (token.type !== "word") {
+      continue;
+    }
+
+    const ofMatch = token.value.match(/^of=(.+)$/u);
+
+    if (ofMatch) {
+      const literalPath = parseLiteralShellPath(ofMatch[1]);
+
+      if (literalPath !== null) {
+        targets.push(literalPath);
+      }
+    }
+  }
+
+  return targets;
+}
+
 function extractHeredocDelimiters(line) {
   const delimiters = [];
   const regex = /<<-?\s*(?:'([^']+)'|"([^"]+)"|([^\s"'`<>|&;()]+))/gu;
@@ -246,6 +375,66 @@ function extractHeredocDelimiters(line) {
   }
 
   return delimiters;
+}
+
+function joinContinuationLines(lines) {
+  const joined = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+
+    if (joined.length > 0 && shouldContinueLine(joined[joined.length - 1], line)) {
+      joined[joined.length - 1] += line;
+    } else {
+      joined.push(line);
+    }
+  }
+
+  return joined;
+}
+
+function shouldContinueLine(previous, current) {
+  let quote = null;
+  let escaped = false;
+
+  for (let index = 0; index < previous.length; index += 1) {
+    const char = previous[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      if (quote !== null) {
+        escaped = true;
+      } else {
+        return shouldStartNewLine(current);
+      }
+
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      if (quote === char) {
+        quote = null;
+      } else if (quote === null) {
+        quote = char;
+      }
+
+      continue;
+    }
+
+    if (char === "#") {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+function shouldStartNewLine(line) {
+  return line.trim().length > 0;
 }
 
 function stripShellComment(line) {
@@ -335,7 +524,7 @@ function tokenizeShellLine(line) {
       continue;
     }
 
-    if (char === ">" || char === "|" || char === ";" || char === "<") {
+    if (char === ">" || char === "|" || char === ";" || char === "<" || char === "&") {
       pushWordToken(tokens, current);
       current = "";
       tokens.push({ type: "operator", value: char });
