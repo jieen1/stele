@@ -1,4 +1,5 @@
-import { buildRawCheckReport, prepareCheckContext } from "./check.js";
+import type { FailureWitness, Violation, ViolationLocation } from "@stele/core";
+import { readLastReport, type LastCheckReport } from "../last-report.js";
 import { buildRuleIndex, findIndexedRule, type IndexedRule } from "./rules.js";
 
 export type WhyOptions = {
@@ -8,79 +9,177 @@ export type WhyOptions = {
 export async function runWhy(projectDir: string, idOrFingerprint: string, options: WhyOptions = {}): Promise<void> {
   const explanation = await explainWhy(projectDir, idOrFingerprint);
 
-  process.stdout.write(options.json ? `${JSON.stringify(explanation, null, 2)}\n` : formatWhyHuman(explanation));
+  process.stdout.write(options.json ? `${JSON.stringify(buildWhyJson(explanation), null, 2)}\n` : formatWhyHuman(explanation));
 }
 
 type WhyExplanation =
   | {
       kind: "rule";
       rule: IndexedRule;
+      lastReport: LastCheckReport | undefined;
+      violation: Violation | undefined;
       guidance: string[];
     }
   | {
       kind: "violation";
-      violation: Awaited<ReturnType<typeof buildRawCheckReport>>["violations"][number];
+      lastReport: LastCheckReport;
+      violation: Violation;
       guidance: string[];
     };
 
 async function explainWhy(projectDir: string, idOrFingerprint: string): Promise<WhyExplanation> {
   const index = await buildRuleIndex(projectDir);
   const rule = findIndexedRule(index, idOrFingerprint);
+  const lastReport = await readLastReport(projectDir);
+  const violation = findMatchingViolation(lastReport, idOrFingerprint, rule);
 
   if (rule !== undefined) {
     return {
       kind: "rule",
       rule,
-      guidance: ruleGuidance(),
+      lastReport,
+      violation,
+      guidance: violation === undefined ? ruleGuidance() : violationGuidance(violation.rule_kind),
     };
   }
 
-  const context = await prepareCheckContext(projectDir);
-  const report = await buildRawCheckReport(context, "why");
-  const violation = report.violations.find((candidate) => candidate.fingerprint === idOrFingerprint || candidate.rule_id === idOrFingerprint);
-
-  if (violation === undefined) {
-    throw new Error(`No Stele rule or violation matched "${idOrFingerprint}".`);
+  if (violation !== undefined && lastReport !== undefined) {
+    return {
+      kind: "violation",
+      lastReport,
+      violation,
+      guidance: violationGuidance(violation.rule_kind),
+    };
   }
 
-  return {
-    kind: "violation",
-    violation,
-    guidance: violationGuidance(violation.rule_kind),
-  };
+  throw new Error(`No Stele rule or violation matched "${idOrFingerprint}".`);
+}
+
+function findMatchingViolation(
+  lastReport: LastCheckReport | undefined,
+  idOrFingerprint: string,
+  rule: IndexedRule | undefined,
+): Violation | undefined {
+  if (lastReport === undefined) {
+    return undefined;
+  }
+
+  return lastReport.report.violations.find((violation) => {
+    if (violation.fingerprint === idOrFingerprint) {
+      return true;
+    }
+    if (violation.rule_id === idOrFingerprint) {
+      return true;
+    }
+    if (rule !== undefined && violation.rule_id === rule.id) {
+      return true;
+    }
+    return false;
+  });
 }
 
 function formatWhyHuman(explanation: WhyExplanation): string {
   if (explanation.kind === "rule") {
-    const { rule } = explanation;
-    const lines = [
-      `Rule: ${rule.id}`,
-      `Severity: ${rule.severity}`,
-      `Location: ${rule.file_path}:${rule.line}`,
-      `Description: ${rule.description}`,
-      `Rationale: ${rule.rationale ?? "<none>"}`,
-      `Generated Test: ${rule.generated_test_path}`,
-      "",
-      "Agent guidance:",
-      ...explanation.guidance.map((line) => `- ${line}`),
-    ];
-
-    return `${lines.join("\n")}\n`;
+    return formatRuleHuman(explanation);
   }
+  return formatViolationOnlyHuman(explanation);
+}
 
-  const { violation } = explanation;
-  const lines = [
+function formatRuleHuman(explanation: Extract<WhyExplanation, { kind: "rule" }>): string {
+  const { rule, lastReport, violation, guidance } = explanation;
+  const lines: string[] = [
+    `Rule: ${rule.id}`,
+    `Severity: ${rule.severity}`,
+    `Location: ${rule.file_path}:${rule.line}`,
+    `Description: ${rule.description}`,
+    `Rationale: ${rule.rationale ?? "<none>"}`,
+    `Generated Test: ${rule.generated_test_path}`,
+    "",
+  ];
+
+  appendLastCheckLines(lines, lastReport, violation);
+  lines.push("Agent guidance:", ...guidance.map((line) => `- ${line}`));
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatViolationOnlyHuman(explanation: Extract<WhyExplanation, { kind: "violation" }>): string {
+  const { lastReport, violation, guidance } = explanation;
+  const lines: string[] = [
     `Violation: ${violation.rule_id}`,
     `Status: ${violation.status ?? "active"}`,
     `Location: ${formatLocation(violation.location)}`,
-    `Cause: ${violation.cause.summary}`,
-    ...(violation.fix === undefined ? [] : [`Fix: ${violation.fix.summary}`, ...(violation.fix.command === undefined ? [] : [`Command: ${violation.fix.command}`])]),
-    "",
-    "Agent guidance:",
-    ...explanation.guidance.map((line) => `- ${line}`),
   ];
-
+  if (violation.fix !== undefined) {
+    lines.push(`Fix: ${violation.fix.summary}`);
+    if (violation.fix.command !== undefined) {
+      lines.push(`Command: ${violation.fix.command}`);
+    }
+  }
+  lines.push("");
+  appendLastCheckLines(lines, lastReport, violation);
+  lines.push("Agent guidance:", ...guidance.map((line) => `- ${line}`));
   return `${lines.join("\n")}\n`;
+}
+
+function appendLastCheckLines(
+  lines: string[],
+  lastReport: LastCheckReport | undefined,
+  violation: Violation | undefined,
+): void {
+  if (lastReport === undefined) {
+    lines.push("Last check: no recent report (run `stele check` to generate one).", "");
+    return;
+  }
+
+  if (violation === undefined) {
+    lines.push(`Last check: ${lastReport.generated_at} (passing)`, "");
+    return;
+  }
+
+  const status = violation.status === "suppressed" ? "suppressed" : "failed";
+  lines.push(`Last check: ${lastReport.generated_at} (${status})`, "");
+  lines.push(`Cause: ${violation.cause.summary}`);
+  if (violation.cause.detail !== undefined) {
+    lines.push(`Detail: ${violation.cause.detail}`);
+  }
+  if (violation.cause.failure_witness !== undefined) {
+    lines.push(...formatWitnessLines(violation.cause.failure_witness));
+  }
+  lines.push("");
+}
+
+function formatWitnessLines(witness: FailureWitness): string[] {
+  const lines: string[] = [
+    "Failure witness:",
+    `  operator: ${witness.operator}`,
+    `  collection_size: ${witness.collection_size}`,
+  ];
+  if (witness.failed_at_index !== undefined) {
+    lines.push(`  failed at index: ${witness.failed_at_index}`);
+  }
+  if (witness.failed_item !== undefined) {
+    lines.push(`  failed item: ${formatFailedItem(witness.failed_item)}`);
+  }
+  if (witness.predicate_source !== undefined) {
+    lines.push(`  predicate: ${witness.predicate_source}`);
+  }
+  if (witness.truncated) {
+    lines.push("  (truncated to fit witness byte cap)");
+  }
+  return lines;
+}
+
+function formatFailedItem(item: unknown): string {
+  const json = JSON.stringify(item, null, 2);
+  if (json === undefined) {
+    return String(item);
+  }
+
+  return json
+    .split("\n")
+    .map((line, index) => (index === 0 ? line : `    ${line}`))
+    .join("\n");
 }
 
 function ruleGuidance(): string[] {
@@ -112,11 +211,94 @@ function violationGuidance(ruleKind: string): string[] {
   ];
 }
 
-function formatLocation(location: { path?: string; manifest_path?: string; generated_dir?: string; line?: number; column?: number }): string {
+function formatLocation(location: ViolationLocation): string {
   const base = location.path ?? location.manifest_path ?? location.generated_dir ?? "<unknown>";
   if (location.line === undefined) {
     return base;
   }
 
   return `${base}:${location.line}${location.column === undefined ? "" : `:${location.column}`}`;
+}
+
+function buildWhyJson(explanation: WhyExplanation): Record<string, unknown> {
+  if (explanation.kind === "rule") {
+    return buildRuleJson(explanation);
+  }
+  return buildViolationOnlyJson(explanation);
+}
+
+function buildRuleJson(explanation: Extract<WhyExplanation, { kind: "rule" }>): Record<string, unknown> {
+  const { rule, lastReport, violation, guidance } = explanation;
+  const body: Record<string, unknown> = {
+    schema_version: "1",
+    tool: "@stele/cli",
+    command: "why",
+    rule_id: rule.id,
+    severity: rule.severity,
+    description: rule.description,
+  };
+
+  if (rule.rationale !== null) {
+    body.rationale = rule.rationale;
+  }
+  if (rule.category !== null) {
+    body.category = rule.category;
+  }
+  body.location = {
+    file_path: rule.file_path,
+    line: rule.line,
+    column: rule.column,
+  };
+  body.generated_test_path = rule.generated_test_path;
+
+  body.last_check_at = lastReport?.generated_at;
+  body.last_check_status = describeLastCheckStatus(lastReport, violation);
+  if (violation !== undefined) {
+    body.violation = serializeViolationForJson(violation);
+  }
+  body.guidance = guidance;
+  return body;
+}
+
+function buildViolationOnlyJson(explanation: Extract<WhyExplanation, { kind: "violation" }>): Record<string, unknown> {
+  const { lastReport, violation, guidance } = explanation;
+  return {
+    schema_version: "1",
+    tool: "@stele/cli",
+    command: "why",
+    rule_id: violation.rule_id,
+    severity: violation.severity,
+    description: violation.cause.summary,
+    last_check_at: lastReport.generated_at,
+    last_check_status: violation.status === "suppressed" ? "suppressed" : "failed",
+    violation: serializeViolationForJson(violation),
+    guidance,
+  };
+}
+
+function describeLastCheckStatus(
+  lastReport: LastCheckReport | undefined,
+  violation: Violation | undefined,
+): "failed" | "suppressed" | "passing" | "no-report" {
+  if (lastReport === undefined) {
+    return "no-report";
+  }
+  if (violation === undefined) {
+    return "passing";
+  }
+  return violation.status === "suppressed" ? "suppressed" : "failed";
+}
+
+function serializeViolationForJson(violation: Violation): Record<string, unknown> {
+  return {
+    rule_id: violation.rule_id,
+    rule_kind: violation.rule_kind,
+    severity: violation.severity,
+    fingerprint: violation.fingerprint,
+    scope_paths: violation.scope_paths,
+    status: violation.status ?? "active",
+    location: violation.location,
+    cause: violation.cause,
+    fix: violation.fix,
+  };
 }
