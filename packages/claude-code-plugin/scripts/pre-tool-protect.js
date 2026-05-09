@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { minimatch } from "minimatch";
+import { matchProtectedPath } from "@stele/agent-hooks";
 import { TARGET_KEYS } from "./path-utils.js";
 import {
   joinContinuationLines,
@@ -15,7 +15,6 @@ const PROTECTED_REASON =
   "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.";
 const BASH_COMMAND_KEYS = ["command"];
 const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
-const PYTHON_CACHE_SUFFIXES = [".pyc", ".pyo"];
 const DEFAULT_PROTECTED = [
   "contract/**/*.stele",
   "contract/checker_impls/**/*",
@@ -465,171 +464,17 @@ function extractHeredocDelimiters(line) {
   return delimiters;
 }
 
+/**
+ * Decide whether `targetPath` should be denied. Delegates to the SDK so the
+ * matching logic stays in @stele/agent-hooks; this script focuses on
+ * Claude-Code-specific stdin parsing and tool-payload extraction.
+ */
 function shouldDenyTarget(projectDir, patterns, targetPath) {
-  const canonicalTargetPath = canonicalizeTargetPath(targetPath);
-  const normalizedInput = normalizeForComparison(normalizeInputPath(canonicalTargetPath));
-  const resolvedTarget = path.resolve(projectDir, canonicalTargetPath);
-  const relativeToProject = normalizeForComparison(toPosixPath(path.relative(projectDir, resolvedTarget)));
-  const withinProject = isWithinProject(projectDir, resolvedTarget);
-
-  if (withinProject && shouldIgnorePythonCache(relativeToProject)) {
-    return false;
-  }
-
-  if (withinProject) {
-    return patterns.some((pattern) => matchGlob(relativeToProject, pattern) || matchesProtectedDirectoryRoot(relativeToProject, pattern));
-  }
-
-  if (shouldIgnorePythonCache(normalizedInput)) {
-    return false;
-  }
-
-  return patterns.some(
-    (pattern) =>
-      startsWithinProtectedPrefix(normalizedInput, pattern) ||
-      absoluteTraversalTouchesProtectedRoot(projectDir, canonicalTargetPath, pattern),
-  );
-}
-
-function canonicalizeTargetPath(targetPath) {
-  if (process.platform !== "win32") {
-    return targetPath;
-  }
-
-  return normalizeWindowsNamespacedPath(targetPath);
-}
-
-function normalizeInputPath(targetPath) {
-  const normalized = toPosixPath(targetPath)
-    .split("/")
-    .filter((segment) => segment.length > 0 && segment !== ".");
-
-  return normalized.join("/");
-}
-
-function shouldIgnorePythonCache(relativePath) {
-  if (relativePath.length === 0) {
-    return false;
-  }
-
-  const basename = relativePath.split("/").at(-1) ?? "";
-
-  return PYTHON_CACHE_SUFFIXES.some((suffix) => basename.endsWith(suffix));
-}
-
-function startsWithinProtectedPrefix(relativePath, pattern) {
-  const segments = relativePath.split("/");
-  const prefixSegments = getProtectedPrefix(pattern);
-
-  if (prefixSegments.length === 0 || segments.length < prefixSegments.length) {
-    return false;
-  }
-
-  return prefixSegments.every((segment, index) => segments[index] === segment);
-}
-
-function matchesProtectedDirectoryRoot(relativePath, pattern) {
-  const protectedRootPattern = getProtectedDirectoryRootPattern(pattern);
-
-  if (protectedRootPattern === null) {
-    return false;
-  }
-
-  return matchGlob(relativePath, protectedRootPattern);
-}
-
-function absoluteTraversalTouchesProtectedRoot(projectDir, targetPath, pattern) {
-  if (!path.isAbsolute(targetPath)) {
-    return false;
-  }
-
-  const projectPrefix = normalizeForComparison(normalizeAbsolutePrefix(projectDir));
-  const rawAbsolute = normalizeForComparison(normalizeAbsolutePrefix(targetPath));
-  const prefixSegments = getProtectedPrefix(pattern);
-
-  if (prefixSegments.length === 0 || !rawAbsolute.startsWith(`${projectPrefix}/`)) {
-    return false;
-  }
-
-  const rawRelative = rawAbsolute.slice(projectPrefix.length + 1);
-  return startsWithinProtectedPrefix(rawRelative, pattern);
-}
-
-function getProtectedPrefix(pattern) {
-  const segments = normalizeForComparison(toPosixPath(pattern))
-    .split("/")
-    .filter((segment) => segment.length > 0);
-  const prefix = [];
-
-  for (const segment of segments) {
-    if (hasGlobMeta(segment)) {
-      break;
-    }
-
-    prefix.push(segment);
-  }
-
-  return prefix;
-}
-
-function getProtectedDirectoryRootPattern(pattern) {
-  const normalizedPattern = toPosixPath(pattern).replace(/\/+$/u, "");
-
-  if (!normalizedPattern.endsWith("/**/*")) {
-    return null;
-  }
-
-  const rootPattern = normalizedPattern.slice(0, -"/**/*".length);
-  return rootPattern.length > 0 ? rootPattern : null;
-}
-
-function matchGlob(relativePath, pattern) {
-  if (relativePath.length === 0) {
-    return false;
-  }
-
-  return minimatch(relativePath, pattern, {
-    dot: true,
-    windowsPathsNoEscape: true,
-    nocase: process.platform === "win32",
-  });
-}
-
-function hasGlobMeta(segment) {
-  return /[*?]/.test(segment);
-}
-
-function isWithinProject(projectDir, candidatePath) {
-  const relativePath = path.relative(projectDir, candidatePath);
-  return relativePath.length === 0 || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+  return matchProtectedPath(targetPath, patterns, projectDir);
 }
 
 function toPosixPath(value) {
   return value.replaceAll("\\", "/");
-}
-
-function normalizeWindowsNamespacedPath(value) {
-  const uncMatch = value.match(/^[\\/]{2}[?.][\\/]+UNC[\\/]+(.+)$/iu);
-
-  if (uncMatch) {
-    return `\\\\${uncMatch[1].replaceAll("/", "\\")}`;
-  }
-
-  const namespacedMatch = value.match(/^[\\/]{2}[?.][\\/]+(.+)$/u);
-
-  if (namespacedMatch) {
-    return namespacedMatch[1];
-  }
-
-  return value;
-}
-
-function normalizeAbsolutePrefix(value) {
-  return toPosixPath(value).replace(/\/+$/u, "");
-}
-
-function normalizeForComparison(value) {
-  return process.platform === "win32" ? value.toLowerCase() : value;
 }
 
 function isObject(value) {

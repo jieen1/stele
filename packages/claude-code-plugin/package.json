@@ -32,6 +32,7 @@
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
   },
   "dependencies": {
+    "@stele/agent-hooks": "workspace:*",
     "minimatch": "^9.0.5"
   }
 }

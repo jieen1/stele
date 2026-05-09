@@ -1,0 +1,65 @@
+{
+  "name": "@stele/agent-hooks",
+  "version": "0.1.0",
+  "description": "Editor-agnostic Hook SDK for Stele: PreEdit / SessionStart / PostEdit / Stop handlers, plus Claude Code and Cursor adapters.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./adapters/claude-code": {
+      "types": "./dist/adapters/claude-code.d.ts",
+      "import": "./dist/adapters/claude-code.js"
+    },
+    "./adapters/cursor": {
+      "types": "./dist/adapters/cursor.d.ts",
+      "import": "./dist/adapters/cursor.js"
+    },
+    "./adapters/continue-dev": {
+      "types": "./dist/adapters/continue-dev.d.ts",
+      "import": "./dist/adapters/continue-dev.js"
+    },
+    "./handlers/pre-edit-protect": {
+      "types": "./dist/handlers/pre-edit-protect.d.ts",
+      "import": "./dist/handlers/pre-edit-protect.js"
+    },
+    "./handlers/session-start-context": {
+      "types": "./dist/handlers/session-start-context.d.ts",
+      "import": "./dist/handlers/session-start-context.js"
+    },
+    "./handlers/stop-validate": {
+      "types": "./dist/handlers/stop-validate.d.ts",
+      "import": "./dist/handlers/stop-validate.js"
+    },
+    "./handlers/post-edit-observe": {
+      "types": "./dist/handlers/post-edit-observe.d.ts",
+      "import": "./dist/handlers/post-edit-observe.js"
+    },
+    "./install/cursor-installer": {
+      "types": "./dist/install/cursor-installer.d.ts",
+      "import": "./dist/install/cursor-installer.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/adapters/claude-code.ts src/adapters/cursor.ts src/adapters/continue-dev.ts src/handlers/pre-edit-protect.ts src/handlers/session-start-context.ts src/handlers/stop-validate.ts src/handlers/post-edit-observe.ts src/install/cursor-installer.ts --format esm --dts --clean",
+    "prepack": "npm run build",
+    "test": "vitest run --dir tests",
+    "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
+    "lint": "tsc --project tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@stele/cli": "workspace:*",
+    "@stele/core": "workspace:*",
+    "minimatch": "^9.0.5"
+  }
+}

@@ -155,9 +155,9 @@ describe("commands coverage", () => {
             cb(new Error("command not found"), "", "");
           }
         },
-        execFileSync: vi.importActual("node:child_process").execFileSync,
-        exec: vi.importActual("node:child_process").exec,
-        spawn: vi.importActual("node:child_process").spawn,
+        execFileSync: (vi.importActual("node:child_process") as any).execFileSync,
+        exec: (vi.importActual("node:child_process") as any).exec,
+        spawn: (vi.importActual("node:child_process") as any).spawn,
       }));
 
       const { runDev: mockedRunDev } = await import("../src/commands/dev.js");
@@ -307,8 +307,12 @@ describe("commands coverage", () => {
       await runWhy(projectDir, "TEST_INVARIANT", { json: true });
 
       const parsed = JSON.parse(stdout.read());
-      expect(parsed.kind).toBe("rule");
-      expect(parsed.rule.id).toBe("TEST_INVARIANT");
+      expect(parsed.schema_version).toBe("1");
+      expect(parsed.tool).toBe("@stele/cli");
+      expect(parsed.command).toBe("why");
+      expect(parsed.rule_id).toBe("TEST_INVARIANT");
+      expect(parsed.severity).toBe("high");
+      expect(parsed.last_check_status).toBe("no-report");
       expect(parsed.guidance).toBeDefined();
     });
 

@@ -1,0 +1,12 @@
+;; cursor-demo: minimal contract showing how `stele install --agent cursor`
+;; surfaces rules to the Cursor agent through `.cursor/rules/stele.md`.
+
+(invariant CART_TOTAL_NON_NEGATIVE
+  (severity high)
+  (description "Cart subtotal must be non-negative.")
+  (assert (gte (path subtotal) 0)))
+
+(invariant CART_STATUS_OPEN
+  (severity high)
+  (description "Cart status must indicate it is open.")
+  (assert (eq (path status) "open")))

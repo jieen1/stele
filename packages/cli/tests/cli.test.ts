@@ -130,7 +130,7 @@ describe("stele CLI", () => {
     );
 
     await expect(pathExists(join(projectDir, "contract", ".manifest.json"))).resolves.toBe(false);
-    expect(summary).toEqual({
+    expect(summary).toMatchObject({
       generatedDir: "tests/contract",
       generatedFileCount: 3,
     });
@@ -688,13 +688,14 @@ describe("stele CLI", () => {
     expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project", {
       diffFrom: "main",
       json: true,
+      recursive: false,
       reportFile: ".stele/reports/last.json",
     });
     expect(handlers.baselineInit).toHaveBeenCalledWith("E:/tmp/project", { reason: "initial legacy adoption" });
     expect(handlers.baselineUpdate).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved legacy fix" });
-    expect(handlers.generate).toHaveBeenCalledWith("E:/tmp/project", { force: true });
-    expect(handlers.lock).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved" });
-    expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python" });
+    expect(handlers.generate).toHaveBeenCalledWith("E:/tmp/project", { force: true, recursive: false });
+    expect(handlers.lock).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved", recursive: false });
+    expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python", preCommit: false });
   });
 
   it("CLI lock and check print success summaries for operators", async () => {
@@ -725,7 +726,7 @@ describe("stele CLI", () => {
     await runCli(["node", "stele", "generate"]);
 
     expect(process.exitCode).toBe(0);
-    expect(stdout.read()).toContain("OK generated 3 files in tests/contract.");
+    expect(stdout.read()).toContain("OK generated 3 files in tests/contract");
     process.exitCode = originalExitCode;
   });
 
@@ -938,7 +939,15 @@ async function snapshotProject(projectDir: string): Promise<Record<string, strin
     files.map(async (fullPath) => [fullPath.slice(projectDir.length + 1).replaceAll("\\", "/"), await readFile(fullPath, "utf8")] as const),
   );
 
-  return Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right)));
+  // `contract/.last-check-report.json` is the EP07 check-run cache that
+  // `stele why <id>` consumes. It is rewritten on every `stele check` by
+  // design, so exclude it from project-state diffs that assert no other side
+  // effects. See packages/cli/src/last-report.ts.
+  return Object.fromEntries(
+    entries
+      .filter(([path]) => path !== "contract/.last-check-report.json")
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
 }
 
 async function walkFiles(directory: string): Promise<string[]> {

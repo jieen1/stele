@@ -12,6 +12,9 @@ const publishPackageDirs = [
   join(repoRoot, "packages", "backend-python"),
   join(repoRoot, "packages", "cli"),
   join(repoRoot, "packages", "claude-code-plugin"),
+  // Note: the GitHub Action is distributed via git tag + Marketplace, not npm.
+  // We still publish the npm artifact for name-squat / build provenance.
+  join(repoRoot, "packages", "github-action"),
 ];
 const pnpmTool = resolveTool("pnpm", ["node_modules", "pnpm", "bin", "pnpm.cjs"]);
 const npmTool = resolveTool("npm", ["node_modules", "npm", "bin", "npm-cli.js"]);

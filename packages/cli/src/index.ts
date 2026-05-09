@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
 import { Command, Option } from "commander";
+
+export { DEFAULT_CONFIG, type SteleConfig } from "./config/defaults.js";
+export { loadConfig } from "./config/loadConfig.js";
+
 import { runAddChecker } from "./commands/addChecker.js";
+import { formatCacheClean, formatCacheInfo, runCacheClean, runCacheInfo } from "./commands/cache.js";
 import {
   formatBaselineSummary,
   runBaselineInit,
@@ -14,6 +19,7 @@ import {
   formatCheckReportHuman,
   formatCheckReportJson,
   isCheckCommandError,
+  runCheckRecursive,
   type CheckCommandOptions,
   type CheckCommandResult,
   type CheckSummary,
@@ -21,10 +27,10 @@ import {
 } from "./commands/check.js";
 import { runAgentContext, type AgentContextOptions } from "./commands/agentContext.js";
 import { runExplain, type ExplainOptions } from "./commands/explain.js";
-import { runGenerate, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
+import { runGenerate, runGenerateRecursive, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
 import { runList } from "./commands/list.js";
-import { lockProject, type LockOptions, type LockSummary } from "./commands/lock.js";
+import { lockProject, runLockRecursive, type LockOptions, type LockSummary } from "./commands/lock.js";
 import { runMaintenanceSummary, type MaintenanceSummaryOptions } from "./commands/maintenance.js";
 import { runPropose, type ProposeOptions } from "./commands/propose.js";
 import { runRules, type RulesOptions } from "./commands/rules.js";
@@ -116,7 +122,25 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--json", "emit the check report as JSON")
     .option("--report-file <path>", "write the JSON check report to a file")
     .option("--lenient", "skip code-shape checks (faster)")
+    .option("--recursive", "auto-discover stele.config.json files and check each project", false)
     .action(async (options: CheckCommandOptions) => {
+      if (options.recursive) {
+        try {
+          const result = await runCheckRecursive(cwd(), options, {
+            stdout: (chunk) => process.stdout.write(chunk),
+            stderr: (chunk) => process.stderr.write(chunk),
+          });
+          if (result.exitCode !== 0) {
+            process.exitCode = result.exitCode;
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          process.stderr.write(`${message}\n`);
+          process.exitCode = getExitCode(error) ?? 1;
+        }
+        return;
+      }
+
       try {
         const result = await check(cwd(), options);
 
@@ -148,8 +172,36 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   program
     .command("generate")
     .description("Generate contract test files from the contract source.")
-    .option("--force", "overwrite existing generated files")
-    .action(async (options) => {
+    .option("--force", "ignore the incremental cache; regenerate every file")
+    .option("--no-cache", "skip cache (do not read or write); always regenerate")
+    .option("--json", "emit aggregate JSON output (only with --recursive)")
+    .option("--recursive", "auto-discover stele.config.json files and generate for each project", false)
+    .action(async (rawOptions: GenerateOptions & { cache?: boolean }) => {
+      // Commander's `--no-cache` flag emits `cache: false` when set; translate
+      // to the GenerateOptions `noCache: true` shape.
+      const options: GenerateOptions = {
+        force: rawOptions.force,
+        noCache: rawOptions.cache === false ? true : rawOptions.noCache,
+        recursive: rawOptions.recursive,
+        json: rawOptions.json,
+      };
+      if (options.recursive) {
+        try {
+          const result = await runGenerateRecursive(cwd(), options, {
+            stdout: (chunk) => process.stdout.write(chunk),
+            stderr: (chunk) => process.stderr.write(chunk),
+          });
+          if (result.exitCode !== 0) {
+            process.exitCode = result.exitCode;
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          process.stderr.write(`${message}\n`);
+          process.exitCode = getExitCode(error) ?? 1;
+        }
+        return;
+      }
+
       const result = await generate(cwd(), options);
       if (isGenerateSummary(result)) {
         process.stdout.write(formatGenerateSummary(result));
@@ -159,7 +211,26 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .command("lock")
     .description("Lock the manifest by recording SHA-256 hashes of all protected files.")
     .option("--reason <reason>", "reason for locking the manifest")
-    .action(async (options) => {
+    .option("--json", "emit aggregate JSON output (only with --recursive)")
+    .option("--recursive", "auto-discover stele.config.json files and lock each project", false)
+    .action(async (options: LockOptions) => {
+      if (options.recursive) {
+        try {
+          const result = await runLockRecursive(cwd(), options, {
+            stdout: (chunk) => process.stdout.write(chunk),
+            stderr: (chunk) => process.stderr.write(chunk),
+          });
+          if (result.exitCode !== 0) {
+            process.exitCode = result.exitCode;
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          process.stderr.write(`${message}\n`);
+          process.exitCode = getExitCode(error) ?? 1;
+        }
+        return;
+      }
+
       const result = await lock(cwd(), options);
       if (isLockSummary(result)) {
         process.stdout.write(formatLockSummary(result));
@@ -233,6 +304,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .description("Initialize Stele in the current project.")
     .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))
     .option("--dry-run", "show what files would be created without writing")
+    .option("--pre-commit", "install Stele hooks into .pre-commit-config.yaml", false)
     .action((options) => init(cwd(), options));
   program
     .command("dev")
@@ -272,6 +344,37 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       await runDoc(cwd(), options);
     });
 
+  program
+    .command("install")
+    .description("Install Stele integration with an agent IDE (currently: cursor).")
+    .requiredOption("--agent <name>", "agent name (cursor | claude-code | continue-dev)")
+    .option("--enable-shell", "Enable composer-rule shell hooks (Cursor only)", false)
+    .option("--uninstall", "Remove the agent integration", false)
+    .option("--force", "Overwrite existing manually-edited rule files (Cursor only)", false)
+    .action(async (options: { agent: string; enableShell?: boolean; uninstall?: boolean; force?: boolean }) => {
+      await runInstallCommand(cwd(), options);
+    });
+
+  const cacheCommand = program
+    .command("cache")
+    .description("Manage Stele incremental generation cache (contract/.cache/hash-manifest.json).");
+
+  cacheCommand
+    .command("clean")
+    .description("Delete contract/.cache/hash-manifest.json (forces full regeneration on next 'stele generate').")
+    .action(async () => {
+      const result = await runCacheClean(cwd());
+      process.stdout.write(formatCacheClean(result));
+    });
+
+  cacheCommand
+    .command("info")
+    .description("Show incremental cache stats (entries, size, generated_at).")
+    .action(async () => {
+      const result = await runCacheInfo(cwd());
+      process.stdout.write(formatCacheInfo(result));
+    });
+
   return program;
 }
 
@@ -284,7 +387,12 @@ function formatLockSummary(summary: LockSummary): string {
 }
 
 function formatGenerateSummary(summary: GenerateSummary): string {
-  return `OK generated ${summary.generatedFileCount} file${summary.generatedFileCount === 1 ? "" : "s"} in ${summary.generatedDir}.\n`;
+  const total = summary.generatedFileCount;
+  const totalNoun = `${total} file${total === 1 ? "" : "s"}`;
+  const breakdown = summary.fullInvalidate
+    ? `(${summary.written} written, full regenerate)`
+    : `(${summary.written} written, ${summary.skipped} skipped${summary.deleted > 0 ? `, ${summary.deleted} deleted` : ""})`;
+  return `OK generated ${totalNoun} in ${summary.generatedDir} ${breakdown}.\n`;
 }
 
 function formatVersion(): string {
@@ -319,6 +427,56 @@ export async function runCli(argv = process.argv): Promise<void> {
     process.stderr.write(`${message}\n`);
     process.exitCode = getExitCode(error) ?? 1;
   }
+}
+
+async function runInstallCommand(
+  projectDir: string,
+  options: { agent: string; enableShell?: boolean; uninstall?: boolean; force?: boolean },
+): Promise<void> {
+  const { SteleError } = await import("@stele/core");
+
+  if (options.agent === "cursor") {
+    const installerModule = await loadAgentHooksInstaller();
+    if (options.uninstall) {
+      await installerModule.uninstall(projectDir);
+    } else {
+      await installerModule.install(projectDir, { enableShell: options.enableShell, force: options.force });
+    }
+    return;
+  }
+
+  if (options.agent === "claude-code") {
+    process.stdout.write(
+      "Claude Code uses the @stele/claude-code-plugin package directly; no install step is required here.\n",
+    );
+    return;
+  }
+
+  if (options.agent === "continue-dev") {
+    throw new SteleError(
+      "E_AGENT_NOT_IMPLEMENTED",
+      "AgentHooksError",
+      "continue-dev adapter is a Phase 3 candidate and not yet implemented.",
+    );
+  }
+
+  throw new SteleError(
+    "E_UNSUPPORTED_AGENT",
+    "AgentHooksError",
+    `Agent ${options.agent} not supported. Supported: cursor, claude-code, continue-dev.`,
+  );
+}
+
+async function loadAgentHooksInstaller(): Promise<{
+  install: (projectDir: string, opts: { enableShell?: boolean; force?: boolean }) => Promise<void>;
+  uninstall: (projectDir: string) => Promise<void>;
+}> {
+  const dynamicSpecifier = ["@stele", "agent-hooks/install/cursor-installer"].join("/");
+  const mod = (await import(dynamicSpecifier)) as {
+    install: (projectDir: string, opts: { enableShell?: boolean; force?: boolean }) => Promise<void>;
+    uninstall: (projectDir: string) => Promise<void>;
+  };
+  return mod;
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
