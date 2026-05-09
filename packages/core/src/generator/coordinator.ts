@@ -23,6 +23,26 @@ export interface LanguageBackend {
   version: string;
   generate(contract: Contract, config: GenerationConfig): GeneratedFile[];
   supportFiles?(contract: Contract, config: GenerationConfig): GeneratedFile[];
+  /**
+   * v0.2: emit fixture-specific test bootstrap (conftest.py / vitest setup / setup_test.go).
+   * Called by tests/conformance/ runner before invoking the test runner.
+   */
+  writeFixtureBootstrap?(fixture: ConformanceFixture, tmpdir: string): Promise<void>;
+}
+
+/**
+ * v0.2: Conformance fixture descriptor passed to LanguageBackend.writeFixtureBootstrap.
+ *
+ * Backends consume `appState` (parsed app-state.json) to emit the fixture-specific
+ * test runner setup (conftest.py for Python, conftest.ts for TypeScript, setup_test.go for Go).
+ */
+export interface ConformanceFixture {
+  /** Stable id, e.g. "01-simple-invariant". */
+  id: string;
+  /** Absolute path to the source fixture directory in tests/conformance/fixtures/. */
+  dir: string;
+  /** Parsed app-state.json (conformance runner injects this into stele_context). */
+  appState: unknown;
 }
 
 export type GeneratedVerificationStatus = "missing" | "changed" | "extra" | "unchanged";
@@ -206,6 +226,21 @@ function buildCanonicalGeneratedPaths(
 
   for (const groupPath of groupPaths) {
     registerGeneratedPath(groupPath, seenPaths, seenCaseFoldedPaths, "canonical generated file path", (path) => expectedPaths.push(path));
+  }
+
+  // EP06: Python backend emits an extra test file that drives Code Shape
+  // declarations through pytest. Other backends ignore code shapes (TS
+  // backend has no Code Shape support in v0.2 — see
+  // docs/design/phase-1/06-code-shape-python.md §8) so they do not register
+  // this canonical path.
+  if (backend.name === "python" && contract.codeShapes.length > 0) {
+    registerGeneratedPath(
+      posix.join(config.outputDir, `test_code_shape${fileExtension}`),
+      seenPaths,
+      seenCaseFoldedPaths,
+      "canonical generated file path",
+      (path) => expectedPaths.push(path),
+    );
   }
 
   expectedPaths.sort((left, right) => left.localeCompare(right));

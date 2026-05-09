@@ -1,0 +1,215 @@
+import { expect } from "vitest";
+import type { Violation, ViolationReport } from "@stele/core";
+
+/**
+ * Real schema field shape: see `packages/core/src/report/types.ts` and
+ * `docs/spec/cli-output.md`. Cross-backend comparison uses `rule_id`,
+ * `location.path`, `cause.summary`, and string `cause.detail`. Path/line
+ * differ across backends and are ignored by default.
+ */
+
+export interface ViolationCompareOptions {
+  /** Numeric tolerance for IEEE-754 double comparisons inside witness payloads. */
+  tolerance: number;
+  /** Ignore `location.path` (different backends emit different paths). */
+  ignoreLocationPath: boolean;
+  /** Ignore `location.line` (line numbers differ across backends). */
+  ignoreLocationLine: boolean;
+  /** Ignore the free-text `cause.detail` (wording differs across backends). */
+  ignoreCauseDetailText: boolean;
+  /** Ignore SHA-based `fingerprint` (depends on path). */
+  ignoreFingerprint: boolean;
+}
+
+export const DEFAULT_COMPARE_OPTIONS: ViolationCompareOptions = {
+  tolerance: 1e-9,
+  ignoreLocationPath: true,
+  ignoreLocationLine: true,
+  ignoreCauseDetailText: true,
+  ignoreFingerprint: true,
+};
+
+// `failure_witness` is an EP07 (v0.2) cause field that has not yet shipped on
+// `ViolationCause` in `@stele/core`. Use a structural type here so the
+// comparator is forward-compatible with EP07 without taking a hard dep today.
+type WitnessLike = {
+  operator?: string;
+  collection_size?: number;
+  failed_at_index?: number;
+  failed_item?: unknown;
+  predicate_source?: string;
+  truncated?: boolean;
+};
+
+/**
+ * Assert that two ViolationReports are structurally equal under the
+ * configured options. Used by the conformance runner to compare every
+ * backend's output against the fixture's expected-violations.json.
+ */
+export function assertViolationReportsEqual(
+  actual: ViolationReport,
+  expected: ViolationReport,
+  options: ViolationCompareOptions = DEFAULT_COMPARE_OPTIONS,
+): void {
+  expect(actual.summary.violation_count, "summary.violation_count").toBe(expected.summary.violation_count);
+  expect(actual.summary.active_violation_count ?? 0, "summary.active_violation_count").toBe(
+    expected.summary.active_violation_count ?? 0,
+  );
+
+  expect(actual.violations.length, "violations.length").toBe(expected.violations.length);
+
+  const sortedActual = sortViolations(actual.violations);
+  const sortedExpected = sortViolations(expected.violations);
+
+  for (let index = 0; index < sortedActual.length; index += 1) {
+    compareViolation(sortedActual[index], sortedExpected[index], options, index);
+  }
+}
+
+/** Stable sort by `rule_id` then `scope_paths` join, so order isn't compared. */
+export function sortViolations(violations: readonly Violation[]): Violation[] {
+  return [...violations].sort((left, right) => {
+    const ruleCompare = left.rule_id.localeCompare(right.rule_id);
+
+    if (ruleCompare !== 0) {
+      return ruleCompare;
+    }
+
+    return uniqueSorted(left.scope_paths).join("|").localeCompare(uniqueSorted(right.scope_paths).join("|"));
+  });
+}
+
+export function uniqueSorted(values: readonly string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function compareViolation(
+  actual: Violation,
+  expected: Violation,
+  options: ViolationCompareOptions,
+  index: number,
+): void {
+  const label = `violations[${index}]`;
+  expect(actual.rule_id, `${label}.rule_id`).toBe(expected.rule_id);
+  expect(actual.rule_kind, `${label}.rule_kind`).toBe(expected.rule_kind);
+  expect(actual.severity, `${label}.severity`).toBe(expected.severity);
+  expect(uniqueSorted(actual.scope_paths), `${label}.scope_paths`).toEqual(uniqueSorted(expected.scope_paths));
+
+  expect(actual.cause.summary, `${label}.cause.summary`).toBe(expected.cause.summary);
+
+  if (!options.ignoreCauseDetailText && expected.cause.detail !== undefined) {
+    expect(actual.cause.detail, `${label}.cause.detail`).toBe(expected.cause.detail);
+  }
+
+  const expectedWitness = (expected.cause as { failure_witness?: WitnessLike }).failure_witness;
+
+  if (expectedWitness) {
+    const actualWitness = (actual.cause as { failure_witness?: WitnessLike }).failure_witness;
+    compareWitness(actualWitness, expectedWitness, options, label);
+  }
+
+  if (!options.ignoreLocationPath && expected.location?.path !== undefined) {
+    expect(actual.location?.path, `${label}.location.path`).toBe(expected.location.path);
+  }
+
+  if (!options.ignoreLocationLine && expected.location?.line !== undefined) {
+    expect(actual.location?.line, `${label}.location.line`).toBe(expected.location.line);
+  }
+
+  if (!options.ignoreFingerprint) {
+    expect(actual.fingerprint, `${label}.fingerprint`).toBe(expected.fingerprint);
+  }
+}
+
+function compareWitness(
+  actual: WitnessLike | undefined,
+  expected: WitnessLike,
+  options: ViolationCompareOptions,
+  label: string,
+): void {
+  expect(actual, `${label}.cause.failure_witness`).toBeDefined();
+
+  if (actual === undefined) {
+    return;
+  }
+
+  if (expected.operator !== undefined) {
+    expect(actual.operator, `${label}.failure_witness.operator`).toBe(expected.operator);
+  }
+
+  if (expected.collection_size !== undefined) {
+    expect(actual.collection_size, `${label}.failure_witness.collection_size`).toBe(expected.collection_size);
+  }
+
+  if (expected.failed_at_index !== undefined) {
+    expect(actual.failed_at_index, `${label}.failure_witness.failed_at_index`).toBe(expected.failed_at_index);
+  }
+
+  if (expected.predicate_source !== undefined) {
+    expect(actual.predicate_source, `${label}.failure_witness.predicate_source`).toBe(expected.predicate_source);
+  }
+
+  if (expected.truncated !== undefined) {
+    expect(actual.truncated, `${label}.failure_witness.truncated`).toBe(expected.truncated);
+  }
+
+  if (expected.failed_item !== undefined) {
+    assertStructurallyEqual(actual.failed_item, expected.failed_item, options.tolerance, `${label}.failure_witness.failed_item`);
+  }
+}
+
+/**
+ * Recursive structural equality with IEEE-754 tolerance. Used for witness
+ * `failed_item` comparison (numbers may drift across backends).
+ */
+export function assertStructurallyEqual(actual: unknown, expected: unknown, tolerance: number, label: string): void {
+  if (typeof expected === "number" && typeof actual === "number") {
+    if (Number.isNaN(expected) && Number.isNaN(actual)) {
+      return;
+    }
+
+    expect(Math.abs(actual - expected) <= tolerance, `${label} (number tolerance ${tolerance})`).toBe(true);
+    return;
+  }
+
+  if (Array.isArray(expected)) {
+    expect(Array.isArray(actual), `${label} expected array`).toBe(true);
+
+    if (!Array.isArray(actual)) {
+      return;
+    }
+
+    expect(actual.length, `${label}.length`).toBe(expected.length);
+
+    for (let index = 0; index < expected.length; index += 1) {
+      assertStructurallyEqual(actual[index], expected[index], tolerance, `${label}[${index}]`);
+    }
+
+    return;
+  }
+
+  if (expected !== null && typeof expected === "object") {
+    expect(typeof actual === "object" && actual !== null, `${label} expected object`).toBe(true);
+
+    if (typeof actual !== "object" || actual === null) {
+      return;
+    }
+
+    const expectedKeys = Object.keys(expected as Record<string, unknown>).sort();
+    const actualKeys = Object.keys(actual as Record<string, unknown>).sort();
+    expect(actualKeys, `${label} keys`).toEqual(expectedKeys);
+
+    for (const key of expectedKeys) {
+      assertStructurallyEqual(
+        (actual as Record<string, unknown>)[key],
+        (expected as Record<string, unknown>)[key],
+        tolerance,
+        `${label}.${key}`,
+      );
+    }
+
+    return;
+  }
+
+  expect(actual, label).toBe(expected);
+}

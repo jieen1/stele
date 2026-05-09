@@ -1,0 +1,7 @@
+{
+  "positions": [
+    { "symbol": "AAPL", "quantity": 10, "market-value": 2500, "asset-class": "equity" },
+    { "symbol": "MSFT", "quantity": 15, "market-value": 3000, "asset-class": "equity" },
+    { "symbol": "VOO", "quantity": 2, "market-value": 875, "asset-class": "etf" }
+  ]
+}

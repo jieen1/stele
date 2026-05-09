@@ -1,0 +1,9 @@
+(checker order-notional-within-cap
+  (description "Validate that every order notional stays under the per-account cap."))
+
+(invariant ORDER_NOTIONALS_VALID
+  (severity high)
+  (category business-rule)
+  (description "All open orders satisfy the per-account notional cap.")
+  (rationale "Caps prevent runaway order placement when the cap configuration is correct.")
+  (uses-checker order-notional-within-cap))

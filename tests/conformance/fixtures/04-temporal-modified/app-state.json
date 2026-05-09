@@ -1,0 +1,20 @@
+{
+  "account": {
+    "id": "acc-001",
+    "balance": 5000,
+    "opening-balance": 4800
+  },
+  "transactions": [
+    { "id": "txn-001", "delta": 200 }
+  ],
+  "state-before": {
+    "account": {
+      "balance": 4800
+    }
+  },
+  "state-after": {
+    "account": {
+      "balance": 5000
+    }
+  }
+}

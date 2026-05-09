@@ -1,0 +1,17 @@
+(invariant BALANCE_CHANGE_REQUIRES_TXN
+  (severity high)
+  (category business-rule)
+  (description "Account balance only changes when there is a matching transaction.")
+  (rationale "Every balance delta must be auditable via the transaction ledger.")
+  (when (modified (path account balance)))
+  (assert
+    (exists txn (collection transactions)
+      (eq (path txn delta)
+          (sub (path account balance) (path account opening-balance))))))
+
+(invariant BALANCE_NEVER_NEGATIVE
+  (severity high)
+  (category data-integrity)
+  (description "Account balance stays non-negative.")
+  (rationale "Smoke check that runs even when balance is unchanged.")
+  (assert (gte (path account balance) 0)))

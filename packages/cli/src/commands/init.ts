@@ -1,19 +1,26 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { listRegisteredBackends } from "../backend-registry.js";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../config/defaults.js";
 import { readOptionalFile, writeIfMissing } from "../utils/shared-utils.js";
+import { maybeInstallPreCommit } from "./pre-commit.js";
 
 export type InitOptions = {
   language: string;
   dryRun?: boolean;
+  preCommit?: boolean;
 };
 
-export const SUPPORTED_LANGUAGES = ["python"] as const;
-const supportedLanguageSet = new Set<string>(SUPPORTED_LANGUAGES);
+export const SUPPORTED_LANGUAGES: readonly string[] = Array.from(
+  new Set(listRegisteredBackends().map((entry) => entry.language)),
+);
 
 export async function runInit(projectDir: string, options: InitOptions): Promise<void> {
+  const supportedLanguageSet = new Set<string>(SUPPORTED_LANGUAGES);
+
   if (!supportedLanguageSet.has(options.language)) {
-    throw new Error(`Unsupported language "${options.language}". Supported languages: python.`);
+    const supported = SUPPORTED_LANGUAGES.join(", ");
+    throw new Error(`Unsupported language "${options.language}". Supported languages: ${supported}.`);
   }
 
   const config = {
@@ -31,6 +38,10 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
 
   for (const file of files) {
     await writeIfMissing(file.path, file.content);
+  }
+
+  if (options.preCommit) {
+    await maybeInstallPreCommit(projectDir);
   }
 
   printInitSummary(projectInfo);

@@ -1,0 +1,12 @@
+(invariant ACCOUNT_BALANCE_NON_NEGATIVE
+  (severity high)
+  (category data-integrity)
+  (description "Account balance must remain non-negative.")
+  (rationale "Negative balances corrupt downstream accounting reports.")
+  (assert (gte (path account balance) 0)))
+
+(invariant ACCOUNT_HAS_ID
+  (severity critical)
+  (category identity)
+  (description "Account carries a non-null identifier.")
+  (assert (not-null (path account id))))

@@ -1,0 +1,16 @@
+{
+  "limits": {
+    "max-order-notional": 25000
+  },
+  "orders": [
+    { "id": "ord-001", "notional": 3200 },
+    { "id": "ord-002", "notional": 1500 },
+    { "id": "ord-003", "notional": 12000 }
+  ],
+  "_checkers": {
+    "order-notional-within-cap": {
+      "file": "order_notional_within_cap.py",
+      "function": "check"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@stele/conformance-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-backend conformance test suite for the Stele monorepo. Internal; not published.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@stele/cli": "workspace:*",
+    "@stele/core": "workspace:*"
+  }
+}

@@ -1,0 +1,6 @@
+(invariant ACCOUNT_CURRENCY_USD
+  (severity high)
+  (category data-integrity)
+  (description "Brokerage accounts use the USD ledger currency.")
+  (rationale "The USD pipeline is the only currency supported in this fixture.")
+  (assert (eq (path account currency) "USD")))

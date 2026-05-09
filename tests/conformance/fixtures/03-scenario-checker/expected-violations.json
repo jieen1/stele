@@ -1,0 +1,11 @@
+{
+  "schema_version": "1",
+  "tool": "@stele/cli",
+  "command": "check",
+  "ok": true,
+  "summary": {
+    "violation_count": 0,
+    "active_violation_count": 0
+  },
+  "violations": []
+}

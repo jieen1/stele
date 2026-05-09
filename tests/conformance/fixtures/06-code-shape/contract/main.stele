@@ -1,0 +1,24 @@
+;; Fixture 06: Code Shape (EP06)
+;;
+;; Exercises class-shape and function-shape declarations against a compliant
+;; Python module under app/. Generated pytest must pass; stele check must
+;; report zero violations.
+
+(invariant CODE_SHAPE_FIXTURE_HAS_INVARIANT
+  (severity low)
+  (description "Fixture must always include at least one invariant so the runner generates test_contract.py.")
+  (assert (eq 1 1)))
+
+(class-shape account_class
+  (lang python)
+  (target "app/account.py::Account")
+  (must-have-field id "str")
+  (must-have-field balance "int")
+  (must-have-method deposit)
+  (must-have-method withdraw))
+
+(function-shape calculate_total_fn
+  (lang python)
+  (target "app/account.py::calculate_total")
+  (must-have-parameter cart)
+  (must-have-parameter tax_rate))

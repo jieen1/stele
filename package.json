@@ -7,6 +7,7 @@
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
+    "test:conformance": "pnpm --filter @stele/conformance-tests test",
     "test:packed-adoption": "node scripts/verify-packed-adoption.mjs",
     "release:dry-run": "node scripts/publish-npm.mjs --dry-run",
     "release:publish": "node scripts/publish-npm.mjs",

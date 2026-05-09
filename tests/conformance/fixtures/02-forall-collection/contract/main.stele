@@ -1,0 +1,18 @@
+(invariant POSITIONS_POSITIVE_QUANTITY
+  (severity high)
+  (category data-integrity)
+  (description "Every open position has a positive quantity.")
+  (rationale "Zero-or-negative positions corrupt downstream P&L calculations.")
+  (assert
+    (forall position (collection positions)
+      (gt (path position quantity) 0))))
+
+(invariant EQUITY_POSITION_TOTAL
+  (severity medium)
+  (category aggregation)
+  (description "Total market value of equity positions stays under the cap.")
+  (rationale "Validates aggregation (sum) over a filtered (where) collection.")
+  (assert
+    (lt (sum (where pos (collection positions) (eq (path pos asset-class) "equity"))
+             (path market-value))
+        100000)))
