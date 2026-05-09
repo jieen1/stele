@@ -1,0 +1,17 @@
+repos:
+  - repo: local
+    hooks:
+      - id: stele-generate
+        name: Stele Generate
+        entry: npx stele generate
+        language: node
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^(contract/.*\.stele|stele\.config\.json)$
+
+      - id: stele-check
+        name: Stele Check
+        entry: npx stele check
+        language: node
+        pass_filenames: false
+        stages: [pre-commit]
