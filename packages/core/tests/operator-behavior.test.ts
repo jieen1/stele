@@ -133,6 +133,35 @@ const OPERATORS: OperatorExpectation[] = [
   { name: "starts-with", parameters: [req("String"), req("String")], returnType: "Boolean" },
   { name: "ends-with", parameters: [req("String"), req("String")], returnType: "Boolean" },
   { name: "has-length", parameters: [req("Collection"), req("Number")], returnType: "Boolean" },
+
+  // EP04 batch 1: collection (4)
+  { name: "length", parameters: [req("Collection")], returnType: "Number" },
+  { name: "concat", parameters: [req("Collection"), var_("Collection")], returnType: "Collection" },
+  { name: "sort-by", parameters: [req("Collection"), req("Path")], returnType: "Collection" },
+  { name: "sort-by-desc", parameters: [req("Collection"), req("Path")], returnType: "Collection" },
+
+  // EP04 batch 1: arithmetic (5)
+  { name: "mod", parameters: [req("Number"), req("Number")], returnType: "Number" },
+  { name: "pow", parameters: [req("Number"), req("Number")], returnType: "Number" },
+  { name: "round", parameters: [req("Number"), opt("Number")], returnType: "Number" },
+  { name: "ceil", parameters: [req("Number")], returnType: "Number" },
+  { name: "floor", parameters: [req("Number")], returnType: "Number" },
+
+  // EP04 batch 1: string (5)
+  { name: "trim", parameters: [req("String")], returnType: "String" },
+  { name: "lower", parameters: [req("String")], returnType: "String" },
+  { name: "upper", parameters: [req("String")], returnType: "String" },
+  { name: "split", parameters: [req("String"), req("String")], returnType: "Collection" },
+  { name: "join", parameters: [req("Collection"), req("String")], returnType: "String" },
+
+  // EP04 batch 1: data access (1)
+  { name: "type-of", parameters: [req("Unknown")], returnType: "String" },
+
+  // EP04 batch 1: FP promoted (3 + 1 alias)
+  { name: "map", parameters: [req("Collection"), req("Path")], returnType: "Collection" },
+  { name: "first", parameters: [req("Collection")], returnType: "Unknown" },
+  { name: "last", parameters: [req("Collection")], returnType: "Unknown" },
+  { name: "filter", parameters: [req("Symbol"), req("Collection"), req("Predicate")], returnType: "Collection" },
 ];
 
 /* ------------------------------------------------------------------ */

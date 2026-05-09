@@ -430,6 +430,106 @@ describe("quantifier type inference", () => {
 });
 
 // ---------------------------------------------------------------------------
+// EP04 batch 1: filter alias type inference
+// ---------------------------------------------------------------------------
+describe("EP04 batch 1: filter operator alias", () => {
+  it("accepts filter with the same shape as where", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant FILTER_OK",
+        "  (severity high)",
+        '  (description "filter binds an identifier and filters a collection (alias of where).")',
+        "  (assert (gt (count (filter item (collection items) (gt (path item value) 0))) 0)))",
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.invariants).toHaveLength(1);
+  });
+
+  it("rejects filter when binding is not an identifier", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant FILTER_BAD_BIND",
+        "  (severity high)",
+        '  (description "filter binding must be an identifier.")',
+        "  (assert (gt (count (filter 1 (collection items) (gt (path item value) 0))) 0)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0310",
+      messageIncludes: "must bind an identifier",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EP04 batch 1: arity / type checks on a sample of new operators
+// ---------------------------------------------------------------------------
+describe("EP04 batch 1: arity and type checks on new operators", () => {
+  it("rejects (length) with no arguments", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant LENGTH_BAD_ARITY",
+        "  (severity high)",
+        '  (description "length expects exactly one collection.")',
+        "  (assert (gt (length) 0)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0309",
+      messageIncludes: "length",
+    });
+  });
+
+  it("rejects (round) with three arguments", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant ROUND_BAD_ARITY",
+        "  (severity high)",
+        '  (description "round expects 1 or 2 args (value plus optional digits).")',
+        "  (assert (gt (round 1.5 2 3) 0)))",
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0309",
+      messageIncludes: "round",
+    });
+  });
+
+  it("accepts (concat) with multiple collections", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant CONCAT_OK",
+        "  (severity high)",
+        '  (description "concat is variadic over Collection arguments.")',
+        "  (assert (gt (length (concat (collection a) (collection b))) 0)))",
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.invariants).toHaveLength(1);
+  });
+
+  it("accepts (type-of) on any value (Unknown parameter)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(invariant TYPE_OF_OK",
+        "  (severity high)",
+        '  (description "type-of accepts an Unknown value.")',
+        '  (assert (eq (type-of (path account balance)) "number")))',
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.invariants).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Logical operator type inference (and, or, not, implies, iff)
 // ---------------------------------------------------------------------------
 describe("logical operator type inference", () => {

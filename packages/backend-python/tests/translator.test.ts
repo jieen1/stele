@@ -663,7 +663,272 @@ describe("@stele/backend-python translator", () => {
     }
     expect(missing.length).toBe(0);
   });
+
+  // ---------------------------------------------------------------------
+  // EP06: Code Shape pytest emit. Each shape kind owns one test that
+  // verifies a representative declaration becomes a real pytest function
+  // backed by the runtime helpers shipped in `_stele_runtime.py`.
+  // ---------------------------------------------------------------------
+
+  describe("Code Shape emit (EP06)", () => {
+    it("emits test_code_shape.py only when the contract carries Code Shape declarations", async () => {
+      const empty = await createContract({
+        "main.stele": [
+          "(invariant FOO",
+          "  (severity high)",
+          '  (description "no code shapes")',
+          "  (assert (eq 1 1)))",
+        ].join("\n"),
+      });
+      const emptyFiles = getGeneratePytestFiles()(empty);
+      expect(emptyFiles.map((file) => file.path)).not.toContain("tests/contract/test_code_shape.py");
+
+      const withShapes = await createContract({
+        "main.stele": [
+          "(invariant FOO",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(class-shape demo",
+          "  (lang python)",
+          '  (target "app/account.py::Account")',
+          "  (must-have-method save))",
+        ].join("\n"),
+      });
+      const shapeFiles = getGeneratePytestFiles()(withShapes);
+      expect(shapeFiles.map((file) => file.path)).toContain("tests/contract/test_code_shape.py");
+    });
+
+    it("class-shape emits stele_resolve_class plus stele_has_field / stele_has_callable assertions", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(invariant SMOKE",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(class-shape account_class",
+          "  (lang python)",
+          '  (target "app/account.py::Account")',
+          '  (must-have-field id "str")',
+          "  (must-have-field created_at)",
+          "  (must-have-method deposit)",
+          "  (must-extend BaseAccount))",
+        ].join("\n"),
+      });
+      const file = getGeneratedCodeShapeFile(contract);
+
+      expect(file).toContain("def test_class_shape_account_class(stele_context):");
+      expect(file).toContain('cls = stele_resolve_class("app.account.Account")');
+      expect(file).toContain('stele_has_field(cls, "id", expected_type="str")');
+      expect(file).toContain('stele_has_field(cls, "created_at")');
+      expect(file).toContain('stele_has_callable(cls, "deposit")');
+      expect(file).toContain("getattr(cls, \"__mro__\", [cls])[1:]");
+      expect(file).toContain("must extend BaseAccount");
+    });
+
+    it("function-shape emits stele_resolve_function and inspect.signature parameter checks", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(invariant SMOKE",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(function-shape calculate_total_fn",
+          "  (lang python)",
+          '  (target "app/totals.py::calculate_total")',
+          "  (must-have-parameter cart)",
+          "  (must-have-parameter tax-rate)",
+          "  (must-have-decorator login_required)",
+          '  (must-have-call "transaction.atomic"))',
+        ].join("\n"),
+      });
+      const file = getGeneratedCodeShapeFile(contract);
+
+      expect(file).toContain("def test_function_shape_calculate_total_fn(stele_context):");
+      expect(file).toContain('fn = stele_resolve_function("app.totals.calculate_total")');
+      expect(file).toContain("signature = inspect.signature(fn)");
+      expect(file).toContain('"cart" not in actual_parameters');
+      // kebab-to-snake conversion for parameter names
+      expect(file).toContain('"tax_rate" not in actual_parameters');
+      expect(file).toContain("__stele_decorators__");
+      // must-have-call defers to AST analysis in stele check
+      expect(file).toContain("must-have-call rules are enforced by AST analysis in 'stele check'");
+      expect(file).toContain("return_hints = stele_get_type_hints(fn)");
+    });
+
+    it("boundary emits stele_glob plus stele_collect_imports / stele_import_allowed iteration", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(invariant SMOKE",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(boundary api_boundary",
+          "  (lang python)",
+          '  (target "src/api/*.py")',
+          '  (deny-import "requests" "urllib3")',
+          '  (allow-target "src/api/safe.py"))',
+        ].join("\n"),
+      });
+      const file = getGeneratedCodeShapeFile(contract);
+
+      expect(file).toContain("def test_boundary_api_boundary(stele_context):");
+      expect(file).toContain('matched = stele_glob("src/api/*.py")');
+      expect(file).toContain('allowed_targets = ["src/api/safe.py"]');
+      expect(file).toContain('denied_imports = ["requests", "urllib3"]');
+      expect(file).toContain("imports = stele_collect_imports(filepath)");
+      expect(file).toContain("stele_import_allowed(imp, allowed=[], forbidden=denied_imports)");
+      expect(file).toContain("forbidden import");
+    });
+
+    it("type-policy emits stele_resolve_class + stele_get_class_fields when a class selector is present", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(invariant SMOKE",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(type-policy account_typing",
+          "  (lang python)",
+          '  (target "app/account.py::Account")',
+          '  (require-type "str")',
+          '  (deny-type "Any"))',
+        ].join("\n"),
+      });
+      const file = getGeneratedCodeShapeFile(contract);
+
+      expect(file).toContain("def test_type_policy_account_typing(stele_context):");
+      expect(file).toContain('cls = stele_resolve_class("app.account.Account")');
+      expect(file).toContain("fields = stele_get_class_fields(cls)");
+      expect(file).toContain('stele_type_matches(field_type, "str")');
+      expect(file).toContain('uses denied type Any');
+    });
+
+    it("type-policy without selector falls back to glob + textual scan over matched files", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(invariant SMOKE",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(type-policy module_typing",
+          "  (lang python)",
+          '  (target "app/**/*.py")',
+          '  (require-type "Decimal")',
+          '  (deny-type "Any"))',
+        ].join("\n"),
+      });
+      const file = getGeneratedCodeShapeFile(contract);
+
+      expect(file).toContain("def test_type_policy_module_typing(stele_context):");
+      expect(file).toContain('required_names = ["Decimal"]');
+      expect(file).toContain('denied_names = ["Any"]');
+      expect(file).toContain('for filepath in stele_glob("app/**/*.py"):');
+      expect(file).toContain("text = stele_read_file(filepath)");
+    });
+
+    it("file-policy emits glob + stele_read_file substring / ending checks", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(invariant SMOKE",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(file-policy formatting_rules",
+          "  (lang python)",
+          '  (target "src/settings.py")',
+          '  (must-contain "from __future__ import annotations")',
+          '  (must-end-with "\\n"))',
+        ].join("\n"),
+      });
+      const file = getGeneratedCodeShapeFile(contract);
+
+      expect(file).toContain("def test_file_policy_formatting_rules(stele_context):");
+      expect(file).toContain('required_substrings = ["from __future__ import annotations"]');
+      expect(file).toContain('required_endings = ["\\n"]');
+      expect(file).toContain('for filepath in stele_glob("src/settings.py"):');
+      expect(file).toContain("text = stele_read_file(filepath)");
+      expect(file).toContain("missing required substring");
+      expect(file).toContain("does not end with");
+    });
+
+    it("class-shape rejects glob targets (cannot resolve a single module from a wildcard)", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(class-shape glob_class",
+          "  (lang python)",
+          '  (target "app/**/*.py::Account")',
+          "  (must-have-method save))",
+        ].join("\n"),
+      });
+      expect(() => getGeneratePytestFiles()(contract)).toThrow(SteleError);
+      expect(() => getGeneratePytestFiles()(contract)).toThrow(/cannot use glob metacharacters/);
+    });
+
+    it("class-shape requires a class name selector after ::", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(class-shape no_selector",
+          "  (lang python)",
+          '  (target "app/account.py")',
+          "  (must-have-method save))",
+        ].join("\n"),
+      });
+      expect(() => getGeneratePytestFiles()(contract)).toThrow(SteleError);
+      expect(() => getGeneratePytestFiles()(contract)).toThrow(/must specify a class name after "::"/);
+    });
+
+    it("test_code_shape.py imports the EP06 runtime helpers it references", async () => {
+      const contract = await createContract({
+        "main.stele": [
+          "(invariant SMOKE",
+          "  (severity high)",
+          '  (description "smoke")',
+          "  (assert (eq 1 1)))",
+          "(class-shape demo",
+          "  (lang python)",
+          '  (target "app/account.py::Account")',
+          "  (must-have-method save))",
+        ].join("\n"),
+      });
+      const file = getGeneratedCodeShapeFile(contract);
+
+      expect(file.startsWith("import inspect\nimport pytest\nfrom ._stele_runtime import")).toBe(true);
+      expect(file).toContain("stele_resolve_class");
+      expect(file).toContain("stele_has_callable");
+      expect(file).toContain("stele_glob");
+    });
+
+    it("runtime helpers are present on the embedded runtime source", () => {
+      const source = getRuntimeSource()();
+      expect(source).toContain("def stele_resolve_class(qualified_name");
+      expect(source).toContain("def stele_resolve_function(qualified_name");
+      expect(source).toContain("def stele_has_field(cls, field_name");
+      expect(source).toContain("def stele_has_callable(cls, method_name");
+      expect(source).toContain("def stele_get_class_fields(cls):");
+      expect(source).toContain("def stele_get_type_hints(obj):");
+      expect(source).toContain("def stele_type_matches(actual_type, expected_name");
+      expect(source).toContain("def stele_glob(pattern");
+      expect(source).toContain("def stele_read_file(filepath");
+      expect(source).toContain("def stele_collect_imports(filepath");
+      expect(source).toContain("def stele_import_allowed(imp");
+      // EP06 allowlist split: both names must coexist; the user list must
+      // not gain stdlib modules like importlib (security boundary).
+      expect(source).toContain("_STELE_USER_ALLOWED_MODULES = frozenset");
+      expect(source).toContain("_STELE_INTERNAL_ALLOWED_MODULES = frozenset");
+      expect(source).toContain("_STELE_ALLOWED_MODULES = _STELE_USER_ALLOWED_MODULES");
+      expect(source).toContain("def _stele_user_module_allowed(module_name");
+    });
+  });
 });
+
+function getGeneratedCodeShapeFile(contract: Contract): string {
+  const file = getGeneratePytestFiles()(contract).find((entry) => entry.path === "tests/contract/test_code_shape.py");
+
+  expect(file?.content).toBeTypeOf("string");
+
+  return file!.content;
+}
 
 async function createContract(files: Record<string, string>): Promise<Contract> {
   const directory = await mkdtemp(join(tmpdir(), "stele-backend-python-"));

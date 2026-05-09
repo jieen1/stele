@@ -78,7 +78,7 @@ export function createCoreOperatorRegistry(): OperatorRegistry {
   return createOperatorRegistry(CORE_OPERATOR_SPECS);
 }
 
-const CORE_OPERATOR_SPECS: OperatorSpec[] = [
+export const CORE_OPERATOR_SPECS: OperatorSpec[] = [
   defineOperator({
     name: "path",
     parameters: [required("Symbol"), variadic("Symbol")],
@@ -386,6 +386,125 @@ const CORE_OPERATOR_SPECS: OperatorSpec[] = [
     parameters: [required("Collection"), required("Number")],
     returnType: "Boolean",
     description: "Check whether a collection has the expected length.",
+  }),
+  // EP04 batch 1: collection (4)
+  defineOperator({
+    name: "length",
+    parameters: [required("Collection")],
+    returnType: "Number",
+    description: "Number of elements in a collection (empty -> 0).",
+  }),
+  defineOperator({
+    name: "concat",
+    parameters: [required("Collection"), variadic("Collection")],
+    returnType: "Collection",
+    description: "Concatenate one or more collections in order, preserving duplicates.",
+  }),
+  defineOperator({
+    name: "sort-by",
+    parameters: [required("Collection"), required("Path")],
+    returnType: "Collection",
+    description: "Stable ascending sort of a collection by a path projection.",
+  }),
+  defineOperator({
+    name: "sort-by-desc",
+    parameters: [required("Collection"), required("Path")],
+    returnType: "Collection",
+    description: "Stable descending sort of a collection by a path projection.",
+  }),
+  // EP04 batch 1: arithmetic (5)
+  defineOperator({
+    name: "mod",
+    parameters: [required("Number"), required("Number")],
+    returnType: "Number",
+    description: "Sign-of-divisor modulo (Python semantics): mod(-7, 3) = 2.",
+  }),
+  defineOperator({
+    name: "pow",
+    parameters: [required("Number"), required("Number")],
+    returnType: "Number",
+    description: "IEEE-754 double power; negative base with non-integer exponent yields NaN.",
+  }),
+  defineOperator({
+    name: "round",
+    parameters: [required("Number"), optional("Number")],
+    returnType: "Number",
+    description: "Banker's rounding (half to even); optional digits parameter defaults to 0.",
+  }),
+  defineOperator({
+    name: "ceil",
+    parameters: [required("Number")],
+    returnType: "Number",
+    description: "Round toward positive infinity; NaN propagates.",
+  }),
+  defineOperator({
+    name: "floor",
+    parameters: [required("Number")],
+    returnType: "Number",
+    description: "Round toward negative infinity; NaN propagates.",
+  }),
+  // EP04 batch 1: string (5)
+  defineOperator({
+    name: "trim",
+    parameters: [required("String")],
+    returnType: "String",
+    description: "Strip leading and trailing Unicode whitespace.",
+  }),
+  defineOperator({
+    name: "lower",
+    parameters: [required("String")],
+    returnType: "String",
+    description: "Locale-independent Unicode lowercase conversion.",
+  }),
+  defineOperator({
+    name: "upper",
+    parameters: [required("String")],
+    returnType: "String",
+    description: "Locale-independent Unicode uppercase conversion.",
+  }),
+  defineOperator({
+    name: "split",
+    parameters: [required("String"), required("String")],
+    returnType: "Collection",
+    description: "Split a string by a literal separator; empty separator raises SteleRuntimeError.",
+  }),
+  defineOperator({
+    name: "join",
+    parameters: [required("Collection"), required("String")],
+    returnType: "String",
+    description: "Join a collection of strings with a separator; mixed types fail at validation.",
+  }),
+  // EP04 batch 1: data access (1)
+  defineOperator({
+    name: "type-of",
+    parameters: [required("Unknown")],
+    returnType: "String",
+    description: "Return the structural type tag (number, string, boolean, collection, object, null, undefined).",
+  }),
+  // EP04 batch 1: FP promoted from EP13 (3 + 1 alias)
+  defineOperator({
+    name: "map",
+    parameters: [required("Collection"), required("Path")],
+    returnType: "Collection",
+    description: "Project each item in a collection by a path; missing paths skipped silently.",
+  }),
+  defineOperator({
+    name: "first",
+    parameters: [required("Collection")],
+    returnType: "Unknown",
+    description: "Return the first element; raises SteleRuntimeError on empty collection.",
+  }),
+  defineOperator({
+    name: "last",
+    parameters: [required("Collection")],
+    returnType: "Unknown",
+    description: "Return the last element; raises SteleRuntimeError on empty collection.",
+  }),
+  defineOperator({
+    name: "filter",
+    parameters: [required("Symbol"), required("Collection"), required("Predicate")],
+    returnType: "Collection",
+    description: "Alias for where: filter a collection by a predicate evaluated against each bound item.",
   }),
 ];
 

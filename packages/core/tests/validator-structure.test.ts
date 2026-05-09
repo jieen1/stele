@@ -141,7 +141,7 @@ describe("invariant validation", () => {
     });
 
     const contract = await getLoadContract()(project.rootPath);
-    const inv = contract.invariants.find((i) => i.id === "FULL_INVARIANT");
+    const inv = contract.invariants.find((i: any) => i.id === "FULL_INVARIANT");
     expect(inv).toBeDefined();
     expect(inv!.severity).toBe("high");
     expect(inv!.category?.name).toBe("category");
@@ -586,7 +586,7 @@ describe("contract metadata", () => {
 
     const contract = await getLoadContract()(project.rootPath);
     expect(contract.invariants).toHaveLength(2);
-    const ids = contract.invariants.map((inv) => inv.id);
+    const ids = contract.invariants.map((inv: any) => inv.id);
     expect(ids).toContain("ROOT_INVARIANT");
     expect(ids).toContain("IMPORTED_INVARIANT");
     expect(contract.files).toHaveLength(2);

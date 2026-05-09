@@ -9,7 +9,9 @@ export const collectionOperatorHandlers: Record<string, PythonOperatorHandler> =
   avg: (node, context, translate) => translateAverage(node, context, translate),
   min: (node, context, translate) => translateExtremum(node, context, translate, "min"),
   max: (node, context, translate) => translateExtremum(node, context, translate, "max"),
-  where: (node, context, translate) => translateWhere(node, context, translate),
+  where: (node, context, translate) => translateWhere(node, context, translate, "where"),
+  // EP04 batch 1: filter is a strict alias of where; same translation path.
+  filter: (node, context, translate) => translateWhere(node, context, translate, "filter"),
   forall: (node, context, translate) => translateQuantifier(node, context, translate, "all"),
   exists: (node, context, translate) => translateQuantifier(node, context, translate, "any"),
   none: (node, context, translate) => `not ${wrapExpression(translateQuantifier(node, context, translate, "any"))}`,
@@ -19,6 +21,32 @@ export const collectionOperatorHandlers: Record<string, PythonOperatorHandler> =
   unique: (node, context, translate) => translateUnique(node, context, translate),
   "is-empty": (node, context, translate) => `len(${translate(node.items[0]!, context)}) == 0`,
   "has-length": (node, context, translate) => `len(${translate(node.items[0]!, context)}) == ${translate(node.items[1]!, context)}`,
+  // EP04 batch 1: collection helpers.
+  length: (node, context, translate) => `stele_length(${translate(node.items[0]!, context)})`,
+  concat: (node, context, translate) => {
+    const args = node.items.map((item) => translate(item, context)).join(", ");
+    return `stele_concat(${args})`;
+  },
+  "sort-by": (node, context, translate) => {
+    const collection = translate(node.items[0]!, context);
+    const pathParts = JSON.stringify(readProjectionPath(node.items[1]!));
+    return `stele_sort_by(${collection}, ${pathParts})`;
+  },
+  "sort-by-desc": (node, context, translate) => {
+    const collection = translate(node.items[0]!, context);
+    const pathParts = JSON.stringify(readProjectionPath(node.items[1]!));
+    return `stele_sort_by_desc(${collection}, ${pathParts})`;
+  },
+  // EP04 batch 1: FP promoted helpers.
+  map: (node, context, translate) => {
+    const collection = translate(node.items[0]!, context);
+    const pathParts = JSON.stringify(readProjectionPath(node.items[1]!));
+    return `stele_map(${collection}, ${pathParts})`;
+  },
+  first: (node, context, translate) => `stele_first(${translate(node.items[0]!, context)})`,
+  last: (node, context, translate) => `stele_last(${translate(node.items[0]!, context)})`,
+  // EP04 batch 1: data access.
+  "type-of": (node, context, translate) => `stele_type_of(${translate(node.items[0]!, context)})`,
 } as Record<string, PythonOperatorHandler>;
 
 function translateCollection(node: ListNode, context: TranslationContext): string {
@@ -67,17 +95,22 @@ function translateExtremum(
   return `${operator}(stele_get_path(item, ${pathParts}) for item in ${collection})`;
 }
 
-function translateWhere(node: ListNode, context: TranslationContext, translate: PythonExpressionTranslator): string {
+function translateWhere(
+  node: ListNode,
+  context: TranslationContext,
+  translate: PythonExpressionTranslator,
+  operatorName: "where" | "filter" = "where",
+): string {
   const binding = node.items[0];
 
   if (binding?.kind !== "identifier") {
     throw new SteleError(
       "E0602",
       "Backend Error",
-      'Operator "where" must bind an identifier.',
+      `Operator "${operatorName}" must bind an identifier.`,
       node.span,
-      "The first where argument becomes the Python list-comprehension variable.",
-      'Use a form like (where txn (collection transactions) ...).',
+      `The first ${operatorName} argument becomes the Python list-comprehension variable.`,
+      `Use a form like (${operatorName} txn (collection transactions) ...).`,
     );
   }
 

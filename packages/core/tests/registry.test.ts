@@ -67,6 +67,30 @@ const EXPECTED_SIGNATURES: ExpectedSignature[] = [
   signature("starts-with", 2, 2, ["String", "String"], parameters(required("String"), required("String")), "Boolean"),
   signature("ends-with", 2, 2, ["String", "String"], parameters(required("String"), required("String")), "Boolean"),
   signature("has-length", 2, 2, ["Collection", "Number"], parameters(required("Collection"), required("Number")), "Boolean"),
+  // EP04 batch 1: collection (4)
+  signature("length", 1, 1, ["Collection"], parameters(required("Collection")), "Number"),
+  signature("concat", 1, "variadic", ["Collection"], parameters(required("Collection"), variadic("Collection")), "Collection"),
+  signature("sort-by", 2, 2, ["Collection", "Path"], parameters(required("Collection"), required("Path")), "Collection"),
+  signature("sort-by-desc", 2, 2, ["Collection", "Path"], parameters(required("Collection"), required("Path")), "Collection"),
+  // EP04 batch 1: arithmetic (5)
+  signature("mod", 2, 2, ["Number", "Number"], parameters(required("Number"), required("Number")), "Number"),
+  signature("pow", 2, 2, ["Number", "Number"], parameters(required("Number"), required("Number")), "Number"),
+  signature("round", 1, 2, ["Number", "Number"], parameters(required("Number"), optional("Number")), "Number"),
+  signature("ceil", 1, 1, ["Number"], parameters(required("Number")), "Number"),
+  signature("floor", 1, 1, ["Number"], parameters(required("Number")), "Number"),
+  // EP04 batch 1: string (5)
+  signature("trim", 1, 1, ["String"], parameters(required("String")), "String"),
+  signature("lower", 1, 1, ["String"], parameters(required("String")), "String"),
+  signature("upper", 1, 1, ["String"], parameters(required("String")), "String"),
+  signature("split", 2, 2, ["String", "String"], parameters(required("String"), required("String")), "Collection"),
+  signature("join", 2, 2, ["Collection", "String"], parameters(required("Collection"), required("String")), "String"),
+  // EP04 batch 1: data access (1)
+  signature("type-of", 1, 1, ["Unknown"], parameters(required("Unknown")), "String"),
+  // EP04 batch 1: FP promoted (3 + 1 alias)
+  signature("map", 2, 2, ["Collection", "Path"], parameters(required("Collection"), required("Path")), "Collection"),
+  signature("first", 1, 1, ["Collection"], parameters(required("Collection")), "Unknown"),
+  signature("last", 1, 1, ["Collection"], parameters(required("Collection")), "Unknown"),
+  signature("filter", 3, 3, ["Symbol", "Collection", "Predicate"], parameters(required("Symbol"), required("Collection"), required("Predicate")), "Collection"),
 ];
 
 describe("createCoreOperatorRegistry", () => {
