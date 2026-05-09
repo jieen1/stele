@@ -1,23 +1,22 @@
 # Stele Phase 2 需求文档
 
-> 版本: 0.1 | 日期: 2026-05-08 | 状态: 草稿
-> 范围: 第二阶段平台扩张（3-6个月）
+> 版本: 2.0 | 日期: 2026-05-08 | 状态: 已审查 (Round 1 + Round 2)
+> 范围: Phase 2 平台扩张（约 8-10 周，2 FTE / 14-16 周，1 FTE）
+> 前置: [Phase 1](prd-phase-1.md) 必须先完成
+> 审查记录: [Round 1](internal/prd-round-1-review.md) · [Round 2](internal/prd-round-2-review.md)
 
 ---
 
 ## 目录
 
 1. [概述](#1-概述)
-2. [EP06: Go 后端](#2-ep06-go-后端)
-3. [EP07: VS Code 扩展](#3-ep07-vs-code-扩展)
-4. [EP08: 自我修复契约](#4-ep08-自我修复契约)
-5. [EP09: 契约变更检测与自动建议](#5-ep09-契约变更检测与自动建议)
-6. [EP10: 观察性仪表板](#6-ep10-观察性仪表板)
-7. [EP11: 插件生态系统](#7-ep11-插件生态系统)
-8. [EP12: Rust 后端](#8-ep12-rust-后端)
-9. [EP13: CDL 操作符增强（批次 2）](#9-ep13-cdl-操作符增强批次-2)
-10. [里程碑和依赖](#10-里程碑和依赖)
-11. [验收标准](#11-验收标准)
+2. [EP10: Go 后端](#2-ep10-go-后端)
+3. [EP11: VS Code 扩展 (MVP)](#3-ep11-vs-code-扩展-mvp)
+4. [EP12: stele impact 变更影响分析](#4-ep12-stele-impact-变更影响分析)
+5. [EP13: CDL 操作符增强批次 2](#5-ep13-cdl-操作符增强批次-2)
+6. [里程碑和依赖](#6-里程碑和依赖)
+7. [验收标准](#7-验收标准)
+8. [Phase 3 候选项（信息性）](#8-phase-3-候选项信息性)
 
 ---
 
@@ -25,944 +24,626 @@
 
 ### 1.1 目标
 
-覆盖更多语言，增强 AI 代理能力，建立观察性。Phase 2 完成后 Stele 需具备：
+完成跨语言扩张与编辑器独立性。Phase 2 完成后 Stele 需具备：
 
-- Go 和 Rust 语言后端
-- VS Code 扩展（语法高亮、内联提示、命令面板）
-- 自我修复契约（违约后自动分析原因并建议修复）
-- 契约变更检测（代码变更→影响分析→契约建议）
-- 观察性仪表板（覆盖率、趋势、严重性分布）
-- 插件系统（第三方操作符、后端、校验器）
-- 70+ 操作符
+- Go 语言后端
+- VS Code 扩展 MVP（语法高亮 + 命令面板 + 内联诊断）
+- 确定性变更影响分析（`stele impact`）
+- 70 → 76 个注册操作符（69 → 75 用户面，+ 1 内部 `entries` 占位）
 
-### 1.2 设计原则
+### 1.2 与 PRD v1.0 的差异
 
-- **平台无关**: VS Code 扩展不依赖 Claude Code
-- **AI 原生**: 自我修复和变更检测利用 AI 代理能力
-- **可插拔**: 插件系统支持第三方扩展
-- **渐进增强**: 不破坏现有工作流，增量增强
+| v1.0 编号 / 主题 | v2.0 决定 | 理由 |
+|---|---|---|
+| EP09 Go 后端 | **保留**，重编号 v2.0 EP10 | 受众清晰；加显式 Phase 0 W0.3 引用 |
+| EP10 VS Code 扩展 MVP | **保留**，重编号 v2.0 EP11 | 删除"publisher 在 Phase 0 W0.1 已设置"声明（Phase 0 仅做 GitHub Marketplace；VS Code 在 Phase 0 W0.1.5 增加 Microsoft publisher 占名）|
+| EP11 `stele impact` | **保留并下修**，重编号 v2.0 EP12 | 仅含 direct + uncovered + orphan；删除 indirect impact（依赖 `depends-on` 字段，但用户当前几乎不填写；用户实际行为优先于规范理想）|
+| EP12 `stele report --format json` | **完全丢弃** | 无命名消费者；`stele check --json` + `manifest.json` 已覆盖机器可读需求；移到 Phase 3 候选，触发条件"首次书面用户请求"|
+| EP13 操作符批次 2 | **保留并裁剪**，编号不变 v2.0 EP13 | 6 → 5 个用户面操作符；删除 `entries`（无 lambda 支持时是死代码）；保留 `max-by`、`min-by`、`unique-by`、`contains-all`、`contains-any` |
+| EP14 agent-hooks SDK + Cursor | **提到 Phase 1 EP09** | Cursor 是最大 AI IDE；竞争窗口不能等 5 个月（Round 2 战略反虚饰审查）|
 
-### 1.3 交付物
+净结果：Phase 2 从 6 个 EP（v1.0：EP09-EP14）缩到 4 个 EP（v2.0：EP10-EP13）；EP14 上升到 Phase 1；EP12 (JSON) 丢弃。
 
-| # | 交付物 | 包 | 估算 |
-|----|--------|-----|------|
-| EP06 | `@stele/backend-go` | 新包 | 3-4 周 |
-| EP07 | VS Code 扩展 | 新包 | 4-6 周 |
-| EP08 | `stele fix` 命令 | `@stele/cli` | 3-4 周 |
-| EP09 | `stele impact` 命令 | `@stele/cli` | 3-4 周 |
-| EP10 | `stele doc --format html` | `@stele/cli` | 2 周 |
-| EP11 | 插件加载器 | `@stele/core` | 4-6 周 |
-| EP12 | `@stele/backend-rust` | 新包 | 4-6 周 |
-| EP13 | 操作符 10+ 个 | `@stele/core` + 各后端 | 1-2 周 |
+### 1.3 设计原则
+
+- **不引入非确定性服务依赖**：所有功能离线可用；不假设 Anthropic API 可达
+- **复刻 Phase 0 一致性套件**：Go 后端、新操作符必须在 `tests/conformance/` 中有 fixture；扩展到 3 个 backend（Python + TypeScript + Go）
+- **VS Code 扩展不与 Claude Code 插件竞争**：MVP 仅覆盖 Claude Code 不在的场景（独立 IDE 用户）
+- **删除即删除**：丢弃的 EP 不在 Phase 2 测试套件 / 文档 / acceptance 中残留
+
+### 1.4 团队规模假设
+
+本计划假设 **2 FTE 并行执行**。单 FTE 时间线 1.6×（约 14-16 周）。
+
+### 1.5 交付物
+
+| # | 交付物 | 包 | 估算 | 关键路径? |
+|---|---|---|---|---|
+| EP10 | `@stele/backend-go` v0.1.0 | 新包 | 4-6 周 | 是 |
+| EP11 | `stelehq.stele-vscode` MVP | 新包 | 2-3 周 | 否 |
+| EP12 | `stele impact` 命令（直接 + 未覆盖 + orphan）| `@stele/cli` | **1 周**（v1.0 是 2 周）| 否 |
+| EP13 | 5 个新操作符 | `@stele/core` + 后端 | 1-2 周 | 否 |
+
+合计原始估算：~8-12 周；2 FTE 并行约 8-10 周。
 
 ---
 
-## 2. EP06: Go 后端
+## 2. EP10: Go 后端
+
+> v1.0 时编号为 EP09；v2.0 重编号为 EP10。
 
 ### 2.1 背景
 
 Go 是云基础设施和微服务的标准语言。AI 基础设施（LLM serving、向量数据库）大量使用 Go。Go 的 `testing` 标准库简单直接。
 
-### 2.2 需求规格
+### 2.2 与 v0.1 草稿的差异（沿用 v1.0 修正）
 
-#### 2.2.1 包结构
+| 草稿 v0.1 | v1.0 / v2.0 | 原因 |
+|---|---|---|
+| 文件名 `test_contract_test.go` | **`contract_main_test.go`** | 草稿命名违反 `coordinator.ts:175-213` 的 E0505 校验 |
+| `Number → float64` 一律 | **保留 int / float64 区分** | 强类型语言一律 `float64` 在比较 ID 等场景 panic |
+| `testify` 强制 | **可选**，默认用标准 `testing` | 不必要的依赖 |
+| `steleWhere(t *testing.T, ...)` | **`steleWhere(coll, pred)` 不接受 t** | 查询助手不应让测试失败 |
+| Scenario / checker runtime 缺失 | **完整移植 Python helpers** | PRD 缺口必须修复 |
+| 与 Phase 0 W0.3 关系隐含 | **§2.3.1 显式引用 W0.3** | v2.0 加：`通过 Phase 0 W0.3 的 backend 注册表装配，与 EP01 同模式` |
+
+### 2.3 需求规格
+
+#### 2.3.1 包结构
 
 ```
 packages/backend-go/
   src/
     translator.ts              -- 主翻译器
-    runtime.ts                 -- Go 运行时源输出
+    runtime/
+      stele_runtime.go         -- Go 运行时辅助源码（generator emit 时重命名为 _stele_runtime.go 以满足 E0505 校验）
+      arithmetic.go.tmpl
+      collection.go.tmpl
+      ...
     templates/
-      comparison.ts            -- Go 比较操作符
-      arithmetic.ts            -- Go 算术操作符
-      collection.ts            -- Go 集合操作符
-      logic.ts                 -- Go 逻辑操作符
-      temporal.ts              -- Go 时间操作符
-      string.ts                -- Go 字符串操作符
-    index.ts                   -- LanguageBackend 实现 + 导出
-  test/
-    operator-coverage.test.ts
+      test-file.go.tmpl        -- *_test.go 模板
+    index.ts                   -- LanguageBackend 实现（通过 Phase 0 W0.3 backend 注册表装配，与 EP01 同模式）
+  tests/
+    translator.test.ts
+    runtime/
+      stele_runtime_test.go    -- Go 端单测
     integration.test.ts
 ```
 
-#### 2.2.2 测试框架
+源码模板用 `stele_runtime.go`（无前缀，便于 Go 包内引用与开发；命名约定）；generator emit 时按 E0505 重命名为 `_stele_runtime.go`。
 
-- **框架**: Go 标准库 `testing`
-- **断言**: `testify`（`require.Equal`, `require.True` 等）
-- 文件命名: `*_test.go`
-- 输出目录: `contract_test/`
+#### 2.3.2 测试框架
 
-#### 2.2.3 生成文件
+- **默认**：标准库 `testing`（无外部依赖）
+- **可选**：`testify` 通过 `stele.config.json` 中 `testFramework: "testify"` 启用
+- 文件命名：`contract_main_test.go`、`contract_<group>_test.go`（snake_case 与 Python `test_<group>.py` 对应）
+- 输出目录：`contract_test/`（Go 习惯将 contract test 放在 standalone 包，单独目录避免污染）
 
-```
-contract_test/
-  stele_helpers.go             -- 运行时辅助函数
-  test_contract_test.go        -- 主测试文件
-  test_<group>_test.go         -- 每个 group 一个测试文件（可选）
-```
+#### 2.3.3 类型模型
 
-#### 2.2.4 Go 运行时辅助函数
+CDL 动态类型 → Go 静态类型映射：
+
+| CDL 类型 | Go 类型 | 注 |
+|---|---|---|
+| `Number` (整数语境) | `int64` | 通过 path 类型推断或上下文 |
+| `Number` (小数语境) | `float64` | sum/avg 自动 promote 为 float64 |
+| `String` | `string` | |
+| `Boolean` | `bool` | |
+| `Collection` | `[]interface{}` | runtime 动态访问 |
+| `Path` | `[]string` 至 `interface{}` | 通过 `steleGetPath` |
+
+混合 int + float64 比较：
+
+- runtime helper `steleNumeric(v interface{}) (int64, float64, bool)` 返回 `(intVal, floatVal, isFloat)`
+- 比较先尝试 int 比较，若任一边是 float 则提升
 
 ```go
-package contract_test
-
-import "testing"
-
-// 路径导航
-func steleGetPath(obj map[string]interface{}, pathSegments []string) interface{}
-
-// 集合操作
-func steleWhere(t *testing.T, collection []map[string]interface{}, predicate func(map[string]interface{}) bool) []map[string]interface{}
-func steleForEach(t *testing.T, collection []map[string]interface{}, predicate func(map[string]interface{}) bool) bool
-func steleExists(t *testing.T, collection []map[string]interface{}, predicate func(map[string]interface{}) bool) bool
-
-// 聚合
-func steleSum(t *testing.T, collection []map[string]interface{}, pathSegments []string) float64
-func steleAvg(t *testing.T, collection []map[string]interface{}, pathSegments []string) float64
-
-// 断言包装
-func requireTrue(t *testing.T, condition bool, msg string) {
-    if !condition {
-        t.Errorf(msg)
-        t.FailNow()
+func steleEq(a, b interface{}) bool {
+    if ai, af, isFloat := steleNumeric(a); isFloat {
+        bf := steleAsFloat(b)
+        return math.Abs(af - bf) < 1e-9
+    } else {
+        bi := steleAsInt(b)
+        return ai == bi
     }
 }
 ```
 
-#### 2.2.5 操作符翻译映射
+#### 2.3.4 路径访问语义
 
-| CDL 操作符 | Go 表达 | 示例 |
-|-----------|---------|------|
-| `forall` | 循环 + `t.Errorf` | `for _, item := range accounts { if steleGetPath(item, []string{"balance"}) <= 0 { t.Errorf(...) } }` |
-| `exists` | 循环 + `found` 标志 | `found := false; for _, item := range orders { if ... { found = true; break } }` |
-| `sum` | 循环累加 | `var total float64; for _, item := range items { total += steleGetPath(item, path).(float64) }` |
-| `matches` | `regexp.MustCompile(pattern).MatchString(str)` | |
-| `in` | `slices.Contains` (Go 1.21+) | |
+与 Python / TypeScript backend 完全等价（参见 EP01 §2.2.4）：
 
-#### 2.2.6 类型推断
-
-Go 是强类型语言。CDL 动态类型需映射到 Go 类型：
-
-- `Number` → `float64`（统一用 float64 避免 int/float 混用问题）
-- `String` → `string`
-- `Boolean` → `bool`
-- `Collection` → `[]map[string]interface{}`
-- `Path` → 通过 `steleGetPath` 返回 `interface{}`，使用时类型断言
-
-### 2.3 非功能性需求
-
-- **Go 版本**: Go >= 1.21（使用 `slices` 包）
-- **性能**: 100+ invariant 生成 < 1 秒
-- **编译**: 生成的代码通过 `go build` 无错误
-
-### 2.4 验收标准
-
-- [ ] `stele generate` 在 Go 项目中生成有效的测试文件
-- [ ] 生成的测试通过 `go test ./contract_test/` 执行
-- [ ] 所有内置操作符翻译通过单元测试
-- [ ] 生成的代码通过 `go vet` 检查
-
----
-
-## 3. EP07: VS Code 扩展
-
-### 3.1 背景
-
-VS Code 是全球最大 IDE。扩展使 Stele 不依赖 Claude Code，独立可用。
-
-### 3.2 需求规格
-
-#### 3.2.1 包结构
-
-```
-packages/vscode-extension/
-  package.json                 -- 扩展定义
-  src/
-    extension.ts               -- 扩展入口
-    languageServer.ts          -- LSP 客户端（或内建）
-    commands/
-      check.ts                 -- Stele: Check
-      generate.ts              -- Stele: Generate
-      lock.ts                  -- Stele: Lock
-      explain.ts               -- Stele: Explain This Violation
-    providers/
-      steleLanguageProvider.ts -- .stele 文件语法高亮
-      diagnosticProvider.ts    -- 内联违约提示
-      treeViewProvider.ts      -- 契约文件导航
-  syntaxes/
-    stele.tmGrammar.json       -- TextMate 语法高亮
-    stele.tmLanguage.json
-  resources/
-    icons/
-      stele.svg
-      invariant.svg
-```
-
-#### 3.2.2 功能规格
-
-**3.2.2.1 语法高亮**
-
-基于 TextMate 语法的 `.stele` 文件高亮：
-
-```json
-{
-  "scopeName": "source.stele",
-  "patterns": [
-    { "match": "\\(invariant", "name": "keyword.declaration.stele" },
-    { "match": "\\(group", "name": "keyword.declaration.stele" },
-    { "match": "\\(assert", "name": "keyword.control.stele" },
-    { "match": ":\\w+", "name": "keyword.other.stele" },
-    { "match": "\"[^\"]*\"", "name": "string.quoted.stele" },
-    { "match": ";.*$", "name": "comment.line.stele" },
-    { "match": "\\b(forall|exists|where|and|or|not)\\b", "name": "keyword.operator.stele" }
-  ]
+```go
+func steleGetPath(obj interface{}, segments []string) (interface{}, error) {
+    current := obj
+    for _, seg := range segments {
+        m, ok := current.(map[string]interface{})
+        if !ok {
+            return nil, fmt.Errorf("path navigation hit non-map at %q", seg)
+        }
+        if v, hit := m[seg]; hit {
+            current = v
+            continue
+        }
+        // kebab → snake fallback (与 Python 一致；Go 习惯 snake_case)
+        snake := strings.ReplaceAll(seg, "-", "_")
+        if v, hit := m[snake]; hit {
+            current = v
+            continue
+        }
+        return nil, fmt.Errorf("path not found: %q", seg)
+    }
+    return current, nil
 }
 ```
 
-**3.2.2.2 命令面板**
+#### 2.3.5 Scenario / Checker Runtime
 
-- `Stele: Check` — 运行 `stele check`，结果输出到面板
-- `Stele: Generate` — 运行 `stele generate`
-- `Stele: Lock` — 运行 `stele lock`
-- `Stele: Explain` — 光标所在行是违约时，解释原因
+完整移植 Python：
 
-**3.2.2.3 内联诊断**
+- `steleRunScenario(steps []Step, ctx *Context) error`
+- `steleCallChecker(name string, args []interface{}, ctx *Context) (CheckerResult, error)`
+- `steleMergeContexts(a, b *Context) *Context`
+- `steleIsModified(before, after interface{}, path []string) bool`
 
-`stele check` 发现违约后：
+Checker 注册接口：
 
-- 在对应文件行上显示错误/警告波浪线
-- hover 显示违约详情（invariant ID、描述、严重程度）
-- quick fix：`stele baseline-init` 或 `stele explain`
+```go
+// contract_test/setup_test.go (用户编写)
+package contract_test
 
-**3.2.2.4 契约导航（Tree View）**
+import "stele/runtime"
 
-侧边栏树形视图：
-
-```
-📋 Stele Contracts
-├── 📄 contracts/
-│   ├── 📄 account.stele
-│   │   ├── 🔒 BALANCE_NON_NEGATIVE (error)
-│   │   ├── 🔒 TRANSACTION_SUM_MATCHES (error)
-│   │   └── 📝 ACCOUNT_NAME_REQUIRED (warning)
-│   └── 📄 transaction.stele
-│       └── 🔒 NO_DBL_SPEND (error)
-└── ⚠️ Violations (3)
-    ├── ❌ BALANCE_NON_NEGATIVE
-    ├── ❌ TRANSACTION_SUM_MATCHES
-    └── ⚠️ ACCOUNT_NAME_REQUIRED
+func SetupSteleContext() *runtime.Context {
+    ctx := runtime.NewContext()
+    ctx.Data["account"] = realAccountSnapshot()
+    ctx.Data["positions"] = loadOpenPositions()
+    ctx.RegisterChecker("balance-change-has-transaction", func(args []interface{}, c *runtime.Context) runtime.CheckerResult {
+        return runtime.CheckerOk()
+    })
+    return ctx
+}
 ```
 
-**3.2.2.5 Tree-sitter 语法（可选增强）**
+`TestMain(m *testing.M)` 通过 generator 在每个 `*_test.go` 顶部生成，自动调用 `SetupSteleContext`。
+
+#### 2.3.6 Failure Witness（与 Phase 1 EP07 一致）
+
+Go runtime helpers 在 `forall`/`exists`/`where`/`none` 失败时构造 `FailureWitness` 结构（与 Python/TS backend 等价的字段），通过 helper 返回值传播到 violation report。witness 字段名与 Phase 1 EP07 §8.2.1 定义一致。
+
+#### 2.3.7 配置扩展
+
+```json
+{
+  "targetLanguage": "go",
+  "testFramework": "testing",
+  "generatedDir": "contract_test",
+  "goModulePath": "github.com/example/myapp/contract_test"
+}
+```
+
+`goModulePath` 是 Go-specific，用于 generator 在文件顶部 emit `package contract_test` 和 import 路径。
+
+`stele init --language go` 可用前置：Phase 0 W0.3 backend 注册表已支持新增条目，CLI 在 init 时校验 language 已注册。
+
+### 2.4 非功能性需求
+
+- **Go 版本**：Go >= 1.21（slices 包）
+- **生成性能**：100 invariant 套件 < 1s（GitHub Actions ubuntu-latest 4-core）
+- **编译**：生成的代码通过 `go build ./contract_test/...` 与 `go vet ./contract_test/...` 无错误
+- **执行**：通过 `go test ./contract_test/...` 全通
+
+### 2.5 验收标准
+
+- [ ] `stele init --language go` 生成正确的 contract 与 setup_test.go 骨架
+- [ ] `stele generate` 生成的 Go 代码通过 `go build` 与 `go vet`
+- [ ] `tests/conformance/` 5 个 Phase 0 fixture + EP04 新增 fixture 全部在 Go backend 上通过
+- [ ] **跨 backend 一致性**：每个 fixture 在 Python + TypeScript + Go 三 backend 上 violation report 字节等价（含 failure_witness 结构等价）
+- [ ] Scenario fixture 在 Go backend 上行为等价
+- [ ] `_stele_runtime.go` 不引入 `testify` 依赖（除非 user 在 config 显式启用）
+- [ ] `examples/go-project/` 演示
+- [ ] `docs/guides/go-integration.md` 完整
+
+---
+
+## 3. EP11: VS Code 扩展 (MVP)
+
+> v1.0 时编号为 EP10；v2.0 重编号为 EP11。
+
+### 3.1 背景
+
+VS Code 是全球最大 IDE。MVP 扩展使 Stele 不依赖 Claude Code，独立可用。
+
+**关键决定**（v1.0）：v0.1 草稿的"完整 VS Code 扩展（含 LSP + Tree View + Tree-sitter + 5 命令）"被降范围至 MVP。Tree View / LSP / Tree-sitter 推迟到 Phase 3。
+
+### 3.2 MVP 范围
+
+| 包含 | 不包含（推迟到 Phase 3）|
+|---|---|
+| TextMate 语法高亮（`.stele` 文件）| LSP 服务器（complete/hover/goto-def）|
+| 命令：`Stele: Check`（运行 `stele check`）| 命令：`Stele: Generate / Lock / Explain`|
+| 内联诊断（基于 `stele check --json` 输出）| Tree View（与 Claude Code 插件功能重复）|
+| Quick Fix：`Suppress in baseline`| Tree-sitter 文法 |
+| 状态栏：违约数显示 | 自定义 UI 面板 |
+
+### 3.3 需求规格
+
+#### 3.3.1 包结构
 
 ```
-packages/vscode-extension/grammars/
-  stele.js                     -- tree-sitter 文法定义
+packages/vscode-extension/
+  package.json                 -- 扩展 manifest
+  src/
+    extension.ts               -- activate / deactivate
+    cliRunner.ts               -- 调用 stele 二进制（带版本检查）
+    diagnostics.ts             -- 解析 violation report 转 vscode.Diagnostic
+    commands/
+      check.ts                 -- vscode.commands.registerCommand("stele.check", ...)
+    statusBar.ts               -- 违约数显示
+    quickFix.ts                -- baseline-update 行动
+  syntaxes/
+    stele.tmLanguage.json      -- TextMate 文法（手写，不依赖 tree-sitter）
+  resources/
+    icon.svg
+  __tests__/
+    extension.test.ts
 ```
 
-#### 3.2.3 配置项
+#### 3.3.2 CLI 调用模型
+
+扩展通过用户工作区的 `npx stele` 调用 CLI（不内嵌）：
+
+- 启动时检查 `npx stele --version`，若失败 → 状态栏显示"Stele CLI not found, install with: npm install --save-dev @stele/cli"
+- 不内嵌 CLI 二进制
+- 调用通过 `child_process.spawn` 异步
+
+#### 3.3.3 内联诊断
+
+```typescript
+async function runCheck(workspaceFolder: vscode.WorkspaceFolder) {
+  const result = await runCli(["check", "--json"], workspaceFolder.uri.fsPath);
+  const violations = JSON.parse(result.stdout) as ViolationReport;
+  const diagsByFile = new Map<string, vscode.Diagnostic[]>();
+  for (const v of violations.violations) {
+    const file = v.location?.file ?? v.scope_paths[0];
+    const line = (v.location?.line ?? 1) - 1; // VS Code 0-based
+    const witness = v.cause.failure_witness;  // EP07 嵌入字段
+    const witnessSummary = witness
+      ? `\n  Witness: index ${witness.failed_at_index} of ${witness.collection_size}`
+      : "";
+    const diag = new vscode.Diagnostic(
+      new vscode.Range(line, 0, line, 1000),
+      `[${v.invariant_id}] ${v.detail?.message ?? "Contract violation"}${witnessSummary}`,
+      severityToVsCode(v.severity),
+    );
+    diag.source = "Stele";
+    diag.code = v.invariant_id;
+    addToMap(diagsByFile, file, diag);
+  }
+  diagnosticCollection.clear();
+  for (const [file, diags] of diagsByFile) {
+    diagnosticCollection.set(vscode.Uri.file(file), diags);
+  }
+}
+```
+
+触发：
+
+- `vscode.workspace.onDidSaveTextDocument`（带 1s debounce）
+- 命令面板 `Stele: Check` 显式触发
+
+#### 3.3.4 TextMate 语法
+
+手写 `stele.tmLanguage.json`，覆盖：
+
+- 顶层声明 `(invariant`、`(group`、`(checker`、`(scenario`、`(metadata`、`(import`、`(operator`、`(boundary`、`(class-shape`、`(function-shape`、`(type-policy`、`(file-policy`
+- 关键字：`assert`、`uses-checker`、`severity`、`description`、`category`、`tags`、`when`、`tolerance`、`depends-on`、`rationale`、`since`、`applies-to`
+- 操作符：完整列表
+- 字符串、数字、关键字（`:critical`/`:high`/`:medium`/`:low`）
+- 注释：`;` 到行尾
+- 平衡括号高亮（VS Code 内建）
+
+测试：手写 fixture `.stele` 文件 + `vscode-tmgrammar-test` 工具校验 token 类型。
+
+#### 3.3.5 配置项
 
 ```json
 {
   "stele.checkOnSave": true,
   "stele.checkOnSaveDebounceMs": 1000,
-  "stele.cliPath": "npx stele",
+  "stele.cliCommand": "npx stele",
   "stele.diagnosticSeverity": {
-    "error": "error",
-    "warning": "warning",
-    "info": "information"
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Information"
   }
 }
 ```
 
-### 3.3 非功能性需求
+#### 3.3.6 Quick Fix
 
-- **启动时间**: 扩展加载 < 500ms
-- **内存**: 稳定运行 < 200MB
-- **兼容性**: VS Code >= 1.90
+仅 1 个 quick fix：
 
-### 3.4 验收标准
+- **"Suppress this violation in baseline"** —— 运行 `npx stele baseline-update --reason "<file>:<line>"` 并刷新诊断
+- 不引入 "auto-fix" 或 "ai suggestion"（保持确定性）
 
-- [ ] `.stele` 文件正确语法高亮
-- [ ] 命令面板命令正确执行
-- [ ] 违约正确显示为内联诊断
-- [ ] Tree View 正确展示契约结构
-- [ ] 扩展发布到 VS Code Marketplace
+#### 3.3.7 发布渠道
+
+VS Code Marketplace（**不**通过 npm publish）。`vsce publish` 流程独立于 `scripts/publish-npm.mjs`。
+
+**前置**：[Phase 0 §4.2.5](prd-phase-0.md) 已完成 Microsoft publisher 账户准备 + `stelehq.stele-vscode` placeholder 0.0.1 占名。本 EP 启动时升级到 0.1.0 含 MVP 功能。
+
+### 3.4 非功能性需求
+
+- **启动时间**：扩展激活 < 200ms（`onLanguage:stele` 事件触发；VS Code 1.85 cold start in 4-core 测试机）
+- **内存**：稳定运行 < 100 MB
+- **VS Code 兼容**：>= 1.85（2023-12 发布）
+
+### 3.5 新增依赖
+
+| 依赖 | 用途 | 备注 |
+|---|---|---|
+| `vscode-tmgrammar-test` | TextMate 语法 token 单测 | npm devDependency |
+| `@vscode/vsce` | Marketplace 发布 | 已在 [Phase 0 §4.2.5](prd-phase-0.md) 安装 |
+
+### 3.6 验收标准
+
+- [ ] `.stele` 文件正确语法高亮（`vscode-tmgrammar-test` 通过 ≥ 95% token）
+- [ ] `Stele: Check` 命令在 Command Palette 出现并可执行
+- [ ] 违约显示为内联诊断，hover 显示 invariant_id + message + witness 摘要（基于 EP07）
+- [ ] Quick Fix "Suppress in baseline" 工作
+- [ ] 状态栏显示违约总数（实时更新）
+- [ ] 无 LSP 依赖（无 Tree View、无 goto-def，**这是有意为之**）
+- [ ] 扩展在 VS Code Marketplace 列出（升级 0.0.1 placeholder → 0.1.0），icon 与 README 完整
 
 ---
 
-## 4. EP08: 自我修复契约
+## 4. EP12: stele impact 变更影响分析
+
+> v1.0 时编号为 EP11；v2.0 重编号为 EP12。**v2.0 进一步下修**：删除 indirect impact 分析。
 
 ### 4.1 背景
 
-违约发生时，人工分析原因是瓶颈。自我修复自动分析代码变更和违约的关系，判断是合理漂移还是真正的 bug，然后生成修复方案。
+代码变更可能影响现有契约。变更分析在编辑**之前**给出预防性提示。
 
-### 4.2 需求规格
+**关键决定**：v0.1 草稿的 EP08（自我修复）丢弃；v1.0 EP11 → v2.0 EP12 仅保留**确定性**的影响分析。v2.0 进一步删除"indirect impact"维度（依赖 `depends-on` 字段，实际用户填写率低；不如把那部分代码省了）。
 
-#### 4.2.1 命令设计
+### 4.2 与 v1.0 的差异
 
-```bash
-# 自动分析违约原因并给出建议
-stele fix --suggest
+| v1.0 | v2.0 |
+|---|---|
+| direct + indirect + uncovered + orphan | direct + uncovered + orphan |
+| 通过 `depends-on` 链推断 indirect | 删除 |
+| 估算 2 周 | **1 周** |
 
-# 自动应用修复（需确认）
-stele fix --auto --confirm
+### 4.3 需求规格
 
-# 对特定违约修复
-stele fix --invariant BALANCE_NON_NEGATIVE
-```
-
-#### 4.2.2 分析流程
-
-```
-1. 获取当前违约列表（stele check --json）
-2. 对每个违约:
-   a. 获取 diff-from 的变更（git diff）
-   b. 识别变更的代码区域（AST diff）
-   c. 匹配受影响的 invariant（applies-to, depends-on 链）
-   d. 分类原因:
-      - 合理漂移: 代码正常演进，invariant 定义过时
-      - 真正 bug: 代码变更确实破坏了不变量
-      - 误报: invariant 定义有歧义
-   e. 生成修复建议:
-      - 合理漂移 → 提案更新 invariant
-      - 真正 bug → 生成代码修复补丁
-      - 误报 → 提案修改 invariant 描述或条件
-3. 输出报告（JSON 或人类可读格式）
-```
-
-#### 4.2.3 输出格式
-
-```json
-{
-  "fixId": "fix-2026-05-08-001",
-  "invariantId": "BALANCE_NON_NEGATIVE",
-  "violationFingerprint": "sha256:abc123...",
-  "rootCause": "code-change",
-  "classification": "reasonable-drift",
-  "reasoning": "The `balance` field was changed from `int` to `float`, and the invariant uses `gt (path balance) 0` which fails for zero balances that are now valid.",
-  "suggestedFix": {
-    "type": "update-invariant",
-    "currentAssert": "(gt (path balance) 0)",
-    "proposedAssert": "(gte (path balance) 0)",
-    "rationale": "Zero balance is valid after float migration."
-  },
-  "confidence": 0.85,
-  "requiresHumanReview": true
-}
-```
-
-#### 4.2.4 AI 代理集成
-
-利用 AI 代理能力进行智能分析：
-
-```typescript
-interface FixAnalysisResult {
-  classification: "reasonable-drift" | "real-bug" | "false-positive";
-  reasoning: string;
-  suggestedFix: SuggestedFix;
-  confidence: number;
-}
-
-async function analyzeViolation(
-  violation: Violation,
-  diff: GitDiff,
-  invariant: InvariantDeclaration,
-  context: string
-): Promise<FixAnalysisResult> {
-  // 构建 prompt: 包含 invariant 定义、代码变更、违约详情
-  // 调用 AI 代理进行分析
-  // 返回分类和建议
-}
-```
-
-#### 4.2.5 安全约束
-
-- **所有修复必须经过人类审批**（`--confirm` 标志）
-- **不允许直接修改 `.stele` 文件**（只生成提案，通过 `stele propose` 流程）
-- **代码修复以补丁形式输出**（diff），用户手动应用
-- **置信度 < 0.7 的修复标记为低置信度**，建议人工分析
-
-### 4.3 非功能性需求
-
-- **分析时间**: 单个违约分析 < 5 秒（含 AI 调用）
-- **准确率**: 分类准确率 > 80%（基于测试集）
-
-### 4.4 验收标准
-
-- [ ] `stele fix --suggest` 输出合理的修复建议
-- [ ] 修复建议包含原因分类、推理、建议代码
-- [ ] 所有修复需人类审批
-- [ ] 置信度低时明确标注
-
----
-
-## 5. EP09: 契约变更检测与自动建议
-
-### 5.1 背景
-
-代码变更可能影响现有契约。变更检测在编辑**之前**提供预防性建议，而非违约**之后**的修复。
-
-### 5.2 需求规格
-
-#### 5.2.1 命令设计
+#### 4.3.1 命令
 
 ```bash
-# 分析当前变更对契约的影响
-stele impact
-
-# 指定对比基准
-stele impact --diff-from main
-
-# 输出 JSON（CI 集成）
-stele impact --json
+stele impact                          # 当前 worktree vs HEAD
+stele impact --diff-from main         # 当前 worktree vs main
+stele impact --json                   # 机器可读
 ```
 
-#### 5.2.2 分析流程
+#### 4.3.2 算法
 
 ```
-1. 获取 git diff（当前工作区 vs 指定基准）
-2. 解析 diff，识别变更的代码元素:
-   - 新增/删除/修改的函数
-   - 新增/删除/修改的类
-   - 新增/删除的字段
-   - 方法签名变更
-3. 对每个变更元素:
-   a. 查找引用的 invariant（通过 applies-to 路径匹配）
-   b. 查找 depends-on 链（传递依赖）
-   c. 判断影响类型:
-      - 直接影响: 代码元素被 invariant 直接引用
-      - 间接影响: 通过 depends-on 链影响
-      - 潜在影响: 路径模式可能匹配但不确定
-4. 生成影响报告 + 建议:
-   - 如果受影响 invariant 可能需要更新 → 建议 review
-   - 如果新增代码缺乏契约覆盖 → 建议新增 invariant
-   - 如果删除代码导致 orphan invariant → 建议清理
+1. 计算 git diff（从 --diff-from 到当前 worktree，含 staged/unstaged/untracked）
+2. 对每个变更的 file path：
+   a. 查找所有 invariant 的 applies-to 字段
+   b. 若 applies-to 与变更 file 进行 minimatch / 字符串匹配
+      - 匹配 → "直接影响"
+3. 收集**未被任何 invariant 的 applies-to 覆盖**的变更 file → "未覆盖"
+4. 收集 applies-to 引用了**已删除的 file**的 invariant → "孤儿"
 5. 输出报告
 ```
 
-#### 5.2.3 输出格式
+注意：
+
+- **不**做 AST diff
+- **不**做 indirect / depends-on 链传递（v2.0 删除）
+- 用户填 `depends-on` 时仍可手动追踪；本命令不替代 review
+
+#### 4.3.3 输出（机器可读）
 
 ```json
 {
-  "analysisId": "impact-2026-05-08-001",
-  "diffFrom": "main",
+  "diff_from": "main",
+  "head_ref": "feature/balance-refactor",
   "timestamp": "2026-05-08T10:00:00Z",
-  "affectedInvariants": [
+  "changed_files": ["ledger/account.py", "ledger/transaction.py"],
+  "affected_invariants": [
     {
-      "invariantId": "BALANCE_NON_NEGATIVE",
-      "impactLevel": "direct",
-      "changedElements": ["ledger/account.py:Account.balance"],
-      "recommendation": "review",
-      "reasoning": "The `balance` field type changed from int to float. Invariant uses `gt` which may need to become `gte`."
+      "invariant_id": "BALANCE_NON_NEGATIVE",
+      "matched_files": ["ledger/account.py"],
+      "applies_to": "ledger/account.py",
+      "recommendation": "review"
     }
   ],
-  "uncoveredChanges": [
+  "uncovered_changes": [
     {
-      "changedElement": "ledger/transaction.py:Transaction.refund_amount",
-      "recommendation": "add-invariant",
-      "suggestion": "Consider adding an invariant to ensure refund_amount <= original_amount."
+      "file": "ledger/transaction.py",
+      "matched_by_no_applies_to": true,
+      "recommendation": "consider-adding-invariant"
     }
   ],
-  "orphanInvariants": [
+  "orphan_invariants": [
     {
-      "invariantId": "OLD_VALIDATION",
-      "reasoning": "The `validate_legacy` function referenced by this invariant was removed."
+      "invariant_id": "OLD_VALIDATION",
+      "applies_to": "legacy/validate.py",
+      "reason": "applies-to file does not exist",
+      "recommendation": "consider-removing"
     }
   ]
 }
 ```
 
-#### 5.2.4 与 Self-Healing 的区别
+JSON schema 文档化在 `docs/spec/cli-output.md`（**不**在 CDL spec）。
 
-| 维度 | Self-Healing (EP08) | 变更检测 (EP09) |
-|------|---------------------|-----------------|
-| 触发时机 | 违约发生后 | 代码变更时（编辑前） |
-| 目标 | 修复已发生的违约 | 预防违约发生 |
-| 输入 | 违约报告 + 代码 diff | 代码 diff |
-| 输出 | 修复建议 | 影响分析 + 建议 |
+#### 4.3.4 与 stele check 的关系
 
-### 5.3 验收标准
+`stele impact` 是**预防性**（编辑前 / PR 评审中）；`stele check` 是**强制性**（CI gate）。两者不重叠。
 
-- [ ] `stele impact` 正确识别受影响的 invariant
-- [ ] 直接影响和间接影响分类准确
-- [ ] 未覆盖的代码变更有新增 invariant 建议
-- [ ] orphan invariant 检测准确
-- [ ] JSON 输出格式可用于 CI 集成
+CI 集成（在 EP02 GitHub Action 中可加 mode）：
+
+```yaml
+- uses: stelehq/stele-action@v1
+  with:
+    mode: impact          # 新增模式
+    diff-from: ${{ github.event.pull_request.base.sha }}
+    pr-comment: true      # impact 报告作为单独评论
+```
+
+### 4.4 验收标准
+
+- [ ] `stele impact` 在 examples/finance-guard 上正确识别直接影响
+- [ ] orphan invariant 检测准确（人造 fixture：删除一个 applies-to 引用的文件）
+- [ ] uncovered changes 准确（人造 fixture：变更一个无 applies-to 覆盖的文件）
+- [ ] **不存在** indirect impact 输出字段（v2.0 删除）
+- [ ] `--json` 输出 schema 文档化在 `docs/spec/cli-output.md`
+- [ ] **不**调用任何外部服务（AI、网络）；离线可用
+- [ ] 大变更（100+ files）分析时间 < 5s
 
 ---
 
-## 6. EP10: 观察性仪表板
+## 5. EP13: CDL 操作符增强批次 2
 
-### 6.1 背景
+### 5.1 v2.0 操作符清单
 
-大型团队需要可视化的契约健康度报告。HTML 报告作为最低成本方案。
+5 个新操作符（v1.0 是 6 个；v2.0 删除 `entries`）：
 
-### 6.2 需求规格
+| 操作符 | 签名 | 语义钉死 |
+|---|---|---|
+| `max-by` | `(Collection, Path) -> Unknown` | 按路径值最大的元素；空集合抛错；并列时返回**第一个** |
+| `min-by` | `(Collection, Path) -> Unknown` | 按路径值最小的元素；空集合抛错；并列时返回第一个 |
+| `unique-by` | `(Collection, Path) -> Collection` | 按路径值去重，保留**第一次出现**；保持原顺序 |
+| `contains-all` | `(Collection, Collection) -> Boolean` | 第二集合是第一集合的子集；按值比较（non-strict equality）|
+| `contains-any` | `(Collection, Collection) -> Boolean` | 两集合交集非空 |
 
-#### 6.2.1 命令设计
+**已删除 `entries`**：v1.0 PRD 提议 `entries` 把 Map 转为 Pair Collection，目的是配合 lambda + `group-by`。但：
 
-```bash
-# 生成 HTML 报告
-stele doc --format html --output reports/contract-health.html
+- v0.2 没有 lambda 支持
+- `group-by` 在 EP04 中已标记为 internal-only
+- 没有 lambda 时 `entries` 是死代码
 
-# 生成 JSON 数据（供 Grafana 等消费）
-stele doc --format json --output reports/contract-health.json
-```
+`entries` 移到 Phase 3 候选，触发条件"lambda 支持落地"。
 
-#### 6.2.2 HTML 报告内容
+### 5.2 实现范围（每个操作符）
 
-单页 HTML 报告，内联样式（无需外部依赖）：
+每个操作符需在 EP04 §5.4 的同样 8 项中**全部**完成：注册、validator、Python translator、Python runtime、TypeScript translator、TypeScript runtime、Go translator、Go runtime、conformance fixture、正反单测。
 
-**6.2.2.1 概览卡片**
+由于 Phase 2 引入 Go backend，每个操作符需在 **3 个 backend** 实现。每操作符约 6-8 小时；5 个操作符 ≈ 30-40 小时；约 1-1.5 周（2 FTE 并行）。
 
-- 契约覆盖率: 多少代码被契约保护（受保护文件数 / 总文件数）
-- 违约总数: 按严重程度分类
-- 活跃不变量数
-- 最近检查时间
+### 5.3 总数（v2.0 钉死）
 
-**6.2.2.2 违约趋势**
+| 阶段边界 | 注册总数 | 用户面（去 alias，去内部）|
+|---|---|---|
+| Phase 1 末 | 70 注册（51 + 18 新 + 1 内部 group-by + 1 alias filter）| 69 |
+| Phase 2 末 (含本 EP) | 70 + 5 = **75** 注册 | 69 + 5 = **74** |
 
-折线图（使用纯 SVG/CSS，无外部库）：
+> v1.0 PRD §6.4 的 "76" 假设 `entries` 也注册。v2.0 删除 `entries` 后修正为 75 注册（74 用户面）。
 
-- 按时间的违约数量变化
-- 按严重程度的分布
+### 5.4 文档
 
-**6.2.2.3 严重性分布**
+- 更新 `docs/spec/cdl.md` 操作符总数到 **75 注册（74 用户面）**
+- 更新 "Operator semantics across backends" 表格
 
-饼图: error / warning / info
+### 5.5 验收标准
 
-**6.2.2.4 热点文件**
-
-列表: 违约最多的文件/模块
-
-```
-文件                          违约数  严重程度
-──────────────────────────────────────────
-ledger/account.py              3      2 error, 1 warning
-ledger/transaction.py          2      2 error
-api/handlers.py                1      1 warning
-```
-
-**6.2.2.5 契约清单**
-
-可折叠的表格:
-
-| ID | 描述 | 严重程度 | 分类 | 状态 | since |
-|----|------|---------|------|------|-------|
-| BALANCE_NON_NEGATIVE | 账户余额不得为负 | error | accounting | ✅ passing | 2026-01-15 |
-| TRANSACTION_SUM_MATCHES | 交易金额之和等于总额 | error | accounting | ❌ failing | 2026-01-15 |
-
-**6.2.2.6 契约时间线**
-
-每个 invariant 的 `since` 时间线：
-
-```
-BALANCE_NON_NEGATIVE
-├── 2026-01-15  创建 (initial)
-├── 2026-03-01  更新 (relaxed condition)
-└── 2026-05-01  更新 (added category)
-```
-
-#### 6.2.3 JSON 输出格式
-
-```json
-{
-  "generatedAt": "2026-05-08T10:00:00Z",
-  "coverage": {
-    "totalFiles": 150,
-    "protectedFiles": 45,
-    "percentage": 30.0
-  },
-  "violations": {
-    "total": 12,
-    "bySeverity": { "error": 8, "warning": 3, "info": 1 },
-    "byFile": { "ledger/account.py": 3, "ledger/transaction.py": 2, ... }
-  },
-  "invariants": {
-    "total": 24,
-    "passing": 20,
-    "failing": 4
-  },
-  "trends": [
-    { "date": "2026-04-01", "count": 15 },
-    { "date": "2026-04-15", "count": 12 },
-    { "date": "2026-05-01", "count": 10 }
-  ]
-}
-```
-
-#### 6.2.4 Prometheus 指标（可选，远期）
-
-```
-# Stele 契约违约总数
-stele_violations_total{severity="error"} 8
-stele_violations_total{severity="warning"} 3
-
-# Stele 契约覆盖率
-stele_coverage_ratio 0.3
-
-# Stele 不变量状态
-stele_invariants_total{status="passing"} 20
-stele_invariants_total{status="failing"} 4
-```
-
-### 6.3 非功能性需求
-
-- **报告大小**: < 500KB（内联样式，无外部依赖）
-- **生成时间**: < 1 秒
-- **兼容性**: Chrome/Edge/Firefox/Safari 最新两个版本
-
-### 6.4 验收标准
-
-- [ ] HTML 报告正确展示概览、趋势、分布、热点、清单
-- [ ] JSON 输出格式正确
-- [ ] 报告无外部依赖（内联样式）
-- [ ] 浏览器兼容性测试通过
+- [ ] 5 个操作符注册并通过类型校验
+- [ ] 在 Python + TypeScript + Go 三个 backend 上 conformance fixture 字节等价
+- [ ] 空集合行为（`max-by`、`min-by`）跨 backend 一致（皆抛 SteleRuntimeError）
+- [ ] **不存在** `entries` 操作符注册
+- [ ] CDL spec 操作符总数与注册表一致（CI lint 校验）
 
 ---
 
-## 7. EP11: 插件生态系统
+## 6. 里程碑和依赖
 
-### 7.1 背景
+### 6.1 团队 2 FTE 规划（8-10 周）
 
-允许第三方扩展 Stele 的能力（操作符、后端、校验器）。
+| 周 | Eng A（核心 + Go）| Eng B（IDE + 集成）|
+|---|---|---|
+| W1-2 | EP10 Go 后端骨架 + 操作符翻译 | EP11 VS Code MVP（语法 + 命令）|
+| W3 | EP10 runtime + scenario | EP11 内联诊断 + Quick Fix |
+| W4 | EP10 完成 + 狗食 | EP11 完成 + Marketplace 0.1.0 升级 |
+| W5 | EP13 操作符批次 2（Go 落地）| EP12 stele impact（1 周）|
+| W6 | EP13 完成 | EP12 完成 + 文档 |
+| W7-8 | conformance suite 扩充（含 Go）| 文档收尾 + 发布前修复 |
 
-### 7.2 需求规格
-
-#### 7.2.1 插件 API
-
-```typescript
-// 插件接口
-interface StelePlugin {
-  name: string;
-  version: string;
-
-  // 注册自定义操作符
-  operators?: OperatorSpec[];
-
-  // 注册自定义后端
-  backends?: LanguageBackend[];
-
-  // 注册自定义校验器
-  checkers?: CheckerSpec[];
-
-  // 插件初始化钩子
-  init?(context: PluginContext): void;
-}
-
-// 插件上下文
-interface PluginContext {
-  registerOperator(spec: OperatorSpec): void;
-  registerBackend(backend: LanguageBackend): void;
-  registerChecker(spec: CheckerSpec): void;
-}
-```
-
-#### 7.2.2 插件配置
-
-`stele.config.json` 中的 `plugins` 字段：
-
-```json
-{
-  "plugins": [
-    {
-      "name": "@stele/plugin-http",
-      "path": "./plugins/http-plugin.cjs"
-    },
-    {
-      "name": "my-custom-operators",
-      "path": "./plugins/custom-operators.cjs"
-    }
-  ]
-}
-```
-
-#### 7.2.3 插件加载机制
+### 6.2 依赖图
 
 ```
-1. 读取 stele.config.json 的 plugins 字段
-2. 对每个插件:
-   a. 解析 path（node_modules 或本地路径）
-   b. 动态导入 (import())
-   c. 验证返回对象符合 StelePlugin 接口
-   d. 调用 init() 钩子
-   e. 注册操作符/后端/校验器到全局注册表
-3. 记录已加载插件列表（stele --version 显示）
+Phase 1 完成
+   │
+   ├──→ EP10 (Go 后端) ────────┐
+   │                            │
+   ├──→ EP11 (VS Code MVP)      │
+   │                            │
+   └──→ EP12 (stele impact)     │
+                                │
+                                ↓
+                            EP13 (操作符批次 2)  ← 必须等 EP10 完成（Go runtime 落地）
+                                │
+                                ↓
+                            Phase 2 验收
 ```
 
-#### 7.2.4 插件沙箱
+### 6.3 关键路径
 
-- **操作符插件**: 只注册 `OperatorSpec`，不执行用户代码
-- **后端插件**: 实现 `LanguageBackend` 接口，在沙箱中运行
-- **校验器插件**: 外部进程执行（已有 checker 机制），不做额外沙箱
-
-#### 7.2.5 插件示例
-
-**操作符插件**:
-
-```javascript
-// plugins/custom-operators.cjs
-module.exports = {
-  name: "custom-operators",
-  version: "1.0.0",
-  operators: [
-    {
-      name: "http-get",
-      description: "Perform HTTP GET request",
-      params: [
-        { name: "url", type: "String", required: true }
-      ],
-      returnType: "Unknown"
-    }
-  ]
-};
-```
-
-**后端插件**:
-
-```javascript
-// plugins/php-backend.cjs
-module.exports = {
-  name: "php-backend",
-  version: "1.0.0",
-  backends: [
-    {
-      name: "php",
-      framework: "phpunit",
-      fileExtension: ".php",
-      version: "0.1",
-      generate: async (contract, config) => { /* ... */ },
-      supportFiles: async (contract, config) => { /* ... */ }
-    }
-  ]
-};
-```
-
-### 7.3 非功能性需求
-
-- **加载时间**: 单插件加载 < 100ms
-- **安全性**: 插件不能访问文件系统敏感区域（已有 import 路径限制）
-- **向后兼容**: 插件 API 需版本化（`apiVersion: "1.0"`）
-
-### 7.4 验收标准
-
-- [ ] `stele.config.json` 正确加载插件
-- [ ] 操作符插件注册后可在 CDL 中使用
-- [ ] 后端插件注册后可通过 `stele generate` 选择
-- [ ] 插件加载失败不阻塞 Stele 启动
-- [ ] `stele --version` 显示已加载插件列表
+`Phase 1 完成 → EP10 → EP13` 是关键路径。EP11、EP12 在关键路径之外可并行。
 
 ---
 
-## 8. EP12: Rust 后端
+## 7. 验收标准（总）
 
-### 8.1 背景
+### 7.1 功能验收
 
-Rust 在安全关键系统中广泛使用，社区重视正确性。Rust 的 `proptest` 库是属性测试的优秀选择。
+- [ ] Go 项目可正常生成与执行契约测试（含 failure_witness 结构等价）
+- [ ] VS Code 扩展 MVP 在 Marketplace 列出，`.stele` 高亮 + 内联诊断（含 EP07 witness 摘要）工作
+- [ ] `stele impact` 离线确定性输出（无 AI 调用，无 indirect 字段）
+- [ ] **75 个注册操作符（74 用户面）跨 Python / TypeScript / Go 三个 backend 一致**
+- [ ] **不存在** `stele report --format json` 命令（v2.0 已丢弃）
+- [ ] **不存在** `entries` 操作符（v2.0 已删除）
+- [ ] **不存在** v1.0 EP14 (Cursor 适配器) 在 Phase 2 中（已上升到 Phase 1 EP09）
 
-### 8.2 需求规格
+### 7.2 质量验收
 
-#### 8.2.1 包结构
-
-```
-packages/backend-rust/
-  src/
-    translator.ts
-    runtime.ts
-    templates/
-      comparison.ts
-      arithmetic.ts
-      collection.ts
-      logic.ts
-      temporal.ts
-      string.ts
-    index.ts
-  test/
-    operator-coverage.test.ts
-    integration.test.ts
-```
-
-#### 8.2.2 测试框架
-
-- **框架**: Rust `#[test]`（标准库）
-- **属性测试**: `proptest`（可选，通过配置开启）
-- **断言**: `assert_eq!`, `assert!`
-- 文件命名: `tests/contract_*.rs`
-
-#### 8.2.3 生成文件
-
-```
-tests/
-  contract_helpers.rs          -- 运行时辅助函数
-  contract_main.rs             -- 主测试文件
-  contract_<group>.rs           -- 每个 group 一个测试文件
-```
-
-#### 8.2.4 Rust 运行时辅助函数
-
-```rust
-use serde_json::Value;
-
-// 路径导航
-pub fn stele_get_path(obj: &Value, path_segments: &[String]) -> Option<&Value> {
-    let mut current = obj;
-    for segment in path_segments {
-        match current {
-            Value::Object(map) => {
-                current = map.get(segment.as_str())?;
-            }
-            _ => return None,
-        }
-    }
-    Some(current)
-}
-
-// 集合操作
-pub fn stele_where(collection: &[Value], predicate: fn(&Value) -> bool) -> Vec<&Value> {
-    collection.iter().filter(|item| predicate(item)).collect()
-}
-
-pub fn stele_forall(collection: &[Value], predicate: fn(&Value) -> bool) -> bool {
-    collection.iter().all(|item| predicate(item))
-}
-```
-
-#### 8.2.5 proptest 集成（可选）
-
-```rust
-use proptest::prelude::*;
-
-proptest! {
-    #[test]
-    fn test_balance_never_negative(account in account_strategy()) {
-        assert!(account["balance"].as_f64().unwrap_or(0.0) >= 0.0);
-    }
-}
-```
-
-### 8.3 非功能性需求
-
-- **Rust 版本**: Rust >= 1.75
-- **编译**: 生成的代码通过 `cargo test` 无错误
-
-### 8.4 验收标准
-
-- [ ] `stele generate` 在 Rust 项目中生成有效的测试文件
-- [ ] 生成的测试通过 `cargo test` 执行
-- [ ] 所有内置操作符翻译通过单元测试
-- [ ] proptest 集成可选且默认关闭
-
----
-
-## 9. EP13: CDL 操作符增强（批次 2）
-
-### 9.1 新增操作符
-
-| 操作符 | 签名 | 描述 |
-|--------|------|------|
-| `map` | `(Collection, Path) -> Collection` | 提取路径值到数组 |
-| `filter` | `(Collection, Predicate) -> Collection` | 按谓词过滤（alias of `where`，更一致） |
-| `max-by` | `(Collection, Path) -> Unknown` | 按路径值找到最大元素 |
-| `min-by` | `(Collection, Path) -> Unknown` | 按路径值找到最小元素 |
-| `median` | `(Collection, Path) -> Number` | 中位数 |
-| `stddev` | `(Collection, Path) -> Number` | 标准差 |
-| `first` | `(Collection) -> Unknown` | 第一个元素 |
-| `last` | `(Collection) -> Unknown` | 最后一个元素 |
-| `slice` | `(Collection, Number, Number) -> Collection` | 切片 `[start, end)` |
-| `flatten` | `(Collection) -> Collection` | 展平嵌套集合 |
-| `unique-by` | `(Collection, Path) -> Collection` | 按路径去重 |
-| `contains-all` | `(Collection, Collection) -> Boolean` | 超集检查 |
-| `contains-any` | `(Collection, Collection) -> Boolean` | 交集非空 |
-| `index-of` | `(Collection, Path, Value) -> Number` | 按路径值查找索引 |
-
-### 9.2 验收标准
-
-同 EP04，所有操作符需注册、翻译、测试全覆盖。
-
----
-
-## 10. 里程碑和依赖
-
-### 10.1 第三个月
-
-| 周 | 任务 | 依赖 |
-|----|------|------|
-| W9 | EP06: Go 后端骨架 + 核心操作符 | `@stele/core` |
-| W10 | EP06: Go 运行时 + 完整操作符 + 集成测试 | EP06 W9 |
-| W11 | EP10: HTML 报告生成器 | `@stele/cli` |
-| W12 | EP13: 操作符增强批次 2 | `@stele/core` |
-
-### 10.2 第四个月
-
-| 周 | 任务 | 依赖 |
-|----|------|------|
-| W13 | EP07: VS Code 扩展骨架 + 语法高亮 | `@stele/cli` |
-| W14 | EP07: 命令面板 + 诊断提供器 | EP07 W13 |
-| W15 | EP08: Self-Healing 分析引擎 | `@stele/cli`, AI 集成 |
-| W16 | EP08: 修复建议生成 + 安全约束 | EP08 W15 |
-
-### 10.3 第五个月
-
-| 周 | 任务 | 依赖 |
-|----|------|------|
-| W17 | EP09: 变更检测 diff 分析 | `@stele/cli` |
-| W18 | EP09: 影响匹配 + 建议生成 | EP09 W17 |
-| W19 | EP11: 插件加载器 + API 设计 | `@stele/core` |
-| W20 | EP11: 操作符/后端/校验器插件支持 | EP11 W19 |
-
-### 10.4 第六个月
-
-| 周 | 任务 | 依赖 |
-|----|------|------|
-| W21 | EP12: Rust 后端骨架 | `@stele/core` |
-| W22 | EP12: Rust 运行时 + 操作符 + proptest | EP12 W21 |
-| W23 | EP07: Tree View + 完善 | EP07 W14 |
-| W24 | 集成测试 + 文档 + Phase 2 验收 | 所有 EP |
-
-### 10.5 依赖图
-
-```
-EP06 (Go) ─────────────────────→ EP13 (操作符批次2)
-                                         ↓
-EP10 (仪表板) ───→ EP11 (插件系统) ──→ Phase 2 验收
-                                     ↑
-EP07 (VS Code) ←── EP08 (Self-Healing)
-                     ↑
-                   EP09 (变更检测)
-                     ↑
-                   EP12 (Rust)
-```
-
----
-
-## 11. 验收标准（总）
-
-### 11.1 功能验收
-
-- [ ] Go 和 Rust 项目可正常生成和执行契约测试
-- [ ] VS Code 扩展语法高亮、诊断、命令面板正常工作
-- [ ] 自我修复能正确分类违约原因并给出建议
-- [ ] 变更检测能准确识别受影响的 invariant
-- [ ] HTML 报告正确展示契约健康度
-- [ ] 插件系统支持第三方操作符和后端
-- [ ] 70+ 操作符覆盖所有语言后端
-
-### 11.2 质量验收
-
+- [ ] 全部 conformance fixture（Phase 0 五个 + Phase 1 新增 + Phase 2 新增）在三 backend 上通过
 - [ ] 所有新增代码测试覆盖率 ≥ 80%
-- [ ] 无 TypeScript 类型错误
-- [ ] 所有现有测试仍然通过
-- [ ] Go 后端生成的代码通过 `go vet`
-- [ ] Rust 后端生成的代码通过 `cargo test`
+- [ ] tsc --strict 无错误
+- [ ] Go 后端生成的代码通过 `go build` 与 `go vet`
 
-### 11.3 文档验收
+### 7.3 文档验收
 
-- [ ] `docs/go-backend.md` — Go 后端快速入门
-- [ ] `docs/vscode-extension.md` — VS Code 扩展指南
-- [ ] `docs/self-healing.md` — 自我修复契约指南
-- [ ] `docs/plugins.md` — 插件开发指南
-- [ ] `docs/rust-backend.md` — Rust 后端快速入门
-- [ ] `examples/go-project/` — Go 示例项目
-- [ ] `examples/rust-project/` — Rust 示例项目
-- [ ] `CHANGELOG.md` 更新
+- [ ] `docs/guides/go-integration.md`
+- [ ] `docs/guides/vscode-extension.md`
+- [ ] `docs/spec/cdl.md` 操作符表更新到 **75 注册（74 用户面）**
+- [ ] `docs/spec/cli-output.md` 含 `stele impact --json` schema
+- [ ] `examples/go-project/`
+- [ ] `CHANGELOG.md` 0.3.0 段落
+
+---
+
+## 8. Phase 3 候选项（信息性）
+
+以下功能在 Round 1 / Round 2 评审中被裁出 Phase 1/2，不构成本 PRD 的承诺，但记录于此为 Phase 3 规划提供输入：
+
+| 候选 | 来源 | 触发条件（可验证）|
+|---|---|---|
+| **Java 后端** | roadmap §4.2.2 | Stele 用户群中 Java 项目 ≥ 5 个并提出请求 |
+| **Rust 后端** | 原 EP12 | 安全关键场景客户出现，且 proptest 集成路径清晰；至少 3 个用户请求 |
+| **HTML 报告** | 原 EP10 | 大团队明确请求；持久化历史的 trends 设计完成 |
+| **Prometheus exporter** | 原 EP10 | HTML 报告先落地，且明确 SRE 集成场景 |
+| **`stele report --format json`** | v1.0 EP12 | **首次书面用户请求**（issue + 使用场景描述）|
+| **多项目工作区文件格式（`stele.workspace.json`）**| v1.0 EP08 | **首次书面用户请求**：用户场景超出 `--recursive` 标志能力范围（如需要拓扑排序、shared imports）|
+| **完整 evaluation trace（多步轨迹）**| Phase 1 EP07 推迟部分 | 用户报告 single-step witness 不够诊断时（issue + 具体例子）|
+| **插件系统** | 原 EP11 | 第三方操作符 / backend 作者出现：至少 1 个外部 PR 包含完整 backend 实现 |
+| **Self-Healing 契约（确定性版本）**| 原 EP08 重思 | Phase 1 EP07 + Phase 2 EP12 GA 后 6 个月，**有用户**报告需要自动应用 baseline-update（issue 量化）|
+| **VS Code LSP / Tree View / Tree-sitter** | EP11 推迟部分 | MVP 用户反馈强烈需要 hover / goto-def（issue ≥ 5）|
+| **`stele audit`（陈旧 invariant 检测）**| Round 1 评审建议 | Phase 1+2 部署后 6 个月有数据可分析 |
+| **Continue.dev 完整适配器** | EP09 推迟部分 | Continue.dev SDK 接口稳定（v1.0+）后 |
+| **`entries` + lambda 操作符** | v1.0 EP13 推迟 | lambda 支持落地后；v0.2 未实现 |
+
+每一项进入 Phase 3 PRD 前必须独立评审（依赖性、用户价值、可行性）。
