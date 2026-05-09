@@ -1,0 +1,10 @@
+;; Core service — Python — minimal demo contract.
+;;
+;; Used by docs/design/phase-1/08-recursive-flag.md to demonstrate
+;; `stele check --recursive` discovering and executing across multiple
+;; projects in a monorepo, including heterogeneous backends.
+
+(invariant CORE_SANITY
+  (severity high)
+  (description "Core invariant placeholder.")
+  (assert (eq 1 1)))

@@ -1,0 +1,10 @@
+;; API service — TypeScript — minimal demo contract.
+;;
+;; Demonstrates that `stele check --recursive` correctly loads the
+;; @stele/backend-typescript backend for this project while loading
+;; @stele/backend-python for sibling `packages/core`.
+
+(invariant API_SANITY
+  (severity high)
+  (description "API invariant placeholder.")
+  (assert (eq 1 1)))

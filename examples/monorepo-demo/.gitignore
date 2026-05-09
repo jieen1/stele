@@ -1,0 +1,5 @@
+# Stele generated artifacts (regenerate via `stele generate --recursive`)
+packages/*/contract/.manifest.json
+packages/*/contract/.baseline.json
+packages/*/contract/.unlock-log.jsonl
+packages/*/tests/contract/

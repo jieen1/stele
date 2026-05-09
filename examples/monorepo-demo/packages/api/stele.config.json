@@ -1,0 +1,18 @@
+{
+  "version": "0.1",
+  "contractDir": "contract",
+  "entry": "contract/main.stele",
+  "generatedDir": "tests/contract",
+  "checkerImplDir": "contract/checker_impls",
+  "manifestPath": "contract/.manifest.json",
+  "targetLanguage": "typescript",
+  "testFramework": "vitest",
+  "pathMode": "auto",
+  "protected": [
+    "contract/**/*.stele",
+    "contract/checker_impls/**/*",
+    "contract/.baseline.json",
+    "contract/.manifest.json",
+    "tests/contract/**/*"
+  ]
+}

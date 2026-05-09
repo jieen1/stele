@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve, win32 } from "node:path";
 import { promisify } from "node:util";
 import {
+  SteleError,
   createViolation,
   createViolationReport,
   filterViolationReport,
@@ -19,18 +20,21 @@ import {
   type ViolationBaseline,
   type ViolationReport,
 } from "@stele/core";
+import { loadBackend } from "../backend-registry.js";
 import { STELE_BASELINE_FILE, STELE_CONFIG_FILE, type SteleConfig } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { evaluateCodeShapes } from "../code-shape/evaluate.js";
-import { CliCommandError, ExitCode } from "../errors.js";
+import { CliCommandError, ExitCode, getExitCode } from "../errors.js";
+import { writeLastReport } from "../last-report.js";
+import { discoverProjects } from "../recursive-discovery.js";
 import {
   assertProtectedContractFilesReachable,
   collectProtectedPaths,
-  createLanguageBackend,
   sha256,
   toManifestPaths,
   verifyManagedGeneratedFiles,
 } from "./generate.js";
+import { aggregateExitCode, formatRecursiveHeader, formatRecursiveSummary, type SubReport } from "./recursive.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,6 +49,13 @@ export type CheckCommandOptions = {
   json?: boolean;
   reportFile?: string;
   lenient?: boolean;
+  recursive?: boolean;
+};
+
+export type RecursiveCheckResult = {
+  exitCode: number;
+  subReports: SubReport[];
+  jsonOutput?: string;
 };
 
 export type CheckCommandResult = {
@@ -81,6 +92,7 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   const generatedReport = applyFiltersToReport(buildGeneratedStageReport(context, "check"), filters);
 
   if (!generatedReport.ok) {
+    await persistLastReport(projectDir, generatedReport);
     throw new CheckCommandError(getCheckExitCode(generatedReport), generatedReport);
   }
 
@@ -98,19 +110,162 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   const report = mergeCheckReports(reports);
 
   if (!report.ok) {
+    await persistLastReport(projectDir, report);
     throw new CheckCommandError(getCheckExitCode(report), report);
   }
 
+  const finalReport = withCheckSummary(report, protectedState.summary);
+  await persistLastReport(projectDir, finalReport);
+
   return {
     summary: protectedState.summary,
-    report: withCheckSummary(report, protectedState.summary),
+    report: finalReport,
   };
+}
+
+/**
+ * Persist the most recent violation report to `contract/.last-check-report.json`.
+ *
+ * `stele why <id>` reads this to surface the failure witness from the last
+ * check run. Failures are non-fatal: if persistence fails (e.g. read-only FS),
+ * we swallow the error rather than masking the underlying check exit code.
+ * EP07 §6.1.
+ */
+async function persistLastReport(projectDir: string, report: ViolationReport): Promise<void> {
+  try {
+    await writeLastReport(projectDir, report);
+  } catch {
+    // Swallow persistence errors so the check command's primary exit signal is
+    // not perturbed by I/O quirks (read-only mount, permission denied). The
+    // worst case is a stale `stele why` snapshot.
+  }
+}
+
+/**
+ * Run `stele check` across every project found under `rootDir` (recursive mode).
+ *
+ * Discovers all `stele.config.json` files, sorts them deterministically, then
+ * invokes single-project `checkProject` on each (with `--recursive` removed from
+ * the per-project options). Per-project output is written via `output` (stdout
+ * for human format, captured for JSON aggregation). Aggregates exit codes per
+ * the EP08 spec (any 1 → 1; else max of 2/3 drift; else max of any non-zero).
+ */
+export async function runCheckRecursive(
+  rootDir: string,
+  options: CheckCommandOptions,
+  output: { stdout: (chunk: string) => void; stderr: (chunk: string) => void },
+): Promise<RecursiveCheckResult> {
+  const projects = await discoverProjects(rootDir);
+
+  if (projects.length === 0) {
+    throw new SteleError(
+      "E_NO_PROJECTS_FOUND",
+      "RecursiveError",
+      `No stele.config.json found under ${rootDir}. Run 'stele init' in a sub-directory first.`,
+      undefined,
+      undefined,
+      "Run 'stele init' in a sub-directory or change to a directory containing Stele projects.",
+    );
+  }
+
+  if (!options.json) {
+    output.stdout(formatRecursiveHeader(projects));
+  }
+
+  const subReports: SubReport[] = [];
+  const subOptions: CheckCommandOptions = { ...options, recursive: false, json: false, reportFile: undefined };
+
+  for (let i = 0; i < projects.length; i++) {
+    const project = projects[i];
+    const indexLabel = `[${i + 1}/${projects.length}]`;
+
+    if (!options.json) {
+      output.stdout(`${indexLabel} checking ${project}\n`);
+    }
+
+    const subReport = await runSingleProjectCheck(project, subOptions);
+    subReports.push(subReport);
+
+    if (!options.json) {
+      const status =
+        subReport.exit_code === 0
+          ? `  passed (${subReport.summary.invariant_count ?? 0} invariants, ${subReport.summary.violation_count ?? 0} violations)`
+          : `  failed (exit ${subReport.exit_code}): ${subReport.summary.violation_count ?? 0} violation${subReport.summary.violation_count === 1 ? "" : "s"}`;
+      output.stdout(`${status}\n\n`);
+    }
+  }
+
+  const exitCode = aggregateExitCode(subReports);
+
+  if (options.json) {
+    const passed = subReports.filter((report) => report.exit_code === 0).length;
+    const failed = subReports.length - passed;
+    const aggregate = {
+      schema_version: "1" as const,
+      tool: "@stele/cli",
+      command: "check",
+      generated_at: new Date().toISOString(),
+      cwd: rootDir,
+      projects: subReports,
+      max_exit_code: exitCode,
+      passed,
+      failed,
+    };
+    const jsonOutput = `${JSON.stringify(aggregate, null, 2)}\n`;
+    output.stdout(jsonOutput);
+    return { exitCode, subReports, jsonOutput };
+  }
+
+  output.stdout(formatRecursiveSummary(subReports));
+  return { exitCode, subReports };
+}
+
+async function runSingleProjectCheck(projectDir: string, options: CheckCommandOptions): Promise<SubReport> {
+  try {
+    const result = await checkProject(projectDir, options);
+    return {
+      project: projectDir,
+      exit_code: 0,
+      summary: {
+        invariant_count: result.summary.invariantCount,
+        generated_file_count: result.summary.generatedFileCount,
+        protected_file_count: result.summary.protectedFileCount,
+        violation_count: result.report.summary.violation_count ?? 0,
+      },
+      violations: result.report.violations,
+    };
+  } catch (error) {
+    if (isCheckCommandError(error)) {
+      return {
+        project: projectDir,
+        exit_code: error.exitCode,
+        summary: {
+          invariant_count: error.report.summary.invariant_count,
+          generated_file_count: error.report.summary.generated_file_count,
+          protected_file_count: error.report.summary.protected_file_count,
+          violation_count: error.report.summary.violation_count ?? 0,
+        },
+        violations: error.report.violations,
+      };
+    }
+
+    const exitCode = getExitCode(error) ?? 1;
+    const message = error instanceof Error ? error.message : String(error);
+    const code = error instanceof SteleError ? error.code : undefined;
+
+    return {
+      project: projectDir,
+      exit_code: exitCode,
+      summary: { violation_count: 0 },
+      error: { message, code },
+    };
+  }
 }
 
 export async function prepareCheckContext(projectDir: string): Promise<PreparedCheckContext> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
-  const backend = createLanguageBackend(config.generatedDir, config.targetLanguage, config.testFramework);
+  const backend = await loadBackend(config.targetLanguage, config.testFramework);
   const generated = await verifyManagedGeneratedFiles(projectDir, config.generatedDir, contract, backend);
 
   return {
