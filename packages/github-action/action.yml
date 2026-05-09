@@ -1,0 +1,35 @@
+name: "Stele Contract Check"
+description: "Verify Stele contracts on pull requests with annotations and a live-updating PR comment."
+author: "stelehq"
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  mode:
+    description: "Operating mode: 'check' to verify contracts, 'generate' to detect generated-test drift."
+    required: false
+    default: "check"
+  diff-from:
+    description: "Base ref for --diff-from (defaults to the PR base SHA)."
+    required: false
+    default: ${{ github.event.pull_request.base.sha }}
+  fail-on:
+    description: "Severity threshold that fails the action: 'error' | 'warning' | 'all'."
+    required: false
+    default: "error"
+  annotate:
+    description: "Emit GitHub annotations on the PR diff."
+    required: false
+    default: "true"
+  pr-comment:
+    description: "Post / update a single PR comment with the violation summary."
+    required: false
+    default: "true"
+  token:
+    description: "GitHub token (needs pull-requests:write + checks:write)."
+    required: true
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
