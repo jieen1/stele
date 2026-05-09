@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-07T08:27:01.180Z",
+  "generated_at": "2026-05-08T16:58:05.581Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/.gitkeep": {
@@ -8,25 +8,25 @@
       "size": 0
     },
     "contract/main.stele": {
-      "sha256": "a66e68bf77a054392bdf29c8733bb419b1cd321c8ced89c51870940fa4a1778c",
-      "size": 3109
+      "sha256": "bdefdd3593ca8f441f0c38aca59ecf3a57cc23400940b8a72a56a451c63ab568",
+      "size": 3434
     },
     "tests/contract/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "tests/contract/_stele_runtime.py": {
-      "sha256": "630336187c99c2e4fb85e367dc293487991c116fecc00e94655debbb12b6e697",
-      "size": 5494
+      "sha256": "40346db18e64a30ab0500b01d40e98daec2b4396e41202bf1652943b347016c9",
+      "size": 27506
     },
-    "tests/contract/conftest.py": {
-      "sha256": "5562c88aa87ad07661452ec128ac326355d882d771e1909dea3dd70814e5c4f9",
-      "size": 846
+    "tests/contract/test_code_shape.py": {
+      "sha256": "9e15fd9a7fbb4828b123fba3a16594878d1100afb2eef4433ec284a29382206c",
+      "size": 1299
     },
     "tests/contract/test_contract.py": {
       "sha256": "b11447c2005203ec8227be51035fd0788e9d008a2bc89e1e2248a137e440a403",
       "size": 1754
     }
   },
-  "contract_hash": "8c26fe18859ac50a5cd5dcb6bdb8daa1795473c48ed1ecdf1576a6dfcf6c452f"
+  "contract_hash": "2a11de8303f0c602663bda32b148b879398913a4032c8a18387733bcbef4b84d"
 }

@@ -77,3 +77,14 @@
   (assert (and
     (not-null (path account id))
     (not (is-empty (collection transactions))))))
+
+;; ── Code Shape (EP06): structural rules on app.models.Account ────
+
+(class-shape FG_ACCOUNT_SHAPE
+  (lang python)
+  (target "app/models.py::Account")
+  (must-have-field id "str")
+  (must-have-field currency "str")
+  (must-have-field balance "float")
+  (must-have-method deposit)
+  (must-have-method withdraw))

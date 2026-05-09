@@ -18,7 +18,7 @@ export function normalizeContract(contract: Contract): string {
     .join("\n");
 }
 
-function normalizeFile(file: ContractFile): string {
+export function normalizeFile(file: ContractFile): string {
   const topLevelInvariants = new Map(file.invariants.filter((invariant) => invariant.groupId === undefined).map((invariant) => [invariant.node, invariant]));
   const groups = new Map(file.groups.map((group) => [group.node, group]));
 

@@ -107,7 +107,10 @@ function inferBindingCollectionPredicateType(
   const binding = node.items[0]!;
   const collection = node.items[1]!;
   const predicate = node.items[2]!;
-  const operatorLabel = spec.name === "where" ? 'Operator "where"' : `Quantifier "${node.head}"`;
+  const isFilteringOperator = spec.name === "where" || spec.name === "filter";
+  const operatorLabel = isFilteringOperator
+    ? `Operator "${spec.name}"`
+    : `Quantifier "${node.head}"`;
 
   if (binding.kind !== "identifier") {
     throw new SteleError(
@@ -115,7 +118,7 @@ function inferBindingCollectionPredicateType(
       "Validation Error",
       `${operatorLabel} must bind an identifier symbol.`,
       binding.span,
-      `The first ${spec.name === "where" ? "where" : "quantifier"} argument names the element available inside the predicate body.`,
+      `The first ${isFilteringOperator ? spec.name : "quantifier"} argument names the element available inside the predicate body.`,
       "Replace the binding with an identifier such as txn or item.",
     );
   }
@@ -252,7 +255,9 @@ function isTypeAssignable(expectedType: SteleType, actualType: InferredType): bo
 }
 
 function isBindingCollectionPredicateOperator(name: string): boolean {
-  return name === "forall" || name === "exists" || name === "none" || name === "where";
+  return (
+    name === "forall" || name === "exists" || name === "none" || name === "where" || name === "filter"
+  );
 }
 
 function formatPathAsCollectionHint(node: ListNode): string {
