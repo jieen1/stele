@@ -272,12 +272,21 @@ Because `path` has `Unknown` value type, it is valid in value slots such as `eq`
 
 ### Core operators
 
+<!-- BEGIN_CORE_OPERATORS -->
+
+CDL v0.2 ships **70 registered operators** (69 user-facing — `filter` is an alias of `where` and produces byte-identical generated code in both backends).
+
+The next subsections are partitioned by category. Each entry uses the format `name(param: Type, ...) -> ReturnType` and notes the introducing version (`since`) for operators added after v0.1.
+
 #### Data access
 
 - `path(Symbol, ...Symbol) -> Path [value: Unknown]`
 - `field(Path, Symbol) -> Path [value: Unknown]`
 - `collection(Symbol) -> Collection`
 - `value(Unknown) -> Unknown`
+- `type-of(Unknown) -> String` (since 0.2)
+  - Returns one of `"number"`, `"string"`, `"boolean"`, `"collection"`, `"object"`, `"null"`, or `"undefined"`.
+  - Cross-backend semantics: identical. Python collapses `undefined` into `"null"` because Python only has `None`; TypeScript distinguishes the two but both backends agree on the same seven-tag set otherwise.
 
 #### Equality and comparison
 
@@ -302,6 +311,25 @@ Because `path` has `Unknown` value type, it is valid in value slots such as `eq`
 - `div(Number, Number) -> Number`
 - `neg(Number) -> Number`
 - `abs(Number) -> Number`
+- `mod(Number, Number) -> Number` (since 0.2)
+  - Sign-of-divisor (Python) semantics: `mod(-7, 3) = 2`, `mod(7, -3) = -2`.
+  - Divisor of zero raises `SteleRuntimeError`.
+  - Cross-backend semantics: identical. The TypeScript backend wraps JS `%` (sign-of-dividend) so both backends produce sign-of-divisor results.
+- `pow(Number, Number) -> Number` (since 0.2)
+  - IEEE-754 double power, equivalent to `Math.pow`.
+  - Negative base with non-integer exponent yields `NaN` (no exception).
+  - Cross-backend semantics: identical.
+- `round(Number, Number?) -> Number` (since 0.2)
+  - Banker's rounding (half to even). `round(0.5) = 0`, `round(1.5) = 2`, `round(2.5) = 2`, `round(3.5) = 4`, `round(-0.5) = 0`.
+  - Optional second argument is the number of fractional digits, defaulting to `0`. The digits argument must be an integer-valued number; non-integer digits raise `SteleRuntimeError`.
+  - `NaN` and `±Infinity` propagate without error.
+  - Cross-backend semantics: identical. Python 3's built-in `round` is already banker's; the TypeScript backend wraps `Math.round` (half-away-from-zero) to break ties to even.
+- `ceil(Number) -> Number` (since 0.2)
+  - Round toward `+∞`. `NaN` propagates.
+  - Cross-backend semantics: identical.
+- `floor(Number) -> Number` (since 0.2)
+  - Round toward `-∞`. `NaN` propagates.
+  - Cross-backend semantics: identical.
 
 #### Aggregation and collection transforms
 
@@ -313,6 +341,30 @@ Because `path` has `Unknown` value type, it is valid in value slots such as `eq`
 - `distinct(Collection, Path?) -> Collection`
 - `where(Symbol, Collection, Predicate) -> Collection`
 - `unique(Collection, Path?) -> Boolean`
+- `length(Collection) -> Number` (since 0.2)
+  - Returns the number of elements; empty collection returns `0`. Non-collection input raises `SteleRuntimeError`.
+  - Cross-backend semantics: identical (Python `len()`, TypeScript `Array.length`).
+- `concat(Collection, ...Collection) -> Collection` (since 0.2)
+  - Variadic flat concatenation of one or more collections; preserves duplicates and original element order. Element types are not coerced (e.g. concatenating numbers and strings yields a mixed-type collection).
+  - Cross-backend semantics: identical.
+- `sort-by(Collection, Path) -> Collection` (since 0.2)
+  - Stable ascending sort projected by a path. Numbers compare via `<`; strings compare lexicographically by raw byte/codepoint order (locale-independent). `NaN` sorts to the front; `null`/`undefined` sort to the end.
+  - Cross-backend semantics: identical.
+- `sort-by-desc(Collection, Path) -> Collection` (since 0.2)
+  - Stable descending counterpart of `sort-by`. `NaN` still sorts to the front and `null`/`undefined` still sort to the end (the descending order applies to the comparable middle tier only).
+  - Cross-backend semantics: identical.
+- `map(Collection, Path) -> Collection` (since 0.2)
+  - Project each item by a path; elements where the path is missing are skipped silently (different from `forall`/`exists`/`none`, which surface path errors).
+  - Cross-backend semantics: identical.
+- `first(Collection) -> Unknown` (since 0.2)
+  - Returns the first element. Empty collection raises `SteleRuntimeError` (does not return `null`/`undefined`).
+  - Cross-backend semantics: identical.
+- `last(Collection) -> Unknown` (since 0.2)
+  - Returns the last element. Empty collection raises `SteleRuntimeError`.
+  - Cross-backend semantics: identical.
+- `filter(Symbol, Collection, Predicate) -> Collection` (since 0.2)
+  - Strict alias of `where`. Translators lower `(filter ...)` to the same generated form as `(where ...)`, so conformance fixtures see byte-identical output between the two operator names.
+  - Cross-backend semantics: identical.
 
 #### Quantifiers
 
@@ -363,6 +415,31 @@ The bound item is only available inside the `where` predicate. Outer bindings re
 
 The filtered collection can be used anywhere a `Collection` is expected by the core type checker. The Python backend currently supports it in `sum`, `avg`, `min`, `max`, `count`, and nested quantifiers.
 
+`filter` is a strict alias of `where` introduced in v0.2; the translator lowers it to the same generated form, so the two operators produce byte-identical backend output.
+
+#### String operators
+
+- `matches(String, String) -> Boolean`
+- `contains(String, String) -> Boolean`
+- `starts-with(String, String) -> Boolean`
+- `ends-with(String, String) -> Boolean`
+- `trim(String) -> String` (since 0.2)
+  - Strips leading and trailing Unicode whitespace (parity with JS `String.prototype.trim()`).
+  - Cross-backend semantics: identical.
+- `lower(String) -> String` (since 0.2)
+  - Locale-independent Unicode lowercase. Both backends use the locale-free variant (`String.toLowerCase` in TypeScript, `str.lower` in Python).
+  - Cross-backend semantics: identical.
+- `upper(String) -> String` (since 0.2)
+  - Locale-independent Unicode uppercase counterpart of `lower`.
+  - Cross-backend semantics: identical.
+- `split(String, String) -> Collection<String>` (since 0.2)
+  - Splits the input by the literal separator string. The separator is matched verbatim (no regex parsing).
+  - Empty separator raises `SteleRuntimeError` in both backends.
+  - Cross-backend semantics: identical.
+- `join(Collection<String>, String) -> String` (since 0.2)
+  - Joins a collection of strings with a separator. Elements that are not strings raise `SteleRuntimeError` at runtime; the validator additionally recognizes `join` so its argument count and argument structural types are enforced statically.
+  - Cross-backend semantics: identical.
+
 #### Boolean and control-flow operators
 
 - `and(Predicate, ...Predicate) -> Boolean`
@@ -385,6 +462,30 @@ The filtered collection can be used anywhere a `Collection` is expected by the c
 - `state-after() -> Unknown`
 
 The Python backend specifically implements `modified` against `stele_context["state-before"]` and `stele_context["state-after"]`.
+
+#### Cross-backend semantics summary (EP04 batch 1)
+
+The following table calls out the new operators introduced in v0.2 and the cross-backend implementation notes that keep their behavior byte-equal:
+
+| Operator | Cross-backend implementation note |
+|---|---|
+| `length` | Python `len(coll)`; TypeScript `Array.length`. Non-collection raises `SteleRuntimeError` in both. |
+| `concat` | Variadic flat concatenation; preserves duplicates and order. |
+| `sort-by` / `sort-by-desc` | Stable sort. NaN sorts to the front, null/undefined to the end, comparable values in the middle. Strings compare via raw codepoint/byte order (no locale). |
+| `mod` | Sign-of-divisor (Python). The TypeScript backend wraps JS `%` (sign-of-dividend) to match. |
+| `pow` | IEEE-754 `Math.pow`. Negative base + non-integer exponent yields `NaN` (no exception). |
+| `round` | Banker's rounding. Python 3's built-in `round` is already banker's; the TypeScript backend wraps `Math.round` (half-away-from-zero) to break ties to even. |
+| `ceil` / `floor` | Standard rounding directions; `NaN` propagates without raising. |
+| `trim` | Unicode whitespace; parity with JS `String.prototype.trim()`. Python uses `re.sub(r"^\\s+|\\s+$", "", s, flags=re.UNICODE)` for parity. |
+| `lower` / `upper` | Locale-independent Unicode case mapping (`str.lower` / `String.toLowerCase`, never the locale-aware variants). |
+| `split` | Empty separator raises `SteleRuntimeError`. Separator matched as a literal (no regex). |
+| `join` | Mixed-type collection raises `SteleRuntimeError` (per-element check); validator enforces the structural argument types statically. |
+| `type-of` | Returns one of `"number"`, `"string"`, `"boolean"`, `"collection"`, `"object"`, `"null"`, `"undefined"`. Python collapses `undefined` into `"null"` because Python only has `None`. |
+| `map` | Path-not-found elements skipped silently (different from `forall`/`exists`/`none`). |
+| `first` / `last` | Empty collection raises `SteleRuntimeError` (does not return null/undefined). |
+| `filter` | Strict alias of `where`; produces byte-identical generated code in both backends. |
+
+<!-- END_CORE_OPERATORS -->
 
 ## Static type checking
 

@@ -1,76 +1,77 @@
 # Stele
 
-Stele is a production contract tool for AI-assisted software delivery. It lives inside an existing application repository, turns contract rules into generated test artifacts, and fails local or CI workflows when protected contract state drifts.
+> Contracts carved in stone for AI-assisted software delivery.
 
-This monorepo currently publishes four packages:
+Stele is a contract management framework for projects where AI agents write code. It turns business invariants into generated tests, locks the protected state with cryptographic hashes, and intercepts agent edits at the editor layer — so an agent **cannot** silently violate the contracts you depend on.
 
-- `@stele/core`
-- `@stele/backend-python`
-- `@stele/cli`
-- `@stele/claude-code-plugin`
+The v0.1 runtime targets existing Python applications that already use `pytest`.
 
-The v0.1 runtime target is existing Python applications that already use `pytest`.
+## Why Stele
+
+AI agents are unreliable executors. They write code confidently, but:
+
+- They are blind to a project's implicit invariants.
+- Fixing one bug often breaks another rule that nobody encoded.
+- A green test suite is not a guarantee that business rules still hold.
+- Discipline is not a property they have — only structure can enforce them.
+
+Stele's answer is three layers that stack:
+
+1. **Contracts** are declared in CDL (a tiny S-expression DSL), in files the agent physically cannot edit.
+2. **Tests are generated** from the contracts, also protected. Any code change must pass them.
+3. **Editor hooks** in Claude Code block direct edits to protected paths and run `stele check` before the agent finishes.
+
+Read [`docs/architecture.md`](docs/architecture.md) for the full picture.
+
+## Packages
+
+This monorepo publishes four npm packages:
+
+| Package | Purpose |
+| --- | --- |
+| [`@stele/core`](packages/core) | Lexer, parser, validator, manifest, generator coordinator |
+| [`@stele/backend-python`](packages/backend-python) | CDL → pytest translator and Python runtime helpers |
+| [`@stele/cli`](packages/cli) | The `stele` executable used by humans, agents, and CI |
+| [`@stele/claude-code-plugin`](packages/claude-code-plugin) | Hooks, slash commands, subagents, and skills for Claude Code |
 
 ## Quickstart
 
-Before a public npm release is available, the supported external-adoption path is the same tarball workflow verified by this repository's `test:packed-adoption` check: install the packed `@stele/core`, `@stele/backend-python`, and `@stele/cli` tarballs into your Python app repository.
-
 ```bash
-npm install --save-dev /absolute/path/to/stele-core-0.1.0.tgz /absolute/path/to/stele-backend-python-0.1.0.tgz /absolute/path/to/stele-cli-0.1.0.tgz
-python -m pytest --version
+# 1. Install (during pre-release, install from packed tarballs)
+npm install --save-dev /abs/path/stele-core-0.1.0.tgz \
+                      /abs/path/stele-backend-python-0.1.0.tgz \
+                      /abs/path/stele-cli-0.1.0.tgz
+
+# 2. Initialize the contract scaffolding
 npx stele init --language python
+
+# 3. Author your first invariant in contract/main.stele
+#    and wire tests/contract/conftest.py to your real app state
+
+# 4. Generate, run, lock, and verify
+npx stele generate
+python -m pytest tests/contract -q
+npx stele lock --reason "initial contract baseline"
+npx stele check
 ```
 
-For local adoption from this checkout on Windows, run the installer from the target application directory:
-
-```powershell
-E:\project\stele\local-packages\install-stele-local.ps1
-```
-
-It installs the packed packages and writes `npm run stele:init`, `npm run stele:generate`, `npm run stele:lock`, and `npm run stele:check` scripts.
-
-After npm publish, install from the registry instead:
+After npm publishes, the install line becomes:
 
 ```bash
 npm install --save-dev @stele/cli @stele/claude-code-plugin
 ```
 
-## npm release
+For Windows local adoption from this checkout:
 
-Run the release preflight:
-
-```bash
-pnpm release:dry-run
+```powershell
+E:\project\stele\local-packages\install-stele-local.ps1
 ```
 
-The script packs each workspace package, verifies that packed manifests do not contain `workspace:*`, and then runs `npm publish --dry-run` against the tarballs. The real publish command is:
+That installs the packed packages and writes `npm run stele:init`, `stele:generate`, `stele:lock`, and `stele:check` scripts.
 
-```bash
-pnpm release:publish
-```
+A complete walkthrough — including the `stele_context` fixture, checker registration, temporal helpers, and the controlled contract-change flow — lives in [`docs/guides/python-integration.md`](docs/guides/python-integration.md).
 
-See [docs/release.md](docs/release.md) for the npm account, trusted publishing, tag, and verification flow.
-
-To verify the installed CLI, use one of the Stele-facing forms:
-
-```bash
-npx stele --version
-npx -- stele --version
-npx stele version
-npm exec -- stele --version
-npm run stele -- --version
-```
-
-Avoid `npm exec stele --version`; npm parses that as npm's own version flag instead of passing `--version` to Stele.
-
-That creates:
-
-- `stele.config.json`
-- `contract/main.stele`
-- `contract/checker_impls/.gitkeep`
-- `tests/contract/conftest.py`
-
-Wire `tests/contract/conftest.py` to your real application state through a `stele_context` fixture, then replace the example invariant with your first contract rule. A minimal first rule looks like this:
+## A first invariant
 
 ```lisp
 (invariant ACCOUNT_IS_ACTIVE
@@ -79,89 +80,62 @@ Wire `tests/contract/conftest.py` to your real application state through a `stel
   (assert (eq (path account status) "active")))
 ```
 
-Generate the pytest suite, run it, and lock the protected state:
+Wire your application state through the `stele_context` pytest fixture:
 
-```bash
-npx stele generate
-python -m pytest tests/contract -q
-npx stele lock --reason "initial contract baseline"
-npx stele check
+```python
+@pytest.fixture
+def stele_context():
+    return {
+        "account": real_account_snapshot(),
+        "positions": load_open_positions(),
+        "_stele_checkers": {},
+    }
 ```
 
-When you need to adopt an existing codebase with known legacy contract drift, initialize a baseline after the first lock:
+Stele does **not** invent runtime objects — generated tests read whatever your fixture returns.
+
+## CLI surface
 
 ```bash
-npx stele baseline-init --reason "initial legacy adoption"
-npx stele check
+npx stele init        --language python    # scaffold contract/, tests/contract/
+npx stele generate    [--force]            # regenerate pytest suite from CDL
+npx stele check       [--diff-from main]   # verify generated drift, manifest, baseline
+npx stele lock        --reason "..."       # snapshot protected SHA-256s
+npx stele baseline-init                    # suppress known legacy violations
+npx stele add-checker <id>                 # scaffold a Python checker
 ```
 
-That writes `contract/.baseline.json`, locks it into the manifest, suppresses only matching legacy check violations, and still fails newly introduced drift.
-
-## Agent rule maintenance
-
-Stele includes agent-facing commands so rules stay understandable and can grow as the agent learns the project:
+Agent-facing commands keep contracts understandable as the project grows:
 
 ```bash
 npx stele rules --json
 npx stele agent-context --focus path/to/changed_file.py
 npx stele why <rule-id-or-fingerprint>
 npx stele maintenance-summary --from main --output .stele/maintenance/summary.md
+npx stele propose invariant --id NEW --severity medium \
+    --description "..." --assert "(eq 1 1)" --apply
 ```
 
-Agents may add durable new knowledge through an add-only proposal command:
+`propose` only appends to `contract/proposals/agent-additions.stele` — it never mutates locked manifests, baselines, or generated tests. Changing or deleting an existing rule remains a user-reviewed protected edit.
 
-```bash
-npx stele propose invariant --id AGENT_NEW_RULE --severity medium --description "Describe the invariant." --assert "(eq 1 1)" --apply
-```
+Full reference: [`docs/spec/cdl.md`](docs/spec/cdl.md).
 
-The proposal flow appends to `contract/proposals/agent-additions.stele` and validates the loaded contract. It does not regenerate tests, refresh manifests, or update baselines. Changing or deleting existing contract rules remains a user-reviewed protected change.
+## Claude Code plugin
 
-## First Python app integration
+`@stele/claude-code-plugin` adds editor-side guardrails:
 
-Stele does not invent fake runtime objects. Generated tests read whatever your application returns from `stele_context`.
+- **PreToolUse** hook blocks direct writes/edits/bash to protected contract and generated-test paths.
+- **SessionStart / UserPromptSubmit / PreToolUse** hooks inject focused contract context.
+- **PostToolUse** hook records material source edits for later contract-maintenance review.
+- **Stop** hook runs `stele check` and `pytest tests/contract` before the agent finishes.
+- Slash commands: `/stele:init`, `/stele:check`, `/stele:add`, `/stele:explain`, `/stele:rules`, `/stele:context`, `/stele:why`, `/stele:maintain`.
+- Subagents: `contract-author`, `contract-fixer`, `contract-reviewer`. Skills: `contract-aware-coding`, `contract-debugging`.
 
-```python
-import pytest
-
-
-@pytest.fixture
-def stele_context():
-    return {
-        "account": real_account_snapshot(),
-        "positions": load_open_positions(),
-        "_stele_checkers": {},
-    }
-```
-
-If you use temporal helpers such as `(modified (path account balance))`, expose both snapshots:
-
-```python
-@pytest.fixture
-def stele_context():
-    return {
-        "account": real_account_snapshot(),
-        "positions": load_open_positions(),
-        "state-before": {"account": {"balance": 4800}},
-        "state-after": {"account": {"balance": 5000}},
-        "_stele_checkers": {},
-    }
-```
-
-The generated directory is `tests/contract/`. `conftest.py` stays application-owned; Stele manages the generated test modules and runtime helper.
-
-## Checker-backed rules
-
-If an invariant needs custom Python logic, scaffold a checker implementation:
-
-```bash
-npx stele add-checker balance-change-has-transaction
-```
-
-That command creates `contract/checker_impls/balance_change_has_transaction.py` and prints the matching CDL block with the canonical checker id `(checker balance-change-has-transaction ...)` to paste into your contract source. Register the approved implementation inside `stele_context["_stele_checkers"]` under the same hyphenated id, regenerate, rerun pytest, refresh the lock, and finish with `stele check`.
+See [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md).
 
 ## CI
 
-For ordinary verification CI on an already locked repository, run:
+For verification CI on a locked repository:
 
 ```bash
 npx stele generate
@@ -169,7 +143,11 @@ python -m pytest tests/contract -q
 npx stele check
 ```
 
-When you are bootstrapping a repository or approving a contract change, insert `npx stele lock --reason "..."` between pytest and `stele check`. `stele check` is the enforcement step. It exits `2` when generated files drift and `3` when the protected manifest or protected file set is out of date.
+`stele check` is the enforcement step:
+
+- exit `0` — clean
+- exit `2` — generated files drifted from CDL
+- exit `3` — protected manifest or protected file set is out of date
 
 For focused branch checks, scope failures to your current change set:
 
@@ -177,19 +155,35 @@ For focused branch checks, scope failures to your current change set:
 npx stele check --diff-from main
 ```
 
-Stele compares `main...HEAD` plus staged, unstaged, and untracked files. Out-of-scope violations stay in the JSON report with `out_of_scope` status and summary counts, but they do not block the check.
+Stele compares `main...HEAD` plus staged, unstaged, and untracked files. Out-of-scope violations stay in the JSON report with `out_of_scope` status but do not block the check.
 
-## Claude Code plugin
+## Documentation
 
-`@stele/claude-code-plugin` adds editor-side guardrails:
+| Topic | Location |
+| --- | --- |
+| Documentation index | [`docs/README.md`](docs/README.md) |
+| Architecture overview | [`docs/architecture.md`](docs/architecture.md) |
+| CDL language spec | [`docs/spec/cdl.md`](docs/spec/cdl.md) |
+| CLI JSON output schemas | [`docs/spec/cli-output.md`](docs/spec/cli-output.md) |
+| Python app integration | [`docs/guides/python-integration.md`](docs/guides/python-integration.md) |
+| Claude Code plugin | [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md) |
+| Phased plans (PRDs v2.0) | [`docs/prd-phase-0.md`](docs/prd-phase-0.md) · [`docs/prd-phase-1.md`](docs/prd-phase-1.md) · [`docs/prd-phase-2.md`](docs/prd-phase-2.md) |
+| Original design doc (中文) | [`docs/design/项目设计文档.md`](docs/design/项目设计文档.md) |
+| Roadmap & strategy | [`docs/strategy/`](docs/strategy/) |
+| Contributing & release | [`docs/contributing/`](docs/contributing/) |
 
-- blocks direct edits to protected contract and generated-test paths
-- runs `stele check` in the `Stop` hook before the agent finishes
-- documents `/stele:init`, `/stele:check`, `/stele:add`, `/stele:explain`, `/stele:rules`, `/stele:context`, `/stele:why`, and `/stele:maintain`
-- ships a `contract-author` subagent and `contract-aware-coding` skill
+## Development
 
-For production usage details, see:
+```bash
+pnpm install
+pnpm build           # build all workspace packages
+pnpm test            # run vitest + python tests across packages
+pnpm typecheck       # core/backend-python build + per-package typecheck
+pnpm test:packed-adoption   # full external-adoption verification
+```
 
-- [docs/cdl-spec.md](docs/cdl-spec.md)
-- [docs/app-integration-guide.md](docs/app-integration-guide.md)
-- [docs/plugin-guide.md](docs/plugin-guide.md)
+The release flow is documented in [`docs/contributing/release.md`](docs/contributing/release.md). For day-to-day development conventions, see [`docs/contributing/development.md`](docs/contributing/development.md). For testing strategy and the coverage gap report, see [`docs/contributing/testing.md`](docs/contributing/testing.md).
+
+## License
+
+[MIT](LICENSE)

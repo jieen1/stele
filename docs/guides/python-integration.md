@@ -346,4 +346,4 @@ npx stele check
 
 Pre-publish installation is real and continuously verified, but it is still tarball-based. The automation currently proves that a fresh Python app can install the packed `@stele/core`, `@stele/backend-python`, and `@stele/cli` tarballs together, initialize, generate, run pytest, explicitly lock the initial baseline, and then pass `stele check`.
 
-The Claude Code plugin is editor-hosted, so its registration flow is documented separately in [plugin-guide.md](plugin-guide.md) rather than included in the tarball adoption script.
+The Claude Code plugin is editor-hosted, so its registration flow is documented separately in [claude-code-plugin.md](claude-code-plugin.md) rather than included in the tarball adoption script.
