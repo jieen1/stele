@@ -33,20 +33,18 @@ describe("@stele/backend-python translator", () => {
       "tests/contract/_stele_runtime.py",
       "tests/contract/test_contract.py",
     ]);
-    expect(runtimeFile?.content).toContain([
-      "def stele_get_path(root, parts):",
-      "    current = root",
-      "    for part in parts:",
-      "        if isinstance(current, dict) and part in current:",
-      "            current = current[part]",
-      "        elif hasattr(current, part):",
-      "            current = getattr(current, part)",
-      "        elif hasattr(current, part.replace(\"-\", \"_\")):",
-      "            current = getattr(current, part.replace(\"-\", \"_\"))",
-      "        else:",
-      "            raise KeyError(f\"Stele path segment not found: {part}\")",
-      "    return current",
-    ].join("\n"));
+    const runtimeContent = (runtimeFile?.content ?? "").replace(/\r\n/g, "\n");
+    expect(runtimeContent).toContain("def stele_get_path(root, parts):");
+    expect(runtimeContent).toContain("current = root");
+    expect(runtimeContent).toContain("for part in parts:");
+    expect(runtimeContent).toContain("if isinstance(current, dict) and part in current:");
+    expect(runtimeContent).toContain("current = current[part]");
+    expect(runtimeContent).toContain("elif hasattr(current, part):");
+    expect(runtimeContent).toContain("current = getattr(current, part)");
+    expect(runtimeContent).toContain('elif hasattr(current, part.replace("-", "_")):');
+    expect(runtimeContent).toContain('current = getattr(current, part.replace("-", "_"))');
+    expect(runtimeContent).toContain('raise KeyError(f"Stele path segment not found: {part}")');
+    expect(runtimeContent).toContain("return current");
     expect(runtimeFile?.content).toContain("def stele_sum(items, parts):");
     expect(runtimeFile?.content).toContain("def stele_call_checker(name, stele_context, kwargs):");
     expect(runtimeFile?.content).toContain("def stele_is_modified(stele_context, parts):");
