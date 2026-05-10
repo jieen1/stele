@@ -138,7 +138,7 @@ describe("runCheckRecursive", () => {
       stderr: (chunk) => stderr.push(chunk),
     });
 
-    // Both projects have ungenerated tests → drift (exit 4 GENERATION_FAIL or 3 TAMPER_DETECTED).
+    // Both projects have ungenerated tests → drift (exit 2 CONTRACT_FAIL or 3 TAMPER_DETECTED).
     expect(result.subReports).toHaveLength(2);
     expect(result.subReports[0].project).toBe(join(root, "packages/a"));
     expect(result.subReports[1].project).toBe(join(root, "packages/b"));

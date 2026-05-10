@@ -739,7 +739,7 @@ describe("stele CLI", () => {
     expect(stdout.read()).toBe("0.1.0\n0.1.0\n");
   });
 
-  it("CLI exits with code 4 when generated files are tampered", async () => {
+  it("CLI exits with code 2 when generated files are tampered", async () => {
     const projectDir = await createFixtureProject();
     const stderr = captureStderr();
     const originalExitCode = process.exitCode;
@@ -751,7 +751,7 @@ describe("stele CLI", () => {
     process.exitCode = 0;
     await runCli(["node", "stele", "check"]);
 
-    expect(process.exitCode).toBe(4);
+    expect(process.exitCode).toBe(2);
     expect(stderr.read()).toContain("Generated files do not match the contract");
     process.exitCode = originalExitCode;
   });
@@ -780,7 +780,7 @@ describe("stele CLI", () => {
       }>;
     };
 
-    expect(process.exitCode).toBe(4);
+    expect(process.exitCode).toBe(2);
     expect(stderr.read()).toBe("");
     expect(report.ok).toBe(false);
     expect(report.command).toBe("check");

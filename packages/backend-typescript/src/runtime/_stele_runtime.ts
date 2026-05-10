@@ -546,6 +546,55 @@ export function steleEndsWith(value: unknown, suffix: unknown): boolean {
  * (substring match; not anchored). Lookbehind is rejected to match the spec
  * (docs/design/phase-1/01-typescript-backend.md §7).
  */
+/**
+ * Detect potentially catastrophic backtracking patterns in a regex string.
+ *
+ * Checks for nested quantifiers such as `(a+)+`, `(a|b)*`, `(.*?)*` etc.
+ * This is a heuristic — it may produce false negatives (miss some patterns)
+ * but aims to avoid false positives on benign patterns.
+ */
+function hasRedoSPattern(pattern: string): boolean {
+  let depth = 0;
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (ch === "(") {
+      depth += 1;
+      i += 1;
+      continue;
+    }
+    if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+      // Check for quantifier after the closing paren
+      if (i + 1 < pattern.length && (pattern[i + 1] === "+" || pattern[i + 1] === "*")) {
+        // This group has a quantifier. If we're inside another quantified
+        // group (depth > 0), or the group itself contains a quantifier,
+        // it's a potential ReDoS pattern.
+        if (depth > 0) {
+          return true;
+        }
+      }
+      i += 1;
+      continue;
+    }
+    // Check for quantifier on a literal/char-class
+    if ((ch === "+" || ch === "*") && i > 0) {
+      const prev = pattern[i - 1];
+      // Quantifier follows a character class or escaped char — if nested
+      // inside a group (depth > 0), that group may also be quantified.
+      if (depth > 0 && (prev === "]" || prev === "\\")) {
+        return true;
+      }
+    }
+    i += 1;
+  }
+  return false;
+}
+
 export function steleMatches(value: unknown, pattern: unknown): boolean {
   if (typeof value !== "string") {
     throw new SteleRuntimeError(`matches: value must be a string, got ${describeType(value)}`);
@@ -555,6 +604,9 @@ export function steleMatches(value: unknown, pattern: unknown): boolean {
   }
   if (/\(\?<[!=]/.test(pattern)) {
     throw new SteleRuntimeError(`matches: lookbehind is not supported (pattern: ${pattern})`);
+  }
+  if (hasRedoSPattern(pattern)) {
+    throw new SteleRuntimeError(`matches: pattern may cause catastrophic backtracking (ReDoS). Use anchored or non-nested quantifiers instead.`);
   }
   let regex: RegExp;
   try {

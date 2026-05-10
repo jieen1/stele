@@ -26,6 +26,7 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
   const config = {
     ...DEFAULT_CONFIG,
     targetLanguage: options.language,
+    testFramework: options.language === "typescript" ? "vitest" : DEFAULT_CONFIG.testFramework,
   };
 
   const projectInfo = await detectProject(projectDir);
@@ -96,6 +97,7 @@ function getFrameworkContractSource(projectInfo: DetectedProject): string {
         "  (severity high)",
         '  (description "Replace this example with your first contract invariant.")',
         "  (assert (eq 1 1))",
+        ")",
         "",
         ...(projectInfo.endpoints.length > 0
           ? [
@@ -115,6 +117,7 @@ function getFrameworkContractSource(projectInfo: DetectedProject): string {
         "  (severity high)",
         '  (description "Replace this example with your first contract invariant.")',
         "  (assert (eq 1 1))",
+        ")",
         "",
       ].join("\n");
 
@@ -124,6 +127,7 @@ function getFrameworkContractSource(projectInfo: DetectedProject): string {
         "  (severity high)",
         '  (description "Replace this example with your first contract invariant.")',
         "  (assert (eq 1 1))",
+        ")",
         "",
       ].join("\n");
 
@@ -137,6 +141,7 @@ const DEFAULT_CONTRACT_SOURCE = [
   "  (severity high)",
   '  (description "Replace this example rule with your first contract invariant.")',
   "  (assert (eq 1 1))",
+  ")",
   "",
 ].join("\n");
 

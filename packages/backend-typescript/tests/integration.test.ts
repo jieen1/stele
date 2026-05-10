@@ -1,5 +1,4 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { execSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -8,13 +7,19 @@ import { afterEach, describe, expect, it } from "vitest";
 import { coordinateGeneration, loadContract, type Contract } from "@stele/core";
 import backend from "../src/backend.js";
 
-const execFileAsync = promisify(execFile);
 const tempDirs: string[] = [];
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(TEST_DIR, "..", "..", "..");
-const TSC_BIN = resolve(REPO_ROOT, "node_modules", ".bin", "tsc");
-const REPO_NODE_MODULES = resolve(REPO_ROOT, "node_modules");
+const REPO_NODE_MODULES = resolve(TEST_DIR, "..", "..", "..", "node_modules");
+
+function runTsc(projectRoot: string): void {
+  // Use npx tsc via shell so .cmd wrapper works on Windows
+  execSync("npx --no-install tsc --project tsconfig.json --noEmit --pretty false", {
+    cwd: projectRoot,
+    stdio: "pipe",
+    windowsHide: true,
+  });
+}
 
 describe("@stele/backend-typescript integration", () => {
   afterEach(async () => {
@@ -380,9 +385,3 @@ async function materializeFiles(projectRoot: string, files: ReadonlyArray<{ path
   }
 }
 
-async function runTsc(projectRoot: string): Promise<void> {
-  await execFileAsync(TSC_BIN, ["--project", "tsconfig.json", "--noEmit", "--pretty", "false"], {
-    cwd: projectRoot,
-    windowsHide: true,
-  });
-}

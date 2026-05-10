@@ -528,7 +528,6 @@ async function buildCodeShapeStageReport(
 function withCheckSummary(report: ViolationReport, summary: CheckSummary): ViolationReport {
   return {
     ...report,
-    ok: true,
     summary: {
       ...report.summary,
       message: formatCheckSummary(summary, report).trimEnd(),
@@ -542,7 +541,7 @@ function withCheckSummary(report: ViolationReport, summary: CheckSummary): Viola
 function getCheckExitCode(report: ViolationReport): ExitCode {
   const activeViolations = report.violations.filter((violation) => (violation.status ?? "active") === "active");
   return activeViolations.length > 0 && activeViolations.every((violation) => violation.rule_kind === "generated_drift")
-    ? ExitCode.GENERATION_FAIL
+    ? ExitCode.CONTRACT_FAIL
     : ExitCode.TAMPER_DETECTED;
 }
 

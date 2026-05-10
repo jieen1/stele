@@ -1,5 +1,6 @@
 import type { AgentHookContext, HookDecision, PreEditHook } from "../protocol.js";
 import { extractBashWriteTarget } from "../util/bash-write-target.js";
+import { KNOWN_SAFE_COMMANDS } from "../util/known-safe-commands.js";
 import { matchProtectedPath } from "../util/path-glob.js";
 import type { SteleConfig } from "../util/stele-config-types.js";
 
@@ -31,7 +32,22 @@ export function createPreEditProtect(config: SteleConfig): PreEditHook {
       const command = typeof ctx.args.command === "string" ? ctx.args.command : "";
       const bashTarget = extractBashWriteTarget(command);
       if (!bashTarget) {
-        return { action: "allow" };
+        // Write target could not be determined. Deny unless the command is
+        // a known read-only command. This closes the bypass where heredocs,
+        // $() substitution, python3 -c, sed -i, etc. would slip through.
+        const firstToken = extractBashFirstToken(command);
+        if (
+          firstToken !== null &&
+          KNOWN_SAFE_COMMANDS.has(firstToken)
+        ) {
+          return { action: "allow" };
+        }
+        return {
+          action: "deny",
+          reason:
+            `Bash command target could not be determined and "${firstToken ?? "(empty)"}" is ` +
+            "not in the known-safe-commands allowlist. Denying by default.",
+        };
       }
       if (matchProtectedPath(bashTarget, config.protected, ctx.projectRoot)) {
         return {
@@ -53,4 +69,16 @@ export function createPreEditProtect(config: SteleConfig): PreEditHook {
 
     return { action: "allow" };
   };
+}
+
+/**
+ * Extract the first whitespace-delimited token from a bash command string.
+ * Used to determine which executable is being invoked for allowlist matching.
+ */
+function extractBashFirstToken(command: string): string | null {
+  if (typeof command !== "string") return null;
+  const trimmed = command.trim();
+  if (trimmed.length === 0) return null;
+  const spaceIndex = trimmed.search(/\s/);
+  return spaceIndex === -1 ? trimmed : trimmed.slice(0, spaceIndex);
 }
