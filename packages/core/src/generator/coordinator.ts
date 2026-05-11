@@ -202,12 +202,20 @@ function buildCanonicalGeneratedPaths(
   const seenCaseFoldedPaths = new Map<string, string>();
   const fileExtension = normalizeFileExtension(backend.fileExtension);
   const topLevelInvariants = contract.invariants.filter((invariant) => invariant.groupId === undefined);
+  const testFileExtension = backend.name === "go" ? "_test.go" : fileExtension;
   const groupPaths = contract.groups.map((group) =>
-    posix.join(config.outputDir, `test_${sanitizeGeneratedPathSegment(group.id, "group")}${fileExtension}`),
+    posix.join(config.outputDir, `test_${sanitizeGeneratedPathSegment(group.id, "group")}${testFileExtension}`),
   );
 
+  // Go uses stele_runtime_test.go in contract_test package so runtime + tests
+  // compile together. Other backends use _stele_runtime{ext}.
+  const runtimePath =
+    backend.name === "go"
+      ? posix.join(config.outputDir, "stele_runtime_test.go")
+      : posix.join(config.outputDir, `_stele_runtime${fileExtension}`);
+
   registerGeneratedPath(
-    posix.join(config.outputDir, `_stele_runtime${fileExtension}`),
+    runtimePath,
     seenPaths,
     seenCaseFoldedPaths,
     "canonical generated file path",
@@ -216,7 +224,7 @@ function buildCanonicalGeneratedPaths(
 
   if (topLevelInvariants.length > 0) {
     registerGeneratedPath(
-      posix.join(config.outputDir, `test_contract${fileExtension}`),
+      posix.join(config.outputDir, `test_contract${testFileExtension}`),
       seenPaths,
       seenCaseFoldedPaths,
       "canonical generated file path",
@@ -434,7 +442,7 @@ function normalizeRelativeFilePath(pathValue: string, label: string): string {
 }
 
 function normalizeFileExtension(fileExtension: string): string {
-  if (typeof fileExtension !== "string" || !/^\.[A-Za-z0-9]+$/.test(fileExtension)) {
+  if (typeof fileExtension !== "string" || !/^[\._][A-Za-z0-9_.]+$/.test(fileExtension)) {
     throw generationError(
       "E0502",
       `Invalid backend file extension "${fileExtension}".`,

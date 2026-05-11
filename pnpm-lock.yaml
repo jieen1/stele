@@ -36,7 +36,25 @@ importers:
         specifier: ^9.0.5
         version: 9.0.9
 
+  packages/backend-go:
+    dependencies:
+      '@stele/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/backend-java:
+    dependencies:
+      '@stele/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/backend-python:
+    dependencies:
+      '@stele/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/backend-rust:
     dependencies:
       '@stele/core':
         specifier: workspace:*
@@ -62,9 +80,18 @@ importers:
       '@stele/agent-hooks':
         specifier: workspace:*
         version: link:../agent-hooks
+      '@stele/backend-go':
+        specifier: workspace:*
+        version: link:../backend-go
+      '@stele/backend-java':
+        specifier: workspace:*
+        version: link:../backend-java
       '@stele/backend-python':
         specifier: workspace:*
         version: link:../backend-python
+      '@stele/backend-rust':
+        specifier: workspace:*
+        version: link:../backend-rust
       '@stele/backend-typescript':
         specifier: workspace:*
         version: link:../backend-typescript

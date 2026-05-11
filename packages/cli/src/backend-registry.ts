@@ -27,6 +27,24 @@ export const REGISTERED_BACKENDS: readonly RegisteredBackend[] = Object.freeze([
     packageName: "@stele/backend-typescript",
     displayName: "TypeScript (vitest)",
   },
+  {
+    language: "rust",
+    framework: "cargo-test",
+    packageName: "@stele/backend-rust",
+    displayName: "Rust (cargo test)",
+  },
+  {
+    language: "go",
+    framework: "testing",
+    packageName: "@stele/backend-go",
+    displayName: "Go (testing)",
+  },
+  {
+    language: "java",
+    framework: "junit5",
+    packageName: "@stele/backend-java",
+    displayName: "Java (JUnit 5)",
+  },
 ] as RegisteredBackend[]);
 
 interface BackendModule {

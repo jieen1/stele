@@ -1,0 +1,8 @@
+# Stele
+contract/manifest.json
+contract/baseline.json
+contract/.unlock-log.jsonl
+contract/proposals/
+
+# Generated tests
+tests/contract/

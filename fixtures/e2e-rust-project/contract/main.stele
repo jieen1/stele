@@ -1,0 +1,24 @@
+(invariant BALANCE_POSITIVE
+  (severity high)
+  (description "Balance must be positive")
+  (assert (gt (path ctx balance) 0)))
+
+(invariant BALANCE_NOT_ZERO
+  (severity error)
+  (description "Balance must not be zero")
+  (assert (neq (path ctx balance) 0)))
+
+(invariant STATUS_IS_ACTIVE
+  (severity high)
+  (description "Status must be active")
+  (assert (eq (path ctx status) "active")))
+
+(invariant TOTAL_AMOUNT_CHECK
+  (severity error)
+  (description "Total amount must exceed threshold")
+  (assert (gt (sum (collection accounts) (path item amount)) 1000)))
+
+(invariant NAME_NOT_EMPTY
+  (severity high)
+  (description "Name must not be empty")
+  (assert (not (eq (path ctx name) ""))))

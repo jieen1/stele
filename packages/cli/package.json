@@ -37,7 +37,10 @@
     "@types/js-yaml": "^4.0.9"
   },
   "dependencies": {
+    "@stele/backend-go": "workspace:*",
+    "@stele/backend-java": "workspace:*",
     "@stele/backend-python": "workspace:*",
+    "@stele/backend-rust": "workspace:*",
     "@stele/backend-typescript": "workspace:*",
     "@stele/core": "workspace:*",
     "commander": "^12.1.0",
