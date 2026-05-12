@@ -628,6 +628,105 @@ pub fn stele_join(items: &[SteleValue], sep: &SteleValue) -> Result<SteleValue, 
     Ok(SteleValue::Str(parts?.join(separator)))
 }
 
+/// Extract a value from a JSON string using a simplified JSONPath expression.
+pub fn stele_json_path(data: &SteleValue, path_expr: &SteleValue) -> Result<SteleValue, SteleRuntimeError> {
+    let data_s = data.as_str().ok_or_else(|| SteleRuntimeError::new("json-path: expected string for data"))?;
+    let path_s = path_expr.as_str().ok_or_else(|| SteleRuntimeError::new("json-path: expected string for path"))?;
+    let root: serde_json::Value = serde_json::from_str(data_s)
+        .map_err(|e| SteleRuntimeError::new(&format!("json-path: invalid JSON: {}", e)))?;
+    let results = _stele_eval_json_path(&root, path_s);
+    if results.len() == 1 {
+        return Ok(SteleValue::Str(results[0].to_string()));
+    }
+    Ok(SteleValue::Str(serde_json::to_string(&results).unwrap_or_default()))
+}
+
+fn _stele_eval_json_path(data: &serde_json::Value, path: &str) -> Vec<String> {
+    if path.is_empty() {
+        return vec![data.to_string()];
+    }
+    let tokens = _stele_tokenize_path(path);
+    if tokens.is_empty() {
+        return vec![data.to_string()];
+    }
+    let rest: String = tokens[1..].iter().map(|t| match t {
+        _JsonPathToken::Field(f) => format!(".{}", f),
+        _JsonPathToken::Index(i) => format!("[{}]", i),
+        _JsonPathToken::Wildcard => "[*]".to_string(),
+    }).collect();
+    match &tokens[0] {
+        _JsonPathToken::Field(f) => {
+            if let Some(v) = data.get(f) {
+                return _stele_eval_json_path(v, &rest);
+            }
+            return vec![];
+        }
+        _JsonPathToken::Index(i) => {
+            if let Some(arr) = data.as_array() {
+                if let Some(v) = arr.get(*i as usize) {
+                    return _stele_eval_json_path(v, &rest);
+                }
+            }
+            return vec![];
+        }
+        _JsonPathToken::Wildcard => {
+            if let Some(arr) = data.as_array() {
+                let mut all = Vec::new();
+                for item in arr {
+                    all.extend(_stele_eval_json_path(item, &rest));
+                }
+                return all;
+            }
+            return vec![];
+        }
+    }
+}
+
+enum _JsonPathToken {
+    Field(String),
+    Index(i64),
+    Wildcard,
+}
+
+fn _stele_tokenize_path(path: &str) -> Vec<_JsonPathToken> {
+    let mut tokens = Vec::new();
+    let mut chars = path.chars().peekable();
+    while chars.peek().is_some() {
+        if chars.peek() == Some(&'.') {
+            chars.next();
+            continue;
+        }
+        if chars.peek() == Some(&'[') {
+            chars.next();
+            let mut inner = String::new();
+            while let Some(&c) = chars.peek() {
+                if c == ']' {
+                    chars.next();
+                    break;
+                }
+                inner.push(chars.next().unwrap());
+            }
+            if inner == "*" {
+                tokens.push(_JsonPathToken::Wildcard);
+            } else if let Ok(idx) = inner.parse::<i64>() {
+                tokens.push(_JsonPathToken::Index(idx));
+            }
+            continue;
+        }
+        let mut name = String::new();
+        while let Some(&c) = chars.peek() {
+            if c == '.' || c == '[' {
+                break;
+            }
+            name.push(chars.next().unwrap());
+        }
+        if !name.is_empty() {
+            tokens.push(_JsonPathToken::Field(name));
+        }
+    }
+    tokens
+}
+
 // ---------------------------------------------------------------------------
 // Control operators
 // ---------------------------------------------------------------------------
@@ -658,6 +757,27 @@ pub fn stele_approx_eq(
     let t = target.to_f64()?;
     let tol = tolerance.to_f64()?;
     Ok((v - t).abs() <= tol)
+}
+
+/// Compare two numbers with exact decimal precision, avoiding floating point errors.
+pub fn stele_decimal_eq(
+    left: &SteleValue,
+    right: &SteleValue,
+) -> Result<bool, SteleRuntimeError> {
+    let l = left.to_f64()?;
+    let r = right.to_f64()?;
+    let l_str = format_decimal(l);
+    let r_str = format_decimal(r);
+    Ok(l_str == r_str)
+}
+
+fn format_decimal(v: f64) -> String {
+    if v == v as i64 as f64 {
+        return format!("{}", v as i64);
+    }
+    let s = format!("{:.20}", v);
+    let s = s.trim_end_matches('0').trim_end_matches('.').to_string();
+    s
 }
 
 // ---------------------------------------------------------------------------

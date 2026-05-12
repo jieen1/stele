@@ -162,6 +162,10 @@ const OPERATORS: OperatorExpectation[] = [
   { name: "first", parameters: [req("Collection")], returnType: "Unknown" },
   { name: "last", parameters: [req("Collection")], returnType: "Unknown" },
   { name: "filter", parameters: [req("Symbol"), req("Collection"), req("Predicate")], returnType: "Collection" },
+
+  // Phase 1: new operators
+  { name: "json-path", parameters: [req("String"), req("String")], returnType: "String" },
+  { name: "decimal-eq", parameters: [req("Number"), req("Number")], returnType: "Boolean" },
 ];
 
 /* ------------------------------------------------------------------ */

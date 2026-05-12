@@ -741,6 +741,157 @@ func steleJoin(coll any, sep any) string {
 	return strings.Join(strs, s)
 }
 
+// steleJsonPath extracts a value from a JSON string using a simplified JSONPath expression.
+func steleJsonPath(data any, pathExpr any) string {
+	dataS, ok := data.(string)
+	if !ok {
+		panic(fmt.Sprintf("json-path: data must be a string, got %T", data))
+	}
+	pathS, ok := pathExpr.(string)
+	if !ok {
+		panic(fmt.Sprintf("json-path: path must be a string, got %T", pathExpr))
+	}
+	var root any
+	if err := json.Unmarshal([]byte(dataS), &root); err != nil {
+		panic(fmt.Sprintf("json-path: invalid JSON input: %v", err))
+	}
+	results := _steleEvalJsonPath(root, pathS)
+	if len(results) == 1 {
+		return fmt.Sprintf("%v", results[0])
+	}
+	b, _ := json.Marshal(results)
+	return string(b)
+}
+
+func _steleEvalJsonPath(data any, path string) []any {
+	if path == "" {
+		return []any{data}
+	}
+	tokens := _steleTokenizePath(path)
+	if len(tokens) == 0 {
+		return []any{data}
+	}
+	kind, value := tokens[0]
+	rest := _steleDetokenize(tokens[1:])
+	switch kind {
+	case "field":
+		if m, ok := data.(map[string]any); ok {
+			if v, exists := m[value.(string)]; exists {
+				return _steleEvalJsonPath(v, rest)
+			}
+		}
+		return nil
+	case "index":
+		if arr, ok := data.([]any); ok {
+			idx := value.(int)
+			if idx >= 0 && idx < len(arr) {
+				return _steleEvalJsonPath(arr[idx], rest)
+			}
+		}
+		return nil
+	case "wildcard":
+		if arr, ok := data.([]any); ok {
+			var all []any
+			for _, item := range arr {
+				all = append(all, _steleEvalJsonPath(item, rest)...)
+			}
+			return all
+		}
+		return nil
+	}
+	return nil
+}
+
+type _JsonPathToken struct {
+	kind  string
+	value any
+}
+
+func _steleTokenizePath(path string) []_JsonPathToken {
+	var tokens []_JsonPathToken
+	i := 0
+	for i < len(path) {
+		if path[i] == '.' {
+			i++
+			continue
+		}
+		if path[i] == '[' {
+			j := strings.Index(path[i:], "]")
+			if j == -1 {
+				panic("json-path: unclosed bracket in path")
+			}
+			j += i
+			inner := path[i+1 : j]
+			if inner == "*" {
+				tokens = append(tokens, _JsonPathToken{kind: "wildcard"})
+			} else {
+				idx, err := strconv.Atoi(inner)
+				if err != nil {
+					panic(fmt.Sprintf("json-path: invalid array index: %q", inner))
+				}
+				tokens = append(tokens, _JsonPathToken{kind: "index", value: idx})
+			}
+			i = j + 1
+			continue
+		}
+		start := i
+		for i < len(path) && path[i] != '.' && path[i] != '[' {
+			i++
+		}
+		name := path[start:i]
+		if name != "" {
+			tokens = append(tokens, _JsonPathToken{kind: "field", value: name})
+		}
+	}
+	return tokens
+}
+
+func _steleDetokenize(tokens []_JsonPathToken) string {
+	var sb strings.Builder
+	for _, t := range tokens {
+		switch t.kind {
+		case "field":
+			sb.WriteString(".")
+			sb.WriteString(t.value.(string))
+		case "index":
+			sb.WriteString("[")
+			sb.WriteString(strconv.Itoa(t.value.(int)))
+			sb.WriteString("]")
+		case "wildcard":
+			sb.WriteString("[*]")
+		}
+	}
+	return sb.String()
+}
+
+// steleDecimalEq compares two numbers with exact decimal precision.
+func steleDecimalEq(left any, right any) bool {
+	l, ok := left.(float64)
+	if !ok {
+		panic(fmt.Sprintf("decimal-eq: left must be a number, got %T", left))
+	}
+	r, ok := right.(float64)
+	if !ok {
+		panic(fmt.Sprintf("decimal-eq: right must be a number, got %T", right))
+	}
+	lStr := formatDecimal(l)
+	rStr := formatDecimal(r)
+	return lStr == rStr
+}
+
+func formatDecimal(v float64) string {
+	if v == float64(int64(v)) {
+		return strconv.FormatInt(int64(v), 10)
+	}
+	s := strconv.FormatFloat(v, 'f', 20, 64)
+	// Trim trailing zeros after decimal point.
+	if idx := strings.Index(s, "."); idx != -1 {
+		s = strings.TrimRight(s, "0")
+		s = strings.TrimRight(s, ".")
+	}
+	return s
+}
+
 // ---------------------------------------------------------------------------
 // Collection operators
 // ---------------------------------------------------------------------------

@@ -256,6 +256,20 @@ describe("translateExpression: value", () => {
   });
 });
 
+describe("translateExpression: json-path operator", () => {
+  it("translates json-path via SteleRuntime.steleJsonPath", () => {
+    const node = makeList("json-path", [makeList("path", [makeIdentifier("data")]), makeString("accounts.balance")]);
+    expect(translateExpression(node)).toBe('SteleRuntime.steleJsonPath(SteleRuntime.getAtPath(ctx, new String[]{"data"}), "accounts.balance")');
+  });
+});
+
+describe("translateExpression: decimal-eq operator", () => {
+  it("translates decimal-eq via SteleRuntime.steleDecimalEq", () => {
+    const node = makeList("decimal-eq", [makeList("path", [makeIdentifier("amount")]), makeNumber(1234.56)]);
+    expect(translateExpression(node)).toBe("SteleRuntime.steleDecimalEq(SteleRuntime.getAtPath(ctx, new String[]{\"amount\"}), 1234.56)");
+  });
+});
+
 describe("astToSource", () => {
   it("converts number back to source", () => {
     expect(astToSource(makeNumber(42))).toBe("42");

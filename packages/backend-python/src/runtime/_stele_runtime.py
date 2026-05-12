@@ -1,5 +1,6 @@
 import contextlib
 import importlib
+import json
 import logging
 import math
 import os
@@ -512,6 +513,113 @@ def stele_lower(value):
 def stele_upper(value):
     """Locale-independent Unicode uppercase."""
     return _stele_assert_string("upper", value).upper()
+
+
+def stele_json_path(data: str, path_expr: str):
+    """Extract a value from a JSON string using a simplified JSONPath expression.
+
+    Supports root fields, nested dot paths, array index access [N], and
+    wildcard array access [*]. Returns JSON-encoded string for multiple
+    matches, plain string for single matches.
+    """
+    _stele_assert_string("json-path", data)
+    _stele_assert_string("json-path", path_expr)
+    try:
+        root = json.loads(data)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise SteleRuntimeError(f"json-path: invalid JSON input: {exc}")
+
+    results = _stele_eval_json_path(root, path_expr)
+    if len(results) == 1:
+        return str(results[0])
+    return json.dumps(results, ensure_ascii=False)
+
+
+def _stele_tokenize_path(path: str):
+    """Tokenize a JSONPath-like expression into segments."""
+    tokens = []
+    i = 0
+    while i < len(path):
+        ch = path[i]
+        if ch == '.':
+            i += 1
+            continue
+        if ch == '[':
+            j = path.index(']', i)
+            inner = path[i + 1:j]
+            if inner == '*':
+                tokens.append(('wildcard',))
+            else:
+                try:
+                    tokens.append(('index', int(inner)))
+                except ValueError:
+                    raise SteleRuntimeError(
+                        f"json-path: invalid array index: {inner!r}"
+                    )
+            i = j + 1
+            continue
+        # Read field name
+        start = i
+        while i < len(path) and path[i] not in '.[':
+            i += 1
+        name = path[start:i]
+        if name:
+            tokens.append(('field', name))
+    return tokens
+
+
+def _stele_eval_json_path(data, path: str):
+    """Evaluate a JSONPath expression, returning a list of matches."""
+    if not path:
+        return [data]
+    tokens = _stele_tokenize_path(path)
+    if not tokens:
+        return [data]
+    kind, value = tokens[0]
+    rest = _stele_detokenize(tokens[1:])
+    if kind == 'field':
+        if isinstance(data, dict) and value in data:
+            return _stele_eval_json_path(data[value], rest)
+        return []
+    if kind == 'index':
+        if isinstance(data, list) and 0 <= value < len(data):
+            return _stele_eval_json_path(data[value], rest)
+        return []
+    if kind == 'wildcard':
+        if isinstance(data, list):
+            all_results = []
+            for item in data:
+                all_results.extend(_stele_eval_json_path(item, rest))
+            return all_results
+        return []
+    return []
+
+
+def _stele_detokenize(tokens):
+    """Reconstruct a path string from remaining tokens."""
+    parts = []
+    for kind, value in tokens:
+        if kind == 'field':
+            parts.append('.' + value)
+        elif kind == 'index':
+            parts.append(f'[{value}]')
+        elif kind == 'wildcard':
+            parts.append('[*]')
+    return ''.join(parts)
+
+
+def stele_decimal_eq(left, right):
+    """Compare two numbers with exact decimal precision, avoiding floating point errors."""
+    from decimal import Decimal
+    try:
+        l = Decimal(str(left))
+    except Exception:
+        raise SteleRuntimeError(f"decimal-eq: invalid left operand: {left!r}")
+    try:
+        r = Decimal(str(right))
+    except Exception:
+        raise SteleRuntimeError(f"decimal-eq: invalid right operand: {right!r}")
+    return l == r
 
 
 # ---------------------------------------------------------------------------

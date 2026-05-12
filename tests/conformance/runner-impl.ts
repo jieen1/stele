@@ -157,6 +157,18 @@ async function runFrameworkTests(spec: BackendSpec, workDir: string): Promise<Ru
     return runPytest(workDir);
   }
 
+  if (spec.language === "go" && spec.framework === "testing") {
+    return runGoTest(workDir);
+  }
+
+  if (spec.language === "rust" && spec.framework === "cargo-test") {
+    return runCargoTest(workDir);
+  }
+
+  if (spec.language === "java" && spec.framework === "junit5") {
+    return runMavenTest(workDir);
+  }
+
   if (spec.language === "typescript" && spec.framework === "vitest") {
     // Fixture directories don't ship a populated node_modules with vitest;
     // until EP01 Phase D wires that up the runner skips cleanly so the
@@ -199,6 +211,105 @@ async function runPytest(workDir: string): Promise<RunnerStatus> {
 async function isPytestAvailable(): Promise<boolean> {
   const result = await runProcess("python3", ["-c", "import pytest"], {});
   return result.exitCode === 0;
+}
+
+// ---------------------------------------------------------------------------
+// Go test runner
+// ---------------------------------------------------------------------------
+
+async function runGoTest(workDir: string): Promise<RunnerStatus> {
+  const goAvailable = await isGoAvailable();
+
+  if (!goAvailable) {
+    return {
+      exitCode: null,
+      skipped: true,
+      skipReason: "go not installed",
+    };
+  }
+
+  const result = await runProcess("go", ["test", "./..."], { cwd: workDir });
+
+  return {
+    exitCode: result.exitCode ?? -1,
+    skipped: false,
+    stderr: result.stderr,
+  };
+}
+
+async function isGoAvailable(): Promise<boolean> {
+  try {
+    const result = await runProcess("go", ["version"], {});
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rust test runner (cargo)
+// ---------------------------------------------------------------------------
+
+async function runCargoTest(workDir: string): Promise<RunnerStatus> {
+  const cargoAvailable = await isCargoAvailable();
+
+  if (!cargoAvailable) {
+    return {
+      exitCode: null,
+      skipped: true,
+      skipReason: "cargo not installed",
+    };
+  }
+
+  const result = await runProcess("cargo", ["test"], { cwd: workDir });
+
+  return {
+    exitCode: result.exitCode ?? -1,
+    skipped: false,
+    stderr: result.stderr,
+  };
+}
+
+async function isCargoAvailable(): Promise<boolean> {
+  try {
+    const result = await runProcess("cargo", ["--version"], {});
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Java test runner (Maven)
+// ---------------------------------------------------------------------------
+
+async function runMavenTest(workDir: string): Promise<RunnerStatus> {
+  const mavenAvailable = await isMavenAvailable();
+
+  if (!mavenAvailable) {
+    return {
+      exitCode: null,
+      skipped: true,
+      skipReason: "mvn not installed",
+    };
+  }
+
+  const result = await runProcess("mvn", ["test"], { cwd: workDir });
+
+  return {
+    exitCode: result.exitCode ?? -1,
+    skipped: false,
+    stderr: result.stderr,
+  };
+}
+
+async function isMavenAvailable(): Promise<boolean> {
+  try {
+    const result = await runProcess("mvn", ["--version"], {});
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
 }
 
 async function runCli(args: string[], cwd: string): Promise<void> {
@@ -259,6 +370,15 @@ async function copyFixtureSources(fixtureDir: string, workDir: string): Promise<
   // module(s) the contract targets. Copy it when present so the generated
   // pytest can resolve modules via importlib.
   await maybeCopyOptionalDir(join(fixtureDir, "app"), join(workDir, "app"));
+
+  // Language-specific project files for non-Python backends.
+  // Copy them when present so the test runner can compile and execute.
+  await maybeCopyOptionalFile(join(fixtureDir, "Cargo.toml"), join(workDir, "Cargo.toml"));
+  await maybeCopyOptionalFile(join(fixtureDir, "Cargo.lock"), join(workDir, "Cargo.lock"));
+  await maybeCopyOptionalFile(join(fixtureDir, "go.mod"), join(workDir, "go.mod"));
+  await maybeCopyOptionalFile(join(fixtureDir, "pom.xml"), join(workDir, "pom.xml"));
+  // Rust needs an empty src/lib.rs so `cargo test` can compile.
+  await maybeCopyOptionalDir(join(fixtureDir, "src"), join(workDir, "src"));
 }
 
 async function maybeCopyOptionalDir(sourceDir: string, destDir: string): Promise<void> {
@@ -271,6 +391,18 @@ async function maybeCopyOptionalDir(sourceDir: string, destDir: string): Promise
     return;
   }
   await cp(sourceDir, destDir, { recursive: true });
+}
+
+async function maybeCopyOptionalFile(sourceFile: string, destFile: string): Promise<void> {
+  try {
+    const stats = await stat(sourceFile);
+    if (!stats.isFile()) {
+      return;
+    }
+  } catch {
+    return;
+  }
+  await cp(sourceFile, destFile);
 }
 
 async function injectBackendIntoConfig(workDir: string, spec: BackendSpec): Promise<void> {

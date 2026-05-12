@@ -506,6 +506,18 @@ export const CORE_OPERATOR_SPECS: OperatorSpec[] = [
     returnType: "Collection",
     description: "Alias for where: filter a collection by a predicate evaluated against each bound item.",
   }),
+  defineOperator({
+    name: "json-path",
+    parameters: [required("String"), required("String")],
+    returnType: "String",
+    description: "Extract a value from a JSON string using a JSON path expression.",
+  }),
+  defineOperator({
+    name: "decimal-eq",
+    parameters: [required("Number"), required("Number")],
+    returnType: "Boolean",
+    description: "Compare two numbers with exact decimal precision, avoiding floating point errors.",
+  }),
 ];
 
 type DefineOperatorInput = {

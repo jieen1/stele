@@ -282,6 +282,7 @@ function translateNode(node: AstNode, context: TranslationContext): string {
  */
 const OPERATOR_HANDLERS: Record<string, (node: ListNode, context: TranslationContext, translate: ExpressionTranslator) => string> = {
   path: (node, context, translate) => translatePath(node, context),
+  field: (node, context, translate) => translateField(node, context, translate),
   collection: (node, context) => translateCollection(node, context),
   value: (node, context, translate) => {
     if (node.items.length !== 1) {
@@ -378,6 +379,13 @@ const OPERATOR_HANDLERS: Record<string, (node: ListNode, context: TranslationCon
     }
     return `steleExistsIn(${translate(node.items[0]!, context)}, ${translate(node.items[1]!, context)})`;
   },
+  // "in" is a semantic alias for "exists-in"
+  "in": (node, context, translate) => {
+    if (node.items.length !== 2) {
+      throw new SteleError("E0603", "Backend Error", 'Operator "in" expects exactly two operands.', node.span, `Found ${node.items.length} operand(s).`, "Pass a value and a collection.");
+    }
+    return `steleExistsIn(${translate(node.items[0]!, context)}, ${translate(node.items[1]!, context)})`;
+  },
   length: (node, context, translate) => {
     if (node.items.length !== 1) {
       throw new SteleError("E0603", "Backend Error", 'Operator "length" expects exactly one operand.', node.span, `Found ${node.items.length} operand(s).`, "Pass a collection.");
@@ -400,6 +408,7 @@ const OPERATOR_HANDLERS: Record<string, (node: ListNode, context: TranslationCon
   upper: (node, context, translate) => translateUnaryRuntime(node, context, translate, "upper", "steleUpper"),
   split: (node, context, translate) => translateBinaryRuntime(node, context, translate, "split", "steleSplit"),
   join: (node, context, translate) => translateBinaryRuntime(node, context, translate, "join", "steleJoin"),
+  "json-path": (node, context, translate) => translateBinaryRuntime(node, context, translate, "json-path", "steleJsonPath"),
   // Data access
   "type-of": (node, context, translate) => {
     if (node.items.length !== 1) {
@@ -452,6 +461,12 @@ const OPERATOR_HANDLERS: Record<string, (node: ListNode, context: TranslationCon
       throw new SteleError("E0603", "Backend Error", 'Operator "approx-eq" expects exactly three operands.', node.span, `Found ${node.items.length} operand(s).`, "Pass two values and tolerance.");
     }
     return `steleApproxEq(${translate(node.items[0]!, context)}, ${translate(node.items[1]!, context)}, ${translate(node.items[2]!, context)})`;
+  },
+  "decimal-eq": (node, context, translate) => {
+    if (node.items.length !== 2) {
+      throw new SteleError("E0603", "Backend Error", 'Operator "decimal-eq" expects exactly two operands.', node.span, `Found ${node.items.length} operand(s).`, "Pass two values to compare.");
+    }
+    return `steleDecimalEq(${translate(node.items[0]!, context)}, ${translate(node.items[1]!, context)})`;
   },
   // Quantifiers
   forall: (node, context, translate) => translateQuantifier(node, context, translate, "forall"),
@@ -572,6 +587,26 @@ function translateCollection(node: ListNode, context: TranslationContext): strin
     throw new SteleError("E0603", "Backend Error", 'Operator "collection" expects an identifier target.', target.span, `Found ${target.kind}.`, "Use an identifier for the collection name.");
   }
   return `steleGetPathVal(${context.rootContextName}, ${formatGoStringSlice([target.value])})`;
+}
+
+/**
+ * Translate `(field (path root ...) field_name)` to Go path access.
+ * Extends an existing path by appending one field segment.
+ */
+function translateField(node: ListNode, context: TranslationContext, translate: ExpressionTranslator): string {
+  if (node.items.length !== 2) {
+    throw new SteleError("E0603", "Backend Error", 'Operator "field" expects a path and a field name.', node.span, `Found ${node.items.length} operand(s).`, "Use (field (path account) cash).");
+  }
+  const pathNode = node.items[0]!;
+  const fieldNode = node.items[1]!;
+  if (pathNode.kind !== "list" || pathNode.head !== "path") {
+    throw new SteleError("E0603", "Backend Error", 'Operator "field" expects its first argument to be a path expression.',
+      pathNode.span ?? node.span, "The Go backend extends existing path expressions by appending one field segment.",
+      "Use (field (path account) cash).");
+  }
+  // Build an extended path node that includes the new field segment
+  const extendedPath: ListNode = { kind: "list", head: "path", items: [...pathNode.items, fieldNode], span: node.span };
+  return translatePath(extendedPath, context);
 }
 
 /**

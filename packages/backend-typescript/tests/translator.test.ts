@@ -928,6 +928,100 @@ describe("@stele/backend-typescript translator", () => {
       expect(() => translateExpression(parseExpression("(first)"))).toThrowError(SteleError);
     });
   });
+
+  describe("field operator", () => {
+    it("translates field as path extension: (field (path account) cash)", () => {
+      expect(translateExpression(parseExpression("(field (path account) cash)"))).toBe(
+        'runtime.steleGetPath(ctx, ["account", "cash"])',
+      );
+    });
+
+    it("translates field with multi-segment path: (field (path account nested) val)", () => {
+      expect(translateExpression(parseExpression("(field (path account nested) val)"))).toBe(
+        'runtime.steleGetPath(ctx, ["account", "nested", "val"])',
+      );
+    });
+
+    it("translates field with bound variable path inside quantifier", () => {
+      const out = translateExpression(
+        parseExpression("(forall txn (collection orders) (gt (field (path txn) amount) 0))"),
+      );
+      expect(out).toBe(
+        'runtime.steleForall(runtime.steleGetPath(ctx, ["orders"]), (txn: unknown) => runtime.steleGt(runtime.steleGetPath(txn, ["amount"]), 0), "(gt (field (path txn) amount) 0)")',
+      );
+    });
+
+    it("rejects (field) with wrong arity", () => {
+      expect(() => translateExpression(parseExpression("(field (path x))"))).toThrowError(SteleError);
+      expect(() => translateExpression(parseExpression("(field (path x) a b)"))).toThrowError(SteleError);
+    });
+
+    it("rejects (field) when first arg is not a path expression", () => {
+      expect(() => translateExpression(parseExpression("(field 5 cash)"))).toThrowError(SteleError);
+      try {
+        translateExpression(parseExpression("(field 5 cash)"));
+      } catch (error) {
+        expect((error as SteleError).code).toBe("E0603");
+      }
+    });
+  });
+
+  describe("in operator", () => {
+    it("translates in via runtime.steleExistsIn", () => {
+      expect(
+        translateExpression(parseExpression('(in "alice" (path users))')),
+      ).toBe('runtime.steleExistsIn("alice", runtime.steleGetPath(ctx, ["users"]))');
+    });
+
+    it("translates in with path value", () => {
+      expect(
+        translateExpression(parseExpression('(in (path account id) (path allowed-ids))')),
+      ).toBe('runtime.steleExistsIn(runtime.steleGetPath(ctx, ["account", "id"]), runtime.steleGetPath(ctx, ["allowed-ids"]))');
+    });
+
+    it("translates in identically to exists-in", () => {
+      const inOut = translateExpression(
+        parseExpression('(in "alice" (path users))'),
+      );
+      const existsInOut = translateExpression(
+        parseExpression('(exists-in "alice" (path users))'),
+      );
+      expect(inOut).toBe(existsInOut);
+    });
+
+    it("rejects (in) with wrong arity", () => {
+      expect(() => translateExpression(parseExpression('(in "alice")'))).toThrowError(SteleError);
+      expect(() => translateExpression(parseExpression("(in)"))).toThrowError(SteleError);
+    });
+  });
+
+  describe("json-path operator", () => {
+    it("translates json-path via runtime.steleJsonPath", () => {
+      expect(
+        translateExpression(parseExpression('(json-path (path data) "accounts.balance")')),
+      ).toBe(
+        'runtime.steleJsonPath(runtime.steleGetPath(ctx, ["data"]), "accounts.balance")',
+      );
+    });
+
+    it("translates json-path with wildcard array access", () => {
+      expect(
+        translateExpression(parseExpression('(json-path (path data) "accounts[*].name")')),
+      ).toBe(
+        'runtime.steleJsonPath(runtime.steleGetPath(ctx, ["data"]), "accounts[*].name")',
+      );
+    });
+  });
+
+  describe("decimal-eq operator", () => {
+    it("translates decimal-eq via runtime.steleDecimalEq", () => {
+      expect(
+        translateExpression(parseExpression("(decimal-eq (path amount) 1234.56)")),
+      ).toBe(
+        "runtime.steleDecimalEq(runtime.steleGetPath(ctx, [\"amount\"]), 1234.56)",
+      );
+    });
+  });
 });
 
 async function createContract(files: Record<string, string>): Promise<Contract> {

@@ -13,7 +13,8 @@ export type StringOp =
   | "lower"
   | "upper"
   | "split"
-  | "join";
+  | "join"
+  | "json-path";
 
 const STRING_MAP: Record<StringOp, string> = {
   contains: "steleContains",
@@ -25,6 +26,7 @@ const STRING_MAP: Record<StringOp, string> = {
   upper: "steleUpper",
   split: "steleSplit",
   join: "steleJoin",
+  "json-path": "steleJsonPath",
 };
 
 /**

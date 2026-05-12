@@ -918,6 +918,18 @@ describe("@stele/backend-python translator", () => {
       expect(source).toContain("def _stele_user_module_allowed(module_name");
     });
   });
+
+  it("translates json-path via stele_json_path runtime helper", () => {
+    const translateExpression = getTranslateExpression();
+    const result = translateExpression(parseExpression('(json-path (path data) "accounts[*].balance")'));
+    expect(result).toBe('stele_json_path(stele_get_path(stele_context, ["data"]), "accounts[*].balance")');
+  });
+
+  it("translates decimal-eq via stele_decimal_eq runtime helper", () => {
+    const translateExpression = getTranslateExpression();
+    const result = translateExpression(parseExpression("(decimal-eq (path amount) 1234.56)"));
+    expect(result).toBe('stele_decimal_eq(stele_get_path(stele_context, ["amount"]), 1234.56)');
+  });
 });
 
 function getGeneratedCodeShapeFile(contract: Contract): string {

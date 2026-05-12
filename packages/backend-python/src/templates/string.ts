@@ -40,4 +40,9 @@ export const stringOperatorHandlers: Record<string, PythonOperatorHandler> = {
     const sep = translate(node.items[1]!, context);
     return `stele_join(${collection}, ${sep})`;
   },
+  "json-path": (node, context, translate) => {
+    const data = translate(node.items[0]!, context);
+    const path = translate(node.items[1]!, context);
+    return `stele_json_path(${data}, ${path})`;
+  },
 } as Record<string, PythonOperatorHandler>;

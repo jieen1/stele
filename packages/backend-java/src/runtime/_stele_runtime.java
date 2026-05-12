@@ -108,6 +108,15 @@ final class SteleRuntime {
         throw new SteleRuntimeError("expected number, got " + value.getClass().getName());
     }
 
+    private static double assertNumber(Object value, String label) {
+        return asDouble(value);
+    }
+
+    private static String assertString(Object value, String label) {
+        if (value == null) throw new SteleRuntimeError(label + ": expected string, got null");
+        return value.toString();
+    }
+
     // --- Numeric comparison ---
 
     public static int numericCompare(Object a, Object b) {
@@ -821,6 +830,235 @@ final class SteleRuntime {
             }
         }
         return false;
+    }
+
+    // --- Phase 1: json-path + decimal-eq ---
+
+    /**
+     * Compare two numbers with exact decimal precision, avoiding floating point errors.
+     */
+    public static boolean steleDecimalEq(Object a, Object b) {
+        double left = assertNumber(a, "decimal-eq left");
+        double right = assertNumber(b, "decimal-eq right");
+        return String.format(java.util.Locale.US, "%.10f", left).equals(
+               String.format(java.util.Locale.US, "%.10f", right));
+    }
+
+    /**
+     * Extract a value from a JSON string using a simple JSON path expression.
+     * Supports dot-separated keys and array indices (e.g., "foo.bar" or "foo[0]").
+     */
+    public static String steleJsonPath(Object data, Object pathExpr) {
+        String dataStr = assertString(data, "json-path data");
+        String pathStr = assertString(pathExpr, "json-path path");
+        Object root = parseJson(dataStr);
+        Object result = evalJsonPath(root, pathStr);
+        if (result == null) return "";
+        if (result instanceof Map || result instanceof List) {
+            return toJsonString(result);
+        }
+        return String.valueOf(result);
+    }
+
+    private static Object evalJsonPath(Object data, String path) {
+        if (path == null || path.isEmpty() || "$".equals(path)) return data;
+        String p = path.startsWith("$") ? path.substring(1) : path;
+        // Remove leading dot
+        if (p.startsWith(".")) p = p.substring(1);
+        if (p.isEmpty()) return data;
+
+        int bracketIdx = -1;
+        int dotIdx = -1;
+        if (p.charAt(0) == '[') {
+            bracketIdx = 0;
+        } else {
+            int i = 0;
+            while (i < p.length() && p.charAt(i) != '.' && p.charAt(i) != '[') i++;
+            String key = p.substring(0, i);
+            if (data instanceof Map) {
+                Object value = ((Map<?, Object>) data).get(key);
+                String rest = p.substring(i);
+                return evalJsonPath(value, rest);
+            }
+            return null;
+        }
+
+        // Array index
+        int closeBracket = p.indexOf(']');
+        if (closeBracket == -1) throw new SteleRuntimeError("json-path: unclosed bracket");
+        String indexStr = p.substring(1, closeBracket);
+        if ("*".equals(indexStr)) {
+            // Wildcard - return first match or empty
+            if (data instanceof List) {
+                List<?> items = (List<?>) data;
+                String rest = p.substring(closeBracket + 1);
+                for (Object item : items) {
+                    Object r = evalJsonPath(item, rest);
+                    if (r != null) return r;
+                }
+            }
+            return null;
+        }
+        int index = Integer.parseInt(indexStr);
+        String rest = p.substring(closeBracket + 1);
+        if (data instanceof List) {
+            List<?> items = (List<?>) data;
+            if (index >= 0 && index < items.size()) {
+                return evalJsonPath(items.get(index), rest);
+            }
+        }
+        return null;
+    }
+
+    private static Object parseJson(String json) {
+        json = json.trim();
+        if (json.startsWith("{")) return parseJsonObject(json);
+        if (json.startsWith("[")) return parseJsonArray(json);
+        if (json.startsWith("\"")) return json.substring(1, json.length() - 2);
+        if ("true".equals(json)) return Boolean.TRUE;
+        if ("false".equals(json)) return Boolean.FALSE;
+        if ("null".equals(json)) return null;
+        // Number
+        try {
+            if (json.contains(".")) return Double.parseDouble(json);
+            return Long.parseLong(json);
+        } catch (NumberFormatException e) {
+            throw new SteleRuntimeError("json-path: invalid JSON: " + json);
+        }
+    }
+
+    private static Map<String, Object> parseJsonObject(String json) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        json = json.trim();
+        if (!json.startsWith("{") || !json.endsWith("}")) {
+            throw new SteleRuntimeError("json-path: invalid JSON object");
+        }
+        String inner = json.substring(1, json.length() - 1).trim();
+        if (inner.isEmpty()) return map;
+        int pos = 0;
+        while (pos < inner.length()) {
+            pos = skipWhitespace(inner, pos);
+            if (pos >= inner.length() || inner.charAt(pos) != '"') break;
+            int[] keyResult = extractJsonString(inner, pos);
+            String key = inner.substring(keyResult[0] + 1, keyResult[1] - 1);
+            pos = keyResult[1] + 1;
+            pos = skipWhitespace(inner, pos);
+            if (pos >= inner.length() || inner.charAt(pos) != ':') break;
+            pos++;
+            pos = skipWhitespace(inner, pos);
+            int[] valueResult = extractJsonValue(inner, pos);
+            String valueStr = inner.substring(pos, valueResult[0]);
+            Object value = parseJson(valueStr);
+            map.put(key, value);
+            pos = valueResult[0] + 1;
+            pos = skipWhitespace(inner, pos);
+            if (pos < inner.length() && inner.charAt(pos) == ',') pos++;
+        }
+        return map;
+    }
+
+    private static List<Object> parseJsonArray(String json) {
+        List<Object> list = new ArrayList<>();
+        json = json.trim();
+        if (!json.startsWith("[") || !json.endsWith("]")) {
+            throw new SteleRuntimeError("json-path: invalid JSON array");
+        }
+        String inner = json.substring(1, json.length() - 1).trim();
+        if (inner.isEmpty()) return list;
+        int pos = 0;
+        while (pos < inner.length()) {
+            pos = skipWhitespace(inner, pos);
+            if (pos >= inner.length()) break;
+            int[] valueResult = extractJsonValue(inner, pos);
+            String valueStr = inner.substring(pos, valueResult[0]);
+            list.add(parseJson(valueStr));
+            pos = valueResult[0] + 1;
+            pos = skipWhitespace(inner, pos);
+            if (pos < inner.length() && inner.charAt(pos) == ',') pos++;
+        }
+        return list;
+    }
+
+    private static int skipWhitespace(String s, int pos) {
+        while (pos < s.length() && Character.isWhitespace(s.charAt(pos))) pos++;
+        return pos;
+    }
+
+    private static int[] extractJsonString(String s, int pos) {
+        // pos points to opening quote
+        int i = pos + 1;
+        while (i < s.length()) {
+            if (s.charAt(i) == '\\' ) { i += 2; continue; }
+            if (s.charAt(i) == '"') return new int[]{pos, i};
+            i++;
+        }
+        throw new SteleRuntimeError("json-path: unterminated string");
+    }
+
+    private static int[] extractJsonValue(String s, int pos) {
+        char c = s.charAt(pos);
+        if (c == '"') {
+            return extractJsonString(s, pos);
+        }
+        if (c == '{') {
+            return extractJsonBraced(s, pos, '{', '}');
+        }
+        if (c == '[') {
+            return extractJsonBraced(s, pos, '[', ']');
+        }
+        // Number, true, false, null
+        int i = pos;
+        while (i < s.length() && s.charAt(i) != ',' && s.charAt(i) != '}' && s.charAt(i) != ']'
+               && !Character.isWhitespace(s.charAt(i))) i++;
+        return new int[]{i, i};
+    }
+
+    private static int[] extractJsonBraced(String s, int pos, char open, char close) {
+        int depth = 1;
+        int i = pos + 1;
+        while (i < s.length() && depth > 0) {
+            if (s.charAt(i) == '"') {
+                int[] end = extractJsonString(s, i);
+                i = end[1] + 1;
+                continue;
+            }
+            if (s.charAt(i) == open) depth++;
+            if (s.charAt(i) == close) depth--;
+            if (depth > 0) i++;
+        }
+        return new int[]{i + 1, i + 1};
+    }
+
+    private static String toJsonString(Object value) {
+        if (value == null) return "null";
+        if (value instanceof String) return "\"" + ((String) value).replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        if (value instanceof Number || value instanceof Boolean) return String.valueOf(value);
+        if (value instanceof Map) {
+            Map<?, Object> map = (Map<?, Object>) value;
+            StringBuilder sb = new StringBuilder("{");
+            boolean first = true;
+            for (Map.Entry<?, Object> entry : map.entrySet()) {
+                if (!first) sb.append(",");
+                sb.append("\"").append(entry.getKey().toString().replace("\"", "\\\"")).append("\":");
+                sb.append(toJsonString(entry.getValue()));
+                first = false;
+            }
+            sb.append("}");
+            return sb.toString();
+        }
+        if (value instanceof List) {
+            List<?> list = (List<?>) value;
+            StringBuilder sb = new StringBuilder("[");
+            boolean first = true;
+            for (Object item : list) {
+                if (!first) sb.append(",");
+                sb.append(toJsonString(item));
+                first = false;
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+        return String.valueOf(value);
     }
 
     private static String escapeJson(String value) {

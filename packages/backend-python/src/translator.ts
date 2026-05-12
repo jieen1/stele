@@ -52,9 +52,11 @@ const SCENARIO_RUNTIME_HELPERS = ["stele_merge_contexts", "stele_run_scenario"];
 const EP04_RUNTIME_HELPERS = [
   "stele_ceil",
   "stele_concat",
+  "stele_decimal_eq",
   "stele_first",
   "stele_floor",
   "stele_join",
+  "stele_json_path",
   "stele_last",
   "stele_length",
   "stele_lower",

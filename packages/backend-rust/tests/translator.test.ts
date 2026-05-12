@@ -545,6 +545,91 @@ describe("translateExpression — control operators", () => {
 });
 
 // ---------------------------------------------------------------------------
+// translateExpression: field operator
+// ---------------------------------------------------------------------------
+
+describe("translateExpression — field operator", () => {
+    test("extends a single-segment path", () => {
+        const pathNode = list("path", [ident("account")]);
+        const expr = list("field", [pathNode, ident("cash")]);
+        const result = translateExpression(expr);
+        expect(result).toContain("stele_get_path");
+        expect(result).toContain("account");
+        expect(result).toContain("cash");
+    });
+
+    test("extends a multi-segment path", () => {
+        const pathNode = list("path", [ident("account"), ident("details")]);
+        const expr = list("field", [pathNode, ident("balance")]);
+        const result = translateExpression(expr);
+        expect(result).toContain("stele_get_path");
+        expect(result).toContain("account");
+        expect(result).toContain("details");
+        expect(result).toContain("balance");
+    });
+
+    test("throws when first argument is not a path", () => {
+        const expr = list("field", [ident("account"), ident("cash")]);
+        expect(() => translateExpression(expr)).toThrow('Operator "field" expects its first argument to be a path expression.');
+    });
+
+    test("throws when wrong number of operands", () => {
+        const expr = list("field", [list("path", [ident("account")])]);
+        expect(() => translateExpression(expr)).toThrow('Operator "field" expects a path and a field name.');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// translateExpression: in operator
+// ---------------------------------------------------------------------------
+
+describe("translateExpression — in operator", () => {
+    test("translates in as membership check", () => {
+        const expr = list("in", [num(5), list("path", [ident("ids")])]);
+        const result = translateExpression(expr);
+        expect(result).toContain("stele_exists_in");
+    });
+
+    test("translates in with path value and path collection", () => {
+        const expr = list("in", [list("path", [ident("name")]), list("path", [ident("names")])]);
+        const result = translateExpression(expr);
+        expect(result).toContain("stele_exists_in");
+        expect(result).toContain("name");
+        expect(result).toContain("names");
+    });
+
+    test("throws when wrong number of operands", () => {
+        const expr = list("in", [num(5)]);
+        expect(() => translateExpression(expr)).toThrow('Operator "in" expects two operands');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// json-path operator tests
+// ---------------------------------------------------------------------------
+
+describe("translateExpression — json-path operator", () => {
+    test("translates json-path as stele_json_path call", () => {
+        const expr = list("json-path", [list("path", [ident("data")]), str("accounts.balance")]);
+        const result = translateExpression(expr);
+        expect(result).toContain("stele_json_path");
+        expect(result).toContain("accounts.balance");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// decimal-eq operator tests
+// ---------------------------------------------------------------------------
+
+describe("translateExpression — decimal-eq operator", () => {
+    test("translates decimal-eq as stele_decimal_eq call", () => {
+        const expr = list("decimal-eq", [list("path", [ident("amount")]), num(1234.56)]);
+        const result = translateExpression(expr);
+        expect(result).toContain("stele_decimal_eq");
+    });
+});
+
+// ---------------------------------------------------------------------------
 // generateRustSource integration
 // ---------------------------------------------------------------------------
 

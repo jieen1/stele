@@ -32,6 +32,7 @@ import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { lockProject, runLockRecursive, type LockOptions, type LockSummary } from "./commands/lock.js";
 import { runMaintenanceSummary, type MaintenanceSummaryOptions } from "./commands/maintenance.js";
+import { runObserve, type ObserveOptions } from "./commands/observe.js";
 import { runPropose, type ProposeOptions } from "./commands/propose.js";
 import { runRules, type RulesOptions } from "./commands/rules.js";
 import { runWhy, type WhyOptions } from "./commands/why.js";
@@ -58,6 +59,7 @@ type ProgramDependencies = {
   runWhy?: (projectDir: string, idOrFingerprint: string, options?: WhyOptions) => Promise<void>;
   runPropose?: (projectDir: string, options: ProposeOptions) => Promise<void>;
   runMaintenanceSummary?: (projectDir: string, options?: MaintenanceSummaryOptions) => Promise<void>;
+  runObserve?: (projectDir: string, options?: ObserveOptions) => Promise<void>;
 };
 
 export function createProgram(dependencies: ProgramDependencies = {}): Command {
@@ -76,6 +78,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   const why = dependencies.runWhy ?? runWhy;
   const propose = dependencies.runPropose ?? runPropose;
   const maintenanceSummary = dependencies.runMaintenanceSummary ?? runMaintenanceSummary;
+  const observe = dependencies.runObserve ?? runObserve;
   const program = new Command();
 
   program
@@ -299,6 +302,12 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--from <git-ref>", "compare against the given git reference")
     .option("--output <path>", "write the summary to a file")
     .action((options: MaintenanceSummaryOptions) => maintenanceSummary(cwd(), options));
+  program
+    .command("observe")
+    .description("Analyze agent observation data for invariant health trends.")
+    .option("--json", "emit the observation summary as JSON")
+    .option("--since <iso-date>", "filter observations since the given ISO date")
+    .action((options: ObserveOptions) => observe(cwd(), options));
   program
     .command("init")
     .description("Initialize Stele in the current project.")

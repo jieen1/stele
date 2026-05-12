@@ -111,12 +111,15 @@ const EP04_RUNTIME_HELPERS = [
   "steleRound",
   "steleCeil",
   "steleFloor",
-  // string (5)
+  // string (6)
   "steleTrim",
   "steleLower",
   "steleUpper",
   "steleSplit",
   "steleJoin",
+  "steleJsonPath",
+  // comparison (1)
+  "steleDecimalEq",
   // data access (1)
   "steleTypeOf",
   // FP promoted (3); filter is an alias of where -> reuses steleWhere.
@@ -233,6 +236,7 @@ const OPERATOR_HANDLERS: Record<string, OperatorHandler> = {
   // Collection / value primitives needed by aggregate operators.
   collection: translateCollection,
   value: translateValue,
+  field: translateField,
   ...Object.fromEntries(
     Object.entries(COMPARISON_HELPER).map(([operator, helper]) => [
       operator,
@@ -265,6 +269,9 @@ const OPERATOR_HANDLERS: Record<string, OperatorHandler> = {
   "has-length": translateHasLength,
   "is-empty": translateIsEmpty,
   "exists-in": translateExistsIn,
+  // "in" is semantically identical to "exists-in": checks whether a value
+  // exists inside a collection. Reuses the same runtime helper.
+  in: translateExistsIn,
   // -- Phase B: string ----------------------------------------------------
   contains: (node, context, translate) => translateBinaryRuntime(node, context, translate, "contains", "steleContains"),
   "starts-with": (node, context, translate) =>
@@ -280,6 +287,7 @@ const OPERATOR_HANDLERS: Record<string, OperatorHandler> = {
   "not-null": translateNotNull,
   between: translateBetween,
   "approx-eq": translateApproxEq,
+  "decimal-eq": (node, context, translate) => translateBinaryRuntime(node, context, translate, "decimal-eq", "steleDecimalEq"),
   // -- Phase C: quantifiers -----------------------------------------------
   forall: (node, context, translate) => translateQuantifier(node, context, translate, "forall", "steleForall"),
   exists: (node, context, translate) => translateQuantifier(node, context, translate, "exists", "steleExists"),
@@ -314,6 +322,7 @@ const OPERATOR_HANDLERS: Record<string, OperatorHandler> = {
   upper: (node, context, translate) => translateUnary(node, context, translate, "upper", "steleUpper"),
   split: (node, context, translate) => translateBinaryRuntime(node, context, translate, "split", "steleSplit"),
   join: (node, context, translate) => translateBinaryRuntime(node, context, translate, "join", "steleJoin"),
+  "json-path": (node, context, translate) => translateBinaryRuntime(node, context, translate, "json-path", "steleJsonPath"),
   // -- EP04 batch 1: data access -----------------------------------------
   "type-of": (node, context, translate) => translateUnary(node, context, translate, "type-of", "steleTypeOf"),
   // -- EP04 batch 1: FP promoted -----------------------------------------
@@ -767,6 +776,39 @@ function translateValue(node: ListNode, context: TranslationContext, translate: 
     );
   }
   return translate(node.items[0]!, context);
+}
+
+function translateField(node: ListNode, context: TranslationContext, _translate: ExpressionTranslator): string {
+  if (node.items.length !== 2) {
+    throw new SteleError(
+      "E0603",
+      "Backend Error",
+      'Operator "field" expects a path and a field name.',
+      node.span,
+      `Found ${node.items.length} operand(s).`,
+      "Use a form like (field (path account) cash).",
+    );
+  }
+  const pathNode = node.items[0]!;
+  const fieldNode = node.items[1]!;
+  if (pathNode.kind !== "list" || pathNode.head !== "path") {
+    throw new SteleError(
+      "E0603",
+      "Backend Error",
+      'Operator "field" expects its first argument to be a path expression.',
+      pathNode.span ?? node.span,
+      "The TypeScript backend extends existing path expressions by appending one field segment.",
+      "Use a form like (field (path account) cash).",
+    );
+  }
+  // Build an extended path node and delegate to translatePath.
+  const extendedPath: ListNode = {
+    kind: "list",
+    head: "path",
+    items: [...pathNode.items, fieldNode],
+    span: node.span,
+  };
+  return translatePath(extendedPath, context);
 }
 
 function translateComparison(

@@ -919,6 +919,114 @@ export function steleTypeOf(value: unknown): string {
   return "object";
 }
 
+/**
+ * Extract a value from a JSON string using a simplified JSONPath expression.
+ * Supports root fields, nested dot paths, array index access [N], and wildcard [*].
+ * Returns JSON-encoded string for multiple matches, plain string for single matches.
+ */
+export function steleJsonPath(data: unknown, pathExpr: unknown): string {
+  const dataS = assertString("json-path", data);
+  const pathS = assertString("json-path", pathExpr);
+  let root: unknown;
+  try {
+    root = JSON.parse(dataS);
+  } catch (error) {
+    throw new SteleRuntimeError(`json-path: invalid JSON input: ${error}`);
+  }
+  const results = _steleEvalJsonPath(root, pathS);
+  if (results.length === 1) {
+    return String(results[0]);
+  }
+  return JSON.stringify(results);
+}
+
+function _steleEvalJsonPath(data: unknown, path: string): unknown[] {
+  if (!path) return [data];
+  const tokens = _steleTokenizePath(path);
+  if (!tokens.length) return [data];
+  const [kind, value] = tokens[0];
+  const rest = _steleDetokenize(tokens.slice(1));
+  if (kind === "field") {
+    if (typeof data === "object" && data !== null && !Array.isArray(data) && value in data) {
+      return _steleEvalJsonPath((data as Record<string, unknown>)[value], rest);
+    }
+    return [];
+  }
+  if (kind === "index") {
+    if (Array.isArray(data) && Number.isInteger(value) && value >= 0 && value < data.length) {
+      return _steleEvalJsonPath(data[value], rest);
+    }
+    return [];
+  }
+  if (kind === "wildcard") {
+    if (Array.isArray(data)) {
+      const all: unknown[] = [];
+      for (const item of data) {
+        all.push(..._steleEvalJsonPath(item, rest));
+      }
+      return all;
+    }
+    return [];
+  }
+  return [];
+}
+
+type _JsonPathToken = ["field", string] | ["index", number] | ["wildcard"];
+
+function _steleTokenizePath(path: string): _JsonPathToken[] {
+  const tokens: _JsonPathToken[] = [];
+  let i = 0;
+  while (i < path.length) {
+    if (path[i] === ".") {
+      i++;
+      continue;
+    }
+    if (path[i] === "[") {
+      const j = path.indexOf("]", i);
+      if (j === -1) throw new SteleRuntimeError(`json-path: unclosed bracket in path`);
+      const inner = path.substring(i + 1, j);
+      if (inner === "*") {
+        tokens.push(["wildcard"]);
+      } else {
+        const idx = Number.parseInt(inner, 10);
+        if (!Number.isInteger(idx)) {
+          throw new SteleRuntimeError(`json-path: invalid array index: ${inner}`);
+        }
+        tokens.push(["index", idx]);
+      }
+      i = j + 1;
+      continue;
+    }
+    const start = i;
+    while (i < path.length && path[i] !== "." && path[i] !== "[") i++;
+    const name = path.substring(start, i);
+    if (name) tokens.push(["field", name]);
+  }
+  return tokens;
+}
+
+function _steleDetokenize(tokens: _JsonPathToken[]): string {
+  return tokens.map(([k, v]) => {
+    if (k === "field") return `.${v}`;
+    if (k === "index") return `[${v}]`;
+    return "[*]";
+  }).join("");
+}
+
+/**
+ * Compare two numbers with exact decimal precision, avoiding floating point errors.
+ * Converts both operands to string first, then uses decimal string comparison.
+ */
+export function steleDecimalEq(left: unknown, right: unknown): boolean {
+  const l = assertNumeric("decimal-eq", left);
+  const r = assertNumeric("decimal-eq", right);
+  // Use string representation to avoid floating point comparison issues.
+  // Both are already Numbers in JS, so convert to fixed-point string for exact comparison.
+  const lStr = Number.isInteger(l) ? String(l) : l.toFixed(20).replace(/0+$/, "").replace(/\.$/, "");
+  const rStr = Number.isInteger(r) ? String(r) : r.toFixed(20).replace(/0+$/, "").replace(/\.$/, "");
+  return lStr === rStr;
+}
+
 /** Project items by path; missing-path elements skipped silently (per spec). */
 export function steleMap(coll: unknown, parts: readonly string[]): unknown[] {
   const items = assertCollection("map", coll);

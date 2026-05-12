@@ -24,6 +24,11 @@ export const extendedComparisonHandlers: Record<string, PythonOperatorHandler> =
     const tol = translate(node.items[2]!, context);
     return `abs(${left} - ${right}) <= ${tol}`;
   },
+  "decimal-eq": (node, context, translate) => {
+    const left = translate(node.items[0]!, context);
+    const right = translate(node.items[1]!, context);
+    return `stele_decimal_eq(${left}, ${right})`;
+  },
 };
 
 export const comparisonOperatorHandlers: Record<string, PythonOperatorHandler> = Object.fromEntries(

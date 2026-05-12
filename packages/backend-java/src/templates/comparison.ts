@@ -20,13 +20,18 @@ const COMPARISON_HELPER: Record<string, string> = {
   lte: "steleLte",
 };
 
-export const comparisonOperatorHandlers: Record<string, JavaOperatorHandler> = Object.fromEntries(
-  Object.entries(COMPARISON_HELPER).map(([operator, helper]) => [
-    operator,
-    (node: ListNode, context: TranslationContext, translate: JavaExpressionTranslator) =>
-      translateComparison(node, context, translate, helper),
-  ]),
-) as Record<string, JavaOperatorHandler>;
+export const comparisonOperatorHandlers: Record<string, JavaOperatorHandler> = {
+  ...Object.fromEntries(
+    Object.entries(COMPARISON_HELPER).map(([operator, helper]) => [
+      operator,
+      (node: ListNode, context: TranslationContext, translate: JavaExpressionTranslator) =>
+        translateComparison(node, context, translate, helper),
+    ]),
+  ),
+  // Phase 1: decimal-eq operator
+  "decimal-eq": (node: ListNode, context: TranslationContext, translate: JavaExpressionTranslator) =>
+    translateComparison(node, context, translate, "steleDecimalEq"),
+} as Record<string, JavaOperatorHandler>;
 
 function translateComparison(
   node: ListNode,

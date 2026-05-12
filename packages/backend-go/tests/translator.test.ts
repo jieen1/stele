@@ -392,6 +392,87 @@ describe("generateGoTestSource", () => {
 });
 
 // ---------------------------------------------------------------------------
+// translateExpression: field operator
+// ---------------------------------------------------------------------------
+
+describe("translateExpression field operator", () => {
+  it("translates field extending a simple path", () => {
+    const expr = list("field", [path("account"), atom("identifier", "cash")]);
+    expect(translateExpression(expr)).toBe(
+      'steleGetPathVal(globalCtx, []string{"account", "cash"})',
+    );
+  });
+
+  it("translates field extending a nested path", () => {
+    const expr = list("field", [path("account", "details"), atom("identifier", "balance")]);
+    expect(translateExpression(expr)).toBe(
+      'steleGetPathVal(globalCtx, []string{"account", "details", "balance"})',
+    );
+  });
+
+  it("throws when first argument is not a path", () => {
+    const expr = list("field", [atom("identifier", "account"), atom("identifier", "cash")]);
+    expect(() => translateExpression(expr)).toThrow('Operator "field" expects its first argument to be a path expression.');
+  });
+
+  it("throws when wrong number of operands", () => {
+    const expr = list("field", [path("account")]);
+    expect(() => translateExpression(expr)).toThrow('Operator "field" expects a path and a field name.');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// translateExpression: in operator
+// ---------------------------------------------------------------------------
+
+describe("translateExpression in operator", () => {
+  it("translates in as membership check", () => {
+    const expr = list("in", [atom("number", 5), collection("ids")]);
+    expect(translateExpression(expr)).toContain("steleExistsIn");
+    expect(translateExpression(expr)).toBe(
+      'steleExistsIn(5, steleGetPathVal(globalCtx, []string{"ids"}))',
+    );
+  });
+
+  it("translates in with path value and path collection", () => {
+    const expr = list("in", [path("name"), collection("names")]);
+    expect(translateExpression(expr)).toContain("steleExistsIn");
+    expect(translateExpression(expr)).toBe(
+      'steleExistsIn(steleGetPathVal(globalCtx, []string{"name"}), steleGetPathVal(globalCtx, []string{"names"}))',
+    );
+  });
+
+  it("throws when wrong number of operands", () => {
+    const expr = list("in", [atom("number", 5)]);
+    expect(() => translateExpression(expr)).toThrow('Operator "in" expects exactly two operands.');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// json-path operator tests
+// ---------------------------------------------------------------------------
+
+describe("translateExpression json-path operator", () => {
+  it("translates json-path as steleJsonPath call", () => {
+    const expr = list("json-path", [path("data"), atom("string", "accounts.balance")]);
+    const result = translateExpression(expr);
+    expect(result).toBe('steleJsonPath(steleGetPathVal(globalCtx, []string{"data"}), "accounts.balance")');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// decimal-eq operator tests
+// ---------------------------------------------------------------------------
+
+describe("translateExpression decimal-eq operator", () => {
+  it("translates decimal-eq as steleDecimalEq call", () => {
+    const expr = list("decimal-eq", [path("amount"), atom("number", 1234.56)]);
+    const result = translateExpression(expr);
+    expect(result).toBe("steleDecimalEq(steleGetPathVal(globalCtx, []string{\"amount\"}), 1234.56)");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // STELE_ALLOWED_IMPORTS tests
 // ---------------------------------------------------------------------------
 

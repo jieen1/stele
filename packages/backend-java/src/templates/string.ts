@@ -12,6 +12,8 @@ export const stringOperatorHandlers: Record<string, JavaOperatorHandler> = {
   upper: (node, context, translate) => translateUnary(node, context, translate, "upper", "steleUpper"),
   split: (node, context, translate) => translateBinaryRuntime(node, context, translate, "split", "steleSplit"),
   join: (node, context, translate) => translateBinaryRuntime(node, context, translate, "join", "steleJoin"),
+  // Phase 1: json-path operator
+  "json-path": (node, context, translate) => translateBinaryRuntime(node, context, translate, "json-path", "steleJsonPath"),
 };
 
 function translateBinaryRuntime(

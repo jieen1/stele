@@ -305,6 +305,7 @@ type OperatorHandler = (node: ListNode, context: TranslationContext, translate: 
 const OPERATOR_HANDLERS: Map<string, OperatorHandler> = new Map([
     // path access
     ["path", translatePath],
+    ["field", translateField],
     ["collection", translateCollection],
     ["value", translateValue],
 
@@ -343,6 +344,8 @@ const OPERATOR_HANDLERS: Map<string, OperatorHandler> = new Map([
     ["has-length", translateHasLength],
     ["is-empty", translateIsEmpty],
     ["exists-in", translateExistsIn],
+    // "in" is a semantic alias for "exists-in"
+    ["in", translateIn],
 
     // string
     ["contains", (n, c, t) => translateBinaryString(n, c, t, "contains")],
@@ -354,6 +357,7 @@ const OPERATOR_HANDLERS: Map<string, OperatorHandler> = new Map([
     ["upper", (n, c, t) => translateUnaryString(n, c, t, "upper")],
     ["split", (n, c, t) => translateBinaryString(n, c, t, "split")],
     ["join", (n, c, t) => translateBinaryString(n, c, t, "join")],
+    ["json-path", (n, c, t) => translateBinaryString(n, c, t, "json-path")],
 
     // control
     ["when", translateWhen],
@@ -363,6 +367,7 @@ const OPERATOR_HANDLERS: Map<string, OperatorHandler> = new Map([
     ["not-null", translateNotNull],
     ["between", translateBetween],
     ["approx-eq", translateApproxEq],
+    ["decimal-eq", translateDecimalEq],
 
     // quantifiers
     ["forall", (n, c, t) => translateQuantifier(n, c, t, "forall")],
@@ -424,6 +429,26 @@ function translateCollection(node: ListNode, context: TranslationContext): strin
         throw new SteleError("E0603", "Backend Error", 'Operator "collection" expects an identifier.', node.span, `Found ${target.kind}.`, "Use (collection items).");
     }
     return `stele_get_path(&${context.rootContextName}, &[${rustStringLiteral(target.value)}])${context.inClosure ? "" : "?"}`;
+}
+
+/**
+ * Translate `(field (path root ...) field_name)` to Rust path access.
+ * Extends an existing path by appending one field segment.
+ */
+function translateField(node: ListNode, context: TranslationContext, translate: ExpressionTranslator): string {
+    if (node.items.length !== 2) {
+        throw new SteleError("E0603", "Backend Error", 'Operator "field" expects a path and a field name.', node.span, `Found ${node.items.length}.`, "Use (field (path account) cash).");
+    }
+    const pathNode = node.items[0]!;
+    const fieldNode = node.items[1]!;
+    if (pathNode.kind !== "list" || pathNode.head !== "path") {
+        throw new SteleError("E0603", "Backend Error", 'Operator "field" expects its first argument to be a path expression.',
+            pathNode.span ?? node.span, "The Rust backend extends existing path expressions by appending one field segment.",
+            "Use (field (path account) cash).");
+    }
+    // Build an extended path node that includes the new field segment
+    const extendedPath: ListNode = { kind: "list", head: "path", items: [...pathNode.items, fieldNode], span: node.span };
+    return translatePath(extendedPath, context);
 }
 
 function translateValue(node: ListNode, _context: TranslationContext, translate: ExpressionTranslator): string {
@@ -562,6 +587,19 @@ function translateExistsIn(node: ListNode, context: TranslationContext, translat
     return `stele_exists_in(${wrapSteleArg(value)}, ${wrapSteleArg(container)})`;
 }
 
+/**
+ * Translate `(in value collection)` to Rust membership check.
+ * Semantic alias for exists-in.
+ */
+function translateIn(node: ListNode, context: TranslationContext, translate: ExpressionTranslator): string {
+    if (node.items.length !== 2) {
+        throw new SteleError("E0603", "Backend Error", 'Operator "in" expects two operands: a value and a collection.', node.span, `Found ${node.items.length}.`, "Use (in (path name) (path names)).");
+    }
+    const value = translate(node.items[0]!, context);
+    const container = translate(node.items[1]!, context);
+    return `stele_exists_in(${wrapSteleArg(value)}, ${wrapSteleArg(container)})`;
+}
+
 // ---------------------------------------------------------------------------
 // String
 // ---------------------------------------------------------------------------
@@ -650,6 +688,16 @@ function translateApproxEq(node: ListNode, context: TranslationContext, translat
     const tol = translate(node.items[2]!, context);
     const tryOp = context.inClosure ? "" : "?";
     return `stele_approx_eq(${wrapSteleArg(a)}, ${wrapSteleArg(b)}, ${wrapSteleArg(tol)})${tryOp}`;
+}
+
+function translateDecimalEq(node: ListNode, context: TranslationContext, translate: ExpressionTranslator): string {
+    if (node.items.length !== 2) {
+        throw new SteleError("E0603", "Backend Error", 'Operator "decimal-eq" expects two operands.', node.span, `Found ${node.items.length}.`, "Use (decimal-eq a b).");
+    }
+    const a = translate(node.items[0]!, context);
+    const b = translate(node.items[1]!, context);
+    const tryOp = context.inClosure ? "" : "?";
+    return `stele_decimal_eq(${wrapSteleArg(a)}, ${wrapSteleArg(b)})${tryOp}`;
 }
 
 // ---------------------------------------------------------------------------

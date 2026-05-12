@@ -91,6 +91,9 @@ const EXPECTED_SIGNATURES: ExpectedSignature[] = [
   signature("first", 1, 1, ["Collection"], parameters(required("Collection")), "Unknown"),
   signature("last", 1, 1, ["Collection"], parameters(required("Collection")), "Unknown"),
   signature("filter", 3, 3, ["Symbol", "Collection", "Predicate"], parameters(required("Symbol"), required("Collection"), required("Predicate")), "Collection"),
+  // Phase 1: new operators
+  signature("json-path", 2, 2, ["String", "String"], parameters(required("String"), required("String")), "String"),
+  signature("decimal-eq", 2, 2, ["Number", "Number"], parameters(required("Number"), required("Number")), "Boolean"),
 ];
 
 describe("createCoreOperatorRegistry", () => {

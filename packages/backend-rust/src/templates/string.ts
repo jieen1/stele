@@ -26,6 +26,7 @@ export const STRING_OPERATORS: ReadonlyMap<string, string> = Object.freeze(
         ["upper", "stele_upper"],
         ["split", "stele_split"],
         ["join", "stele_join"],
+        ["json-path", "stele_json_path"],
     ]),
 );
 
