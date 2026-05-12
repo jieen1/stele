@@ -88,7 +88,8 @@ export async function startMcpServer(): Promise<void> {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args = {} } = request.params;
-    const projectDir = (args.projectDir as string) ?? DEFAULT_PROJECT_DIR;
+    const rawDir = typeof args.projectDir === "string" ? args.projectDir : DEFAULT_PROJECT_DIR;
+    const projectDir = rawDir;
 
     switch (name) {
       case "stele-check":
