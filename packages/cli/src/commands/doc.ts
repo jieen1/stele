@@ -75,7 +75,7 @@ function generateMarkdown(contract: Contract): string {
 }
 
 function escapeHtml(s: string): string {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#x27;");
 }
 
 function generateHtml(contract: Contract): string {
