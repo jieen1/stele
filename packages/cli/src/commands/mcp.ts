@@ -4,9 +4,9 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const DEFAULT_PROJECT_DIR = process.cwd();
 
@@ -89,7 +89,7 @@ export async function startMcpServer(): Promise<void> {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args = {} } = request.params;
     const rawDir = typeof args.projectDir === "string" ? args.projectDir : DEFAULT_PROJECT_DIR;
-    const projectDir = rawDir;
+    const projectDir = resolve(rawDir);
 
     switch (name) {
       case "stele-check":
@@ -112,7 +112,7 @@ export async function startMcpServer(): Promise<void> {
 
 function runSteleCheck(projectDir: string) {
   try {
-    const output = execSync("stele check", {
+    const output = execFileSync("stele", ["check"], {
       cwd: projectDir,
       encoding: "utf8",
       maxBuffer: 1024 * 1024,
@@ -153,7 +153,7 @@ function runSteleStatus(projectDir: string) {
 
 function runSteleObserve(projectDir: string) {
   try {
-    const output = execSync("stele observe --json", {
+    const output = execFileSync("stele", ["observe", "--json"], {
       cwd: projectDir,
       encoding: "utf8",
       maxBuffer: 1024 * 1024,
@@ -175,6 +175,10 @@ function runSteleListContracts(projectDir: string) {
   const result: Record<string, unknown> = { projectDir, contracts: [] };
   try {
     const contractDir = join(projectDir, "contract");
+    if (!existsSync(contractDir)) {
+      result.hasContractDir = false;
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: false };
+    }
     const entries = readdirSync(contractDir);
     if (!entries.length) return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: false };
 

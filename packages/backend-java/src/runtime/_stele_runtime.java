@@ -389,6 +389,9 @@ final class SteleRuntime {
     public static List<Object> steleSplit(Object value, Object separator) {
         String s = asString(value);
         String sep = asString(separator);
+        if (sep.isEmpty()) {
+            throw new SteleRuntimeError("split: separator cannot be empty");
+        }
         String[] parts = s.split(sep, -1);
         List<Object> result = new ArrayList<>();
         for (String part : parts) result.add(part);
@@ -840,8 +843,8 @@ final class SteleRuntime {
     public static boolean steleDecimalEq(Object a, Object b) {
         double left = assertNumber(a, "decimal-eq left");
         double right = assertNumber(b, "decimal-eq right");
-        return String.format(java.util.Locale.US, "%.10f", left).equals(
-               String.format(java.util.Locale.US, "%.10f", right));
+        return String.format(java.util.Locale.US, "%.20f", left).equals(
+               String.format(java.util.Locale.US, "%.20f", right));
     }
 
     /**
@@ -888,16 +891,18 @@ final class SteleRuntime {
         if (closeBracket == -1) throw new SteleRuntimeError("json-path: unclosed bracket");
         String indexStr = p.substring(1, closeBracket);
         if ("*".equals(indexStr)) {
-            // Wildcard - return first match or empty
+            // Wildcard - collect all matches into a list
             if (data instanceof List) {
                 List<?> items = (List<?>) data;
                 String rest = p.substring(closeBracket + 1);
+                List<Object> results = new java.util.ArrayList<>();
                 for (Object item : items) {
                     Object r = evalJsonPath(item, rest);
-                    if (r != null) return r;
+                    results.add(r != null ? r : null);
                 }
+                return results;
             }
-            return null;
+            return new java.util.ArrayList<Object>();
         }
         int index = Integer.parseInt(indexStr);
         String rest = p.substring(closeBracket + 1);
@@ -985,11 +990,21 @@ final class SteleRuntime {
     }
 
     private static int[] extractJsonString(String s, int pos) {
-        // pos points to opening quote
+        // pos points to opening quote; find closing quote handling JSON escapes
         int i = pos + 1;
         while (i < s.length()) {
-            if (s.charAt(i) == '\\' ) { i += 2; continue; }
-            if (s.charAt(i) == '"') return new int[]{pos, i};
+            char c = s.charAt(i);
+            if (c == '"') return new int[]{pos, i};
+            if (c == '\\') {
+                i++;
+                if (i < s.length() && s.charAt(i) == 'u') {
+                    // \uXXXX — skip 4 hex digits
+                    i += Math.min(4, Math.max(0, s.length() - i));
+                } else if (i < s.length()) {
+                    i++;
+                }
+                continue;
+            }
             i++;
         }
         throw new SteleRuntimeError("json-path: unterminated string");

@@ -513,7 +513,12 @@ func steleAvg(coll any, pathSegments ...string) float64 {
 	if len(items) == 0 {
 		return 0
 	}
-	return steleSum(coll, pathSegments...) / float64(len(items))
+	projected := projectCollection(items, pathSegments)
+	var total float64
+	for _, v := range projected {
+		total += toFloat(v, "avg")
+	}
+	return total / float64(len(items))
 }
 
 func steleMin(coll any, pathSegments ...string) float64 {

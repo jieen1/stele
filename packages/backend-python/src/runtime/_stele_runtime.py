@@ -6,6 +6,7 @@ import math
 import os
 import re
 import uuid
+from decimal import Decimal
 
 
 class SteleRuntimeError(RuntimeError):
@@ -545,7 +546,10 @@ def _stele_tokenize_path(path: str):
             i += 1
             continue
         if ch == '[':
-            j = path.index(']', i)
+            try:
+                j = path.index(']', i)
+            except ValueError:
+                raise SteleRuntimeError("json-path: unclosed bracket in path")
             inner = path[i + 1:j]
             if inner == '*':
                 tokens.append(('wildcard',))
@@ -610,7 +614,6 @@ def _stele_detokenize(tokens):
 
 def stele_decimal_eq(left, right):
     """Compare two numbers with exact decimal precision, avoiding floating point errors."""
-    from decimal import Decimal
     try:
         l = Decimal(str(left))
     except Exception:
@@ -732,12 +735,8 @@ def stele_type_matches(actual_type, expected_name: str) -> bool:
             return False
         if actual_type in (int, float):
             return True
-        try:
-            from decimal import Decimal
-            if actual_type is Decimal:
-                return True
-        except ImportError:
-            pass
+        if actual_type is Decimal:
+            return True
         return False
     if expected_name == "String":
         return actual_type is str
