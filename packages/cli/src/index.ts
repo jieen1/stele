@@ -33,6 +33,7 @@ import { runList } from "./commands/list.js";
 import { lockProject, runLockRecursive, type LockOptions, type LockSummary } from "./commands/lock.js";
 import { runMaintenanceSummary, type MaintenanceSummaryOptions } from "./commands/maintenance.js";
 import { runObserve, type ObserveOptions } from "./commands/observe.js";
+import { startMcpServer } from "./commands/mcp.js";
 import { runPropose, type ProposeOptions } from "./commands/propose.js";
 import { runRules, type RulesOptions } from "./commands/rules.js";
 import { runWhy, type WhyOptions } from "./commands/why.js";
@@ -121,6 +122,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   program
     .command("check")
     .description("Verify contract invariants against generated tests and protected files.")
+    .option("--diff [ref]", "only check invariants in contract files that changed since the given git ref (default: HEAD)")
     .option("--diff-from <base>", "limit failures to files changed since the given git base")
     .option("--json", "emit the check report as JSON")
     .option("--report-file <path>", "write the JSON check report to a file")
@@ -308,6 +310,10 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--json", "emit the observation summary as JSON")
     .option("--since <iso-date>", "filter observations since the given ISO date")
     .action((options: ObserveOptions) => observe(cwd(), options));
+  program
+    .command("mcp")
+    .description("Start MCP server for AI agent integration")
+    .action(() => startMcpServer());
   program
     .command("init")
     .description("Initialize Stele in the current project.")

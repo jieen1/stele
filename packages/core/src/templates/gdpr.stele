@@ -1,0 +1,227 @@
+;; Stele GDPR Compliance Contract Template
+;;
+;; Encodes core GDPR invariants as machine-checkable rules.
+;; Adapt the metadata and paths to your application's data model
+;; before installing into your contract directory.
+;;
+;; Reference: Regulation (EU) 2016/679 (General Data Protection Regulation)
+
+(metadata
+  (stele-version "0.1")
+  (project "gdpr-compliance")
+  (target-language python))
+
+;; ===============================================================================
+;; Article 5(1)(c) - Data Minimization
+;; ===============================================================================
+
+(group data-minimization
+  (description "Art. 5(1)(c): only approved fields may be stored on a data subject.")
+  (invariant GDPR_MIN_001
+    (severity critical)
+    (description "Every field on the data-subject record must be in the approved-field whitelist.")
+    (category "data-minimization")
+    (tags "gdpr" "art-5" "minimization")
+    (assert
+      (forall field (collection data-subject-fields)
+        (in field (collection approved-fields)))))
+  (invariant GDPR_MIN_002
+    (severity high)
+    (description "The approved-fields list must not be empty; an empty whitelist blocks all collection.")
+    (category "data-minimization")
+    (tags "gdpr" "art-5" "minimization")
+    (assert
+      (not (eq (length (collection approved-fields)) 0))))
+  (invariant GDPR_MIN_003
+    (severity medium)
+    (description "Sensitive category fields must carry an explicit lawful-basis tag.")
+    (category "data-minimization")
+    (tags "gdpr" "art-5" "art-9" "sensitive")
+    (assert
+      (forall field (collection sensitive-fields)
+        (not-null (path field lawful-basis)))))
+)
+
+;; ===============================================================================
+;; Article 7 - Consent
+;; ===============================================================================
+
+(group consent-management
+  (description "Art. 7: consent must be explicit, timestamped, and withdrawable.")
+  (invariant GDPR_CNS_001
+    (severity critical)
+    (description "Every processing record that relies on consent must reference a consent entry with a recorded timestamp.")
+    (category "consent")
+    (tags "gdpr" "art-7" "consent")
+    (assert
+      (forall rec (collection processing-records)
+        (implies
+          (eq (path rec legal-basis) "consent")
+          (and
+            (not-null (path rec consent-id))
+            (not-null (path rec consent-timestamp)))))))
+  (invariant GDPR_CNS_002
+    (severity critical)
+    (description "No processing record may be active when the referenced consent has been withdrawn.")
+    (category "consent")
+    (tags "gdpr" "art-7" "withdrawal")
+    (assert
+      (forall rec (collection processing-records)
+        (implies
+          (and
+            (eq (path rec legal-basis) "consent")
+            (eq (path rec status) "active"))
+          (not (eq (path rec consent-withdrawn) true))))))
+  (invariant GDPR_CNS_003
+    (severity high)
+    (description "Withdrawn consents must record the withdrawal timestamp.")
+    (category "consent")
+    (tags "gdpr" "art-7" "withdrawal")
+    (assert
+      (forall c (collection consents)
+        (implies
+          (eq (path c withdrawn) true)
+          (not-null (path c withdrawn-at))))))
+)
+
+;; ===============================================================================
+;; Article 5(1)(e) - Storage Limitation
+;; ===============================================================================
+
+(group data-retention
+  (description "Art. 5(1)(e): data must not persist beyond its retention period.")
+  (invariant GDPR_RET_001
+    (severity critical)
+    (description "No active record may exceed its configured retention period.")
+    (category "retention")
+    (tags "gdpr" "art-5" "retention")
+    (assert
+      (forall rec (collection data-records)
+        (implies
+          (eq (path rec status) "active")
+          (lte (path rec age-days) (path rec retention-period-days))))))
+  (invariant GDPR_RET_002
+    (severity high)
+    (description "Records past their retention period must be marked pending-deletion.")
+    (category "retention")
+    (tags "gdpr" "art-5" "retention")
+    (assert
+      (forall rec (collection data-records)
+        (implies
+          (gt (path rec age-days) (path rec retention-period-days))
+          (eq (path rec status) "pending-deletion")))))
+)
+
+;; ===============================================================================
+;; Article 17 - Right to Erasure
+;; ===============================================================================
+
+(group erasure
+  (description "Art. 17: erasure requests must be fulfilled within 30 calendar days.")
+  (invariant GDPR_ERS_001
+    (severity critical)
+    (description "Every erasure request must reach status completed or rejected with a reason.")
+    (category "erasure")
+    (tags "gdpr" "art-17" "right-to-be-forgotten")
+    (assert
+      (forall req (collection erasure-requests)
+        (or
+          (eq (path req status) "completed")
+          (and
+            (eq (path req status) "rejected")
+            (not-null (path req rejection-reason)))))))
+  (invariant GDPR_ERS_002
+    (severity critical)
+    (description "Completed erasure requests must be resolved within 30 days of creation.")
+    (category "erasure")
+    (tags "gdpr" "art-17" "right-to-be-forgotten")
+    (assert
+      (forall req (collection erasure-requests)
+        (implies
+          (eq (path req status) "completed")
+          (lte (path req days-since-created) 30)))))
+  (invariant GDPR_ERS_003
+    (severity high)
+    (description "Pending erasure requests older than 20 days must be flagged as escalated.")
+    (category "erasure")
+    (tags "gdpr" "art-17" "escalation")
+    (assert
+      (forall req (collection erasure-requests)
+        (implies
+          (and
+            (eq (path req status) "pending")
+            (gt (path req days-since-created) 20))
+          (eq (path req escalated) true)))))
+  (invariant GDPR_ERS_004
+    (severity critical)
+    (description "A completed erasure request must result in zero active copies of the subject data.")
+    (category "erasure")
+    (tags "gdpr" "art-17" "deletion-verification")
+    (assert
+      (forall req (collection erasure-requests)
+        (implies
+          (eq (path req status) "completed")
+          (eq (path req remaining-active-copies) 0)))))
+)
+
+;; ===============================================================================
+;; Article 28 - Processor Authorization
+;; ===============================================================================
+
+(group processor-authorization
+  (description "Art. 28: only authorized processors may handle personal data.")
+  (invariant GDPR_PROC_001
+    (severity critical)
+    (description "Every processor assigned to a processing record must be in the authorized-processor list.")
+    (category "processor")
+    (tags "gdpr" "art-28" "processor")
+    (assert
+      (forall rec (collection processing-records)
+        (in (path rec processor-name) (collection authorized-processors)))))
+  (invariant GDPR_PROC_002
+    (severity high)
+    (description "Each authorized processor must have a documented data-processing-agreement on file.")
+    (category "processor")
+    (tags "gdpr" "art-28" "dpa")
+    (assert
+      (forall proc (collection authorized-processors)
+        (not-null (path proc dpa-effective-date)))))
+)
+
+;; ===============================================================================
+;; Article 33 - Breach Notification
+;; ===============================================================================
+
+(group breach-notification
+  (description "Art. 33: personal-data breaches must be escalated within 72 hours.")
+  (invariant GDPR_BRN_001
+    (severity critical)
+    (description "Every detected breach must be reported within 72 hours of detection.")
+    (category "breach")
+    (tags "gdpr" "art-33" "notification")
+    (assert
+      (forall breach (collection breaches)
+        (implies
+          (eq (path breach severity) "personal-data")
+          (lte (path breach hours-until-reported) 72)))))
+  (invariant GDPR_BRN_002
+    (severity critical)
+    (description "A reported breach must have a documented impact-assessment attached.")
+    (category "breach")
+    (tags "gdpr" "art-33" "impact-assessment")
+    (assert
+      (forall breach (collection breaches)
+        (implies
+          (eq (path breach reported) true)
+          (not-null (path breach impact-assessment))))))
+  (invariant GDPR_BRN_003
+    (severity high)
+    (description "A breach must not be closed until a remediation-plan is recorded.")
+    (category "breach")
+    (tags "gdpr" "art-33" "remediation")
+    (assert
+      (forall breach (collection breaches)
+        (implies
+          (eq (path breach status) "closed")
+          (not-null (path breach remediation-plan))))))
+)

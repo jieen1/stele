@@ -14,6 +14,7 @@ import {
   tryReadViolationBaseline,
   verifyManifest,
   type Contract,
+  type ContractFile,
   type GeneratedVerificationResult,
   type VerificationResult,
   type Violation,
@@ -45,6 +46,7 @@ export type CheckSummary = {
 };
 
 export type CheckCommandOptions = {
+  diff?: string | true;
   diffFrom?: string;
   json?: boolean;
   reportFile?: string;
@@ -87,6 +89,20 @@ export async function runCheck(projectDir: string, options: CheckCommandOptions 
 }
 
 export async function checkProject(projectDir: string, options: CheckCommandOptions = {}): Promise<CheckCommandResult> {
+  // --diff: compute changed contract files upfront (always, even if not used yet).
+  let changedFileSet: Set<string> | undefined;
+  if (options.diff !== undefined) {
+    const ref = options.diff === true ? "HEAD" : options.diff;
+    const changedFiles = await collectDiffContractFiles(projectDir, ref);
+
+    if (changedFiles.length === 0) {
+      return createDiffNoChangesResult([]);
+    }
+
+    changedFileSet = new Set(changedFiles);
+  }
+
+  // Always verify generated + protected files against the FULL contract.
   const context = await prepareCheckContext(projectDir);
   const filters = await prepareCheckFilters(context, options);
   const generatedReport = applyFiltersToReport(buildGeneratedStageReport(context, "check"), filters);
@@ -104,7 +120,11 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
 
   // In lenient mode, skip code-shape checks (only check generated + protected)
   if (!options.lenient) {
-    reports.push(applyFiltersToReport(await buildCodeShapeStageReport(context, protectedState, "check"), filters));
+    // --diff: only evaluate code shapes for invariants in changed files.
+    const codeShapeContext = changedFileSet !== undefined
+      ? { ...context, contract: filterContractByFiles(context.contract, changedFileSet) }
+      : context;
+    reports.push(applyFiltersToReport(await buildCodeShapeStageReport(codeShapeContext, protectedState, "check"), filters));
   }
 
   const report = mergeCheckReports(reports);
@@ -265,6 +285,14 @@ async function runSingleProjectCheck(projectDir: string, options: CheckCommandOp
 export async function prepareCheckContext(projectDir: string): Promise<PreparedCheckContext> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
+  return prepareCheckContextWithContract(projectDir, contract);
+}
+
+/**
+ * Prepare the check context with a pre-loaded (optionally filtered) contract.
+ */
+export async function prepareCheckContextWithContract(projectDir: string, contract: Contract): Promise<PreparedCheckContext> {
+  const config = await loadConfig(projectDir);
   const backend = await loadBackend(config.targetLanguage, config.testFramework);
   const generated = await verifyManagedGeneratedFiles(projectDir, config.generatedDir, contract, backend);
 
@@ -604,6 +632,94 @@ async function runGit(cwd: string, args: string[], errorMessage: string): Promis
 
 function isOutsideProject(relativePath: string): boolean {
   return relativePath.startsWith("../") || relativePath === ".." || win32.isAbsolute(relativePath);
+}
+
+/**
+ * Collect the relative paths of changed `.stele` contract files since the given
+ * git ref.  Falls back to an empty list when git is unavailable.
+ */
+export async function collectDiffContractFiles(projectDir: string, ref: string): Promise<string[]> {
+  try {
+    const repoRoot = await runGit(projectDir, ["rev-parse", "--show-toplevel"], "Unable to find git repository root.");
+    const output = await runGit(
+      repoRoot,
+      ["diff", "--name-only", `${ref}...HEAD`, "--", "contract/"],
+      "Unable to compute diff.",
+    );
+
+    const projectRoot = resolve(projectDir);
+    const changedFiles = new Set<string>();
+
+    for (const line of output.split(/\r?\n/)) {
+      const candidate = line.trim();
+      if (!candidate || !candidate.endsWith(".stele")) continue;
+
+      const absolutePath = resolve(repoRoot, candidate);
+      const relativePath = relative(projectRoot, absolutePath).replaceAll("\\", "/");
+
+      if (relativePath.length > 0 && !isOutsideProject(relativePath)) {
+        changedFiles.add(relativePath);
+      }
+    }
+
+    return [...changedFiles].sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Return a new Contract object whose invariants are limited to those whose
+ * filePath appears in `changedFileSet`.  Non-invariant declarations are
+ * preserved so downstream generators still see the full contract shape.
+ */
+export function filterContractByFiles(contract: Contract, changedFileSet: Set<string>): Contract {
+  const filteredFiles = contract.files.map((file) => {
+    if (!changedFileSet.has(file.path)) {
+      return {
+        ...file,
+        invariants: [],
+        groups: file.groups.map((g) => ({ ...g, invariants: [] })),
+        codeShapes: [],
+      } as ContractFile;
+    }
+    return file;
+  });
+
+  return {
+    ...contract,
+    files: filteredFiles,
+    invariants: contract.invariants.filter((inv) => changedFileSet.has(inv.filePath)),
+    codeShapes: contract.codeShapes.filter((cs) => changedFileSet.has(cs.filePath)),
+  };
+}
+
+/**
+ * Create a successful check command result for the "no contract changes" case.
+ */
+export function createDiffNoChangesResult(changedFiles: string[]): CheckCommandResult {
+  const report = createViolationReport({
+    tool: "stele",
+    command: "check",
+    ok: true,
+    summary: {
+      message: `No contract changes detected (${changedFiles.length} file${changedFiles.length === 1 ? "" : "s"})`,
+      invariant_count: 0,
+      generated_file_count: 0,
+      protected_file_count: 0,
+      violation_count: 0,
+    },
+    violations: [],
+  });
+
+  return {
+    summary: {
+      invariantCount: 0,
+      generatedFileCount: 0,
+      protectedFileCount: 0,
+    },
+    report,
+  };
 }
 
 function createGeneratedDriftViolation(
