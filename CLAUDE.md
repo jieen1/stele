@@ -6,14 +6,19 @@ Notes for AI assistants working in this repository. Keep changes small, determin
 
 Stele is a contract management framework. Users adopt it to lock business invariants into protected files an agent cannot edit, regenerate tests deterministically, and have Claude Code refuse direct writes to protected paths. The v0.1 runtime targets Python applications using `pytest`.
 
-This repo is a **pnpm monorepo** with four publishable packages:
+This repo is a **pnpm monorepo** with eight publishable packages:
 
 - `packages/core` — TypeScript core: lexer → parser → validator → normalizer → registry → manifest → generator coordinator → report.
 - `packages/backend-python` — TypeScript translator that turns validated CDL into pytest source, plus the Python runtime helper.
+- `packages/backend-go` — Go test generation.
+- `packages/backend-rust` — Rust test generation.
+- `packages/backend-java` — Java/JUnit5 test generation.
+- `packages/backend-typescript` — TypeScript/vitest test generation.
 - `packages/cli` — the `stele` executable (Commander.js).
 - `packages/claude-code-plugin` — hook scripts, slash command docs, subagent prompts, and skill prompts.
+- `packages/agent-hooks` — shared hook SDK (`matchProtectedPath`, etc.).
 
-The repo itself is not yet self-protected by Stele (there is no `contract/` at the root). Treat the security-relevant code paths as if they were — bugs there directly weaken every downstream user.
+The repo is self-protected via `contract/main.stele` (15 invariants) and `packages/claude-code-plugin` hooks. Bugs in security-critical paths are caught by `stele check`.
 
 ## Workspace commands
 
@@ -87,4 +92,30 @@ When updating documentation, **update the spec or guide that the code uses**, no
 
 ## Versioning
 
-All four packages are pinned at `0.1.0` and release together. Bump in lockstep. The release script (`scripts/publish-npm.mjs`) verifies that packed manifests do not contain `workspace:*` before uploading.
+All eight packages are pinned at `0.1.0` and release together. Bump in lockstep. The release script (`scripts/publish-npm.mjs`) verifies that packed manifests do not contain `workspace:*` before uploading.
+
+## Self-protection plugin setup
+
+This repo protects itself via the `@stele/claude-code-plugin`. To activate hooks:
+
+1. Ensure packages are built: `pnpm build`
+2. Register the plugin as a local project-scoped plugin in `~/.claude/plugins/installed_plugins.json`:
+   ```json
+   "stele@local": [
+     {
+       "scope": "project",
+       "projectPath": "<this-repo-root>",
+       "installPath": "<this-repo-root>/packages/claude-code-plugin"
+     }
+   ]
+   ```
+3. Enable in `~/.claude/settings.json`:
+   ```json
+   "enabledPlugins": { "stele@local": true }
+   ```
+
+Hooks enforce:
+- **PreToolUse**: Block writes to `contract/**/*.stele`, `contract/checker_impls/**/*`, `contract/.manifest.json`, `tests/contract/**/*`
+- **Stop**: Run `stele check` + `pytest tests/contract/`; block session if failures
+- **SessionStart/UserPromptSubmit**: Inject contract context into session
+- **PostToolUse**: Record material source edits for maintenance review
