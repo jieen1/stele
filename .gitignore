@@ -22,7 +22,6 @@ Thumbs.db
 
 # Generated Stele files
 contract/.cache/
-contract/.manifest.json
 contract/.last-check-report.json
 tests/contract/__init__.py
 tests/contract/_stele_runtime.py
