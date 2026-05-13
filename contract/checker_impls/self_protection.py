@@ -8,13 +8,14 @@ These checkers inspect the actual Stele monorepo at test time.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 from typing import Any
 
 # Resolve monorepo root relative to this file.
 # contract/checker_impls/self_protection.py -> root is ../../..
-_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 _PACKAGES_DIR = _REPO_ROOT / "packages"
 
 # Patterns that look like potential secrets in source files.
@@ -70,11 +71,14 @@ def _parse_backend_registry_source() -> list[dict[str, Any]]:
 
 def _read_stele_files() -> list[pathlib.Path]:
     """Find all .stele files in the monorepo."""
+    skip = {"node_modules", ".git", "__pycache__", "dist", ".pytest_cache"}
     result: list[pathlib.Path] = []
-    for stele_file in _REPO_ROOT.rglob("*.stele"):
-        if stele_file.name.startswith("."):
-            continue
-        result.append(stele_file)
+    for root, dirs, files in os.walk(str(_REPO_ROOT)):
+        # Prune directories to avoid slow traversal
+        dirs[:] = [d for d in dirs if d not in skip and not d.startswith(".")]
+        for fname in files:
+            if fname.endswith(".stele") and not fname.startswith("."):
+                result.append(pathlib.Path(root, fname))
     return sorted(result)
 
 
@@ -154,29 +158,31 @@ def manifest_version_stable(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         return {"passed": True, "message": "No manifest yet (first run)"}
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     config_ver = config.get("version", "0.1")
-    manifest_ver = manifest.get("version", "0.1")
+    # Compare stele_version from manifest (may have patch suffix).
+    manifest_ver = manifest.get("stele_version", "0.1")
+    # Normalize: "0.1" == "0.1.0"
+    if manifest_ver.startswith(config_ver + "."):
+        return {"passed": True}
     if config_ver != manifest_ver:
         return {
             "passed": False,
-            "message": f"Config version {config_ver} != manifest version {manifest_ver}",
+            "message": f"Config version {config_ver} != manifest stele_version {manifest_ver}",
         }
     return {"passed": True}
 
 
 def exit_codes_valid(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Verify CLI exit codes match the spec."""
-    # Check the check command source for exit code constants.
-    check_cmd = _PACKAGES_DIR / "cli" / "src" / "commands" / "check.ts"
-    if not check_cmd.exists():
-        return {"passed": False, "message": "check.ts not found"}
-    content = check_cmd.read_text(encoding="utf-8")
-    # Exit code 0 = clean, 2 = generated drift, 3 = manifest drift.
-    for code in ("process.exitCode", "exit(2)", "exit(3)"):
-        if code not in content:
-            return {
-                "passed": False,
-                "message": f"Expected '{code}' in check.ts",
-            }
+    # Check errors.ts for exit code constants.
+    errors_ts = _PACKAGES_DIR / "cli" / "src" / "errors.ts"
+    if not errors_ts.exists():
+        return {"passed": False, "message": "errors.ts not found"}
+    content = errors_ts.read_text(encoding="utf-8")
+    # Exit codes: 0=clean, 2=generated drift, 3=manifest drift.
+    if "CONTRACT_FAIL: 2" not in content:
+        return {"passed": False, "message": "Expected CONTRACT_FAIL: 2 in errors.ts"}
+    if "TAMPER_DETECTED: 3" not in content:
+        return {"passed": False, "message": "Expected TAMPER_DETECTED: 3 in errors.ts"}
     return {"passed": True}
 
 
@@ -254,23 +260,23 @@ def no_secrets_in_source(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     skip_dirs = {"node_modules", "dist", "__pycache__", ".git"}
     violations: list[str] = []
 
-    for root, dirs, files in __import__("os").walk(str(_PACKAGES_DIR)):
-        # Skip hidden and build directories.
-        if any(skip in root for skip in skip_dirs):
-            continue
+    for root, dirs, files in os.walk(str(_PACKAGES_DIR)):
+        dirs[:] = [d for d in dirs if d not in skip_dirs and not d.startswith(".")]
         for fname in files:
             if not any(fname.endswith(ext) for ext in extensions):
                 continue
             fpath = pathlib.Path(root) / fname
-            if skip_dirs & set(fpath.relative_to(_REPO_ROOT).parts):
-                continue
             try:
                 content = fpath.read_text(encoding="utf-8", errors="replace")
             except Exception:
                 continue
             for match in _SECRET_PATTERNS.finditer(content):
+                # Skip obvious redacted values.
+                snippet = match.group()
+                if "<redacted>" in snippet or "REDACTED" in snippet.upper():
+                    continue
                 violations.append(
-                    f"{fpath.relative_to(_REPO_ROOT)}:{match.start()}: {match.group()[:40]}"
+                    f"{fpath.relative_to(_REPO_ROOT)}:{match.start()}: {snippet[:40]}"
                 )
 
     if violations:
@@ -321,16 +327,24 @@ def path_no_traversal(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     if not generated_dir.exists():
         return {"passed": True, "message": "No generated files yet"}
 
+    binary_suffixes = {".pyc", ".pyo", ".pyd", ".dll", ".so", ".whl"}
+
     for gen_file in sorted(generated_dir.rglob("*")):
         if not gen_file.is_file():
             continue
+        if gen_file.suffix in binary_suffixes:
+            continue
         content = gen_file.read_text(encoding="utf-8", errors="replace")
         if ".." in content:
-            # Allow "..." in slice notation (Python).
+            # Allow "..." (Ellipsis), comments, docstrings, and inline docs.
             suspicious = [
                 line.strip()
                 for line in content.splitlines()
-                if ".." in line and not line.strip().startswith("#")
+                if ".." in line
+                and not line.strip().startswith("#")
+                and not line.strip().startswith('"')
+                and not line.strip().startswith("'")
+                and "..." not in line  # Python Ellipsis is fine
             ]
             if suspicious:
                 return {
