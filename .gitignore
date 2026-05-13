@@ -19,3 +19,11 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 Thumbs.db
+
+# Generated Stele files
+contract/.cache/
+contract/.manifest.json
+contract/.last-check-report.json
+tests/contract/__init__.py
+tests/contract/_stele_runtime.py
+tests/contract/test_contract.py

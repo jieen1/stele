@@ -1414,5 +1414,7 @@ var _ = steleAssertTrue
 var globalCtx *SteleContext
 
 func init() {
-	globalCtx = NewContext()
+	if globalCtx == nil {
+		globalCtx = NewContext()
+	}
 }

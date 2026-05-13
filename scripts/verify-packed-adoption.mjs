@@ -10,6 +10,10 @@ const dependencyManifestFields = ["dependencies", "devDependencies", "peerDepend
 const publishPackageDirs = [
   join(repoRoot, "packages", "core"),
   join(repoRoot, "packages", "backend-python"),
+  join(repoRoot, "packages", "backend-go"),
+  join(repoRoot, "packages", "backend-rust"),
+  join(repoRoot, "packages", "backend-java"),
+  join(repoRoot, "packages", "backend-typescript"),
   join(repoRoot, "packages", "cli"),
   join(repoRoot, "packages", "claude-code-plugin"),
 ];
@@ -121,6 +125,58 @@ async function main() {
     assertIncludes(lockResult.stdout, "OK manifest locked:", "lock success summary");
     const checkResult = await runTool(npxTool, ["stele", "check"], sanitizedNpmOptions({ cwd: projectDir, capture: true }));
     assertIncludes(checkResult.stdout, "OK 2 invariants checked;", "check success summary");
+
+    // Multi-language adoption: verify init + generate + check for each supported language.
+    // Only init/generate/check — framework-specific test runners (go/cargo/mvn)
+    // are not available in the CI environment.
+    const languageChecks = [
+      { language: "go", expectedFiles: ["go.mod", "tests/contract/setup_test.go"] },
+      { language: "rust", expectedFiles: ["Cargo.toml", "src/lib.rs", "tests/contract/mod.rs"] },
+      { language: "java", expectedFiles: ["pom.xml", "src/test/java/contract/SteleConftest.java"] },
+      { language: "typescript", expectedFiles: ["tests/contract/conftest.ts"] },
+    ];
+
+    for (const { language, expectedFiles } of languageChecks) {
+      const langDir = join(tempRoot, `fresh-${language}-app`);
+      await mkdir(langDir, { recursive: true });
+
+      await runTool(npmTool, ["init", "-y"], sanitizedNpmOptions({ cwd: langDir }));
+      await runTool(npmTool, ["install", "--save-dev", ...tarballs], sanitizedNpmOptions({ cwd: langDir }));
+      await runTool(npxTool, ["stele", "init", "--language", language], sanitizedNpmOptions({ cwd: langDir }));
+
+      // Write a minimal contract for generation.
+      await writeProjectFile(
+        langDir,
+        "contract/main.stele",
+        [
+          "(invariant STELE_STRUCTURE_CHECK",
+          "  (severity high)",
+          '  (description "Minimal invariant to verify generation works for this language.")',
+          "  (assert (eq 1 1))",
+          ")",
+        ].join("\n") + "\n",
+      );
+
+      const genResult = await runTool(npxTool, ["stele", "generate"], sanitizedNpmOptions({ cwd: langDir, capture: true }));
+      assertIncludes(genResult.stdout, "OK generated", `${language} generate success`);
+
+      // Verify expected scaffold files exist.
+      for (const expectedFile of expectedFiles) {
+        if (!existsSync(join(langDir, expectedFile))) {
+          throw new Error(`${language} init: missing expected file ${expectedFile}`);
+        }
+      }
+
+      const lockResult = await runTool(
+        npxTool,
+        ["stele", "lock", "--reason", `${language} adoption baseline`],
+        sanitizedNpmOptions({ cwd: langDir, capture: true }),
+      );
+      assertIncludes(lockResult.stdout, "OK manifest locked:", `${language} lock success`);
+
+      const checkResult = await runTool(npxTool, ["stele", "check"], sanitizedNpmOptions({ cwd: langDir, capture: true }));
+      assertIncludes(checkResult.stdout, "OK", `${language} check success`);
+    }
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

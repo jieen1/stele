@@ -180,14 +180,15 @@ describe("backend.supportFiles()", () => {
 // ---------------------------------------------------------------------------
 
 describe("writeFixtureBootstrap", () => {
-    test("generates stele_fixture_context function", () => {
+    test("generates valid JSON fixture", () => {
         const fixture: ConformanceFixture = {
             id: "simple",
             dir: "/test",
             appState: { balance: 100 },
         };
         const content = writeFixtureBootstrap(fixture);
-        expect(content).toContain("stele_fixture_context");
+        const parsed = JSON.parse(content);
+        expect(parsed).toEqual({ balance: 100 });
     });
 
     test("handles map appState", () => {
@@ -197,9 +198,9 @@ describe("writeFixtureBootstrap", () => {
             appState: { balance: 100, name: "alice" },
         };
         const content = writeFixtureBootstrap(fixture);
-        expect(content).toContain("SteleValue::Map");
-        expect(content).toContain("SteleValue::Int(100)");
-        expect(content).toContain('SteleValue::Str("alice")');
+        const parsed = JSON.parse(content);
+        expect(parsed.balance).toBe(100);
+        expect(parsed.name).toBe("alice");
     });
 
     test("handles list appState", () => {
@@ -209,8 +210,8 @@ describe("writeFixtureBootstrap", () => {
             appState: [1, 2, 3],
         };
         const content = writeFixtureBootstrap(fixture);
-        expect(content).toContain("SteleValue::List");
-        expect(content).toContain("SteleValue::Int(1)");
+        const parsed = JSON.parse(content);
+        expect(parsed).toEqual([1, 2, 3]);
     });
 
     test("handles nested structures", () => {
@@ -225,10 +226,9 @@ describe("writeFixtureBootstrap", () => {
             },
         };
         const content = writeFixtureBootstrap(fixture);
-        expect(content).toContain("SteleValue::Map");
-        expect(content).toContain("SteleValue::List");
-        expect(content).toContain("SteleValue::Int(100)");
-        expect(content).toContain('SteleValue::Str("alice")');
+        const parsed = JSON.parse(content);
+        expect(parsed.accounts).toHaveLength(2);
+        expect(parsed.accounts[0].balance).toBe(100);
     });
 
     test("handles null appState", () => {
@@ -238,17 +238,18 @@ describe("writeFixtureBootstrap", () => {
             appState: null,
         };
         const content = writeFixtureBootstrap(fixture);
-        expect(content).toContain("SteleValue::Null");
+        const parsed = JSON.parse(content);
+        expect(parsed).toBeNull();
     });
 
-    test("includes #[path] directive for runtime", () => {
+    test("generates pretty-printed JSON", () => {
         const fixture: ConformanceFixture = {
-            id: "path-check",
+            id: "formatting",
             dir: "/test",
-            appState: {},
+            appState: { key: "value" },
         };
         const content = writeFixtureBootstrap(fixture);
-        expect(content).toContain('#[path = "_stele_runtime.rs"]');
-        expect(content).toContain("mod _stele_runtime;");
+        // Should be indented with 2 spaces
+        expect(content).toMatch(/\n\s{2}/);
     });
 });

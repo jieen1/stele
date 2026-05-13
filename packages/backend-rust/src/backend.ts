@@ -1,5 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { posix, resolve } from "node:path";
-import { writeFileSync } from "node:fs";
 import type { LanguageBackend } from "@stele/core";
 import { getRustRuntimeSource } from "./runtime.js";
 import { generateRustSource, sanitizeRustIdentifier } from "./translator.js";
@@ -52,9 +52,11 @@ const backend: LanguageBackend = {
     },
 
     async writeFixtureBootstrap(fixture, tmpdir) {
-        const content = writeFixtureBootstrap(fixture);
-        const outputPath = resolve(tmpdir, "_stele_fixture.rs");
-        writeFileSync(outputPath, content, "utf8");
+        const json = writeFixtureBootstrap(fixture);
+        const outDir = resolve(tmpdir, "tests", "contract");
+        const outputPath = resolve(outDir, ".stele_fixture.json");
+        await mkdir(outDir, { recursive: true });
+        await writeFile(outputPath, json, "utf8");
     },
 };
 

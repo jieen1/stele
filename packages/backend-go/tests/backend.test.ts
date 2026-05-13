@@ -83,23 +83,9 @@ describe("generate()", () => {
 // ---------------------------------------------------------------------------
 
 describe("supportFiles()", () => {
-  it("returns setup_test.go", () => {
+  it("returns empty array (setup_test.go provided by init)", () => {
     const files = backend.supportFiles!(createTestContract(), { projectRoot: "/tmp" });
-    const setup = files.find((f) => f.path.endsWith("setup_test.go"));
-    expect(setup).toBeDefined();
-  });
-
-  it("setup_test.go contains SetupSteleContext stub", () => {
-    const files = backend.supportFiles!(createTestContract(), { projectRoot: "/tmp" });
-    const setup = files.find((f) => f.path.endsWith("setup_test.go"));
-    expect(setup!.content).toContain("SetupSteleContext");
-    expect(setup!.content).toContain("NewContext");
-  });
-
-  it("setup_test.go does NOT contain TestMain", () => {
-    const files = backend.supportFiles!(createTestContract(), { projectRoot: "/tmp" });
-    const setup = files.find((f) => f.path.endsWith("setup_test.go"));
-    expect(setup!.content).not.toContain("TestMain");
+    expect(files).toEqual([]);
   });
 });
 

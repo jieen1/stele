@@ -1,0 +1,159 @@
+(metadata
+  (stele-version "0.1")
+  (project "stele-self"))
+
+; ============================================================================
+; Checker declarations — each maps to a Python function in checker_impls/
+; ============================================================================
+
+(checker backend-registries
+  (description "Verify backend registry contains all 5 supported languages."))
+
+(checker backend-contains-python
+  (description "Python backend must be present."))
+
+(checker backend-contains-typescript
+  (description "TypeScript backend must be present."))
+
+(checker backend-contains-go
+  (description "Go backend must be present."))
+
+(checker backend-contains-rust
+  (description "Rust backend must be present."))
+
+(checker backend-contains-java
+  (description "Java backend must be present."))
+
+(checker config-schema-valid
+  (description "stele.config.json must contain all required fields."))
+
+(checker manifest-version-stable
+  (description "Manifest format version must not change without a version bump."))
+
+(checker exit-codes-valid
+  (description "CLI exit codes must match spec: 0=clean, 2=gen-drift, 3=manifest-drift."))
+
+(checker cdl-no-single-quotes
+  (description "No .stele file shall contain single-quoted strings."))
+
+(checker cdl-utf8-valid
+  (description "All .stele files must be valid UTF-8."))
+
+(checker versions-pinned-together
+  (description "All packages must release at the same version."))
+
+(checker no-secrets-in-source
+  (description "No source file shall contain hardcoded secrets."))
+
+(checker generation-deterministic
+  (description "Generated output must be byte-stable."))
+
+(checker path-no-traversal
+  (description "Generated paths must not escape the output directory."))
+
+; ============================================================================
+; Backend registry invariants
+; ============================================================================
+
+(invariant BACKEND_REGISTRY_COUNT
+  (severity error)
+  (description "The backend registry must include all 5 supported languages.")
+  (uses-checker backend-registries))
+
+(invariant BACKEND_REGISTRY_HAS_PYTHON
+  (severity error)
+  (description "Python backend must be present — it is the primary target.")
+  (uses-checker backend-contains-python))
+
+(invariant BACKEND_REGISTRY_HAS_TYPESCRIPT
+  (severity error)
+  (description "TypeScript backend must be present.")
+  (uses-checker backend-contains-typescript))
+
+(invariant BACKEND_REGISTRY_HAS_GO
+  (severity error)
+  (description "Go backend must be present.")
+  (uses-checker backend-contains-go))
+
+(invariant BACKEND_REGISTRY_HAS_RUST
+  (severity error)
+  (description "Rust backend must be present.")
+  (uses-checker backend-contains-rust))
+
+(invariant BACKEND_REGISTRY_HAS_JAVA
+  (severity error)
+  (description "Java backend must be present.")
+  (uses-checker backend-contains-java))
+
+; ============================================================================
+; Manifest / config invariants
+; ============================================================================
+
+(invariant CONFIG_SCHEMA_VALID
+  (severity error)
+  (description "stele.config.json must contain all required fields.")
+  (uses-checker config-schema-valid))
+
+(invariant MANIFEST_VERSION_STABLE
+  (severity error)
+  (description "The manifest format version must not change without a version bump.")
+  (uses-checker manifest-version-stable))
+
+; ============================================================================
+; Exit code invariants
+; ============================================================================
+
+(invariant EXIT_CODES_MATCH_SPEC
+  (severity error)
+  (description "CLI exit codes must match the CDL spec: 0=clean, 2=generated drift, 3=manifest drift.")
+  (uses-checker exit-codes-valid))
+
+; ============================================================================
+; CDL grammar invariants
+; ============================================================================
+
+(invariant CDL_NO_SINGLE_QUOTES
+  (severity warning)
+  (description "All .stele contract files must use double-quoted strings only.")
+  (uses-checker cdl-no-single-quotes))
+
+(invariant CDL_UTF8_VALID
+  (severity error)
+  (description "All .stele files must be valid UTF-8 encoded.")
+  (uses-checker cdl-utf8-valid))
+
+; ============================================================================
+; Version consistency
+; ============================================================================
+
+(invariant VERSIONS_PINNED_TOGETHER
+  (severity warning)
+  (description "All packages must release at the same version.")
+  (uses-checker versions-pinned-together))
+
+; ============================================================================
+; Security invariants
+; ============================================================================
+
+(invariant NO_HARDCODED_SECRETS
+  (severity error)
+  (description "No source file shall contain hardcoded API keys or credentials.")
+  (uses-checker no-secrets-in-source))
+
+; ============================================================================
+; Determinism invariants
+; ============================================================================
+
+(invariant DETERMINISTIC_GENERATION
+  (severity error)
+  (description "Generated test output must be byte-stable across runs.")
+  (uses-checker generation-deterministic))
+
+; ============================================================================
+; Path safety
+; ============================================================================
+
+(invariant PATH_NO_TRAVERSAL
+  (severity error)
+  (description "Generated file paths must not escape the output directory via traversal.")
+  (uses-checker path-no-traversal))

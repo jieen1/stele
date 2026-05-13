@@ -1,7 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { listRegisteredBackends } from "../backend-registry.js";
-import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../config/defaults.js";
+import { DEFAULT_CONFIG, STELE_CONFIG_FILE, SteleConfig } from "../config/defaults.js";
 import { readOptionalFile, writeIfMissing } from "../utils/shared-utils.js";
 import { maybeInstallPreCommit } from "./pre-commit.js";
 
@@ -23,12 +23,7 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
     throw new Error(`Unsupported language "${options.language}". Supported languages: ${supported}.`);
   }
 
-  const config = {
-    ...DEFAULT_CONFIG,
-    targetLanguage: options.language,
-    testFramework: options.language === "typescript" ? "vitest" : DEFAULT_CONFIG.testFramework,
-  };
-
+  const config = buildConfig(options.language);
   const projectInfo = await detectProject(projectDir);
   const files = buildFilesToCreate(projectDir, config, projectInfo);
 
@@ -45,20 +40,18 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
     await maybeInstallPreCommit(projectDir);
   }
 
-  printInitSummary(projectInfo);
+  printInitSummary(projectInfo, config);
 }
 
-function buildFilesToCreate(projectDir: string, config: Record<string, unknown>, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
-  const files: Array<{ path: string; content: string }> = [
-    { path: join(projectDir, STELE_CONFIG_FILE), content: `${JSON.stringify(config, null, 2)}\n` },
-    { path: join(projectDir, "contract", "main.stele"), content: projectInfo.framework !== "unknown" ? getFrameworkContractSource(projectInfo) : DEFAULT_CONTRACT_SOURCE },
-    { path: join(projectDir, "contract", "checker_impls", ".gitkeep"), content: "" },
-    { path: join(projectDir, "tests", "contract", "conftest.py"), content: projectInfo.conftestSource },
-    { path: join(projectDir, "tests", "contract", "__init__.py"), content: "" },
-    { path: join(projectDir, ".gitignore"), content: buildGitignoreContent() },
-  ];
-
-  return files;
+function buildConfig(language: string): SteleConfig {
+  const framework = getFrameworkForLanguage(language);
+  const generatedDir = getGeneratedDirForLanguage(language);
+  return {
+    ...DEFAULT_CONFIG,
+    targetLanguage: language,
+    testFramework: framework,
+    generatedDir: generatedDir,
+  };
 }
 
 function printDryRun(files: Array<{ path: string; content: string }>): void {
@@ -71,8 +64,249 @@ function printDryRun(files: Array<{ path: string; content: string }>): void {
   process.stdout.write("\n");
 }
 
-function printInitSummary(projectInfo: DetectedProject): void {
-  process.stdout.write(`[stele] Initialized Stele in "${projectInfo.root}."\n`);
+function getFrameworkForLanguage(language: string): string {
+  switch (language) {
+    case "typescript": return "vitest";
+    case "go": return "testing";
+    case "rust": return "cargo-test";
+    case "java": return "junit5";
+    default: return DEFAULT_CONFIG.testFramework;
+  }
+}
+
+function getGeneratedDirForLanguage(language: string): string {
+  switch (language) {
+    case "java": return "src/test/java/contract";
+    default: return DEFAULT_CONFIG.generatedDir;
+  }
+}
+
+function buildFilesToCreate(projectDir: string, config: SteleConfig, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
+  const language = config.targetLanguage;
+  const files: Array<{ path: string; content: string }> = [
+    { path: join(projectDir, STELE_CONFIG_FILE), content: `${JSON.stringify(config, null, 2)}\n` },
+    { path: join(projectDir, "contract", "main.stele"), content: projectInfo.framework !== "unknown" ? getFrameworkContractSource(projectInfo) : DEFAULT_CONTRACT_SOURCE },
+    { path: join(projectDir, "contract", "checker_impls", ".gitkeep"), content: "" },
+    ...buildScaffoldFiles(projectDir, language, projectInfo),
+    { path: join(projectDir, ".gitignore"), content: buildGitignoreContent() },
+  ];
+
+  return files;
+}
+
+function buildScaffoldFiles(projectDir: string, language: string, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
+  switch (language) {
+    case "python":
+      return buildPythonScaffold(projectDir, projectInfo);
+    case "typescript":
+      return buildTypeScriptScaffold(projectDir);
+    case "go":
+      return buildGoScaffold(projectDir);
+    case "rust":
+      return buildRustScaffold(projectDir);
+    case "java":
+      return buildJavaScaffold(projectDir);
+    default:
+      return buildPythonScaffold(projectDir, projectInfo);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Language-specific scaffolding
+// ---------------------------------------------------------------------------
+
+function buildPythonScaffold(projectDir: string, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
+  return [
+    { path: join(projectDir, "tests", "contract", "conftest.py"), content: projectInfo.conftestSource },
+    { path: join(projectDir, "tests", "contract", "__init__.py"), content: "" },
+  ];
+}
+
+function buildTypeScriptScaffold(projectDir: string): Array<{ path: string; content: string }> {
+  return [
+    {
+      path: join(projectDir, "tests", "contract", "conftest.ts"),
+      content: buildTypeScriptConftest(),
+    },
+  ];
+}
+
+function buildGoScaffold(projectDir: string): Array<{ path: string; content: string }> {
+  return [
+    { path: join(projectDir, "go.mod"), content: goModTemplate() },
+    { path: join(projectDir, "tests", "contract", "setup_test.go"), content: goSetupTestTemplate() },
+  ];
+}
+
+function buildRustScaffold(projectDir: string): Array<{ path: string; content: string }> {
+  return [
+    { path: join(projectDir, "Cargo.toml"), content: rustCargoTomlTemplate() },
+    { path: join(projectDir, "src", "lib.rs"), content: "// Required by Cargo for compilation.\n" },
+    { path: join(projectDir, "tests", "contract", "mod.rs"), content: "// Test module placeholder.\n" },
+  ];
+}
+
+function buildJavaScaffold(projectDir: string): Array<{ path: string; content: string }> {
+  return [
+    { path: join(projectDir, "pom.xml"), content: javaPomTemplate() },
+    {
+      path: join(projectDir, "src", "test", "java", "contract", "SteleConftest.java"),
+      content: javaSteleConftestTemplate(),
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Template builders
+// ---------------------------------------------------------------------------
+
+function buildTypeScriptConftest(): string {
+  return [
+    'import { defineConfig } from "vitest/config";',
+    "",
+    '// Wire your application data here for contract testing.',
+    '// Example:',
+    "// export default defineConfig({",
+    "//   test: {",
+    "//     setupFiles: ['./tests/contract/stele-setup.ts'],",
+    "//   },",
+    "// });",
+    "",
+    "export default defineConfig({});",
+    "",
+  ].join("\n");
+}
+
+function goModTemplate(): string {
+  return [
+    "module stele-contracts",
+    "",
+    "go 1.21",
+    "",
+  ].join("\n");
+}
+
+function goSetupTestTemplate(): string {
+  return [
+    "package contract_test",
+    "",
+    "// SetupSteleContext initializes the SteleContext with your application data.",
+    "// Override this function to wire real data from your application.",
+    "func SetupSteleContext() *SteleContext {",
+    "\tctx := NewContext()",
+    "\t// Example: ctx.Data[\"account\"] = map[string]any{\"balance\": 1000}",
+    "\treturn ctx",
+    "}",
+    "",
+    "func init() {",
+    "\tglobalCtx = SetupSteleContext()",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function rustCargoTomlTemplate(): string {
+  return [
+    "[package]",
+    'name = "stele-contracts"',
+    "version = \"0.1.0\"",
+    "edition = \"2021\"",
+    "",
+    "[dev-dependencies]",
+    'serde = { version = "1", features = ["derive"] }',
+    'serde_json = "1"',
+    'regex = "1"',
+    'once_cell = "1"',
+    "",
+  ].join("\n");
+}
+
+function javaPomTemplate(): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.stele</groupId>
+  <artifactId>stele-contracts</artifactId>
+  <version>0.1.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <junit.version>5.10.0</junit.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <version>\${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>\${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+`;
+}
+
+function javaSteleConftestTemplate(): string {
+  return [
+    "package contract;",
+    "",
+    "import java.util.LinkedHashMap;",
+    "import java.util.Map;",
+    "",
+    "public class SteleConftest {",
+    "    /**",
+    "     * Wire your application data here for contract testing.",
+    "     * Example: ctx.put(\"account\", createMap(\"balance\", 1000));",
+    "     */",
+    "    public static Map<String, Object> steleContext() {",
+    "        Map<String, Object> ctx = new LinkedHashMap<>();",
+    "        // ctx.put(\"account\", createMap(\"balance\", 1000));",
+    "        return ctx;",
+    "    }",
+    "",
+    '    @SuppressWarnings("unchecked")',
+    "    private static Map<String, Object> createMap(Object... kvs) {",
+    "        Map<String, Object> map = new LinkedHashMap<>();",
+    "        for (int i = 0; i < kvs.length; i += 2) {",
+    "            map.put((String) kvs[i], kvs[i + 1]);",
+    "        }",
+    "        return map;",
+    "    }",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function printInitSummary(projectInfo: DetectedProject, config: SteleConfig): void {
+  const nextSteps = getNextSteps(config.targetLanguage);
+  process.stdout.write(`[stele] Initialized Stele in "${projectInfo.root}." (language: ${config.targetLanguage}, framework: ${config.testFramework})\n`);
 
   if (projectInfo.framework !== "unknown") {
     process.stdout.write(`[stele] Detected framework: ${projectInfo.framework}\n`);
@@ -85,8 +319,28 @@ function printInitSummary(projectInfo: DetectedProject): void {
   process.stdout.write(`[stele] Next steps:\n`);
   process.stdout.write(`  1. Edit contract/main.stele with your invariants\n`);
   process.stdout.write(`  2. stele generate\n`);
-  process.stdout.write(`  3. python -m pytest tests/contract -q\n`);
-  process.stdout.write(`  4. stele check\n`);
+  let num = 3;
+  for (const cmd of nextSteps) {
+    process.stdout.write(`  ${num}. ${cmd}\n`);
+    num++;
+  }
+}
+
+function getNextSteps(language: string): string[] {
+  switch (language) {
+    case "python":
+      return ["python -m pytest tests/contract -q", "stele check"];
+    case "typescript":
+      return ["npx vitest run tests/contract", "stele check"];
+    case "go":
+      return ["go test ./tests/contract/...", "stele check"];
+    case "rust":
+      return ["cargo test", "stele check"];
+    case "java":
+      return ["mvn test", "stele check"];
+    default:
+      return ["Run your test framework", "stele check"];
+  }
 }
 
 function getFrameworkContractSource(projectInfo: DetectedProject): string {

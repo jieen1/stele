@@ -1220,10 +1220,37 @@ pub fn stele_merge_contexts(left: &SteleValue, right: &SteleValue) -> SteleValue
 /// Type alias for the Stele context used in generated tests.
 pub type SteleContext = SteleValue;
 
-/// Create a default (empty) Stele context.
+/// Load fixture data from `.stele_fixture.json` in the test directory,
+/// or return an empty context if no fixture file exists.
+/// The conformance runner writes this file via `writeFixtureBootstrap()`.
+fn load_fixture_context() -> SteleContext {
+    // Try to find the fixture file relative to the test directory.
+    // `std::env::current_exe()` points to the cargo test runner binary.
+    // The fixture lives at `tests/contract/.stele_fixture.json` from project root.
+    let fixture_path = std::path::PathBuf::from(".stele_fixture.json");
+    if fixture_path.exists() {
+        if let Ok(data) = std::fs::read_to_string(&fixture_path) {
+            if let Ok(value) = serde_json::from_str::<SteleValue>(&data) {
+                return value;
+            }
+        }
+    }
+    // Fallback: also check the parent `tests/contract/` directory
+    let alt_path = std::path::PathBuf::from("tests/contract/.stele_fixture.json");
+    if alt_path.exists() {
+        if let Ok(data) = std::fs::read_to_string(&alt_path) {
+            if let Ok(value) = serde_json::from_str::<SteleValue>(&data) {
+                return value;
+            }
+        }
+    }
+    SteleValue::Map(BTreeMap::new())
+}
+
+/// Create a Stele context, loading fixture data if available.
 /// Used by generated tests as the starting context for assertions.
 pub fn stele_context() -> SteleContext {
-    SteleValue::Map(BTreeMap::new())
+    load_fixture_context()
 }
 
 /// Assert and return the context (used by generated checker tests).
