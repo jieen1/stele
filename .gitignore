@@ -27,3 +27,32 @@ contract/.last-check-report.json
 tests/contract/__init__.py
 tests/contract/_stele_runtime.py
 tests/contract/test_contract.py
+
+# E2E fixture artifacts
+fixtures/e2e-go-project/contract/.cache/
+fixtures/e2e-go-project/contract/.manifest.json
+fixtures/e2e-go-project/contract/.last-check-report.json
+fixtures/e2e-java-project/contract/.cache/
+fixtures/e2e-java-project/contract/.manifest.json
+fixtures/e2e-java-project/contract/.last-check-report.json
+fixtures/e2e-java-project/DownloadJunit.class
+fixtures/e2e-java-project/lib/
+fixtures/e2e-java-project/tests/
+fixtures/e2e-rust-project/Cargo.lock
+fixtures/e2e-rust-project/contract/.cache/
+fixtures/e2e-rust-project/contract/.manifest.json
+fixtures/e2e-rust-project/contract/.last-check-report.json
+fixtures/e2e-rust-project/*.jar
+fixtures/e2e-rust-project/target/
+fixtures/e2e-rust-project/tests/
+tests/conformance/fixtures/01-simple-invariant/Cargo.toml
+tests/conformance/fixtures/01-simple-invariant/go.mod
+tests/conformance/fixtures/01-simple-invariant/pom.xml
+tests/conformance/fixtures/01-simple-invariant/src/
+
+# Local packages
+local-packages/*.tgz
+*.tgz
+
+# Claude session
+.claude/scheduled_tasks.lock
