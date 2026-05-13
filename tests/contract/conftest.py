@@ -28,7 +28,10 @@ def _lazy_load_checkers():
         import sys
         sys.modules[mod_name] = mod
         spec.loader.exec_module(mod)
+
+        # All checker function names in self_protection.py
         for name in (
+            # Original checkers
             "backend_registries",
             "backend_contains_python",
             "backend_contains_typescript",
@@ -44,8 +47,55 @@ def _lazy_load_checkers():
             "no_secrets_in_source",
             "generation_deterministic",
             "path_no_traversal",
+            # New checkers
+            "operator_count_stable",
+            "operator_spec_consistent",
+            "manifest_hash_algorithm",
+            "structural_types_stable",
+            "hooks_fail_closed",
+            "hooks_registration_complete",
+            "required_commands_exist",
+            "config_manifest_path_safe",
+            "error_code_families_present",
+            "cli_exit_code_enum_complete",
+            "protected_pattern_safe",
+            "inline_version_sync",
         ):
             _checkers[name] = getattr(mod, name, None)
+
+
+# Map CDL hyphenated checker names to Python function names.
+_CHECKER_NAME_MAP = {
+    # Original checkers
+    "backend-registries": "backend_registries",
+    "backend-contains-python": "backend_contains_python",
+    "backend-contains-typescript": "backend_contains_typescript",
+    "backend-contains-go": "backend_contains_go",
+    "backend-contains-rust": "backend_contains_rust",
+    "backend-contains-java": "backend_contains_java",
+    "config-schema-valid": "config_schema_valid",
+    "manifest-version-stable": "manifest_version_stable",
+    "exit-codes-valid": "exit_codes_valid",
+    "cdl-no-single-quotes": "cdl_no_single_quotes",
+    "cdl-utf8-valid": "cdl_utf8_valid",
+    "versions-pinned-together": "versions_pinned_together",
+    "no-secrets-in-source": "no_secrets_in_source",
+    "generation-deterministic": "generation_deterministic",
+    "path-no-traversal": "path_no_traversal",
+    # New checkers
+    "operator-count-stable": "operator_count_stable",
+    "operator-spec-consistent": "operator_spec_consistent",
+    "manifest-hash-algorithm": "manifest_hash_algorithm",
+    "structural-types-stable": "structural_types_stable",
+    "hooks-fail-closed": "hooks_fail_closed",
+    "hooks-registration-complete": "hooks_registration_complete",
+    "required-commands-exist": "required_commands_exist",
+    "config-manifest-path-safe": "config_manifest_path_safe",
+    "error-code-families-present": "error_code_families_present",
+    "cli-exit-code-enum-complete": "cli_exit_code_enum_complete",
+    "protected-pattern-safe": "protected_pattern_safe",
+    "inline-version-sync": "inline_version_sync",
+}
 
 
 @pytest.fixture
@@ -53,21 +103,8 @@ def stele_context():
     _lazy_load_checkers()
     return {
         "_stele_checkers": {
-            "backend-registries": _checkers.get("backend_registries"),
-            "backend-contains-python": _checkers.get("backend_contains_python"),
-            "backend-contains-typescript": _checkers.get("backend_contains_typescript"),
-            "backend-contains-go": _checkers.get("backend_contains_go"),
-            "backend-contains-rust": _checkers.get("backend_contains_rust"),
-            "backend-contains-java": _checkers.get("backend_contains_java"),
-            "config-schema-valid": _checkers.get("config_schema_valid"),
-            "manifest-version-stable": _checkers.get("manifest_version_stable"),
-            "exit-codes-valid": _checkers.get("exit_codes_valid"),
-            "cdl-no-single-quotes": _checkers.get("cdl_no_single_quotes"),
-            "cdl-utf8-valid": _checkers.get("cdl_utf8_valid"),
-            "versions-pinned-together": _checkers.get("versions_pinned_together"),
-            "no-secrets-in-source": _checkers.get("no_secrets_in_source"),
-            "generation-deterministic": _checkers.get("generation_deterministic"),
-            "path-no-traversal": _checkers.get("path_no_traversal"),
+            cdl_name: _checkers.get(py_name)
+            for cdl_name, py_name in _CHECKER_NAME_MAP.items()
         }
     }
 

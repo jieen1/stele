@@ -31,7 +31,7 @@
   (description "Manifest format version must not change without a version bump."))
 
 (checker exit-codes-valid
-  (description "CLI exit codes must match spec: 0=clean, 2=gen-drift, 3=manifest-drift."))
+  (description "CLI exit codes must match spec: 7 codes, all with correct values."))
 
 (checker cdl-no-single-quotes
   (description "No .stele file shall contain single-quoted strings."))
@@ -50,6 +50,44 @@
 
 (checker path-no-traversal
   (description "Generated paths must not escape the output directory."))
+
+; --- New checkers ---
+
+(checker operator-count-stable
+  (description "Operator registry must have >= 50 operators."))
+
+(checker operator-spec-consistent
+  (description "Every operator spec must have all required fields."))
+
+(checker manifest-hash-algorithm
+  (description "Manifest must use SHA-256 hashing."))
+
+(checker structural-types-stable
+  (description "The 9 structural types must all be present."))
+
+(checker hooks-fail-closed
+  (description "Security hooks must exit non-zero on error."))
+
+(checker hooks-registration-complete
+  (description "All hook scripts referenced in hooks.json must exist."))
+
+(checker required-commands-exist
+  (description "Critical CLI commands must exist: init, generate, check, lock."))
+
+(checker config-manifest-path-safe
+  (description "manifestPath must enforce 2-segment paths."))
+
+(checker error-code-families-present
+  (description "Core error module must have SteleError class."))
+
+(checker cli-exit-code-enum-complete
+  (description "ExitCode enum must define all 7 codes with subclasses."))
+
+(checker protected-pattern-safe
+  (description "Protected patterns must not escape project root."))
+
+(checker inline-version-sync
+  (description "Inline version strings must match package.json."))
 
 ; ============================================================================
 ; Backend registry invariants
@@ -99,14 +137,29 @@
   (description "The manifest format version must not change without a version bump.")
   (uses-checker manifest-version-stable))
 
+(invariant MANIFEST_HASH_ALGORITHM
+  (severity error)
+  (description "Manifest hashing must use SHA-256 — changing to a weaker algorithm undermines tamper detection.")
+  (uses-checker manifest-hash-algorithm))
+
+(invariant CONFIG_MANIFEST_PATH_SAFE
+  (severity error)
+  (description "manifestPath must enforce 2-segment paths to keep manifest paths project-relative.")
+  (uses-checker config-manifest-path-safe))
+
 ; ============================================================================
 ; Exit code invariants
 ; ============================================================================
 
 (invariant EXIT_CODES_MATCH_SPEC
   (severity error)
-  (description "CLI exit codes must match the CDL spec: 0=clean, 2=generated drift, 3=manifest drift.")
+  (description "CLI exit codes: ALL 7 codes must be defined with correct values.")
   (uses-checker exit-codes-valid))
+
+(invariant CLI_EXIT_CODE_ENUM_COMPLETE
+  (severity error)
+  (description "ExitCode enum must define SUCCESS, USER_ERROR, CONTRACT_FAIL, TAMPER_DETECTED, GENERATION_FAIL, CONFIG_ERROR, INTERNAL_ERROR with subclasses.")
+  (uses-checker cli-exit-code-enum-complete))
 
 ; ============================================================================
 ; CDL grammar invariants
@@ -131,6 +184,34 @@
   (description "All packages must release at the same version.")
   (uses-checker versions-pinned-together))
 
+(invariant INLINE_VERSION_SYNC
+  (severity warning)
+  (description "Inline version strings in source must match package.json versions.")
+  (uses-checker inline-version-sync))
+
+; ============================================================================
+; Operator registry invariants
+; ============================================================================
+
+(invariant OPERATOR_COUNT_STABLE
+  (severity error)
+  (description "The operator registry must maintain >= 50 operators — a drop indicates accidental deletion.")
+  (uses-checker operator-count-stable))
+
+(invariant OPERATOR_SPEC_CONSISTENT
+  (severity error)
+  (description "Every operator spec must have name, parameters, returnType, and description fields.")
+  (uses-checker operator-spec-consistent))
+
+; ============================================================================
+; Type system invariants
+; ============================================================================
+
+(invariant STRUCTURAL_TYPES_STABLE
+  (severity error)
+  (description "The 9 structural types (Number, String, Boolean, Path, Collection, Predicate, TimeRange, Symbol, Unknown) must be present.")
+  (uses-checker structural-types-stable))
+
 ; ============================================================================
 ; Security invariants
 ; ============================================================================
@@ -139,6 +220,43 @@
   (severity error)
   (description "No source file shall contain hardcoded API keys or credentials.")
   (uses-checker no-secrets-in-source))
+
+(invariant PROTECTED_PATTERN_SAFE
+  (severity error)
+  (description "Default protected patterns must not escape project root via traversal or absolute paths.")
+  (uses-checker protected-pattern-safe))
+
+; ============================================================================
+; Hook security invariants
+; ============================================================================
+
+(invariant HOOKS_FAIL_CLOSED
+  (severity error)
+  (description "Security-critical hooks must fail closed (exit non-zero on error).")
+  (uses-checker hooks-fail-closed))
+
+(invariant HOOKS_REGISTRATION_COMPLETE
+  (severity error)
+  (description "All hook scripts referenced in hooks.json must exist on disk.")
+  (uses-checker hooks-registration-complete))
+
+; ============================================================================
+; CLI command invariants
+; ============================================================================
+
+(invariant REQUIRED_COMMANDS_EXIST
+  (severity error)
+  (description "Critical CLI commands must exist: init, generate, check, lock.")
+  (uses-checker required-commands-exist))
+
+; ============================================================================
+; Error code invariants
+; ============================================================================
+
+(invariant ERROR_CODE_FAMILIES_PRESENT
+  (severity error)
+  (description "Core error module must define SteleError class.")
+  (uses-checker error-code-families-present))
 
 ; ============================================================================
 ; Determinism invariants

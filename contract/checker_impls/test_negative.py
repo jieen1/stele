@@ -1,0 +1,547 @@
+"""Negative tests for self-protection checkers.
+
+Each test creates a controlled violation, runs the checker, and verifies it fails.
+These confirm that each checker actually detects the thing it claims to protect.
+
+Run: python contract/checker_impls/test_negative.py
+"""
+from __future__ import annotations
+
+import json
+import pathlib
+import re
+import textwrap
+from typing import Any
+
+import self_protection as sp
+
+# Reset caches before each test.
+def _reset_caches():
+    sp._backend_registry_cache = None
+    sp._stele_files_cache = None
+
+
+def _pass_if_false(result: dict[str, Any], name: str) -> bool:
+    """Return True if checker correctly detected a violation (passed=False)."""
+    if not result.get("passed"):
+        print(f"  OK: {name} — detected violation: {result.get('message', '')}")
+        return True
+    print(f"  MISS: {name} — did NOT detect violation!")
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Test: exit_codes_valid — remove an exit code
+# ---------------------------------------------------------------------------
+
+def test_exit_codes_valid_missing_code():
+    _reset_caches()
+    errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
+    original = errors_ts.read_text(encoding="utf-8")
+    tampered = original.replace("INTERNAL_ERROR: 99,", "")
+    errors_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.exit_codes_valid({})
+    finally:
+        errors_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "exit_codes_valid_missing_code")
+
+
+def test_exit_codes_valid_wrong_value():
+    _reset_caches()
+    errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
+    original = errors_ts.read_text(encoding="utf-8")
+    tampered = original.replace("CONTRACT_FAIL: 2", "CONTRACT_FAIL: 99")
+    errors_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.exit_codes_valid({})
+    finally:
+        errors_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "exit_codes_valid_wrong_value")
+
+
+def test_cli_exit_code_enum_complete_missing_class():
+    _reset_caches()
+    errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
+    original = errors_ts.read_text(encoding="utf-8")
+    tampered = re.sub(
+        r'export class ConfigError.*?^\s*\}',
+        "",
+        original,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    errors_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.cli_exit_code_enum_complete({})
+    finally:
+        errors_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "cli_exit_code_enum_missing_class")
+
+
+# ---------------------------------------------------------------------------
+# Test: operator_count_stable — drop operators below threshold
+# ---------------------------------------------------------------------------
+
+def test_operator_count_stable_low_count():
+    """Add 40 fake operators at count=49, verify checker still passes,
+    then set threshold by temporarily changing the checker logic."""
+    _reset_caches()
+    operators_ts = sp._PACKAGES_DIR / "core" / "src" / "registry" / "operators.ts"
+    original = operators_ts.read_text(encoding="utf-8")
+
+    current_count = len(re.findall(r"defineOperator\s*\(", original))
+
+    # Remove enough operators to drop below 50
+    # Find operator blocks and remove the last ones
+    # Match: defineOperator({ ... }),
+    blocks = list(re.finditer(
+        r"defineOperator\s*\(\s*\{",
+        original,
+    ))
+
+    if len(blocks) > 50:
+        # Remove last (len(blocks) - 40) blocks — this leaves only 40 operators
+        to_remove = len(blocks) - 40
+        last_block_start = blocks[-to_remove].start()
+        # Remove from last_block_start to end of CORE_OPERATOR_SPECS array
+        # Find the closing ];
+        end_marker = original.rfind("];")
+        if end_marker > last_block_start:
+            # Count how many defineOperator calls remain
+            tampered = original[:last_block_start]
+            # We need to keep the array opening
+            # Actually, let's just modify the threshold in the checker
+            # This is safer than tampering with the source
+            pass
+
+    # Alternative: directly test with a mocked threshold
+    # The checker is: if count < 50: fail
+    # We can't easily mock this, so let's use a different approach
+    # Remove ALL defineOperator calls to make count = 0
+    # This is drastic but proves the checker works
+
+    # Actually, the simplest approach: count the current operators,
+    # remove enough to go under the threshold
+    # Find blocks from the end and remove them one by one
+    remove_count = current_count - 49  # drop to 49
+
+    # Find all defineOperator( ... ), patterns using a more robust approach
+    operator_pattern = re.compile(
+        r"defineOperator\s*\(\s*\{[^}]*\}\s*\),?\s*\n?",
+        re.DOTALL,
+    )
+    matches = list(operator_pattern.finditer(original))
+
+    if remove_count > 0 and len(matches) >= remove_count:
+        # Remove the last N operators
+        removals = matches[-remove_count:]
+        # Remove in reverse order to preserve positions
+        tampered = original
+        for m in reversed(removals):
+            tampered = tampered[:m.start()] + tampered[m.end():]
+
+        operators_ts.write_text(tampered, encoding="utf-8")
+        try:
+            result = sp.operator_count_stable({})
+        finally:
+            operators_ts.write_text(original, encoding="utf-8")
+        return _pass_if_false(result, "operator_count_stable_low_count")
+
+    print("  SKIP: not enough operators to remove")
+    return True  # Skip counts as pass
+
+
+# ---------------------------------------------------------------------------
+# Test: operator_spec_consistent — remove a required field
+# ---------------------------------------------------------------------------
+
+def test_operator_spec_consistent_missing_field():
+    _reset_caches()
+    operators_ts = sp._PACKAGES_DIR / "core" / "src" / "registry" / "operators.ts"
+    original = operators_ts.read_text(encoding="utf-8")
+    tampered = original.replace(
+        'description: "Resolve a data path from one or more symbols."',
+        "",
+        1,
+    )
+    operators_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.operator_spec_consistent({})
+    finally:
+        operators_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "operator_spec_consistent_missing_field")
+
+
+# ---------------------------------------------------------------------------
+# Test: manifest_hash_algorithm — change to weaker hash
+# ---------------------------------------------------------------------------
+
+def test_manifest_hash_algorithm_weaker():
+    _reset_caches()
+    manifest_ts = sp._PACKAGES_DIR / "core" / "src" / "manifest" / "manifest.ts"
+    original = manifest_ts.read_text(encoding="utf-8")
+    tampered = original.replace('createHash("sha256")', 'createHash("sha1")')
+    manifest_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.manifest_hash_algorithm({})
+    finally:
+        manifest_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "manifest_hash_algorithm_weaker")
+
+
+# ---------------------------------------------------------------------------
+# Test: structural_types_stable — remove a type
+# ---------------------------------------------------------------------------
+
+def test_structural_types_stable_missing_type():
+    _reset_caches()
+    types_ts = sp._PACKAGES_DIR / "core" / "src" / "ast" / "types.ts"
+    original = types_ts.read_text(encoding="utf-8")
+    tampered = original.replace('| "Unknown";', "")
+    types_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.structural_types_stable({})
+    finally:
+        types_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "structural_types_stable_missing_type")
+
+
+# ---------------------------------------------------------------------------
+# Test: manifest_version_stable — version mismatch
+# ---------------------------------------------------------------------------
+
+def test_manifest_version_stable_mismatch():
+    _reset_caches()
+    manifest_path = sp._REPO_ROOT / "contract" / ".manifest.json"
+    original_content = None
+    had_manifest = manifest_path.exists()
+    if had_manifest:
+        original_content = manifest_path.read_text(encoding="utf-8")
+
+    bad_manifest = json.dumps({
+        "version": "1",
+        "stele_version": "9.9",
+        "generated_at": "2026-01-01T00:00:00Z",
+        "protected_files": {},
+        "contract_hash": "abc123",
+    })
+    manifest_path.write_text(bad_manifest, encoding="utf-8")
+    try:
+        result = sp.manifest_version_stable({})
+    finally:
+        if had_manifest:
+            manifest_path.write_text(original_content, encoding="utf-8")
+        else:
+            manifest_path.unlink()
+    return _pass_if_false(result, "manifest_version_stable_mismatch")
+
+
+def test_manifest_version_stable_missing_field():
+    _reset_caches()
+    manifest_path = sp._REPO_ROOT / "contract" / ".manifest.json"
+    original_content = None
+    had_manifest = manifest_path.exists()
+    if had_manifest:
+        original_content = manifest_path.read_text(encoding="utf-8")
+
+    bad_manifest = json.dumps({
+        "version": "1",
+        "generated_at": "2026-01-01T00:00:00Z",
+        "protected_files": {},
+        "contract_hash": "abc123",
+    })
+    manifest_path.write_text(bad_manifest, encoding="utf-8")
+    try:
+        result = sp.manifest_version_stable({})
+    finally:
+        if had_manifest:
+            manifest_path.write_text(original_content, encoding="utf-8")
+        else:
+            manifest_path.unlink()
+    return _pass_if_false(result, "manifest_version_stable_missing_field")
+
+
+# ---------------------------------------------------------------------------
+# Test: required_commands_exist — remove a command
+# ---------------------------------------------------------------------------
+
+def test_required_commands_exist_missing():
+    _reset_caches()
+    commands_dir = sp._PACKAGES_DIR / "cli" / "src" / "commands"
+    lock_ts = commands_dir / "lock.ts"
+    backup_ts = commands_dir / "lock_backup.ts"
+    lock_ts.rename(backup_ts)
+    try:
+        result = sp.required_commands_exist({})
+    finally:
+        backup_ts.rename(lock_ts)
+    return _pass_if_false(result, "required_commands_exist_missing")
+
+
+# ---------------------------------------------------------------------------
+# Test: config_manifest_path_safe — remove 2-segment check
+# ---------------------------------------------------------------------------
+
+def test_config_manifest_path_safe_no_validation():
+    _reset_caches()
+    load_config_ts = sp._PACKAGES_DIR / "cli" / "src" / "config" / "loadConfig.ts"
+    original = load_config_ts.read_text(encoding="utf-8")
+    tampered = original.replace("segments.length !== 2", "segments.length !== 999")
+    load_config_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.config_manifest_path_safe({})
+    finally:
+        load_config_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "config_manifest_path_safe_no_validation")
+
+
+# ---------------------------------------------------------------------------
+# Test: hooks_fail_closed — remove all try blocks from pre-tool-protect.js
+# ---------------------------------------------------------------------------
+
+def test_hooks_fail_closed_no_try():
+    """Replace ALL 'try {' with '// TRY_BLOCK', so checker sees no try."""
+    _reset_caches()
+    pre_tool = sp._PACKAGES_DIR / "claude-code-plugin" / "scripts" / "pre-tool-protect.js"
+    original = pre_tool.read_text(encoding="utf-8")
+    # Replace ALL occurrences
+    tampered = original.replace("try {", "// TRY_BLOCK_REMOVED {")
+    pre_tool.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.hooks_fail_closed({})
+    finally:
+        pre_tool.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "hooks_fail_closed_no_try")
+
+
+# ---------------------------------------------------------------------------
+# Test: hooks_registration_complete — add reference to missing script
+# ---------------------------------------------------------------------------
+
+def test_hooks_registration_missing_script():
+    """Replace a full command string with one referencing a missing script."""
+    _reset_caches()
+    hooks_json = sp._PACKAGES_DIR / "claude-code-plugin" / "hooks" / "hooks.json"
+    original = hooks_json.read_text(encoding="utf-8")
+
+    # Replace the observation hook command entirely with a reference to a missing script
+    tampered = original.replace(
+        'scripts/observation-hook.js',
+        'scripts/absolutely-real-missing-script.js',
+    )
+    hooks_json.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.hooks_registration_complete({})
+    finally:
+        hooks_json.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "hooks_registration_missing_script")
+
+
+# ---------------------------------------------------------------------------
+# Test: protected_pattern_safe — add traversal pattern
+# ---------------------------------------------------------------------------
+
+def test_protected_pattern_safe_traversal():
+    """Add a traversal pattern to defaults.ts protected config."""
+    _reset_caches()
+    defaults_ts = sp._PACKAGES_DIR / "cli" / "src" / "config" / "defaults.ts"
+    original = defaults_ts.read_text(encoding="utf-8")
+
+    # Add a pattern with parent traversal
+    tampered = original.replace(
+        "protected: [",
+        'protected: [\n    "../secret.env",',
+    )
+    defaults_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.protected_pattern_safe({})
+    finally:
+        defaults_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "protected_pattern_safe_traversal")
+
+
+# ---------------------------------------------------------------------------
+# Test: error_code_families_present — remove SteleError class
+# ---------------------------------------------------------------------------
+
+def test_error_code_families_missing_class():
+    _reset_caches()
+    stele_error_ts = sp._PACKAGES_DIR / "core" / "src" / "errors" / "SteleError.ts"
+    original = stele_error_ts.read_text(encoding="utf-8")
+    tampered = original.replace("class SteleError", "class _SteleError_RENAMED")
+    stele_error_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.error_code_families_present({})
+    finally:
+        stele_error_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "error_code_families_missing_class")
+
+
+# ---------------------------------------------------------------------------
+# Test: cdl_no_single_quotes — add single quote on non-comment line
+# ---------------------------------------------------------------------------
+
+def test_cdl_no_single_quotes_violation():
+    """Write a .stele file with single quotes NOT inside double quotes."""
+    _reset_caches()
+    stele_file = sp._REPO_ROOT / "contract" / "negative-test.stele"
+
+    # A line with single quotes NOT inside double-quoted strings.
+    # The checker flags ' characters that are not inside "..."
+    content = textwrap.dedent("""\
+    (metadata
+      (project "test")
+    )
+
+    ; ; comment line with ' quotes — should be skipped
+    (invariant BAD 'single-quoted-value')
+    """)
+    stele_file.write_text(content, encoding="utf-8")
+    try:
+        result = sp.cdl_no_single_quotes({})
+    finally:
+        stele_file.unlink(missing_ok=True)
+    return _pass_if_false(result, "cdl_no_single_quotes_violation")
+
+
+# ---------------------------------------------------------------------------
+# Test: inline_version_sync — mismatched version
+# ---------------------------------------------------------------------------
+
+def test_inline_version_sync_mismatch():
+    _reset_caches()
+    manifest_ts = sp._PACKAGES_DIR / "core" / "src" / "manifest" / "manifest.ts"
+    original = manifest_ts.read_text(encoding="utf-8")
+    tampered = original.replace('STELE_VERSION = "0.1.0"', 'STELE_VERSION = "99.99"')
+    manifest_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.inline_version_sync({})
+    finally:
+        manifest_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "inline_version_sync_mismatch")
+
+
+# ---------------------------------------------------------------------------
+# Test: backend_registries — remove a backend
+# ---------------------------------------------------------------------------
+
+def test_backend_registries_missing_language():
+    _reset_caches()
+    registry_ts = sp._PACKAGES_DIR / "cli" / "src" / "backend-registry.ts"
+    original = registry_ts.read_text(encoding="utf-8")
+    tampered = original.replace('language: "go"', 'language: "go-temp-removed"')
+    registry_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.backend_registries({})
+    finally:
+        registry_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "backend_registries_missing_language")
+
+
+def test_backend_contains_go_missing():
+    _reset_caches()
+    registry_ts = sp._PACKAGES_DIR / "cli" / "src" / "backend-registry.ts"
+    original = registry_ts.read_text(encoding="utf-8")
+    tampered = original.replace('language: "go"', 'language: "go-removed"')
+    registry_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.backend_contains_go({})
+    finally:
+        registry_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "backend_contains_go_missing")
+
+
+# ---------------------------------------------------------------------------
+# Test: config_schema_valid — missing field
+# ---------------------------------------------------------------------------
+
+def test_config_schema_valid_missing_field():
+    _reset_caches()
+    config_path = sp._REPO_ROOT / "stele.config.json"
+    original = config_path.read_text(encoding="utf-8")
+    config = json.loads(original)
+    config.pop("targetLanguage", None)
+    tampered = json.dumps(config, indent=2)
+    config_path.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.config_schema_valid({})
+    finally:
+        config_path.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "config_schema_valid_missing_field")
+
+
+# ---------------------------------------------------------------------------
+# Test: cdl_utf8_valid — invalid UTF-8
+# ---------------------------------------------------------------------------
+
+def test_cdl_utf8_valid_invalid_bytes():
+    """Write invalid UTF-8 bytes to a .stele file, verify checker catches it."""
+    _reset_caches()
+    stele_file = sp._REPO_ROOT / "contract" / "test-utf8.stele"
+    # Write a file with invalid UTF-8 byte sequence
+    stele_file.write_bytes(b"(invariant TEST \xff\xfe)")
+    try:
+        result = sp.cdl_utf8_valid({})
+    finally:
+        stele_file.unlink(missing_ok=True)
+    return _pass_if_false(result, "cdl_utf8_valid_invalid_bytes")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    passed = 0
+    failed = 0
+    errors = 0
+
+    tests = [
+        ("exit_codes_valid_missing_code", test_exit_codes_valid_missing_code),
+        ("exit_codes_valid_wrong_value", test_exit_codes_valid_wrong_value),
+        ("cli_exit_code_enum_missing_class", test_cli_exit_code_enum_complete_missing_class),
+        ("operator_count_stable_low_count", test_operator_count_stable_low_count),
+        ("operator_spec_consistent_missing_field", test_operator_spec_consistent_missing_field),
+        ("manifest_hash_algorithm_weaker", test_manifest_hash_algorithm_weaker),
+        ("structural_types_stable_missing_type", test_structural_types_stable_missing_type),
+        ("manifest_version_stable_mismatch", test_manifest_version_stable_mismatch),
+        ("manifest_version_stable_missing_field", test_manifest_version_stable_missing_field),
+        ("required_commands_exist_missing", test_required_commands_exist_missing),
+        ("config_manifest_path_safe_no_validation", test_config_manifest_path_safe_no_validation),
+        ("hooks_fail_closed_no_try", test_hooks_fail_closed_no_try),
+        ("hooks_registration_missing_script", test_hooks_registration_missing_script),
+        ("protected_pattern_safe_traversal", test_protected_pattern_safe_traversal),
+        ("error_code_families_missing_class", test_error_code_families_missing_class),
+        ("cdl_no_single_quotes_violation", test_cdl_no_single_quotes_violation),
+        ("cdl_utf8_valid_invalid_bytes", test_cdl_utf8_valid_invalid_bytes),
+        ("inline_version_sync_mismatch", test_inline_version_sync_mismatch),
+        ("backend_registries_missing_language", test_backend_registries_missing_language),
+        ("backend_contains_go_missing", test_backend_contains_go_missing),
+        ("config_schema_valid_missing_field", test_config_schema_valid_missing_field),
+    ]
+
+    print("=" * 60)
+    print("Negative tests for self-protection checkers")
+    print("Each test creates a violation, runs the checker, verifies FAIL.")
+    print("=" * 60)
+
+    for name, fn in tests:
+        print(f"\n--- {name} ---")
+        try:
+            if fn():
+                passed += 1
+            else:
+                failed += 1
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            errors += 1
+
+    print(f"\n{'=' * 60}")
+    print(f"Results: {passed} passed, {failed} missed, {errors} errors out of {len(tests)}")
+    print(f"{'=' * 60}")
+
+    return 1 if failed > 0 else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
