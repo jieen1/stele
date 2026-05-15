@@ -93,6 +93,7 @@ function severityToLevel(severity: ViolationSeverity): SarifLevel {
  * invariant descriptions contain user-authored HTML/Markdown.
  */
 function sanitizeMessage(text: string): string {
+  if (!text) return "";
   return text
     .replace(/<[^>]*>/g, "")
     .replace(/\s+/g, " ")

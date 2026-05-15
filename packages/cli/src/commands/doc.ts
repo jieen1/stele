@@ -1,7 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { loadContract, type AstNode, type Contract } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
+import { validateOutputPath } from "../utils/output-path.js";
 
 export type DocOptions = {
   format?: "markdown" | "html";
@@ -22,7 +23,7 @@ export async function runDoc(projectDir: string, options: DocOptions): Promise<v
 
   const outputDir = options.output ?? resolve(projectDir, "docs", "contract");
   const filename = options.format === "html" ? "index.html" : "contract.md";
-  const outputPath = resolve(outputDir, filename);
+  const outputPath = validateOutputPath(projectDir, join(outputDir, filename));
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, content, "utf8");

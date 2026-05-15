@@ -36,7 +36,7 @@ import { discoverProjects } from "../recursive-discovery.js";
 import { isMissingFileError, isAbsoluteLikePath } from "../utils/shared-utils.js";
 import { aggregateExitCode, formatRecursiveHeader, formatRecursiveSummary, type SubReport } from "./recursive.js";
 
-const STELE_VERSION_FOR_CACHE = "0.1.0";
+import { STELE_VERSION } from "../version.js";
 
 export type GenerateOptions = {
   force?: boolean;
@@ -106,7 +106,7 @@ export async function runGenerate(projectDir: string, options: GenerateOptions):
     stableStringify(stripVolatileConfigFields(config as unknown as Record<string, unknown>)),
   );
   const currentBackendName = backend.name;
-  const currentSteleVersion = STELE_VERSION_FOR_CACHE;
+  const currentSteleVersion = STELE_VERSION;
   const currentOperatorRegistryHash = hashManifestSha256(stableStringify(CORE_OPERATOR_SPECS));
 
   const fullInvalidate =

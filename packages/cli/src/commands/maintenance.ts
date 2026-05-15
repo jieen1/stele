@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
+import { validateOutputPath } from "../utils/output-path.js";
 import { buildRawCheckReport, prepareCheckContext } from "./check.js";
 import { buildRuleIndex } from "./rules.js";
 
@@ -20,7 +21,7 @@ export async function runMaintenanceSummary(projectDir: string, options: Mainten
     return;
   }
 
-  const outputPath = resolve(projectDir, options.output);
+  const outputPath = validateOutputPath(projectDir, options.output);
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, summary, "utf8");
   process.stdout.write(`OK wrote Stele maintenance summary to ${options.output}.\n`);
