@@ -63,6 +63,7 @@ export {
   formatViolationReportJson,
 } from "./report/format.js";
 export type {
+  ExplainTrace,
   FailureWitness,
   FailureWitnessOperator,
   Violation,
@@ -93,6 +94,11 @@ export type {
 } from "./registry/operators.js";
 export { CORE_OPERATOR_SPECS, createCoreOperatorRegistry, createOperatorRegistry } from "./registry/operators.js";
 export { uniqueSortedStrings } from "./util/array.js";
+export {
+  buildInvariantTrace,
+  formatExplainTrace,
+  invariantExplanation,
+} from "./evaluator/explain.js";
 export type {
   BoundaryDeclaration,
   CheckerDeclaration,

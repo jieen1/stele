@@ -37,6 +37,7 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
   let rationale: InvariantSingleValueField | undefined;
   let since: InvariantSingleValueField | undefined;
   let appliesTo: InvariantSingleValueField | undefined;
+  let explain: InvariantSingleValueField | undefined;
 
   for (const field of node.items.slice(1)) {
     if (field.kind !== "list") {
@@ -169,6 +170,10 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
         ensureInvariantFieldUnset(appliesTo, field, `Invariant "${idNode.value}" applies-to`);
         appliesTo = readSingleValueField(field, "applies-to");
         break;
+      case "explain":
+        ensureInvariantFieldUnset(explain, field, `Invariant "${idNode.value}" explain`);
+        explain = readSingleValueField(field, "explain");
+        break;
     }
   }
 
@@ -222,6 +227,7 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
     rationale,
     since,
     appliesTo,
+    explain,
   };
 }
 

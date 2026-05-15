@@ -30,6 +30,7 @@ export const ALLOWED_INVARIANT_FIELDS = new Set([
   "rationale",
   "since",
   "applies-to",
+  "explain",
 ]);
 
 export type LoadedContractFile = {
@@ -88,7 +89,7 @@ export type InvariantDependency = {
   span: SourceSpan;
 };
 
-export type InvariantSingleValueFieldName = "category" | "tolerance" | "rationale" | "since" | "applies-to";
+export type InvariantSingleValueFieldName = "category" | "tolerance" | "rationale" | "since" | "applies-to" | "explain";
 
 export type InvariantSingleValueField = {
   kind: "field";
@@ -126,6 +127,7 @@ export type InvariantDeclaration = {
   rationale?: InvariantSingleValueField;
   since?: InvariantSingleValueField;
   appliesTo?: InvariantSingleValueField;
+  explain?: InvariantSingleValueField;
 };
 
 export type GroupDeclaration = {

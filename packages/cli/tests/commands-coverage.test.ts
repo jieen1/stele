@@ -333,7 +333,7 @@ describe("commands coverage", () => {
       const output = stdout.read();
       expect(output).toContain("ID: TEST_INVARIANT");
       expect(output).toContain("Generated Test Path: tests/contract/test_contract.py");
-      expect(output).toContain("Source:");
+      expect(output).toContain("## Source");
       expect(output).toContain("(invariant TEST_INVARIANT");
     });
 

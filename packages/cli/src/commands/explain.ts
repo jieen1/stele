@@ -1,7 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { posix, resolve } from "node:path";
+import {
+  buildInvariantTrace,
+  formatExplainTrace,
+  invariantExplanation,
+  loadContract,
+  type InvariantDeclaration,
+  type SourceSpan,
+} from "@stele/core";
 import { sanitizePythonIdentifier } from "@stele/backend-python";
-import { loadContract, type InvariantDeclaration, type SourceSpan } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
 import { buildRuleIndex, findIndexedRule } from "./rules.js";
 import { formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
@@ -20,12 +27,13 @@ export async function runExplain(projectDir: string, invariantId: string, option
   }
 
   const source = await getInvariantSource(invariant);
+  const explanation = invariantExplanation(invariant);
 
   if (options.json) {
     const index = await buildRuleIndex(projectDir);
     const rule = findIndexedRule(index, invariant.id);
 
-    process.stdout.write(`${JSON.stringify({ rule, source }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ rule, source, explanation }, null, 2)}\n`);
     return;
   }
 
@@ -33,6 +41,7 @@ export async function runExplain(projectDir: string, invariantId: string, option
     invariant.groupId === undefined
       ? posix.join(config.generatedDir, "test_contract.py")
       : posix.join(config.generatedDir, `test_${sanitizePythonIdentifier(invariant.groupId, "group")}.py`);
+
   const lines = [
     `ID: ${invariant.id}`,
     `File Path: ${toProjectRelativePath(projectDir, invariant.filePath)}`,
@@ -40,9 +49,19 @@ export async function runExplain(projectDir: string, invariantId: string, option
     `Dependencies: ${invariant.dependsOn.length === 0 ? "<none>" : invariant.dependsOn.map((dependency) => dependency.id).join(", ")}`,
     `Rationale: ${invariant.rationale === undefined ? "<none>" : formatAstNode(invariant.rationale.valueNode)}`,
     `Checker ID: ${invariant.usesChecker?.checkerId ?? "<none>"}`,
-    "Source:",
-    source,
+    `Explanation: ${explanation ?? "<none>"}`,
+    "",
+    "## Expression Trace",
   ];
+
+  // Build and format the expression trace
+  const trace = buildInvariantTrace(invariant, null);
+  const traceLines = formatExplainTrace(trace);
+  lines.push(...traceLines);
+
+  lines.push("");
+  lines.push("## Source");
+  lines.push(source);
 
   process.stdout.write(`${lines.join("\n")}\n`);
 }
@@ -76,7 +95,6 @@ function extractSourceFromSpan(source: string, span: SourceSpan): string | undef
       if (character === "\n") {
         inComment = false;
       }
-
       continue;
     }
 
@@ -85,16 +103,13 @@ function extractSourceFromSpan(source: string, span: SourceSpan): string | undef
         escaping = false;
         continue;
       }
-
       if (character === "\\") {
         escaping = true;
         continue;
       }
-
       if (character === '"') {
         inString = false;
       }
-
       continue;
     }
 
@@ -115,7 +130,6 @@ function extractSourceFromSpan(source: string, span: SourceSpan): string | undef
 
     if (character === ")") {
       depth -= 1;
-
       if (depth === 0) {
         return source.slice(cursor, index + 1);
       }

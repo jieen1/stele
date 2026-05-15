@@ -117,7 +117,7 @@ describe("inspection commands", () => {
     expect(stdout.read()).toContain("Checker ID: <none>\n");
     expect(stdout.read()).toContain(
       [
-        "Source:",
+        "## Source",
         "(invariant ROOT_PAYMENT_BALANCE",
         "  (severity critical)",
         '  (description "Payments remain balanced before settlement.")',
@@ -361,7 +361,7 @@ describe("inspection commands", () => {
     expect(stdout.read()).toContain("Checker ID: approved_checker\n");
     expect(stdout.read()).toContain(
       [
-        "Source:",
+        "## Source",
         "(invariant GROUP_CHECKED_SETTLEMENT",
         "    (severity medium)",
         '    (description "Settlement batches require an approved checker.")',
@@ -380,7 +380,7 @@ describe("inspection commands", () => {
 
     expect(stdout.read()).toContain(
       [
-        "Source:",
+        "## Source",
         "(invariant COMMENT_RULE",
         "  (severity high)",
         "  ; note: this comment mentions ) and should not end the invariant",

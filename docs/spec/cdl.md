@@ -172,6 +172,7 @@ Allowed fields:
 - `rationale`
 - `since`
 - `applies-to`
+- `explain`
 
 Unknown or repeated fields fail with `E0305`.
 
@@ -197,6 +198,7 @@ Every invariant must include:
 - `rationale`: exactly one value node
 - `since`: exactly one value node
 - `applies-to`: exactly one value node
+- `explain`: exactly one value node (string preferred)
 
 ### Checker requirements
 
@@ -217,6 +219,26 @@ without additional arguments.
 ### Scenario requirements
 
 `uses-scenario` must reference a declared scenario id. Unknown scenario references fail with `E0316`.
+
+### Explain operator
+
+`(explain "...")` attaches a human-readable explanation to an invariant. It is consumed by `stele explain` CLI output, SARIF reports, and MCP explain tools.
+
+```lisp
+(invariant USER_EMAIL_MUST_BE_VALID
+  (severity error)
+  (description "User email must match service pattern.")
+  (explain "Email format check ensures only valid service emails enter the system.")
+  (assert (matches (path user email) "[a-z]+@[a-z]+\\.com")))
+```
+
+The `(explain)` field is optional. When present:
+
+- `stele explain INVARIANT_ID` shows the explanation as the "why" line in the trace output
+- SARIF output includes the explanation in the result description
+- The expression trace engine uses it to annotate sub-expression failures
+
+The `(explain)` value must be a string literal or identifier. The explanation text is used as-is — no interpolation or templating is performed.
 
 ### `scenario`
 

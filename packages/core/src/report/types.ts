@@ -98,6 +98,21 @@ export type ViolationReportInput = Omit<ViolationReport, "schema_version" | "vio
   violations: Array<Violation | ViolationInput>;
 };
 
+/**
+ * Single-step trace node for CDL expression evaluation.
+ *
+ * Each node records the original CDL sub-expression, whether it evaluated
+ * true/false/unknown, and an optional human explanation from the (explain)
+ * operator.
+ */
+export type ExplainTrace = {
+  expression: string;
+  evaluated: boolean | null;
+  children?: ExplainTrace[];
+  explanation?: string;
+  failureDetail?: string;
+};
+
 export function createViolation(input: ViolationInput): Violation {
   const normalized: ViolationInput = {
     ...input,
