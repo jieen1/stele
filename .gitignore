@@ -55,3 +55,6 @@ local-packages/*.tgz
 
 # Claude session
 .claude/scheduled_tasks.lock
+
+# Stele agent session data
+.stele/agent/
