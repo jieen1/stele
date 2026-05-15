@@ -100,6 +100,8 @@ export {
   invariantExplanation,
 } from "./evaluator/explain.js";
 export type {
+  AgentDeclaration,
+  AgentSingleValueField,
   BoundaryDeclaration,
   CheckerDeclaration,
   CheckerUse,
@@ -107,6 +109,8 @@ export type {
   ClassShapeFieldRequirement,
   CodeShapeDeclaration,
   CodeShapeLang,
+  ConflictDeclaration,
+  ConflictResolutionStrategy,
   Contract,
   ContractFile,
   FilePolicyDeclaration,
@@ -118,9 +122,11 @@ export type {
   InvariantMultiValueField,
   InvariantSingleValueField,
   InvariantSingleValueFieldName,
+  InterAgentContractDeclaration,
   LoadedContractFile,
   MetadataDeclaration,
   OperatorDeclaration,
+  RequiresClause,
   ScenarioCall,
   ScenarioCaptureStateDeclaration,
   ScenarioDeclaration,
@@ -129,5 +135,7 @@ export type {
   ScenarioSandbox,
   ScenarioStepDeclaration,
   ScenarioUse,
+  ScopeDeclaration,
   TypePolicyDeclaration,
 } from "./validator/structure.js";
+

@@ -6,15 +6,25 @@ import { describeNode, validationError } from "./structure-error.js";
 import { parseInvariantDeclaration } from "./structure-invariant.js";
 import { parseScenarioDeclaration } from "./structure-scenario.js";
 import { parseCodeShapeDeclaration } from "./structure-code-shape.js";
+import {
+  parseAgentDeclaration,
+  parseScopeDeclaration,
+  parseInterAgentContractDeclaration,
+  parseConflictDeclaration,
+} from "./structure-agent.js";
 import { TOP_LEVEL_DECLARATIONS } from "./structure-types.js";
 import type {
+  AgentDeclaration,
+  ConflictDeclaration,
   Contract,
   ContractFile,
   GroupDeclaration,
   ImportDeclaration,
+  InterAgentContractDeclaration,
   LoadedContractFile,
   MetadataDeclaration,
   OperatorDeclaration,
+  ScopeDeclaration,
   CheckerDeclaration,
 } from "./structure-types.js";
 
@@ -32,6 +42,10 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     groups: contractFiles.flatMap((file) => file.groups),
     invariants: contractFiles.flatMap((file) => file.invariants),
     codeShapes: contractFiles.flatMap((file) => file.codeShapes),
+    agents: contractFiles.flatMap((file) => file.agents),
+    scopes: contractFiles.flatMap((file) => file.scopes),
+    interAgentContracts: contractFiles.flatMap((file) => file.interAgentContracts),
+    conflicts: contractFiles.flatMap((file) => file.conflicts),
   };
 }
 
@@ -54,6 +68,10 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   const groups: GroupDeclaration[] = [];
   const invariants: Array<ReturnType<typeof parseInvariantDeclaration>> = [];
   const codeShapes: Array<ReturnType<typeof parseCodeShapeDeclaration>> = [];
+  const agents: AgentDeclaration[] = [];
+  const scopes: ScopeDeclaration[] = [];
+  const interAgentContracts: InterAgentContractDeclaration[] = [];
+  const conflicts: ConflictDeclaration[] = [];
 
   for (const node of file.parsed.body) {
     if (node.kind !== "list") {
@@ -125,6 +143,18 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
       case "file-policy":
         codeShapes.push(parseCodeShapeDeclaration(file.path, node));
         break;
+      case "agent":
+        agents.push(parseAgentDeclaration(file.path, node));
+        break;
+      case "scope":
+        scopes.push(parseScopeDeclaration(file.path, node));
+        break;
+      case "inter-agent-contract":
+        interAgentContracts.push(parseInterAgentContractDeclaration(file.path, node));
+        break;
+      case "conflict":
+        conflicts.push(parseConflictDeclaration(file.path, node));
+        break;
     }
   }
 
@@ -139,6 +169,10 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
     groups,
     invariants,
     codeShapes,
+    agents,
+    scopes,
+    interAgentContracts,
+    conflicts,
   };
 }
 

@@ -33,12 +33,27 @@ export {
 } from "./structure-code-shape.js";
 
 export {
+  parseAgentDeclaration,
+  parseScopeDeclaration,
+  parseInterAgentContractDeclaration,
+  parseConflictDeclaration,
+} from "./structure-agent.js";
+
+
+export {
   describeNode,
   validationError,
 } from "./structure-error.js";
 
 // -- all types live in structure-types.js --
 export type {
+  AgentDeclaration,
+  AgentSingleValueField,
+  ConflictDeclaration,
+  ConflictResolutionStrategy,
+  InterAgentContractDeclaration,
+  RequiresClause,
+  ScopeDeclaration,
   LoadedContractFile,
   MetadataDeclaration,
   ImportDeclaration,
@@ -70,3 +85,4 @@ export type {
   ContractFile,
   Contract,
 } from "./structure-types.js";
+

@@ -68,6 +68,10 @@ Only these top-level declarations are valid in v0.1:
 - `group`
 - `invariant`
 - `scenario`
+- `agent`
+- `scope`
+- `inter-agent-contract`
+- `conflict`
 
 Any other top-level declaration fails validation with `E0301`.
 
@@ -276,6 +280,86 @@ Supported scenario body expressions in v0.1:
 - `(gen unique-name "prefix")`
 
 The lexer does not support `$`-prefixed interpolation syntax in v0.1, so scenario references are always explicit forms such as `(ref fund id)`.
+
+## Agent declarations
+
+Agent declarations define identities, permissions, and conflict resolution for multi-agent systems.
+
+### `agent`
+
+Form:
+
+```lisp
+(agent "code-reviewer"
+  (description "Reviews code changes for quality and compliance.")
+  (allowed-paths "src/**" "tests/**")
+  (denied-paths "contract/**" "config/**"))
+```
+
+The first item must be an identifier or string literal. Fields:
+
+- `description`: exactly one string or identifier (optional)
+- `allowed-paths`: zero or more string literals (optional)
+- `denied-paths`: zero or more string literals (optional)
+
+Agent identity is determined by the first item. Duplicate `description` fields fail with `E0317`.
+
+### `scope`
+
+Form:
+
+```lisp
+(scope "code-reviewer"
+  (path "src/lib/**")
+  (path "tests/lib/**"))
+```
+
+The first item must be an identifier or string literal representing the agent id. Each `(path "...")` form declares a path pattern owned by that agent. At least one path is required.
+
+### `inter-agent-contract`
+
+Form:
+
+```lisp
+(inter-agent-contract "review-before-merge"
+  (description "All feature-writer changes must be reviewed.")
+  (agents "code-reviewer" "feature-writer")
+  (requires "feature-writer" (path "src/**") (approved-by "code-reviewer")))
+```
+
+The first item must be an identifier or string literal. Fields:
+
+- `description`: exactly one string or identifier (optional)
+- `agents`: one or more agent id string literals (required)
+- `requires`: one or more requirement clauses (required)
+
+Each `(requires ...)` clause has the form:
+
+```lisp
+(requires "agent-id" (path "pattern") (approved-by "approver-id"))
+```
+
+### `conflict`
+
+Form:
+
+```lisp
+(conflict (path "src/core/engine.ts")
+  (agents "feature-writer" "perf-optimizer")
+  (resolution "last-writer-wins")
+  (fallback "manual-review"))
+```
+
+The first item must be a `(path "...")` form. Fields:
+
+- `path`: exactly one string literal (required, first position)
+- `agents`: zero or more agent id string literals (optional)
+- `resolution`: exactly one strategy (required)
+- `fallback`: exactly one strategy (optional)
+
+Valid resolution strategies: `last-writer-wins`, `manual-review`, `merge-strategy`, `contract-gated`.
+
+Agent declarations are consumed by the MCP server's `stele-validate-edit` tool and the agent policy evaluation engine. They do not affect invariant verification or test generation in v0.1.
 
 ## Expressions and operator semantics
 

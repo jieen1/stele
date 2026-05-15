@@ -14,6 +14,10 @@ export const TOP_LEVEL_DECLARATIONS = new Set([
   "function-shape",
   "type-policy",
   "file-policy",
+  "agent",
+  "scope",
+  "inter-agent-contract",
+  "conflict",
 ]);
 
 export const ALLOWED_INVARIANT_FIELDS = new Set([
@@ -94,6 +98,18 @@ export type InvariantSingleValueFieldName = "category" | "tolerance" | "rational
 export type InvariantSingleValueField = {
   kind: "field";
   name: InvariantSingleValueFieldName;
+  node: ListNode;
+  span: SourceSpan;
+  valueNode: AstNode;
+};
+
+/**
+ * Generic single-value field that allows names beyond the invariant-specific set.
+ * Used for agent declarations, inter-agent contracts, and other non-invariant contexts.
+ */
+export type AgentSingleValueField = {
+  kind: "field";
+  name: string;
   node: ListNode;
   span: SourceSpan;
   valueNode: AstNode;
@@ -261,6 +277,83 @@ export type CodeShapeDeclaration =
   | TypePolicyDeclaration
   | FilePolicyDeclaration;
 
+// -- Agent policy declarations --
+
+/**
+ * Agent identity declaration. Declares an agent's name, description, allowed paths, and denied paths.
+ */
+export type AgentDeclaration = {
+  kind: "agent";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  description?: AgentSingleValueField;
+  allowedPaths: string[];
+  deniedPaths: string[];
+};
+
+/**
+ * Scope declaration. Assigns path ownership to an agent.
+ */
+export type ScopeDeclaration = {
+  kind: "scope";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  agentId: string;
+  paths: string[];
+};
+
+/**
+ * Inter-agent contract. Cross-agent rules about approvals and dependencies.
+ */
+export type InterAgentContractDeclaration = {
+  kind: "inter-agent-contract";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  agents: string[];
+  requires: RequiresClause[];
+  description?: AgentSingleValueField;
+};
+
+/**
+ * A single requirement within an inter-agent contract.
+ * Example: (requires "reviewer" (path "src/**") approved-by "reviewer")
+ */
+export type RequiresClause = {
+  agentId: string;
+  pathPattern: string;
+  approvedBy: string;
+  span: SourceSpan;
+};
+
+/**
+ * Conflict resolution strategy.
+ */
+export type ConflictResolutionStrategy = "last-writer-wins" | "manual-review" | "merge-strategy" | "contract-gated";
+
+/**
+ * Conflict declaration. Defines how to resolve conflicts when multiple agents edit the same path.
+ */
+export type ConflictDeclaration = {
+  kind: "conflict";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  path: string;
+  agents: string[];
+  resolution: ConflictResolutionStrategy;
+  fallback?: ConflictResolutionStrategy;
+};
+
+/**
+ * All agent-related declarations.
+ */
+export type AgentDeclarationKind = AgentDeclaration | ScopeDeclaration | InterAgentContractDeclaration | ConflictDeclaration;
+
 export type ContractFile = {
   path: string;
   parsed: ParsedFile;
@@ -272,6 +365,10 @@ export type ContractFile = {
   groups: GroupDeclaration[];
   invariants: InvariantDeclaration[];
   codeShapes: CodeShapeDeclaration[];
+  agents: AgentDeclaration[];
+  scopes: ScopeDeclaration[];
+  interAgentContracts: InterAgentContractDeclaration[];
+  conflicts: ConflictDeclaration[];
 };
 
 export type Contract = {
@@ -285,4 +382,8 @@ export type Contract = {
   groups: GroupDeclaration[];
   invariants: InvariantDeclaration[];
   codeShapes: CodeShapeDeclaration[];
+  agents: AgentDeclaration[];
+  scopes: ScopeDeclaration[];
+  interAgentContracts: InterAgentContractDeclaration[];
+  conflicts: ConflictDeclaration[];
 };
