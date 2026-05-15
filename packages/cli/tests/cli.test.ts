@@ -687,6 +687,7 @@ describe("stele CLI", () => {
 
     expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project", {
       diffFrom: "main",
+      format: "human",
       json: true,
       recursive: false,
       reportFile: ".stele/reports/last.json",

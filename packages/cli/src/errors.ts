@@ -11,6 +11,8 @@ export const ExitCode = {
   GENERATION_FAIL: 4,
   /** Configuration error */
   CONFIG_ERROR: 5,
+  /** Score below threshold (quality gate) */
+  SCORE_BELOW_THRESHOLD: 6,
   /** Internal error */
   INTERNAL_ERROR: 99,
 } as const;

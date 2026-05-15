@@ -9,6 +9,7 @@ export type InitOptions = {
   language: string;
   dryRun?: boolean;
   preCommit?: boolean;
+  ci?: "github-actions" | "gitlab-ci";
 };
 
 export const SUPPORTED_LANGUAGES: readonly string[] = Array.from(
@@ -38,6 +39,11 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
 
   if (options.preCommit) {
     await maybeInstallPreCommit(projectDir);
+  }
+
+  if (options.ci) {
+    await writeIfMissing(join(projectDir, ".github", "workflows", "stele.yml"), getCiTemplate(options.ci));
+    process.stdout.write(`[stele] CI template created: .github/workflows/stele.yml\n`);
   }
 
   printInitSummary(projectInfo, config);
@@ -405,12 +411,56 @@ function buildGitignoreContent(): string {
     "contract/manifest.json",
     "contract/baseline.json",
     "contract/.unlock-log.jsonl",
+    "contract/.last-check-report.json",
     "contract/proposals/",
     "",
     "# Generated tests",
     "tests/contract/",
     "",
   ].join("\n");
+}
+
+function getCiTemplate(ci: "github-actions" | "gitlab-ci"): string {
+  if (ci === "gitlab-ci") {
+    return `stele-contracts:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - pip install pytest
+  script:
+    - npx stele generate
+    - npx stele check
+    - python -m pytest tests/contract -q
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+`;
+  }
+  return `name: Stele Contracts
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  stele:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install pytest
+      - run: npx stele generate
+      - run: npx stele check
+      - run: python -m pytest tests/contract -q
+`;
 }
 
 interface BaseProjectInfo {

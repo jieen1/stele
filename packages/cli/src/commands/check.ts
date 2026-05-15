@@ -26,6 +26,7 @@ import { STELE_BASELINE_FILE, STELE_CONFIG_FILE, type SteleConfig } from "../con
 import { loadConfig } from "../config/loadConfig.js";
 import { evaluateCodeShapes } from "../code-shape/evaluate.js";
 import { CliCommandError, ExitCode, getExitCode } from "../errors.js";
+import { validateOutputPath } from "../utils/output-path.js";
 import { writeLastReport } from "../last-report.js";
 import { discoverProjects } from "../recursive-discovery.js";
 import {
@@ -48,6 +49,7 @@ export type CheckSummary = {
 export type CheckCommandOptions = {
   diff?: string | true;
   diffFrom?: string;
+  format?: string;
   json?: boolean;
   reportFile?: string;
   lenient?: boolean;
@@ -391,7 +393,7 @@ export function formatCheckReportJson(report: ViolationReport): string {
 }
 
 export async function writeCheckReportFile(projectDir: string, reportFile: string, report: ViolationReport): Promise<void> {
-  const absoluteReportPath = resolve(projectDir, reportFile);
+  const absoluteReportPath = validateOutputPath(projectDir, reportFile);
   await mkdir(dirname(absoluteReportPath), { recursive: true });
   await writeFile(absoluteReportPath, formatViolationReportJson(report), "utf8");
 }

@@ -16,8 +16,6 @@ import {
 } from "./commands/baseline.js";
 import {
   checkProject,
-  formatCheckReportHuman,
-  formatCheckReportJson,
   isCheckCommandError,
   runCheckRecursive,
   type CheckCommandOptions,
@@ -25,6 +23,7 @@ import {
   type CheckSummary,
   writeCheckReportFile,
 } from "./commands/check.js";
+import { formatCheckReport } from "./report/formatter.js";
 import { runAgentContext, type AgentContextOptions } from "./commands/agentContext.js";
 import { runExplain, type ExplainOptions } from "./commands/explain.js";
 import { runGenerate, runGenerateRecursive, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
@@ -41,8 +40,8 @@ import { runDev, type DevOptions } from "./commands/dev.js";
 import { runDoc, type DocOptions } from "./commands/doc.js";
 import { unlockProject, type UnlockOptions, type UnlockSummary } from "./commands/unlock.js";
 import { getExitCode } from "./errors.js";
-
-const STELE_CLI_VERSION = "0.1.0";
+import { runScore } from "./commands/score.js";
+import { STELE_VERSION } from "./version.js";
 
 type ProgramDependencies = {
   cwd?: () => string;
@@ -85,7 +84,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   program
     .name("stele")
     .description("Contract management for AI-assisted development")
-    .version(STELE_CLI_VERSION)
+    .version(STELE_VERSION)
     .option("--stele-version", "print Stele CLI version")
     .action((options: { steleVersion?: boolean }) => {
       if (options.steleVersion) {
@@ -124,14 +123,18 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .description("Verify contract invariants against generated tests and protected files.")
     .option("--diff [ref]", "only check invariants in contract files that changed since the given git ref (default: HEAD)")
     .option("--diff-from <base>", "limit failures to files changed since the given git base")
-    .option("--json", "emit the check report as JSON")
+    .option("--format <format>", "output format (human|json|sarif)", "human")
+    .option("--json", "deprecated; use --format json")
     .option("--report-file <path>", "write the JSON check report to a file")
     .option("--lenient", "skip code-shape checks (faster)")
     .option("--recursive", "auto-discover stele.config.json files and check each project", false)
     .action(async (options: CheckCommandOptions) => {
+      const fmt = options.json ? "json" : (options.format ?? "human");
+      const isJson = fmt !== "human";
+
       if (options.recursive) {
         try {
-          const result = await runCheckRecursive(cwd(), options, {
+          const result = await runCheckRecursive(cwd(), { ...options, json: isJson }, {
             stdout: (chunk) => process.stdout.write(chunk),
             stderr: (chunk) => process.stderr.write(chunk),
           });
@@ -154,7 +157,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
             await writeCheckReportFile(cwd(), options.reportFile, result.report);
           }
 
-          process.stdout.write(options.json ? formatCheckReportJson(result.report) : formatCheckSummary(result.summary));
+          process.stdout.write(isJson ? formatCheckReport(result.report, fmt) : formatCheckSummary(result.summary));
         }
       } catch (error) {
         if (!isCheckCommandError(error)) {
@@ -165,10 +168,10 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
           await writeCheckReportFile(cwd(), options.reportFile, error.report);
         }
 
-        if (options.json) {
-          process.stdout.write(formatCheckReportJson(error.report));
+        if (isJson) {
+          process.stdout.write(formatCheckReport(error.report, fmt));
         } else {
-          process.stderr.write(formatCheckReportHuman(error.report));
+          process.stderr.write(formatCheckReport(error.report, "human"));
         }
 
         process.exitCode = getExitCode(error) ?? 1;
@@ -320,6 +323,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))
     .option("--dry-run", "show what files would be created without writing")
     .option("--pre-commit", "install Stele hooks into .pre-commit-config.yaml", false)
+    .option("--ci <provider>", "add CI workflow (github-actions|gitlab-ci)")
     .action((options) => init(cwd(), options));
   program
     .command("dev")
@@ -357,6 +361,14 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--output <path>", "output directory")
     .action(async (options: DocOptions) => {
       await runDoc(cwd(), options);
+    });
+  program
+    .command("score")
+    .description("Compute a 0-10 contract health score.")
+    .option("--json", "emit score as JSON")
+    .option("--threshold <n>", "fail with exit code 6 if score is below threshold", parseFloat)
+    .action(async (options: { json?: boolean; threshold?: number }) => {
+      await runScore(cwd(), options);
     });
 
   program
@@ -411,7 +423,7 @@ function formatGenerateSummary(summary: GenerateSummary): string {
 }
 
 function formatVersion(): string {
-  return `${STELE_CLI_VERSION}\n`;
+  return `${STELE_VERSION}\n`;
 }
 
 function isCheckCommandResult(value: CheckCommandResult | void): value is CheckCommandResult {
