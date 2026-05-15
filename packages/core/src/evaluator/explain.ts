@@ -75,7 +75,10 @@ function nodeToTrace(node: AstNode): ExplainTrace | undefined {
     (item): item is ListNode => item.kind === "list" && item.head === "explain" && item.items[0]?.kind === "string",
   );
   if (explainNode !== undefined) {
-    explanation = explainNode.items[0]!.value;
+    const valNode = explainNode.items[0];
+    if (valNode?.kind === "string") {
+      explanation = valNode.value;
+    }
   }
 
   const children: ExplainTrace[] = [];
@@ -92,13 +95,9 @@ function nodeToTrace(node: AstNode): ExplainTrace | undefined {
   const result: ExplainTrace = {
     expression: astToString(node),
     evaluated: null,
+    ...(explanation !== undefined ? { explanation } : {}),
+    ...(children.length > 0 ? { children } : {}),
   };
-  if (explanation !== undefined) {
-    result.explanation = explanation;
-  }
-  if (children.length > 0) {
-    result.children = children;
-  }
   return result;
 }
 
