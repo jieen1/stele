@@ -42,8 +42,12 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
   }
 
   if (options.ci) {
-    await writeIfMissing(join(projectDir, ".github", "workflows", "stele.yml"), getCiTemplate(options.ci));
-    process.stdout.write(`[stele] CI template created: .github/workflows/stele.yml\n`);
+    const ciPath = options.ci === "gitlab-ci"
+      ? join(projectDir, ".gitlab-ci.yml")
+      : join(projectDir, ".github", "workflows", "stele.yml");
+    await writeIfMissing(ciPath, getCiTemplate(options.ci));
+    const ciRel = options.ci === "gitlab-ci" ? ".gitlab-ci.yml" : ".github/workflows/stele.yml";
+    process.stdout.write(`[stele] CI template created: ${ciRel}\n`);
   }
 
   printInitSummary(projectInfo, config);

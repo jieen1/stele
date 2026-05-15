@@ -178,11 +178,16 @@ export interface ScoreOptions {
 export async function runScore(projectDir: string, options: ScoreOptions = {}): Promise<ScoreResult | void> {
   const resolved = resolve(projectDir);
   const config = await loadConfig(resolved);
-  const contract = await loadContract(resolve(resolved, config.entry));
+  let contract: Awaited<ReturnType<typeof loadContract>> | null = null;
+  try {
+    contract = await loadContract(resolve(resolved, config.entry));
+  } catch {
+    // Contract not available — score will show "no data"
+  }
 
   const ctx: EvalContext = {
     projectDir: resolved,
-    invariantCount: contract.invariants.length,
+    invariantCount: contract?.invariants.length ?? 0,
     protectedPatterns: config.protected.length,
     lastCheckReport: readLastCheckReport(resolved),
     baselineMtimeMs: getBaselineMtime(resolved),
