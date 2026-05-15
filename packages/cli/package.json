@@ -44,6 +44,7 @@
     "@stele/backend-rust": "workspace:*",
     "@stele/backend-typescript": "workspace:*",
     "@stele/core": "workspace:*",
+    "@stele/mcp-server": "workspace:*",
     "commander": "^12.1.0",
     "glob-parent": "^6.0.2",
     "js-yaml": "4.1.0",

@@ -1,0 +1,248 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import type { McpResult } from "../types.js";
+import { loadProjectState, listContractFiles } from "../contract-cache.js";
+
+const DEFAULT_PROJECT_DIR = process.cwd();
+
+/**
+ * MCP tool: stele-context
+ *
+ * Generate contract context for agent sessions.
+ * Returns a structured summary of project invariants, severity levels,
+ * and protected paths that an AI agent should respect.
+ */
+export function createContextTool(): {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  handler: (args: Record<string, unknown>) => McpResult;
+} {
+  return {
+    name: "stele-context",
+    description:
+      "Generate contract context for AI agent sessions. Returns structured summary of invariants, severity levels, and protected paths.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectDir: {
+          type: "string",
+          description: "Path to the project directory",
+        },
+        focusPaths: {
+          type: "array",
+          items: { type: "string" },
+          description: "Focus context on specific file paths",
+        },
+        format: {
+          type: "string",
+          enum: ["markdown", "json"],
+          description: "Output format (default: markdown)",
+        },
+      },
+      required: [],
+    },
+    handler: async (args: Record<string, unknown>): Promise<McpResult> => {
+      const projectDir = resolve(args.projectDir as string ?? DEFAULT_PROJECT_DIR);
+      const focusPaths = args.focusPaths as string[] ?? [];
+      const format = (args.format as string) ?? "markdown";
+      const context = buildContext(projectDir, focusPaths);
+
+      if (format === "json") {
+        return {
+          content: [{ type: "text", text: JSON.stringify(context, null, 2) }],
+          isError: false,
+        };
+      }
+
+      return {
+        content: [{ type: "text", text: formatMarkdown(context) }],
+        isError: false,
+      };
+    },
+  };
+}
+
+interface Context {
+  projectDir: string;
+  hasConfig: boolean;
+  hasContracts: boolean;
+  invariants: Array<{
+    id: string;
+    severity: string;
+    description: string;
+  }>;
+  checkers: Array<{
+    id: string;
+    description: string;
+  }>;
+  protectedPatterns: string[];
+  invariantCount: number;
+  checkerCount: number;
+}
+
+function buildContext(projectDir: string, focusPaths: string[]): Context {
+  const contractDir = join(projectDir, "contract");
+  const context: Context = {
+    projectDir,
+    hasConfig: false,
+    hasContracts: false,
+    invariants: [],
+    checkers: [],
+    protectedPatterns: [],
+    invariantCount: 0,
+    checkerCount: 0,
+  };
+
+  try {
+    const configFile = join(projectDir, "stele.config.json");
+    context.hasConfig = existsSync(configFile);
+
+    if (context.hasConfig) {
+      try {
+        const config = JSON.parse(readFileSync(configFile, "utf8"));
+        if (config?.protected && Array.isArray(config.protected)) {
+          context.protectedPatterns = config.protected;
+        } else {
+          context.protectedPatterns = [
+            "contract/**/*.stele",
+            "contract/checker_impls/**/*",
+            "contract/.manifest.json",
+            "tests/contract/**/*",
+          ];
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    context.hasContracts = existsSync(contractDir);
+
+    if (context.hasContracts) {
+      const files = listContractFiles(contractDir);
+
+      for (const file of files) {
+        try {
+          const content = readFileSync(file.path, "utf8");
+          const parsed = parseContract(content);
+
+          for (const invariant of parsed.invariants) {
+            if (focusPaths.length === 0 || invariant.description.some((p) => focusPaths.includes(p))) {
+              context.invariants.push(invariant);
+            }
+          }
+
+          context.checkers.push(...parsed.checkers);
+        } catch {
+          // Skip files that fail to parse
+        }
+      }
+    }
+
+    context.invariantCount = context.invariants.length;
+    context.checkerCount = context.checkers.length;
+  } catch (err) {
+    context.error = err instanceof Error ? err.message : String(err);
+  }
+
+  return context;
+}
+
+function parseContract(content: string): {
+  invariants: Array<{
+    id: string;
+    severity: string;
+    description: string[];
+  }>;
+  checkers: Array<{
+    id: string;
+    description: string[];
+  }>;
+} {
+  const invariants: Array<{
+    id: string;
+    severity: string;
+    description: string[];
+  }> = [];
+  const checkers: Array<{
+    id: string;
+    description: string[];
+  }> = [];
+
+  // Parse (invariant NAME ...) blocks
+  const invariantRegex = /\(invariant\s+([A-Z_]+)\s*\n?([\s\S]*?)\)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = invariantRegex.exec(content))) {
+    const id = match[1];
+    const body = match[2] ?? "";
+    const severityMatch = /\(severity\s+(error|warning|info)\)/.exec(body);
+    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
+
+    invariants.push({
+      id,
+      severity: severityMatch?.[1] ?? "error",
+      description: descMatch?.[1] ?? "",
+    });
+  }
+
+  // Parse (checker NAME ...) blocks
+  const checkerRegex = /\(checker\s+([a-zA-Z0-9_-]+)\s*\n?([\s\S]*?)\)/g;
+  while ((match = checkerRegex.exec(content))) {
+    const id = match[1];
+    const body = match[2] ?? "";
+    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
+
+    checkers.push({
+      id,
+      description: descMatch?.[1] ?? "",
+    });
+  }
+
+  return { invariants, checkers };
+}
+
+function formatMarkdown(context: Context): string {
+  const lines: string[] = [];
+
+  lines.push(`# Stele Contract Context`);
+  lines.push(``);
+  lines.push(`**Project:** ${context.projectDir}`);
+  lines.push(`**Config:** ${context.hasConfig ? "Yes" : "No"}`);
+  lines.push(`**Contracts:** ${context.hasContracts ? "Yes" : "No"}`);
+  lines.push(`**Invariants:** ${context.invariantCount}`);
+  lines.push(`**Checkers:** ${context.checkerCount}`);
+  lines.push(``);
+
+  if (context.invariantCount > 0) {
+    lines.push(`## Invariants`);
+    lines.push(``);
+
+    for (const inv of context.invariants) {
+      lines.push(`### ${inv.id}`);
+      lines.push(`- **Severity:** ${inv.severity}`);
+      lines.push(`- **Description:** ${inv.description}`);
+      lines.push(``);
+    }
+  }
+
+  if (context.checkerCount > 0) {
+    lines.push(`## Checkers`);
+    lines.push(``);
+
+    for (const checker of context.checkers) {
+      lines.push(`### ${checker.id}`);
+      lines.push(`- **Description:** ${checker.description}`);
+      lines.push(``);
+    }
+  }
+
+  lines.push(`## Protected Patterns`);
+  lines.push(``);
+
+  for (const pattern of context.protectedPatterns) {
+    lines.push(`- \`${pattern}\``);
+  }
+
+  return lines.join("\n");
+}
