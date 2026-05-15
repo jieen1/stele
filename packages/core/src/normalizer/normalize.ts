@@ -77,7 +77,6 @@ function renderInvariant(invariant: InvariantDeclaration, indent = 0): string {
     renderSingleValueField(invariant.since, indent + 1),
     renderSingleValueField(invariant.appliesTo, indent + 1),
     renderSingleValueField(invariant.explain, indent + 1),
-    renderSingleValueField(invariant.explain, indent + 1),
   ].filter((item): item is string => item !== undefined);
 
   return wrapBlock(`(invariant ${invariant.id}`, items, indent);

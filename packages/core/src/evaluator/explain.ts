@@ -13,7 +13,7 @@ function astToString(node: AstNode): string {
     case "identifier":
       return node.value;
     case "keyword":
-      return `:${node.value}`;
+      return node.value.startsWith(":") ? node.value : `:${node.value}`;
     case "string":
       return node.value;
     case "number":
@@ -37,12 +37,6 @@ function astToString(node: AstNode): string {
  * actual runtime results.
  */
 export function buildInvariantTrace(invariant: InvariantDeclaration, evaluated: boolean | null): ExplainTrace {
-  const root: ExplainTrace = {
-    expression: `(invariant ${invariant.id})`,
-    evaluated,
-    explanation: invariantExplanation(invariant),
-  };
-
   const children: ExplainTrace[] = [];
 
   if (invariant.assertExpression !== undefined) {
@@ -59,11 +53,12 @@ export function buildInvariantTrace(invariant: InvariantDeclaration, evaluated: 
     }
   }
 
-  if (children.length > 0) {
-    root.children = children;
-  }
-
-  return root;
+  return {
+    expression: `(invariant ${invariant.id})`,
+    evaluated,
+    explanation: invariantExplanation(invariant),
+    ...(children.length > 0 ? { children } : {}),
+  };
 }
 
 /**
@@ -79,8 +74,8 @@ function nodeToTrace(node: AstNode): ExplainTrace | undefined {
   const explainNode = node.items.find(
     (item): item is ListNode => item.kind === "list" && item.head === "explain" && item.items[0]?.kind === "string",
   );
-  if (explainNode?.items[0]?.kind === "string") {
-    explanation = explainNode.items[0].value;
+  if (explainNode !== undefined) {
+    explanation = explainNode.items[0]!.value;
   }
 
   const children: ExplainTrace[] = [];
@@ -124,7 +119,7 @@ export function formatExplainTrace(trace: ExplainTrace, depth = 0): string[] {
       ? "false"
       : "?";
 
-  lines.push(`${prefix}${trace.expression} — ${status}`);
+  lines.push(`${prefix}${trace.expression} - ${status}`);
 
   if (trace.explanation !== undefined) {
     lines.push(`${prefix}  why: ${trace.explanation}`);
