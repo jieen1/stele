@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { McpResult } from "../types.js";
-import { loadContractFiles, listContractFiles } from "../contract-cache.js";
+import { loadContractFiles, listContractFiles, parseContract } from "../contract-cache.js";
 import { validateProjectDir } from "../path-validation.js";
 
 /**
@@ -86,7 +86,7 @@ async function buildContractsResult(
     const parsedContracts: Array<Record<string, unknown>> = [];
 
     for (const contract of contracts) {
-      const parsed = parseContractContract(contract.content);
+      const parsed = parseContract(contract.content);
       parsedContracts.push({
         file: contract.path,
         size: statSync(contract.path).size,
@@ -104,44 +104,4 @@ async function buildContractsResult(
   }
 
   return result;
-}
-
-function parseContractContract(content: string): {
-  invariants: Array<{ id: string; severity: string; description: string }>;
-  checkers: Array<{ id: string; description: string }>;
-} {
-  const invariants: Array<{ id: string; severity: string; description: string }> = [];
-  const checkers: Array<{ id: string; description: string }> = [];
-
-  // Parse (invariant NAME ...) blocks
-  const invariantRegex = /\(invariant\s+([A-Z_]+)\s*\n?([\s\S]*?)\)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = invariantRegex.exec(content))) {
-    const id = match[1];
-    const body = match[2] ?? "";
-    const severityMatch = /\(severity\s+(error|warning|info)\)/.exec(body);
-    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
-
-    invariants.push({
-      id,
-      severity: severityMatch?.[1] ?? "error",
-      description: descMatch?.[1] ?? "",
-    });
-  }
-
-  // Parse (checker NAME ...) blocks
-  const checkerRegex = /\(checker\s+([a-zA-Z0-9_-]+)\s*\n?([\s\S]*?)\)/g;
-  while ((match = checkerRegex.exec(content))) {
-    const id = match[1];
-    const body = match[2] ?? "";
-    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
-
-    checkers.push({
-      id,
-      description: descMatch?.[1] ?? "",
-    });
-  }
-
-  return { invariants, checkers };
 }

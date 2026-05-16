@@ -22,7 +22,7 @@ export {
   listContractFiles,
   getProtectedPatterns,
   isSteleProject,
-  clearWatchers,
+  parseContract,
   invalidateCache,
   getCachedState,
   setCachedState,

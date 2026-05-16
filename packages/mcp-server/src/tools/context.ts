@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { McpResult } from "../types.js";
-import { loadProjectState, listContractFiles } from "../contract-cache.js";
+import { parseContract, listContractFiles } from "../contract-cache.js";
 import { validateProjectDir } from "../path-validation.js";
 
 /**
@@ -169,60 +169,6 @@ function buildContext(projectDir: string, focusPaths: string[]): Context {
   }
 
   return context;
-}
-
-function parseContract(content: string): {
-  invariants: Array<{
-    id: string;
-    severity: string;
-    description: string;
-  }>;
-  checkers: Array<{
-    id: string;
-    description: string;
-  }>;
-} {
-  const invariants: Array<{
-    id: string;
-    severity: string;
-    description: string;
-  }> = [];
-  const checkers: Array<{
-    id: string;
-    description: string;
-  }> = [];
-
-  // Parse (invariant NAME ...) blocks
-  const invariantRegex = /\(invariant\s+([A-Z_]+)\s*\n?([\s\S]*?)\)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = invariantRegex.exec(content))) {
-    const id = match[1];
-    const body = match[2] ?? "";
-    const severityMatch = /\(severity\s+(error|warning|info)\)/.exec(body);
-    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
-
-    invariants.push({
-      id,
-      severity: severityMatch?.[1] ?? "error",
-      description: descMatch?.[1] ?? "",
-    });
-  }
-
-  // Parse (checker NAME ...) blocks
-  const checkerRegex = /\(checker\s+([a-zA-Z0-9_-]+)\s*\n?([\s\S]*?)\)/g;
-  while ((match = checkerRegex.exec(content))) {
-    const id = match[1];
-    const body = match[2] ?? "";
-    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
-
-    checkers.push({
-      id,
-      description: descMatch?.[1] ?? "",
-    });
-  }
-
-  return { invariants, checkers };
 }
 
 function formatMarkdown(context: Context): string {

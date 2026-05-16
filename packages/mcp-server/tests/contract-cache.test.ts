@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   scanSteleFiles,
   listContractFiles,
@@ -8,13 +8,9 @@ import {
   setCachedState,
   invalidateCache,
   getProtectedPatterns,
-  clearWatchers,
 } from "../src/contract-cache.js";
 
-describe("contract-cache", () => {
-  beforeEach(() => {
-    clearWatchers();
-  });
+describe("contract-cache", () => {;
 
   describe("scanSteleFiles", () => {
     it("returns empty array for non-existent directory", () => {

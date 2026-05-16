@@ -6,14 +6,6 @@ const CONTRACT_DIR = "contract";
 const CONFIG_FILE = "stele.config.json";
 
 /**
- * Invalidate all watchers (no-op: watchers were removed in favor of TTL-based caching).
- * Kept for backward compatibility.
- */
-export function clearWatchers(): void {
-  // No-op: watcher infrastructure removed
-}
-
-/**
  * Cache of project states keyed by projectDir.
  */
 const projectCache = new Map<string, ProjectState>();
@@ -195,11 +187,57 @@ export function getProtectedPatterns(projectDir: string): string[] {
   ];
 }
 
+export interface ParsedInvariant {
+  id: string;
+  severity: string;
+  description: string;
+}
+
+export interface ParsedChecker {
+  id: string;
+  description: string;
+}
+
+export interface ParsedContract {
+  invariants: ParsedInvariant[];
+  checkers: ParsedChecker[];
+}
+
 /**
- * Watch contract directory for changes and invalidate cache.
- * Deprecated: removed in favor of TTL-based caching. This function is a no-op.
- * Kept for backward compatibility.
+ * Parse Stele contract content into invariants and checkers.
+ * Uses regex extraction — not a full CDL parser.
  */
-export function watchContractDir(_contractDir: string, _projectDir: string): void {
-  // No-op: watcher infrastructure removed
+export function parseContract(content: string): ParsedContract {
+  const invariants: ParsedInvariant[] = [];
+  const checkers: ParsedChecker[] = [];
+
+  const invariantRegex = /\(invariant\s+([A-Z_]+)\s*\n?([\s\S]*?)\)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = invariantRegex.exec(content))) {
+    const id = match[1];
+    const body = match[2] ?? "";
+    const severityMatch = /\(severity\s+(error|warning|info)\)/.exec(body);
+    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
+
+    invariants.push({
+      id,
+      severity: severityMatch?.[1] ?? "error",
+      description: descMatch?.[1] ?? "",
+    });
+  }
+
+  const checkerRegex = /\(checker\s+([a-zA-Z0-9_-]+)\s*\n?([\s\S]*?)\)/g;
+  while ((match = checkerRegex.exec(content))) {
+    const id = match[1];
+    const body = match[2] ?? "";
+    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
+
+    checkers.push({
+      id,
+      description: descMatch?.[1] ?? "",
+    });
+  }
+
+  return { invariants, checkers };
 }
