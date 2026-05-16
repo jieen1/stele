@@ -99,8 +99,8 @@ function readProtectedConfig(value) {
       throw new Error(`invalid protected config: protected patterns must be project-relative and must not contain '..': ${pattern}`);
     }
 
-    if (pattern.includes("[") || pattern.includes("]")) {
-      throw new Error(`unsupported glob pattern in protected config: bracket syntax is not supported: ${pattern}`);
+    if (pattern.split("[").length > 3) {
+      throw new Error(`unsupported glob pattern in protected config: deeply nested bracket syntax is not supported: ${pattern}`);
     }
   }
 
