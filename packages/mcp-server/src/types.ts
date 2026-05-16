@@ -27,6 +27,21 @@ export interface ViolationReportSummary {
 }
 
 /**
+ * Convert core's ViolationReportSummary (snake_case) to our camelCase version.
+ */
+export function toReportSummary(summary: import("@stele/core").ViolationReportSummary): ViolationReportSummary {
+  return {
+    invariantCount: summary.invariant_count ?? 0,
+    generatedFileCount: summary.generated_file_count ?? 0,
+    protectedFileCount: summary.protected_file_count ?? 0,
+    violationCount: summary.violation_count ?? 0,
+    activeViolationCount: summary.active_violation_count,
+    suppressedViolationCount: summary.suppressed_violation_count,
+    outOfScopeViolationCount: summary.out_of_scope_violation_count,
+  };
+}
+
+/**
  * Response for the validate-edit tool.
  */
 export interface ValidateEditResult {

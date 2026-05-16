@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import type { ViolationReport } from "@stele/core";
 import type { CheckResult, McpResult } from "../types.js";
+import { toReportSummary } from "../types.js";
 import { validateProjectDir } from "../path-validation.js";
 import { getSessionState, readMaterialObservations } from "../session-state.js";
 import { loadProjectState } from "../contract-cache.js";
@@ -73,7 +74,7 @@ export function createCheckSessionTool(): {
           ok: report.ok,
           report,
           violations: report.violations ?? [],
-          summary: report.summary ?? {},
+          summary: toReportSummary(report.summary),
         });
 
         // Check if maintenance review is needed

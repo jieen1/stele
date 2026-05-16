@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import type { ViolationReport } from "@stele/core";
 import type { CheckResult, McpResult } from "../types.js";
+import { toReportSummary } from "../types.js";
 import type { SessionState } from "../session-state.js";
 import { validateProjectDir } from "../path-validation.js";
 
@@ -69,7 +70,7 @@ export function createCheckTool(): {
           ok: report.ok,
           report,
           violations: report.violations ?? [],
-          summary: report.summary ?? {},
+          summary: toReportSummary(report.summary),
         });
 
         if (json) {
