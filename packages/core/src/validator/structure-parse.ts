@@ -182,6 +182,12 @@ function isPathWithin(candidate: string, directory: string): boolean {
   if (candidate === directory) {
     return true;
   }
+  // Case-insensitive on Windows (case-insensitive FS)
+  if (process.platform === "win32") {
+    const c = candidate.toLowerCase();
+    const d = directory.toLowerCase();
+    return c.startsWith(d + path.sep);
+  }
   return candidate.startsWith(directory + path.sep);
 }
 

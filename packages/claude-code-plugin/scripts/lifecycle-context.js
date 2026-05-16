@@ -184,19 +184,14 @@ function spawnCommand(commandPath, args, cwd) {
     CLAUDE_PROJECT_DIR: cwd,
   };
 
-  if (process.platform === "win32" && !["git"].includes(commandPath)) {
-    const command = [`"${commandPath}"`, ...args.map(quoteWindowsShellArg)].join(" ");
-    return spawn(command, {
-      cwd,
-      env,
-      shell: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  }
-
+  // Use shell: false on all platforms. On Windows, spawn with shell: false
+  // correctly resolves the executable via PATHEXT, avoiding cmd.exe metacharacter
+  // injection vectors (%VAR%, !, ^, backtick, etc.) present in the old
+  // shell: true + quoteWindowsShellArg() pattern (CVE-style command injection).
   return spawn(commandPath, args, {
     cwd,
     env,
+    shell: false,
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
@@ -234,14 +229,6 @@ async function runCommand({ commandPath, args, cwd }) {
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
-}
-
-function quoteWindowsShellArg(value) {
-  if (!/[\s"]/u.test(value)) {
-    return value;
-  }
-
-  return `"${value.replaceAll('"', '\\"')}"`;
 }
 
 function normalizeLineEndings(value) {

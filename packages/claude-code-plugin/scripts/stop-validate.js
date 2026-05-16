@@ -109,29 +109,16 @@ function spawnCommand(commandPath, args, cwd) {
     CLAUDE_PROJECT_DIR: cwd,
   };
 
-  if (process.platform === "win32") {
-    const command = [quoteWindowsShellArg(commandPath), ...args.map(quoteWindowsShellArg)].join(" ");
-    return spawn(command, {
-      cwd,
-      env,
-      shell: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  }
-
+  // Use shell: false on all platforms. On Windows, spawn with shell: false
+  // correctly resolves the executable via PATHEXT, avoiding cmd.exe metacharacter
+  // injection vectors (%VAR%, !, ^, backtick, etc.) present in the old
+  // shell: true + quoteWindowsShellArg() pattern (CVE-style command injection).
   return spawn(commandPath, args, {
     cwd,
     env,
+    shell: false,
     stdio: ["ignore", "pipe", "pipe"],
   });
-}
-
-function quoteWindowsShellArg(value) {
-  if (!/[\s"]/u.test(value)) {
-    return value;
-  }
-
-  return `"${value.replaceAll('"', '\\"')}"`;
 }
 
 async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = true, blockOnSpawnError = true }) {

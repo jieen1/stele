@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFile, mkdir, appendFile } from "node:fs/promises";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { renameSync } from "node:fs";
 import path from "node:path";
 import { minimatch } from "minimatch";
 import { extractPathsFromValue } from "./path-utils.js";
@@ -45,7 +46,25 @@ try {
 
   const observationPath = path.join(projectDir, ".stele", "agent", "session-observations.jsonl");
   await mkdir(path.dirname(observationPath), { recursive: true });
-  await appendFile(observationPath, `${JSON.stringify(observation)}\n`, "utf8");
+  // Atomic append: read → append → write temp → rename.
+  // Prevents concurrent hook invocations from interleaving mid-line.
+  const content = `${JSON.stringify(observation)}\n`;
+  let existing = "";
+  try {
+    existing = await readFile(observationPath, "utf8");
+  } catch (error) {
+    // File may not exist on first write
+  }
+  const tmpPath = `${observationPath}.tmp.${process.pid}`;
+  await writeFile(tmpPath, existing + content, "utf8");
+  try {
+    // rename is atomic on POSIX. On Windows, rename is atomic only when
+    // source and target are on the same volume (same dir = same volume here).
+    await renameSync(tmpPath, observationPath);
+  } catch {
+    // Best-effort cleanup: unlink temp on failure
+    try { await readFile(tmpPath); } catch { /* no-op */ }
+  }
 } catch {
   process.exit(0);
 }
