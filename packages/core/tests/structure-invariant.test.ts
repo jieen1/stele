@@ -230,7 +230,7 @@ describe("parseInvariantDeclaration", () => {
       throw new Error("expected SteleError");
     } catch (err) {
       expect(err).toMatchObject({ code: "E0305" });
-      expect((err as SteleError).message).toContain("may only be declared once");
+      expect((err as SteleError).message).toContain("may declare");
     }
   });
 

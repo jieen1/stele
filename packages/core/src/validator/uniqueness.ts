@@ -1,5 +1,5 @@
 import { SteleError } from "../errors/SteleError.js";
-import type { Contract } from "./structure.js";
+import type { Contract } from "./structure-types.js";
 
 export function validateUniqueness(contract: Contract): Contract {
   validateDuplicateIds(

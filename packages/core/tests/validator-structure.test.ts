@@ -185,7 +185,7 @@ describe("invariant validation", () => {
 
     await expectSteleError(getLoadContract()(project.rootPath), {
       code: "E0305",
-      messageIncludes: "may only be declared once",
+      messageIncludes: "may declare",
     });
   });
 });

@@ -19,10 +19,10 @@ export async function loadContract(rootPath: string): Promise<Contract> {
 }
 
 export function validateContract(contract: Contract): Contract {
-  validateUniqueness(contract);
-  validateReferences(contract);
-  validateTypes(contract);
-  return contract;
+  let validated = validateUniqueness(contract);
+  validated = validateReferences(validated);
+  validateTypes(validated);
+  return validated;
 }
 
 async function loadRecursive(

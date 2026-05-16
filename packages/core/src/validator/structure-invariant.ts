@@ -1,5 +1,5 @@
 import type { AstNode, ListNode } from "../ast/types.js";
-import { readSingleExpression, readSingleString as sharedReadSingleString } from "./structure-shared.js";
+import { readSingleExpression, readSingleString as sharedReadSingleString, ensureFieldUnset } from "./structure-shared.js";
 import { ALLOWED_INVARIANT_FIELDS } from "./structure-types.js";
 
 // Re-export for backward compatibility (tests)
@@ -66,19 +66,19 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
 
     switch (field.head) {
       case "severity":
-        ensureInvariantFieldUnset(severity, field, `Invariant "${idNode.value}" severity`);
+        ensureFieldUnset(severity, "severity", `Invariant "${idNode.value}" severity`, "E0305", field.span);
         severity = readSingleText(field, `Invariant "${idNode.value}" severity`);
         break;
       case "description":
-        ensureInvariantFieldUnset(description, field, `Invariant "${idNode.value}" description`);
-        description = readSingleString(field, `Invariant "${idNode.value}" description`);
+        ensureFieldUnset(description, "description", `Invariant "${idNode.value}" description`, "E0305", field.span);
+        description = readStringLiteral(field, `Invariant "${idNode.value}" description`);
         break;
       case "assert":
-        ensureInvariantFieldUnset(assertExpression, field, `Invariant "${idNode.value}" assert`);
+        ensureFieldUnset(assertExpression, "assert", `Invariant "${idNode.value}" assert`, "E0305", field.span);
         assertExpression = readSingleExpression(field, `Invariant "${idNode.value}" assert`, "E0305");
         break;
       case "uses-checker": {
-        ensureInvariantFieldUnset(usesChecker, field, `Invariant "${idNode.value}" uses-checker`);
+        ensureFieldUnset(usesChecker, "uses-checker", `Invariant "${idNode.value}" uses-checker`, "E0305", field.span);
         const checkerIdNode = field.items[0];
 
         if (checkerIdNode?.kind !== "identifier") {
@@ -100,7 +100,7 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
         break;
       }
       case "uses-scenario": {
-        ensureInvariantFieldUnset(usesScenario, field, `Invariant "${idNode.value}" uses-scenario`);
+        ensureFieldUnset(usesScenario, "uses-scenario", `Invariant "${idNode.value}" uses-scenario`, "E0305", field.span);
         const scenarioIdNode = field.items[0];
 
         if (scenarioIdNode?.kind !== "identifier") {
@@ -131,11 +131,11 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
         break;
       }
       case "when":
-        ensureInvariantFieldUnset(whenExpression, field, `Invariant "${idNode.value}" when`);
+        ensureFieldUnset(whenExpression, "when", `Invariant "${idNode.value}" when`, "E0305", field.span);
         whenExpression = readSingleExpression(field, `Invariant "${idNode.value}" when`, "E0305");
         break;
       case "depends-on":
-        ensureInvariantFieldUnset(dependsOn.length === 0 ? undefined : dependsOn, field, `Invariant "${idNode.value}" depends-on`);
+        ensureFieldUnset(dependsOn.length === 0 ? undefined : dependsOn, "depends-on", `Invariant "${idNode.value}" depends-on`, "E0305", field.span);
         dependsOn = field.items.map((item) => {
           if (item.kind !== "identifier") {
             throw validationError(
@@ -151,31 +151,31 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
         });
         break;
       case "category":
-        ensureInvariantFieldUnset(category, field, `Invariant "${idNode.value}" category`);
+        ensureFieldUnset(category, "category", `Invariant "${idNode.value}" category`, "E0305", field.span);
         category = readSingleValueField(field, "category");
         break;
       case "tags":
-        ensureInvariantFieldUnset(tags, field, `Invariant "${idNode.value}" tags`);
+        ensureFieldUnset(tags, "tags", `Invariant "${idNode.value}" tags`, "E0305", field.span);
         tags = readMultiValueField(field, "tags");
         break;
       case "tolerance":
-        ensureInvariantFieldUnset(tolerance, field, `Invariant "${idNode.value}" tolerance`);
+        ensureFieldUnset(tolerance, "tolerance", `Invariant "${idNode.value}" tolerance`, "E0305", field.span);
         tolerance = readSingleValueField(field, "tolerance");
         break;
       case "rationale":
-        ensureInvariantFieldUnset(rationale, field, `Invariant "${idNode.value}" rationale`);
+        ensureFieldUnset(rationale, "rationale", `Invariant "${idNode.value}" rationale`, "E0305", field.span);
         rationale = readSingleValueField(field, "rationale");
         break;
       case "since":
-        ensureInvariantFieldUnset(since, field, `Invariant "${idNode.value}" since`);
+        ensureFieldUnset(since, "since", `Invariant "${idNode.value}" since`, "E0305", field.span);
         since = readSingleValueField(field, "since");
         break;
       case "applies-to":
-        ensureInvariantFieldUnset(appliesTo, field, `Invariant "${idNode.value}" applies-to`);
+        ensureFieldUnset(appliesTo, "applies-to", `Invariant "${idNode.value}" applies-to`, "E0305", field.span);
         appliesTo = readSingleValueField(field, "applies-to");
         break;
       case "explain":
-        ensureInvariantFieldUnset(explain, field, `Invariant "${idNode.value}" explain`);
+        ensureFieldUnset(explain, "explain", `Invariant "${idNode.value}" explain`, "E0305", field.span);
         explain = readSingleValueField(field, "explain");
         break;
     }
@@ -237,7 +237,7 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
 
 // -- helpers --
 
-function readSingleString(node: ListNode, label: string): string {
+function readStringLiteral(node: ListNode, label: string): string {
   const item = readSingleExpression(node, label, "E0305");
 
   if (item.kind !== "string") {
@@ -297,16 +297,4 @@ function readMultiValueField(node: ListNode, name: "tags"): InvariantMultiValueF
     span: node.span,
     valueNodes: [...node.items],
   };
-}
-
-function ensureInvariantFieldUnset(value: unknown, field: ListNode, label: string): void {
-  if (value !== undefined) {
-    throw validationError(
-      "E0305",
-      `${label} may only be declared once.`,
-      field.span,
-      "This field already appeared earlier in the same invariant or group.",
-      "Merge the values into one field.",
-    );
-  }
 }

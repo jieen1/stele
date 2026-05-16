@@ -174,8 +174,7 @@ export function validateReferences(contract: Contract): Contract {
     validateAgentPath(conflict.path, conflict.span, `Conflict declaration for "${conflict.path}"`);
   }
 
-  contract.warnings = warnings;
-  return contract;
+  return { ...contract, warnings };
 }
 
 function validateAgentPath(path: string, span: SourceSpan, label: string): void {
