@@ -3,15 +3,6 @@ import {
   type ListNode,
 } from "@stele/core";
 
-export const PYTEST_PACKAGE_INIT_PATH = "tests/contract/__init__.py";
-export const PYTEST_TEST_PATH = "tests/contract/test_contract.py";
-export const PYTEST_CODE_SHAPE_PATH = "tests/contract/test_code_shape.py";
-
-export type GeneratedPytestFile = {
-  path: string;
-  content: string;
-};
-
 export type PythonExpressionTranslator = (node: AstNode, context?: TranslationContext) => string;
 
 export type PythonOperatorHandler = (
