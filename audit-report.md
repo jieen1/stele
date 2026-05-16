@@ -192,13 +192,12 @@ The Stele core codebase has solid architecture and clean TypeScript patterns. Al
 - **Mitigation:** Contract files are read-only protected by agent hooks. Symlink attack requires filesystem-level write access to the contract directory, which is blocked by the protection model.
 - **Recommendation:** Acceptable risk level. Future improvement: add `realpath()` check in `loadRecursive` with proper containment boundaries.
 
-#### [MEDIUM-9] Duplicated Shared Helpers (CONFIRMED — Stencils Created)
+#### [MEDIUM-9] ✅ Duplicated Shared Helpers (FIXED — `5fc2691`)
 
 - **Agent:** Code Structure
-- **Location:** `readSingleExpression` ×4 (`structure-invariant.ts`, `structure-parse.ts`, `structure-scenario.ts`, `structure-code-shape.ts`); `ensureFieldUnset` ×4; `isPlainRecord` ×3 (`baseline/io.ts`, `manifest/manifest.ts`, `manifest/hash-manifest.ts`)
-- **Stencils:** `util/types.ts` (shared `isPlainRecord`), `validator/structure-shared.ts` (shared `readSingleExpression`, `ensureFieldUnset`)
-- **Impact:** Code duplication, maintenance burden.
-- **Recommendation:** Adopt shared helpers in dedicated refactoring sprint.
+- **Location:** `readSingleExpression` ×4 (`structure-invariant.ts`, `structure-parse.ts`, `structure-scenario.ts`, `structure-code-shape.ts`); `ensureFieldUnset` ×2 (`structure-agent.ts`, `structure-scenario.ts`); `isPlainRecord` ×3 (`baseline/io.ts`, `manifest/manifest.ts`, `manifest/hash-manifest.ts`)
+- **Fix:** All local copies replaced with imports from shared `util/types.ts` (`isPlainRecord`) and `validator/structure-shared.ts` (`readSingleExpression`, `ensureFieldUnset`). Error messages for `ensureFieldUnset` improved to include field name. 7 test expectations updated.
+- **Tests:** 1084 passing, 0 regressions.
 
 #### [MEDIUM-10] God Modules (CONFIRMED)
 
@@ -226,12 +225,11 @@ The Stele core codebase has solid architecture and clean TypeScript patterns. Al
 
 1. **[HIGH] Split large validator files** — `structure-agent.ts` (502 lines), `structure-code-shape.ts` (524 lines). Effort: 3-4 hours.
 2. **[HIGH] Create error code registry** — Central `error-codes.ts` with documentation. Effort: 1 hour.
-3. **[HIGH] Extract shared helpers** — Adopt `isPlainRecord` from `util/types.ts` (3 copies), `readSingleExpression`/`ensureFieldUnset` from `validator/structure-shared.ts` (4 copies). Effort: 2 hours.
-4. **[MEDIUM] Adopt shared test helpers** — Consolidate `createTempProject()`, `getLoadContract()` patterns. Effort: 1 hour.
-5. **[MEDIUM] Add `readStringList()` identifier test** — Dedicated regression test. Effort: 30 min.
-6. **[MEDIUM] Add path overlap detection** — Warn on overlapping allowed/denied patterns. Effort: 2 hours.
-7. **[MEDIUM] Align vitest versions** — Root `^1.4.0` → `^4.0.0`, fix 2 transitive CVEs. Effort: 1 hour.
-8. **[MEDIUM] Update pnpm** — Bump to 10.x. Effort: 30 min.
+3. **[MEDIUM] Adopt shared test helpers** — Consolidate `createTempProject()`, `getLoadContract()` patterns. Effort: 1 hour.
+4. **[MEDIUM] Add `readStringList()` identifier test** — Dedicated regression test. Effort: 30 min.
+5. **[MEDIUM] Add path overlap detection** — Warn on overlapping allowed/denied patterns. Effort: 2 hours.
+6. **[MEDIUM] Align vitest versions** — Root `^1.4.0` → `^4.0.0`, fix 2 transitive CVEs. Effort: 1 hour.
+7. **[MEDIUM] Update pnpm** — Bump to 10.x. Effort: 30 min.
 
 ---
 
