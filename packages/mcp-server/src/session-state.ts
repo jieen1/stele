@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { matchProtectedPath } from "@stele/agent-hooks";
 import type { Violation } from "@stele/core";
 import type { CheckResult, ValidateEditResult } from "./types.js";
 import { getProtectedPatterns } from "./contract-cache.js";
@@ -36,12 +37,12 @@ export class SessionState {
   /**
    * Record an edit attempt.
    */
-  recordEdit(path: string, result: ValidateEditResult): void {
+  recordEdit(targetPath: string, result: ValidateEditResult): void {
     const protectedPatterns = getProtectedPatterns(this.projectDir);
-    const wasProtected = isProtectedPath(path, protectedPatterns);
+    const wasProtected = matchProtectedPath(targetPath, protectedPatterns, this.projectDir);
 
     this.edits.push({
-      path,
+      path: targetPath,
       timestamp: Date.now(),
       wasProtected,
       result,
@@ -178,22 +179,8 @@ export function readMaterialObservations(projectDir: string): Array<Record<strin
 
 /**
  * Check if a path matches any protected pattern.
- *
- * This is a simplified glob matcher for the common cases.
- * For full glob support, use the path-glob utility from @stele/agent-hooks.
+ * Delegates to matchProtectedPath from @stele/agent-hooks for proper glob matching.
  */
-export function isProtectedPath(filePath: string, patterns: string[]): boolean {
-  // Simple prefix-based check for common patterns
-  for (const pattern of patterns) {
-    if (pattern.includes("**")) {
-      const prefix = pattern.replace("**/*", "");
-      if (filePath.startsWith(prefix) || filePath.includes(join(prefix, ""))) {
-        return true;
-      }
-    } else if (filePath === pattern) {
-      return true;
-    }
-  }
-
-  return false;
+export function isProtectedPath(filePath: string, patterns: string[], projectDir: string): boolean {
+  return matchProtectedPath(filePath, patterns, projectDir);
 }

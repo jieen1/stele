@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
+import { matchProtectedPath } from "@stele/agent-hooks";
 import type { McpResult, ValidateEditResult } from "../types.js";
 import { validateProjectDir } from "../path-validation.js";
-import { getSessionState, isProtectedPath } from "../session-state.js";
+import { getSessionState } from "../session-state.js";
 import { getProtectedPatterns } from "../contract-cache.js";
 
 /**
@@ -57,8 +58,8 @@ export function createValidateEditTool(): {
 
       let resolvedPath = resolve(projectDir, filePath);
 
-      // Check if the path is protected
-      if (!isProtectedPath(resolvedPath, protectedPatterns)) {
+      // Check if the path is protected (delegated to agent-hooks glob matcher)
+      if (!matchProtectedPath(resolvedPath, protectedPatterns, projectDir)) {
         const editResult: ValidateEditResult = {
           allowed: true,
           reason: "Path is not protected by Stele",

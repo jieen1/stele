@@ -150,6 +150,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ~1.29.0
         version: 1.29.0(zod@4.4.3)
+      '@stele/agent-hooks':
+        specifier: workspace:*
+        version: link:../agent-hooks
       '@stele/core':
         specifier: workspace:*
         version: link:../core
