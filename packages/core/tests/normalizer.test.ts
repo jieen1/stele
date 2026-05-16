@@ -202,5 +202,10 @@ function createSingleFileContract(contract: Contract, file: Contract["files"][nu
     groups: [...file.groups],
     invariants: [...file.invariants],
     codeShapes: [...file.codeShapes],
+    agents: [...(file.agents ?? [])],
+    scopes: [...(file.scopes ?? [])],
+    interAgentContracts: [...(file.interAgentContracts ?? [])],
+    conflicts: [...(file.conflicts ?? [])],
+    warnings: [...(contract.warnings ?? [])],
   };
 }

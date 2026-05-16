@@ -371,6 +371,12 @@ export type ContractFile = {
   conflicts: ConflictDeclaration[];
 };
 
+export type ContractWarning = {
+  type: "path-overlap";
+  agentId: string;
+  overlaps: string[];
+};
+
 export type Contract = {
   rootPath: string;
   files: ContractFile[];
@@ -386,4 +392,5 @@ export type Contract = {
   scopes: ScopeDeclaration[];
   interAgentContracts: InterAgentContractDeclaration[];
   conflicts: ConflictDeclaration[];
+  warnings: ContractWarning[];
 };

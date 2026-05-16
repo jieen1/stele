@@ -5,7 +5,6 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SteleError, type Contract } from "../src/index";
 import * as stele from "../src/index";
-import { verifyManifest, writeManifest } from "../src/manifest/manifest.js";
 
 const tempDirs: string[] = [];
 

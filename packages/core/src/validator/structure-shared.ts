@@ -35,3 +35,35 @@ export function ensureFieldUnset(value: unknown, field: string, label: string, c
     );
   }
 }
+
+/**
+ * Read exactly one string or identifier from a list node.
+ * Returns the value of the node item.
+ * Throws validation error if the node contains more or fewer than one item,
+ * or if the item is not a string or identifier.
+ * @param code - Error code to use in the thrown error
+ */
+export function readSingleString(node: ListNode, label: string, code: string): string {
+  if (node.items.length !== 1) {
+    throw validationError(
+      code,
+      `${label} expects exactly one value.`,
+      node.span,
+      `Found ${node.items.length} value(s).`,
+      "Keep a single value inside this field.",
+    );
+  }
+
+  const item = node.items[0]!;
+  if (item.kind !== "string" && item.kind !== "identifier") {
+    throw validationError(
+      code,
+      `${label} must be a string or identifier.`,
+      item.span,
+      "Expected a string literal or identifier.",
+      "Wrap the value in double quotes.",
+    );
+  }
+
+  return item.value;
+}

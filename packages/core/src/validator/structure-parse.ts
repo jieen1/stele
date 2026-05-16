@@ -47,6 +47,7 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     scopes: contractFiles.flatMap((file) => file.scopes),
     interAgentContracts: contractFiles.flatMap((file) => file.interAgentContracts),
     conflicts: contractFiles.flatMap((file) => file.conflicts),
+    warnings: [],
   };
 }
 

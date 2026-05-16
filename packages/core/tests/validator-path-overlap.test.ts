@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { SteleError } from "../src/index";
 import * as stele from "../src/index";
 
@@ -32,75 +32,54 @@ function getLoadContract(): (rootPath: string) => Promise<any> {
   return loadContract as (rootPath: string) => Promise<any>;
 }
 
-describe("warnPathOverlap", () => {
-  it("warns when allowed and denied paths are identical", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+describe("path-overlap warnings", () => {
+  it("reports warning when allowed and denied paths are identical", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(agent "writer" (allowed-paths "src/**") (denied-paths "src/**"))',
+      ].join("\n"),
+    });
 
-    try {
-      const project = await createTempProject({
-        "main.stele": [
-          '(agent "writer" (allowed-paths "src/**") (denied-paths "src/**"))',
-        ].join("\n"),
-      });
-
-      await getLoadContract()(project.rootPath);
-      expect(warnSpy).toHaveBeenCalled();
-      expect(warnSpy.mock.calls[0][0]).toContain("overlapping allowed/denied paths");
-      expect(warnSpy.mock.calls[0][0]).toContain('"src/**" / "src/**"');
-    } finally {
-      warnSpy.mockRestore();
-    }
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.warnings).toHaveLength(1);
+    expect(contract.warnings[0].type).toBe("path-overlap");
+    expect(contract.warnings[0].agentId).toBe("writer");
+    expect(contract.warnings[0].overlaps[0]).toContain("src/**");
   });
 
-  it("warns when denied path is prefix of allowed path", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("reports warning when denied path is prefix of allowed path", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(agent "writer" (allowed-paths "src/core/**") (denied-paths "src/core/engine.ts"))',
+      ].join("\n"),
+    });
 
-    try {
-      const project = await createTempProject({
-        "main.stele": [
-          '(agent "writer" (allowed-paths "src/core/**") (denied-paths "src/core/engine.ts"))',
-        ].join("\n"),
-      });
-
-      await getLoadContract()(project.rootPath);
-      expect(warnSpy).toHaveBeenCalled();
-    } finally {
-      warnSpy.mockRestore();
-    }
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.warnings.length).toBeGreaterThan(0);
+    expect(contract.warnings[0].type).toBe("path-overlap");
   });
 
   it("does not warn for non-overlapping paths", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const project = await createTempProject({
+      "main.stele": [
+        '(agent "writer" (allowed-paths "src/**") (denied-paths "config/**"))',
+      ].join("\n"),
+    });
 
-    try {
-      const project = await createTempProject({
-        "main.stele": [
-          '(agent "writer" (allowed-paths "src/**") (denied-paths "config/**"))',
-        ].join("\n"),
-      });
-
-      await getLoadContract()(project.rootPath);
-      expect(warnSpy).not.toHaveBeenCalled();
-    } finally {
-      warnSpy.mockRestore();
-    }
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.warnings).toHaveLength(0);
   });
 
-  it("warns when allowed path is prefix of denied path", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("reports warning when allowed path is prefix of denied path", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(agent "writer" (allowed-paths "src") (denied-paths "src/secrets/**"))',
+      ].join("\n"),
+    });
 
-    try {
-      const project = await createTempProject({
-        "main.stele": [
-          '(agent "writer" (allowed-paths "src") (denied-paths "src/secrets/**"))',
-        ].join("\n"),
-      });
-
-      await getLoadContract()(project.rootPath);
-      expect(warnSpy).toHaveBeenCalled();
-    } finally {
-      warnSpy.mockRestore();
-    }
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.warnings.length).toBeGreaterThan(0);
+    expect(contract.warnings[0].type).toBe("path-overlap");
   });
 });
 

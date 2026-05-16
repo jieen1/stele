@@ -1,13 +1,13 @@
 import { SteleError } from "../errors/SteleError.js";
 import type { SourceSpan } from "../ast/types.js";
-import type { Contract } from "./structure.js";
+import type { Contract, ContractWarning } from "./structure-types.js";
 
 /**
- * Warn when allowed and denied paths overlap.
+ * Detect overlapping allowed and denied paths.
  * Uses simple prefix matching — full glob overlap detection is not attempted.
  * The enforcement layer already resolves conflicts (deny takes precedence).
  */
-function warnPathOverlap(agentId: string, allowedPaths: string[], deniedPaths: string[]): void {
+export function findPathOverlaps(allowedPaths: string[], deniedPaths: string[]): string[] {
   const overlaps: string[] = [];
   for (const allowed of allowedPaths) {
     for (const denied of deniedPaths) {
@@ -16,14 +16,11 @@ function warnPathOverlap(agentId: string, allowedPaths: string[], deniedPaths: s
       }
     }
   }
-  if (overlaps.length > 0) {
-    console.warn(
-      `[W] Agent "${agentId}" has overlapping allowed/denied paths: ${overlaps.join("; ")}. Deny takes precedence.`,
-    );
-  }
+  return overlaps;
 }
 
 export function validateReferences(contract: Contract): Contract {
+  const warnings: ContractWarning[] = [];
   const checkerIds = new Set(contract.checkers.map((checker) => checker.id));
   const invariantIds = new Set(contract.invariants.map((invariant) => invariant.id));
   const scenarioIds = new Set(contract.scenarios.map((scenario) => scenario.id));
@@ -155,7 +152,10 @@ export function validateReferences(contract: Contract): Contract {
     for (const path of agent.deniedPaths) {
       validateAgentPath(path, agent.span, `Agent "${agent.id}" denied-paths`);
     }
-    warnPathOverlap(agent.id, agent.allowedPaths, agent.deniedPaths);
+    const overlaps = findPathOverlaps(agent.allowedPaths, agent.deniedPaths);
+    if (overlaps.length > 0) {
+      warnings.push({ type: "path-overlap", agentId: agent.id, overlaps });
+    }
   }
 
   for (const scope of contract.scopes) {
@@ -174,6 +174,7 @@ export function validateReferences(contract: Contract): Contract {
     validateAgentPath(conflict.path, conflict.span, `Conflict declaration for "${conflict.path}"`);
   }
 
+  contract.warnings = warnings;
   return contract;
 }
 

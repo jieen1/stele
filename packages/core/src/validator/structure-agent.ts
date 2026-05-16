@@ -9,7 +9,7 @@ import type {
   ScopeDeclaration,
 } from "./structure-types.js";
 import { validationError } from "./structure-error.js";
-import { ensureFieldUnset } from "./structure-shared.js";
+import { ensureFieldUnset, readSingleString } from "./structure-shared.js";
 
 // -- Agent declaration --
 
@@ -287,7 +287,7 @@ export function parseConflictDeclaration(filePath: string, node: ListNode): Conf
         break;
       case "resolution": {
         ensureFieldUnset(resolution, "resolution", `Conflict "${pathItem.value}" resolution`, "E0317", item.span);
-        const strategy = readSingleString(item, `Conflict "${pathItem.value}" resolution`);
+        const strategy = readSingleString(item, `Conflict "${pathItem.value}" resolution`, "E0317");
         if (!VALID_STRATEGIES.includes(strategy as ConflictResolutionStrategy)) {
           throw validationError(
             "E0317",
@@ -302,7 +302,7 @@ export function parseConflictDeclaration(filePath: string, node: ListNode): Conf
       }
       case "fallback": {
         ensureFieldUnset(fallback, "fallback", `Conflict "${pathItem.value}" fallback`, "E0317", item.span);
-        const strategy = readSingleString(item, `Conflict "${pathItem.value}" fallback`);
+        const strategy = readSingleString(item, `Conflict "${pathItem.value}" fallback`, "E0317");
         if (!VALID_STRATEGIES.includes(strategy as ConflictResolutionStrategy)) {
           throw validationError(
             "E0317",
@@ -393,31 +393,6 @@ function readStringList(node: ListNode, label: string): string[] {
     }
   }
   return result;
-}
-
-function readSingleString(node: ListNode, label: string): string {
-  if (node.items.length !== 1) {
-    throw validationError(
-      "E0317",
-      `${label} expects exactly one value.`,
-      node.span,
-      `Found ${node.items.length} value(s).`,
-      "Keep a single value inside this field.",
-    );
-  }
-
-  const item = node.items[0]!;
-  if (item.kind !== "string" && item.kind !== "identifier") {
-    throw validationError(
-      "E0317",
-      `${label} must be a string or identifier.`,
-      item.span,
-      "Expected a string literal or identifier.",
-      "Wrap the value in double quotes.",
-    );
-  }
-
-  return item.value;
 }
 
 function parseRequiresClause(node: ListNode): RequiresClause {

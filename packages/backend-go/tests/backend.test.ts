@@ -167,6 +167,11 @@ function createTestContract(): Contract {
     groups: [],
     invariants: [createInvariant("balance-positive")],
     codeShapes: [],
+    agents: [],
+    scopes: [],
+    interAgentContracts: [],
+    conflicts: [],
+    warnings: [],
   };
 }
 
@@ -213,6 +218,11 @@ function createContractWithGroup(groupId: string, invariants: any[]): Contract {
     ],
     invariants,
     codeShapes: [],
+    agents: [],
+    scopes: [],
+    interAgentContracts: [],
+    conflicts: [],
+    warnings: [],
   };
 }
 

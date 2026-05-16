@@ -648,6 +648,11 @@ describe("generateRustSource", () => {
             groups: [],
             invariants,
             codeShapes: [],
+            agents: [],
+            scopes: [],
+            interAgentContracts: [],
+            conflicts: [],
+            warnings: [],
         };
     }
 

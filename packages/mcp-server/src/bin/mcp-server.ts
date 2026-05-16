@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { SteleMcpServer from "../server.js";
+import { SteleMcpServer } from "../server.js";
 
 const server = new SteleMcpServer();
 

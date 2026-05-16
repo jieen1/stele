@@ -33,6 +33,11 @@ function makeMinimalContract(invariantCount = 1): Contract {
       dependsOn: [],
     })),
     codeShapes: [],
+    agents: [],
+    scopes: [],
+    interAgentContracts: [],
+    conflicts: [],
+    warnings: [],
   };
 }
 
