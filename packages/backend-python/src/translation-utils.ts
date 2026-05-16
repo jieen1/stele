@@ -57,6 +57,10 @@ export function toPythonString(value: string): string {
   return JSON.stringify(value);
 }
 
+export function isListNode(node: AstNode): node is ListNode {
+  return node.kind === "list";
+}
+
 // ---------------------------------------------------------------------------
 // Path helpers
 // ---------------------------------------------------------------------------

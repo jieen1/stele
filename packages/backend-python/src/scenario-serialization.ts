@@ -1,9 +1,5 @@
 import { SteleError, type AstNode, type ListNode, type ScenarioDeclaration, type ScenarioOperation } from "@stele/core";
-import { readPathPart, toPythonString } from "./translation-utils.js";
-
-function isListNode(node: AstNode): node is ListNode {
-  return node.kind === "list";
-}
+import { isListNode, readPathPart, toPythonString } from "./translation-utils.js";
 
 // ---------------------------------------------------------------------------
 // Scenario serialization

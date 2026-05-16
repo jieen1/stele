@@ -5,7 +5,7 @@ import { comparisonOperatorHandlers, extendedComparisonHandlers } from "./templa
 import { logicOperatorHandlers } from "./templates/logic.js";
 import { temporalOperatorHandlers } from "./templates/temporal.js";
 import { stringOperatorHandlers } from "./templates/string.js";
-import { toPythonString } from "./translation-utils.js";
+import { toPythonString, readPathPart } from "./translation-utils.js";
 import { type TranslationContext, type PythonExpressionTranslator, type PythonOperatorHandler } from "./types.js";
 import { createTranslationContext } from "./translation-utils.js";
 
@@ -168,25 +168,6 @@ function translateField(node: ListNode, context: TranslationContext): string {
 
 function translateValue(node: ListNode, context: TranslationContext): string {
   return translateExpression(node.items[0]!, context);
-}
-
-function readPathPart(node: AstNode): string {
-  if (node.kind === "identifier") {
-    return node.value;
-  }
-
-  if (node.kind === "keyword") {
-    return `:${node.value}`;
-  }
-
-  throw new SteleError(
-    "E0603",
-    "Backend Error",
-    'Path segments must be identifiers or keywords in the Python backend.',
-    node.span,
-    `Found ${node.kind} in a translated path expression.`,
-    "Replace the segment with a symbol-like path part.",
-  );
 }
 
 // ---------------------------------------------------------------------------

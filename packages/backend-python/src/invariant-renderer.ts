@@ -56,14 +56,6 @@ export function buildPytestImportLine(contract: Contract, generatedBody = ""): s
 }
 
 // ---------------------------------------------------------------------------
-// Type guards
-// ---------------------------------------------------------------------------
-
-function isListNode(node: AstNode): node is ListNode {
-  return node.kind === "list";
-}
-
-// ---------------------------------------------------------------------------
 // Invariant test rendering
 // ---------------------------------------------------------------------------
 

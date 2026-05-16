@@ -42,6 +42,8 @@
  *       return None
  */
 
+import { toPythonString } from "./translation-utils.js";
+
 const CHECKERS_KEY = "_checkers";
 
 type CheckerSpec = {
@@ -193,27 +195,5 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * conftest.py deterministic and avoids quoting issues with embedded JSON.
  */
 function pythonStringLiteral(value: string): string {
-  let out = "\"";
-
-  for (const char of value) {
-    const code = char.codePointAt(0) ?? 0;
-
-    if (char === "\\") {
-      out += "\\\\";
-    } else if (char === "\"") {
-      out += "\\\"";
-    } else if (char === "\n") {
-      out += "\\n";
-    } else if (char === "\r") {
-      out += "\\r";
-    } else if (char === "\t") {
-      out += "\\t";
-    } else if (code < 0x20 || code === 0x7f) {
-      out += `\\x${code.toString(16).padStart(2, "0")}`;
-    } else {
-      out += char;
-    }
-  }
-
-  return `${out}"`;
+  return toPythonString(value);
 }
