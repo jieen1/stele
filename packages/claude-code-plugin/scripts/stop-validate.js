@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { constants } from "node:fs";
+import { constants, lstatSync } from "node:fs";
 import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -328,6 +328,12 @@ async function resolveCommandOnPath(commands, pathValue) {
       const candidate = path.resolve(entry, command);
 
       try {
+        // Reject symlinks to prevent supply chain bypass
+        const stats = lstatSync(candidate);
+        if (stats.isSymbolicLink()) {
+          continue;
+        }
+
         await access(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK);
         return candidate;
       } catch {
@@ -369,6 +375,12 @@ async function resolveCommandAtLocations(searchDirs, commands) {
       const candidate = path.join(searchDir, command);
 
       try {
+        // Reject symlinks to prevent supply chain bypass
+        const stats = lstatSync(candidate);
+        if (stats.isSymbolicLink()) {
+          continue;
+        }
+
         await access(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK);
         return candidate;
       } catch {
@@ -412,7 +424,17 @@ async function findNestedVenvCommandDirectories(rootDir) {
         continue;
       }
 
+      // Reject symlinked directories (defense-in-depth: isDirectory() may
+      // return true for symlinks on systems where d_type is DT_UNKNOWN).
       const entryPath = path.join(currentDir, entry.name);
+      try {
+        const lstats = lstatSync(entryPath);
+        if (lstats.isSymbolicLink()) {
+          continue;
+        }
+      } catch {
+        continue;
+      }
 
       if (entry.name === ".venv") {
         directories.push(process.platform === "win32" ? path.join(entryPath, "Scripts") : path.join(entryPath, "bin"));

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { constants } from "node:fs";
+import { constants, lstatSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -144,6 +144,12 @@ async function resolveCommandAtLocations(searchDirs, commands) {
       const candidate = path.join(searchDir, command);
 
       try {
+        // Reject symlinks to prevent supply chain bypass
+        const stats = lstatSync(candidate);
+        if (stats.isSymbolicLink()) {
+          continue;
+        }
+
         await access(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK);
         return candidate;
       } catch {
@@ -167,6 +173,12 @@ async function resolveCommandOnPath(commands, pathValue) {
       const candidate = path.resolve(entry, command);
 
       try {
+        // Reject symlinks in PATH fallback
+        const stats = lstatSync(candidate);
+        if (stats.isSymbolicLink()) {
+          continue;
+        }
+
         await access(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK);
         return candidate;
       } catch {

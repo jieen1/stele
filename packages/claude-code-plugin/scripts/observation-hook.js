@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, mkdir, writeFile } from "node:fs/promises";
-import { renameSync } from "node:fs";
+import { lstatSync, renameSync } from "node:fs";
 import path from "node:path";
 import { minimatch } from "minimatch";
 import { extractPathsFromValue } from "./path-utils.js";
@@ -45,6 +45,12 @@ try {
   };
 
   const observationPath = path.join(projectDir, ".stele", "agent", "session-observations.jsonl");
+
+  // Reject symlinked observation path to prevent write redirection
+  if (isSymlinkedPath(path.dirname(observationPath))) {
+    process.exit(0);
+  }
+
   await mkdir(path.dirname(observationPath), { recursive: true });
   // Atomic append: read → append → write temp → rename.
   // Prevents concurrent hook invocations from interleaving mid-line.
@@ -535,4 +541,16 @@ function isMissingFileError(error) {
 
 function stripBom(value) {
   return value.replace(/^\uFEFF/u, "");
+}
+
+function isSymlinkedPath(checkPath) {
+  try {
+    const stats = lstatSync(checkPath);
+    if (stats.isSymbolicLink()) {
+      return true;
+    }
+  } catch {
+    // Path doesn't exist \u2014 will be created by mkdir
+  }
+  return false;
 }
