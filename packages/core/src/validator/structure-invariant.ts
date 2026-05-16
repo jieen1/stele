@@ -1,5 +1,9 @@
 import type { AstNode, ListNode } from "../ast/types.js";
+import { readSingleExpression } from "./structure-shared.js";
 import { ALLOWED_INVARIANT_FIELDS } from "./structure-types.js";
+
+// Re-export for backward compatibility (tests)
+export { readSingleExpression };
 import type {
   CheckerUse,
   InvariantDeclaration,
@@ -71,7 +75,7 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
         break;
       case "assert":
         ensureInvariantFieldUnset(assertExpression, field, `Invariant "${idNode.value}" assert`);
-        assertExpression = readSingleExpression(field, `Invariant "${idNode.value}" assert`);
+        assertExpression = readSingleExpression(field, `Invariant "${idNode.value}" assert`, "E0305");
         break;
       case "uses-checker": {
         ensureInvariantFieldUnset(usesChecker, field, `Invariant "${idNode.value}" uses-checker`);
@@ -128,7 +132,7 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
       }
       case "when":
         ensureInvariantFieldUnset(whenExpression, field, `Invariant "${idNode.value}" when`);
-        whenExpression = readSingleExpression(field, `Invariant "${idNode.value}" when`);
+        whenExpression = readSingleExpression(field, `Invariant "${idNode.value}" when`, "E0305");
         break;
       case "depends-on":
         ensureInvariantFieldUnset(dependsOn.length === 0 ? undefined : dependsOn, field, `Invariant "${idNode.value}" depends-on`);
@@ -234,7 +238,7 @@ export function parseInvariantDeclaration(filePath: string, node: ListNode, grou
 // -- helpers --
 
 function readSingleString(node: ListNode, label: string): string {
-  const item = readSingleExpression(node, label);
+  const item = readSingleExpression(node, label, "E0305");
 
   if (item.kind !== "string") {
     throw validationError(
@@ -250,7 +254,7 @@ function readSingleString(node: ListNode, label: string): string {
 }
 
 function readSingleText(node: ListNode, label: string): string {
-  const item = readSingleExpression(node, label);
+  const item = readSingleExpression(node, label, "E0305");
 
   if (item.kind !== "identifier" && item.kind !== "string") {
     throw validationError(
@@ -265,27 +269,13 @@ function readSingleText(node: ListNode, label: string): string {
   return item.value;
 }
 
-export function readSingleExpression(node: ListNode, label: string): AstNode {
-  if (node.items.length !== 1) {
-    throw validationError(
-      "E0305",
-      `${label} expects exactly one value.`,
-      node.span,
-      `Found ${node.items.length} value(s).`,
-      "Keep a single value inside this field.",
-    );
-  }
-
-  return node.items[0]!;
-}
-
 function readSingleValueField(node: ListNode, name: InvariantSingleValueFieldName): InvariantSingleValueField {
   return {
     kind: "field",
     name,
     node,
     span: node.span,
-    valueNode: readSingleExpression(node, `Invariant field "${name}"`),
+    valueNode: readSingleExpression(node, `Invariant field "${name}"`, "E0305"),
   };
 }
 

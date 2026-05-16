@@ -9,6 +9,7 @@ import type {
   ScopeDeclaration,
 } from "./structure-types.js";
 import { validationError } from "./structure-error.js";
+import { ensureFieldUnset } from "./structure-shared.js";
 
 // -- Agent declaration --
 
@@ -42,7 +43,7 @@ export function parseAgentDeclaration(filePath: string, node: ListNode): AgentDe
 
     switch (item.head) {
       case "description":
-        ensureFieldUnset(description, item, `Agent "${idNode.value}" description`);
+        ensureFieldUnset(description, "description", `Agent "${idNode.value}" description`, "E0317", item.span);
         description = readSingleValueField(item, "description");
         break;
       case "allowed-paths":
@@ -169,7 +170,7 @@ export function parseInterAgentContractDeclaration(filePath: string, node: ListN
 
     switch (item.head) {
       case "description":
-        ensureFieldUnset(description, item, `Inter-agent contract "${idNode.value}" description`);
+        ensureFieldUnset(description, "description", `Inter-agent contract "${idNode.value}" description`, "E0317", item.span);
         description = readSingleValueField(item, "description");
         break;
       case "agents":
@@ -285,7 +286,7 @@ export function parseConflictDeclaration(filePath: string, node: ListNode): Conf
         agents.push(...readStringList(item, `Conflict "${pathItem.value}" agents`));
         break;
       case "resolution": {
-        ensureFieldUnset(resolution, item, `Conflict "${pathItem.value}" resolution`);
+        ensureFieldUnset(resolution, "resolution", `Conflict "${pathItem.value}" resolution`, "E0317", item.span);
         const strategy = readSingleString(item, `Conflict "${pathItem.value}" resolution`);
         if (!VALID_STRATEGIES.includes(strategy as ConflictResolutionStrategy)) {
           throw validationError(
@@ -300,7 +301,7 @@ export function parseConflictDeclaration(filePath: string, node: ListNode): Conf
         break;
       }
       case "fallback": {
-        ensureFieldUnset(fallback, item, `Conflict "${pathItem.value}" fallback`);
+        ensureFieldUnset(fallback, "fallback", `Conflict "${pathItem.value}" fallback`, "E0317", item.span);
         const strategy = readSingleString(item, `Conflict "${pathItem.value}" fallback`);
         if (!VALID_STRATEGIES.includes(strategy as ConflictResolutionStrategy)) {
           throw validationError(
@@ -348,18 +349,6 @@ export function parseConflictDeclaration(filePath: string, node: ListNode): Conf
 }
 
 // -- Helpers --
-
-function ensureFieldUnset(value: unknown, field: ListNode, label: string): void {
-  if (value !== undefined) {
-    throw validationError(
-      "E0317",
-      `${label} may only be declared once.`,
-      field.span,
-      "This field already appeared earlier in the same declaration.",
-      "Merge the values into one field.",
-    );
-  }
-}
 
 function readSingleValueField(node: ListNode, name: string): AgentSingleValueField {
   if (node.items.length !== 1) {

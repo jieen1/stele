@@ -1,5 +1,6 @@
 import type { AstNode, ListNode } from "../ast/types.js";
 import { describeNode, validationError } from "./structure-error.js";
+import { ensureFieldUnset, readSingleExpression } from "./structure-shared.js";
 import type {
   ScenarioCall,
   ScenarioDeclaration,
@@ -40,11 +41,11 @@ export function parseScenarioDeclaration(filePath: string, node: ListNode): Scen
 
     switch (field.head) {
       case "sandbox":
-        ensureFieldUnset(sandbox, field, `Scenario "${idNode.value}" sandbox`);
+        ensureFieldUnset(sandbox, "sandbox", `Scenario "${idNode.value}" sandbox`, "E0317", field.span);
         sandbox = parseScenarioSandbox(field, idNode.value);
         break;
       case "executor":
-        ensureFieldUnset(executor, field, `Scenario "${idNode.value}" executor`);
+        ensureFieldUnset(executor, "executor", `Scenario "${idNode.value}" executor`, "E0317", field.span);
         executor = parseScenarioExecutor(field, idNode.value);
         break;
       case "step":
@@ -107,7 +108,7 @@ export function parseScenarioDeclaration(filePath: string, node: ListNode): Scen
 }
 
 export function parseScenarioSandbox(node: ListNode, scenarioId: string): ScenarioSandbox {
-  const sandboxNode = readSingleExpression(node, `Scenario "${scenarioId}" sandbox`);
+  const sandboxNode = readSingleExpression(node, `Scenario "${scenarioId}" sandbox`, "E0317");
 
   if (sandboxNode.kind !== "identifier") {
     throw validationError(
@@ -133,7 +134,7 @@ export function parseScenarioSandbox(node: ListNode, scenarioId: string): Scenar
 }
 
 export function parseScenarioExecutor(node: ListNode, scenarioId: string): ScenarioExecutor {
-  const executorNode = readSingleExpression(node, `Scenario "${scenarioId}" executor`);
+  const executorNode = readSingleExpression(node, `Scenario "${scenarioId}" executor`, "E0317");
 
   if (executorNode.kind !== "identifier") {
     throw validationError(
@@ -186,14 +187,14 @@ export function parseScenarioStep(filePath: string, node: ListNode, scenarioId: 
     }
 
     if (field.head === "call") {
-      ensureFieldUnset(call, field, `Scenario step "${idNode.value}" call`);
+      ensureFieldUnset(call, "call", `Scenario step "${idNode.value}" call`, "E0317", field.span);
       call = parseScenarioCall(field, `Scenario step "${idNode.value}"`);
       continue;
     }
 
     if (field.head === "capture") {
       if (capture !== undefined) {
-        ensureFieldUnset(capture, field, `Scenario step "${idNode.value}" capture`);
+        ensureFieldUnset(capture, "capture", `Scenario step "${idNode.value}" capture`, "E0317", field.span);
       }
       capture = parseScenarioCaptureName(field, `Scenario step "${idNode.value}" capture`);
       continue;
@@ -265,7 +266,7 @@ export function parseScenarioCaptureState(filePath: string, node: ListNode, scen
       );
     }
 
-    ensureFieldUnset(call, field, `Scenario capture-state "${captureNode.value}" call`);
+    ensureFieldUnset(call, "call", `Scenario capture-state "${captureNode.value}" call`, "E0317", field.span);
     call = parseScenarioCall(field, `Scenario capture-state "${captureNode.value}"`);
   }
 
@@ -325,8 +326,8 @@ export function parseScenarioCall(node: ListNode, label: string): ScenarioCall {
       );
     }
 
-    ensureFieldUnset(body, field, `${label} call body`);
-    body = readSingleExpression(field, `${label} call body`);
+    ensureFieldUnset(body, "body", `${label} call body`, "E0317", field.span);
+    body = readSingleExpression(field, `${label} call body`, "E0317");
   }
 
   return {
@@ -339,22 +340,8 @@ export function parseScenarioCall(node: ListNode, label: string): ScenarioCall {
 
 // -- helpers --
 
-function readSingleExpression(node: ListNode, label: string): AstNode {
-  if (node.items.length !== 1) {
-    throw validationError(
-      "E0317",
-      `${label} expects exactly one value.`,
-      node.span,
-      `Found ${node.items.length} value(s).`,
-      "Keep a single value inside this field.",
-    );
-  }
-
-  return node.items[0]!;
-}
-
 function parseScenarioCaptureName(node: ListNode, label: string): string {
-  const captureNode = readSingleExpression(node, label);
+  const captureNode = readSingleExpression(node, label, "E0317");
 
   if (captureNode.kind !== "identifier") {
     throw validationError(
@@ -379,14 +366,3 @@ function isValidPythonImportTarget(target: string): boolean {
   return separatorIndex < target.length - 1;
 }
 
-function ensureFieldUnset(value: unknown, field: ListNode, label: string): void {
-  if (value !== undefined) {
-    throw validationError(
-      "E0317",
-      `${label} may only be declared once.`,
-      field.span,
-      "This field already appeared earlier in the same scenario declaration.",
-      "Keep a single copy of this field.",
-    );
-  }
-}

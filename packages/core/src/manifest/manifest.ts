@@ -4,6 +4,7 @@ import { dirname, relative, resolve } from "node:path";
 import { posix as pathPosix } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
+import { isPlainRecord } from "../util/types.js";
 
 const MANIFEST_VERSION = "1";
 const STELE_VERSION = "0.1.0";
@@ -233,10 +234,6 @@ function isManifestDocument(value: unknown): value is ContractManifest {
   return Object.values(value.protected_files).every(
     (entry) => isPlainRecord(entry) && typeof entry.sha256 === "string" && typeof entry.size === "number",
   );
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function sameProtectedFiles(

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
+import { isPlainRecord } from "../util/types.js";
 import type { BaselineViolation, ViolationBaseline } from "./types.js";
 
 export async function readViolationBaseline(path: string): Promise<ViolationBaseline> {
@@ -77,7 +78,4 @@ function isBaselineViolation(fingerprint: string, value: unknown): value is Base
   );
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 

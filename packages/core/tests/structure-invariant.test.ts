@@ -565,7 +565,7 @@ describe("readSingleExpression", () => {
       "severity",
     );
 
-    const child = readSingleExpression(list, "test label");
+    const child = readSingleExpression(list, "test label", "E0305");
     expect(child.kind).toBe("identifier");
     if (child.kind === "identifier") {
       expect(child.value).toBe("high");
@@ -584,10 +584,10 @@ describe("readSingleExpression", () => {
       "tags",
     );
 
-    expect(() => readSingleExpression(list, "my-label")).toThrowError(SteleError);
+    expect(() => readSingleExpression(list, "my-label", "E0305")).toThrowError(SteleError);
 
     try {
-      readSingleExpression(list, "my-label");
+      readSingleExpression(list, "my-label", "E0305");
     } catch (err) {
       expect(err).toMatchObject({ code: "E0305", category: "Validation Error" });
       expect((err as SteleError).message).toContain("my-label");
@@ -608,10 +608,10 @@ describe("readSingleExpression", () => {
       "depends-on",
     );
 
-    expect(() => readSingleExpression(list, "another-label")).toThrowError(SteleError);
+    expect(() => readSingleExpression(list, "another-label", "E0305")).toThrowError(SteleError);
 
     try {
-      readSingleExpression(list, "another-label");
+      readSingleExpression(list, "another-label", "E0305");
     } catch (err) {
       expect(err).toMatchObject({ code: "E0305" });
       expect((err as SteleError).message).toContain("another-label");

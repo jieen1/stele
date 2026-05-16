@@ -1,5 +1,6 @@
-import type { ListNode } from "../ast/types.js";
+import type { AstNode, ListNode } from "../ast/types.js";
 import { describeNode, validationError } from "./structure-error.js";
+import { readSingleExpression } from "./structure-shared.js";
 import type {
   BoundaryDeclaration,
   ClassShapeDeclaration,
@@ -312,7 +313,7 @@ function parseCodeShapeHeader(
 }
 
 function parseCodeShapeLang(node: ListNode, label: string, id: string): CodeShapeLang {
-  const langNode = readSingleExpression(node, `${label} "${id}" lang`);
+  const langNode = readSingleExpression(node, `${label} "${id}" lang`, "E0318");
 
   if (langNode.kind !== "identifier") {
     throw validationError(
@@ -338,7 +339,7 @@ function parseCodeShapeLang(node: ListNode, label: string, id: string): CodeShap
 }
 
 function parseCodeShapeTarget(node: ListNode, label: string, id: string): string {
-  const targetNode = readSingleExpression(node, `${label} "${id}" target`);
+  const targetNode = readSingleExpression(node, `${label} "${id}" target`, "E0318");
 
   if (targetNode.kind !== "string") {
     throw validationError(
@@ -509,16 +510,3 @@ function exampleCodeShapeId(kind: CodeShapeDeclaration["kind"]): string {
   }
 }
 
-function readSingleExpression(node: ListNode, label: string) {
-  if (node.items.length !== 1) {
-    throw validationError(
-      "E0318",
-      `${label} expects exactly one value.`,
-      node.span,
-      `Found ${node.items.length} value(s).`,
-      "Keep a single value inside this field.",
-    );
-  }
-
-  return node.items[0]!;
-}

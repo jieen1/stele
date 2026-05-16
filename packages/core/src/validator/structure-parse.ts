@@ -13,6 +13,7 @@ import {
   parseConflictDeclaration,
 } from "./structure-agent.js";
 import { TOP_LEVEL_DECLARATIONS } from "./structure-types.js";
+import { readSingleExpression } from "./structure-shared.js";
 import type {
   AgentDeclaration,
   ConflictDeclaration,
@@ -333,7 +334,7 @@ function parseGroupDeclaration(filePath: string, node: ListNode): GroupDeclarati
 }
 
 function readSingleString(node: ListNode, label: string): string {
-  const item = readSingleExpression(node, label);
+  const item = readSingleExpression(node, label, "E0304");
 
   if (item.kind !== "string") {
     throw validationError(
@@ -348,16 +349,3 @@ function readSingleString(node: ListNode, label: string): string {
   return item.value;
 }
 
-function readSingleExpression(node: ListNode, label: string): AstNode {
-  if (node.items.length !== 1) {
-    throw validationError(
-      "E0304",
-      `${label} expects exactly one value.`,
-      node.span,
-      `Found ${node.items.length} value(s).`,
-      "Keep a single value inside this field.",
-    );
-  }
-
-  return node.items[0]!;
-}

@@ -101,7 +101,7 @@ describe("parseAgentDeclaration", () => {
     );
 
     expect(() => parseAgentDeclaration(TEST_FILE, node)).toThrow(
-      'Agent "reviewer" description may only be declared once.',
+      'Agent "reviewer" description may declare "description" only once.',
     );
   });
 });

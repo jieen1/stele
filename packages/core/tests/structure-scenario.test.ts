@@ -193,7 +193,7 @@ describe("parseScenarioDeclaration", () => {
 
     expectSteleError(() => parseScenarioDeclaration(FILE, node), {
       code: "E0317",
-      messageIncludes: "may only be declared once",
+      messageIncludes: "may declare",
     });
   });
 
@@ -211,7 +211,7 @@ describe("parseScenarioDeclaration", () => {
 
     expectSteleError(() => parseScenarioDeclaration(FILE, node), {
       code: "E0317",
-      messageIncludes: "may only be declared once",
+      messageIncludes: "may declare",
     });
   });
 });
@@ -425,7 +425,7 @@ describe("parseScenarioStep", () => {
 
     expectSteleError(() => parseScenarioStep(FILE, stepField, "my-flow"), {
       code: "E0317",
-      messageIncludes: "may only be declared once",
+      messageIncludes: "may declare",
     });
   });
 
@@ -443,7 +443,7 @@ describe("parseScenarioStep", () => {
 
     expectSteleError(() => parseScenarioStep(FILE, stepField, "my-flow"), {
       code: "E0317",
-      messageIncludes: "may only be declared once",
+      messageIncludes: "may declare",
     });
   });
 
@@ -561,7 +561,7 @@ describe("parseScenarioCaptureState", () => {
 
     expectSteleError(() => parseScenarioCaptureState(FILE, captureField, "my-flow"), {
       code: "E0317",
-      messageIncludes: "may only be declared once",
+      messageIncludes: "may declare",
     });
   });
 });
@@ -688,7 +688,7 @@ describe("parseScenarioCall", () => {
 
     expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
       code: "E0317",
-      messageIncludes: "may only be declared once",
+      messageIncludes: "may declare",
     });
   });
 

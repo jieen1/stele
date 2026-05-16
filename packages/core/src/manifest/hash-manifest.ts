@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
+import { isPlainRecord } from "../util/types.js";
 
 /**
  * EP05: Incremental generation hash manifest.
@@ -335,10 +336,6 @@ function isFileEntry(value: unknown): value is FileEntry {
   }
 
   return Object.values(value.output_hashes).every((entry) => typeof entry === "string");
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isWindowsRenameError(error: unknown): boolean {
