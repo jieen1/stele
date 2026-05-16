@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { registerTools } from "./tools/index.js";
+import { sanitizeError } from "./error-sanitizer.js";
 import type { ToolDef } from "./types.js";
 
 /**
@@ -68,7 +69,7 @@ export class SteleMcpServer {
           content: [
             {
               type: "text",
-              text: `[stele-mcp] Tool "${name}" threw unhandled error: ${error instanceof Error ? error.message : String(error)}`,
+              text: `[stele-mcp] Tool "${name}" threw unhandled error: ${sanitizeError(error)}`,
             },
           ],
           isError: true,
