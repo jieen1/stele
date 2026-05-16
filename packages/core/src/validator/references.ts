@@ -1,4 +1,5 @@
 import { SteleError } from "../errors/SteleError.js";
+import type { SourceSpan } from "../ast/types.js";
 import type { Contract } from "./structure.js";
 
 export function validateReferences(contract: Contract): Contract {
@@ -124,5 +125,70 @@ export function validateReferences(contract: Contract): Contract {
     }
   }
 
+  // -- Agent path safety validation --
+
+  for (const agent of contract.agents) {
+    for (const path of agent.allowedPaths) {
+      validateAgentPath(path, agent.span, `Agent "${agent.id}" allowed-paths`);
+    }
+    for (const path of agent.deniedPaths) {
+      validateAgentPath(path, agent.span, `Agent "${agent.id}" denied-paths`);
+    }
+  }
+
+  for (const scope of contract.scopes) {
+    for (const path of scope.paths) {
+      validateAgentPath(path, scope.span, `Scope "${scope.agentId}" paths`);
+    }
+  }
+
+  for (const interAgentContract of contract.interAgentContracts) {
+    for (const req of interAgentContract.requires) {
+      validateAgentPath(req.pathPattern, req.span, `Requires clause in contract "${interAgentContract.id}"`);
+    }
+  }
+
+  for (const conflict of contract.conflicts) {
+    validateAgentPath(conflict.path, conflict.span, `Conflict declaration for "${conflict.path}"`);
+  }
+
   return contract;
+}
+
+function validateAgentPath(path: string, span: SourceSpan, label: string): void {
+  if (path === "") {
+    throw new SteleError(
+      "E0322",
+      "Validation Error",
+      `${label} contains an empty path.`,
+      span,
+      "Agent paths must be non-empty glob patterns.",
+      "Provide a valid glob pattern such as \"src/**\".",
+    );
+  }
+
+  if (path.startsWith("/") || /^[a-zA-Z]:\//.test(path)) {
+    throw new SteleError(
+      "E0322",
+      "Validation Error",
+      `${label} contains an absolute path: "${path}".`,
+      span,
+      "Agent paths must be relative glob patterns, not absolute paths.",
+      "Use a relative glob pattern such as \"src/**\".",
+    );
+  }
+
+  const segments = path.split("/").filter((seg) => seg.length > 0);
+  for (const segment of segments) {
+    if (segment === "..") {
+      throw new SteleError(
+        "E0322",
+        "Validation Error",
+        `${label} contains a path traversal segment in "${path}".`,
+        span,
+        "Agent paths must not contain '..' segments (path traversal).",
+        "Use a relative glob pattern without '..' segments.",
+      );
+    }
+  }
 }
