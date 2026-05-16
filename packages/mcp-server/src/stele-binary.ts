@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { execFileSync, type ExecFileOptions } from "node:child_process";
 
@@ -37,21 +37,37 @@ function validateArgs(args: string[]): void {
 
 /**
  * Verify the binary belongs to the legitimate @stele/cli package.
- * Checks package.json identity and rejects symlinks to unexpected packages.
+ * Checks package.json identity, rejects symlinks, and validates the package directory.
  */
 function verifyPackageIdentity(binaryPath: string): boolean {
-  // For .bin/stele -> resolve the actual target
-  let targetPath = binaryPath;
-
-  // For .bin/stele.cmd or .bin/stele, find the actual binary
-  // The .bin entry is usually a wrapper script pointing to @stele/cli/dist/index.js
-  // We verify the package.json in the containing package
+  // Reject symlinks to prevent supply chain bypass
   try {
-    // Walk up to find the package.json for @stele/cli
+    const lstats = lstatSync(binaryPath);
+    if (lstats.isSymbolicLink()) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  // Walk up to find the package.json for @stele/cli
+  try {
     let dir = resolve(binaryPath, "..", "..");
     for (let depth = 0; depth < 10; depth += 1) {
       const pkgPath = resolve(dir, "package.json");
       if (existsSync(pkgPath)) {
+        // Also reject symlinks on package.json
+        try {
+          const lstats = lstatSync(pkgPath);
+          if (lstats.isSymbolicLink()) {
+            dir = resolve(dir, "..");
+            continue;
+          }
+        } catch {
+          dir = resolve(dir, "..");
+          continue;
+        }
+
         const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
         if (pkg.name === "@stele/cli") {
           return true;
