@@ -109,13 +109,26 @@ export interface SessionSummary {
 
 /**
  * In-memory session registry keyed by projectDir.
+ * Uses TTL-based cleanup to prevent memory leaks.
  */
 const sessionRegistry = new Map<string, SessionState>();
 
+/** Sessions older than this (10 minutes) are cleaned up. */
+const SESSION_TTL_MS = 10 * 60 * 1000;
+
 /**
  * Get or create a session state for a project.
+ * Automatically cleans up stale sessions on every access.
  */
 export function getSessionState(projectDir: string): SessionState {
+  // Clean up stale sessions
+  const now = Date.now();
+  for (const [key, session] of sessionRegistry) {
+    if (now - session.startTime > SESSION_TTL_MS) {
+      sessionRegistry.delete(key);
+    }
+  }
+
   const resolved = resolve(projectDir);
   let session = sessionRegistry.get(resolved);
 
@@ -147,6 +160,12 @@ export function resetAllSessions(): void {
  * Returns the count of material observations that are relevant for
  * maintenance review decisions.
  */
+/** Maximum file size for JSONL parsing (1 MB) */
+const MAX_OBSERVATIONS_FILE_SIZE = 1 * 1024 * 1024;
+
+/** Maximum line length for JSONL entries (64 KB) */
+const MAX_LINE_LENGTH = 64 * 1024;
+
 export function readMaterialObservations(projectDir: string): Array<Record<string, unknown>> {
   const observationsFile = join(projectDir, OBSERVATIONS_FILE);
 
@@ -155,12 +174,23 @@ export function readMaterialObservations(projectDir: string): Array<Record<strin
   }
 
   try {
+    // Size limit on file read
+    const stats = require("node:fs").statSync(observationsFile);
+    if (stats.size > MAX_OBSERVATIONS_FILE_SIZE) {
+      return [];
+    }
+
     const content = readFileSync(observationsFile, "utf8");
     const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
 
     const observations: Array<Record<string, unknown>> = [];
 
     for (const line of lines) {
+      // Skip lines that exceed max length
+      if (line.length > MAX_LINE_LENGTH) {
+        continue;
+      }
+
       try {
         const obs = JSON.parse(line);
         if (obs && typeof obs === "object") {

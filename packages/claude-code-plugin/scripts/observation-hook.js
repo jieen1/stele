@@ -94,7 +94,9 @@ async function loadConfig(projectDir) {
     const protectedPatterns = Array.isArray(parsed?.protected) ? parsed.protected : DEFAULT_PROTECTED;
 
     return {
-      protected: protectedPatterns.filter((pattern) => typeof pattern === "string" && pattern.trim().length > 0),
+      protected: protectedPatterns
+        .filter((pattern) => typeof pattern === "string" && pattern.trim().length > 0)
+        .filter(isSafeGlobPattern),
     };
   } catch (error) {
     if (isMissingFileError(error)) {
@@ -105,6 +107,43 @@ async function loadConfig(projectDir) {
       protected: DEFAULT_PROTECTED,
     };
   }
+}
+
+/**
+ * Validate that a glob pattern is safe.
+ * Rejects patterns with parent traversal, absolute paths, or bracket syntax
+ * (which can be ReDoS vectors in minimatch).
+ */
+function isSafeGlobPattern(pattern) {
+  if (typeof pattern !== "string") {
+    return false;
+  }
+
+  // Reject absolute paths
+  if (isAbsoluteLikePattern(pattern)) {
+    return false;
+  }
+
+  // Reject parent traversal
+  if (containsParentTraversal(pattern)) {
+    return false;
+  }
+
+  // Reject bracket glob syntax (ReDoS vector in minimatch)
+  if (pattern.includes("[")) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAbsoluteLikePattern(pattern) {
+  return pattern.startsWith("/") || pattern.startsWith("\\") || /^[a-zA-Z]:/.test(pattern);
+}
+
+function containsParentTraversal(pattern) {
+  const parts = pattern.split("/");
+  return parts.some((part) => part === ".." || part === path.posix.sep + "..");
 }
 
 function extractTargetPaths(payload) {

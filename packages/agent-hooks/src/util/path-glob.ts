@@ -84,8 +84,8 @@ function shouldIgnorePythonCache(relativePath: string): boolean {
 }
 
 function startsWithinProtectedPrefix(relativePath: string, pattern: string): boolean {
-  const segments = relativePath.split("/");
-  const prefixSegments = getProtectedPrefix(pattern);
+  const segments = relativePath.split("/").map((seg) => normalizeForComparison(seg));
+  const prefixSegments = getProtectedPrefix(pattern).map((seg) => normalizeForComparison(seg));
 
   if (prefixSegments.length === 0 || segments.length < prefixSegments.length) {
     return false;
