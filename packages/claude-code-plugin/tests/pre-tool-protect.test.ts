@@ -828,9 +828,9 @@ describe("pre-tool-protect hook", () => {
     expect(result.stderr).toContain("invalid protected config");
   });
 
-  it("fails closed when protected config uses unsupported bracket glob syntax", async () => {
+  it("fails closed when protected config uses deeply nested bracket glob syntax", async () => {
     const projectDir = await createProject({
-      protected: ["docs/[a-z].md"],
+      protected: ["docs/[[[a-z]].md"],
     });
 
     const result = runHook(projectDir, {
