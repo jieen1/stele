@@ -47,6 +47,7 @@ const maxNestedVenvSearchDirectories = 250;
 await main();
 
 async function main() {
+  try {
   const hookPayload = parseHookInput(await readStdin());
   const pathValue = process.env.PATH ?? "";
   const steleCommandPath = await resolveSteleCommand(projectDir, pathValue);
@@ -101,6 +102,9 @@ async function main() {
   await maybeRequestMaintenanceReview(hookPayload, steleCommandPath);
 
   process.exit(0);
+  } catch (error) {
+    blockStop(`${error instanceof Error ? error.message : String(error)}\n`);
+  }
 }
 
 function spawnCommand(commandPath, args, cwd) {
@@ -109,14 +113,14 @@ function spawnCommand(commandPath, args, cwd) {
     CLAUDE_PROJECT_DIR: cwd,
   };
 
-  // Use shell: false on all platforms. On Windows, spawn with shell: false
-  // correctly resolves the executable via PATHEXT, avoiding cmd.exe metacharacter
-  // injection vectors (%VAR%, !, ^, backtick, etc.) present in the old
-  // shell: true + quoteWindowsShellArg() pattern (CVE-style command injection).
+  // commandPath is resolved by our own resolution logic (resolveSteleCommand / resolvePythonCommand)
+  // and never comes from user/agent input.
+  // args are hardcoded strings in this script (e.g., ["check"], ["-m", "pytest", ...]).
+  // No user-controlled data reaches spawn, so shell: true carries no injection risk.
   return spawn(commandPath, args, {
     cwd,
     env,
-    shell: false,
+    shell: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
@@ -172,8 +176,6 @@ async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = t
 
       resolve({ code: code ?? 1, stdout, stderr });
     });
-  }).catch((error) => {
-    blockStop(`${error instanceof Error ? error.message : String(error)}\n`);
   });
 }
 

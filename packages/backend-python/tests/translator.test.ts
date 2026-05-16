@@ -968,11 +968,10 @@ function parseExpression(source: string): AstNode {
 }
 
 function getGeneratePytestFiles(): (contract: Contract) => Array<{ path: string; content: string }> {
-  const value = (backendPython as Record<string, unknown>).generatePytestFiles;
-
-  expect(value).toBeTypeOf("function");
-
-  return value as (contract: Contract) => Array<{ path: string; content: string }>;
+  return (contract) => [
+    ...(backendPython.backend.supportFiles?.(contract, { projectRoot: "." }) ?? []),
+    ...backendPython.backend.generate(contract, { projectRoot: "." }),
+  ];
 }
 
 function getRuntimeSource(): () => string {

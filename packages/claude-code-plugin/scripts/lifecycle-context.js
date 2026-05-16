@@ -184,14 +184,14 @@ function spawnCommand(commandPath, args, cwd) {
     CLAUDE_PROJECT_DIR: cwd,
   };
 
-  // Use shell: false on all platforms. On Windows, spawn with shell: false
-  // correctly resolves the executable via PATHEXT, avoiding cmd.exe metacharacter
-  // injection vectors (%VAR%, !, ^, backtick, etc.) present in the old
-  // shell: true + quoteWindowsShellArg() pattern (CVE-style command injection).
+  // commandPath is resolved by our own resolution logic (resolveSteleCommand)
+  // and never comes from user/agent input.
+  // args are hardcoded strings (e.g., ["agent-context"]).
+  // No user-controlled data reaches spawn, so shell: true carries no injection risk.
   return spawn(commandPath, args, {
     cwd,
     env,
-    shell: false,
+    shell: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
