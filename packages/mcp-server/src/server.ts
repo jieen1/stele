@@ -43,15 +43,35 @@ export class SteleMcpServer {
       const tool = this.tools.find((t) => t.name === name);
 
       if (!tool) {
-        throw new Error(`Unknown tool: ${name}`);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[stele-mcp] Unknown tool: ${name}`,
+            },
+          ],
+          isError: true,
+        };
       }
 
-      const result = await tool.handler(args);
+      try {
+        const result = await tool.handler(args);
 
-      return {
-        content: result.content,
-        isError: result.isError,
-      };
+        return {
+          content: result.content,
+          isError: result.isError,
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[stele-mcp] Tool "${name}" threw unhandled error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     });
   }
 

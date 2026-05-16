@@ -99,7 +99,6 @@ export interface ProjectState {
   configPath: string;
   contractFiles: string[];
   lastLoadTime: number;
-  configHash?: string;
 }
 
 /**

@@ -53,6 +53,14 @@ export function createValidateEditTool(): {
       }
       const projectDir = validated.path!;
       const filePath = args.filePath as string;
+
+      if (!filePath || typeof filePath !== "string") {
+        return {
+          content: [{ type: "text", text: "Missing required argument: filePath" }],
+          isError: true,
+        };
+      }
+
       const session = getSessionState(projectDir);
       const protectedPatterns = getProtectedPatterns(projectDir);
 

@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, lstatSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
@@ -37,20 +37,17 @@ export function validateProjectDir(raw: unknown): ValidateProjectDirResult {
     return { error: `Path does not exist: ${resolved}` };
   }
 
-  // Reject symlinks (symlink attack prevention)
+  // Reject symlinks + verify directory in single lstat call (no TOCTOU)
   try {
-    const lstat = statSync(resolved);
-    if (lstat.isSymbolicLink()) {
+    const lstats = lstatSync(resolved);
+    if (lstats.isSymbolicLink()) {
       return { error: "Symlinks are not allowed for projectDir" };
     }
+    if (!lstats.isDirectory()) {
+      return { error: `${resolved} is not a directory` };
+    }
   } catch {
-    // Broken symlinks already caught by existsSync above
-  }
-
-  // Must be a directory
-  const st = statSync(resolved);
-  if (!st.isDirectory()) {
-    return { error: `${resolved} is not a directory` };
+    return { error: `${resolved} is not accessible` };
   }
 
   return { path: resolved };

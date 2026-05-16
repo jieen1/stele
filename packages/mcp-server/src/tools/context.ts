@@ -54,6 +54,13 @@ export function createContextTool(): {
       const format = (args.format as string) ?? "markdown";
       const context = buildContext(projectDir, focusPaths);
 
+      if (context.error) {
+        return {
+          content: [{ type: "text", text: `[stele-context] Error building context: ${context.error}` }],
+          isError: true,
+        };
+      }
+
       if (format === "json") {
         return {
           content: [{ type: "text", text: JSON.stringify(context, null, 2) }],

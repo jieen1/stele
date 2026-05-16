@@ -5,16 +5,12 @@ import type { ProjectState } from "./types.js";
 const CONTRACT_DIR = "contract";
 const CONFIG_FILE = "stele.config.json";
 
-let watchers: ReturnType<typeof import("node:fs").watch>[] = [];
-
 /**
- * Clear all file watchers.
+ * Invalidate all watchers (no-op: watchers were removed in favor of TTL-based caching).
+ * Kept for backward compatibility.
  */
 export function clearWatchers(): void {
-  for (const watcher of watchers) {
-    watcher.close();
-  }
-  watchers = [];
+  // No-op: watcher infrastructure removed
 }
 
 /**
@@ -117,11 +113,9 @@ export async function loadProjectState(projectDir: string): Promise<ProjectState
   const configPath = join(resolved, CONFIG_FILE);
   const contractDir = join(resolved, CONTRACT_DIR);
   let contractFiles: string[] = [];
-  let configHash = "";
 
   if (existsSync(contractDir)) {
     contractFiles = scanSteleFiles(contractDir);
-    configHash = computeConfigHash(contractFiles);
   }
 
   const state: ProjectState = {
@@ -129,15 +123,10 @@ export async function loadProjectState(projectDir: string): Promise<ProjectState
     configPath,
     contractFiles,
     lastLoadTime: Date.now(),
-    configHash,
   };
 
   projectCache.set(resolved, state);
   return state;
-}
-
-function computeConfigHash(files: string[]): string {
-  return files.sort().join(";");
 }
 
 /**
@@ -208,18 +197,9 @@ export function getProtectedPatterns(projectDir: string): string[] {
 
 /**
  * Watch contract directory for changes and invalidate cache.
+ * Deprecated: removed in favor of TTL-based caching. This function is a no-op.
+ * Kept for backward compatibility.
  */
-export function watchContractDir(contractDir: string, projectDir: string): void {
-  const { watch } = require("node:fs");
-
-  const handler = () => {
-    invalidateCache(projectDir);
-  };
-
-  try {
-    const watcher = watch(contractDir, { recursive: true }, handler);
-    watchers.push(watcher);
-  } catch {
-    // Watch may fail on some filesystems (e.g. network drives)
-  }
+export function watchContractDir(_contractDir: string, _projectDir: string): void {
+  // No-op: watcher infrastructure removed
 }
