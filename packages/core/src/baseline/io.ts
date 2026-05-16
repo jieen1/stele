@@ -32,8 +32,8 @@ function parseViolationBaseline(path: string, content: string): ViolationBaselin
   try {
     parsed = JSON.parse(content);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Baseline "${path}" is not valid JSON: ${message}`);
+    const safeMsg = error instanceof SyntaxError ? "malformed JSON" : "parse error";
+    throw new Error(`Baseline "${path}" is not valid JSON: ${safeMsg}`);
   }
 
   if (!isViolationBaseline(parsed)) {

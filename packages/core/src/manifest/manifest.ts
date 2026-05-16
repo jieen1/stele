@@ -285,6 +285,16 @@ function getManifestBaseDirectory(manifestPath: string): string {
 }
 
 function toManifestError(code: string, message: string, error: unknown, hint: string): SteleError {
-  const detail = error instanceof Error ? error.message : "Unknown manifest error.";
+  const detail = sanitizeManifestError(error);
   return new SteleError(code, "Manifest Error", message, undefined, detail, hint);
+}
+
+function sanitizeManifestError(error: unknown): string {
+  if (error instanceof Error && "code" in error) {
+    return `OS error: ${error.code}`;
+  }
+  if (error instanceof Error) {
+    return error.name;
+  }
+  return "Unable to read manifest.";
 }
