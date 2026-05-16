@@ -291,6 +291,52 @@ describe("parseConflictDeclaration", () => {
   });
 });
 
+describe("readStringList identifier acceptance", () => {
+  it("parses agent with unquoted identifiers in allowed-paths", () => {
+    const node = parseListNode('(agent "reviewer"\n  (allowed-paths mysrc))');
+
+    const result = parseAgentDeclaration(TEST_FILE, node);
+
+    expect(result.allowedPaths).toEqual(["mysrc"]);
+  });
+
+  it("parses agent with unquoted identifiers in denied-paths", () => {
+    const node = parseListNode('(agent "reviewer"\n  (denied-paths mycontract))');
+
+    const result = parseAgentDeclaration(TEST_FILE, node);
+
+    expect(result.deniedPaths).toEqual(["mycontract"]);
+  });
+
+  it("parses mixed quoted strings and identifiers", () => {
+    const node = parseListNode('(agent "reviewer"\n  (allowed-paths "src/**" mytest))');
+
+    const result = parseAgentDeclaration(TEST_FILE, node);
+
+    expect(result.allowedPaths).toEqual(["src/**", "mytest"]);
+  });
+
+  it("parses inter-agent-contract with unquoted agent identifiers", () => {
+    const node = parseListNode(
+      '(inter-agent-contract "review"\n  (agents code-reviewer feature-writer)\n  (requires code-reviewer (path "src/**") (approved-by code-reviewer)))',
+    );
+
+    const result = parseInterAgentContractDeclaration(TEST_FILE, node);
+
+    expect(result.agents).toEqual(["code-reviewer", "feature-writer"]);
+  });
+
+  it("parses conflict with unquoted agent identifiers", () => {
+    const node = parseListNode(
+      '(conflict (path "src/core/engine.ts")\n  (agents feature-writer perf-optimizer)\n  (resolution "last-writer-wins"))',
+    );
+
+    const result = parseConflictDeclaration(TEST_FILE, node);
+
+    expect(result.agents).toEqual(["feature-writer", "perf-optimizer"]);
+  });
+});
+
 describe("agent declarations in pipeline", () => {
   it("buildContract collects agent declarations", () => {
     const source = `(agent "code-reviewer"\n  (allowed-paths "src/**")\n  (denied-paths "contract/**"))`;

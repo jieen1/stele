@@ -381,6 +381,10 @@ function readSingleValueField(node: ListNode, name: string): AgentSingleValueFie
   };
 }
 
+/**
+ * Read a list of string values from a node.
+ * Accepts identifiers (no quotes) for allowed-paths, denied-paths, and agents fields.
+ */
 function readStringList(node: ListNode, label: string): string[] {
   const result: string[] = [];
   for (const item of node.items) {

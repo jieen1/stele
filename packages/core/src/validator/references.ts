@@ -2,6 +2,27 @@ import { SteleError } from "../errors/SteleError.js";
 import type { SourceSpan } from "../ast/types.js";
 import type { Contract } from "./structure.js";
 
+/**
+ * Warn when allowed and denied paths overlap.
+ * Uses simple prefix matching — full glob overlap detection is not attempted.
+ * The enforcement layer already resolves conflicts (deny takes precedence).
+ */
+function warnPathOverlap(agentId: string, allowedPaths: string[], deniedPaths: string[]): void {
+  const overlaps: string[] = [];
+  for (const allowed of allowedPaths) {
+    for (const denied of deniedPaths) {
+      if (allowed === denied || allowed.startsWith(denied.replace(/\*\*/g, "")) || denied.startsWith(allowed.replace(/\*\*/g, ""))) {
+        overlaps.push(`"${allowed}" / "${denied}"`);
+      }
+    }
+  }
+  if (overlaps.length > 0) {
+    console.warn(
+      `[W] Agent "${agentId}" has overlapping allowed/denied paths: ${overlaps.join("; ")}. Deny takes precedence.`,
+    );
+  }
+}
+
 export function validateReferences(contract: Contract): Contract {
   const checkerIds = new Set(contract.checkers.map((checker) => checker.id));
   const invariantIds = new Set(contract.invariants.map((invariant) => invariant.id));
@@ -134,6 +155,7 @@ export function validateReferences(contract: Contract): Contract {
     for (const path of agent.deniedPaths) {
       validateAgentPath(path, agent.span, `Agent "${agent.id}" denied-paths`);
     }
+    warnPathOverlap(agent.id, agent.allowedPaths, agent.deniedPaths);
   }
 
   for (const scope of contract.scopes) {

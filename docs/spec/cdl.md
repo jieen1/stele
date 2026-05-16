@@ -687,8 +687,9 @@ The generated runtime helper implements path traversal, sum helpers, checker inv
 - `E0001`-`E0003`: lexical errors
 - `E0101`-`E0102`: parser errors
 - `E0201`-`E0203`: loader errors
-- `E0301`-`E0317`: validation errors
+- `E0301`-`E0322`: validation errors
 - `E0401`-`E0404`: manifest errors
+- `E0501`-`E0505`: generator errors
 - `E0601`-`E0606`: Python backend errors
 
 All core diagnostics carry a category and, when available, file/line/column span information.
