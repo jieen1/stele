@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { SteleError } from "../errors/SteleError.js";
 import { parseFile } from "../parser/parser.js";
 import { validateReferences } from "../validator/references.js";
@@ -16,7 +16,8 @@ const MAX_IMPORT_DEPTH = 100;
 
 export async function loadContract(rootPath: string): Promise<Contract> {
   const normalizedRootPath = resolve(rootPath);
-  const files = await loadRecursive(normalizedRootPath, new Map(), [], 0);
+  const projectDir = resolve(dirname(normalizedRootPath));
+  const files = await loadRecursive(normalizedRootPath, projectDir, new Map(), [], 0);
   return validateContract(buildContract(normalizedRootPath, files));
 }
 
@@ -29,6 +30,7 @@ export function validateContract(contract: Contract): Contract {
 
 async function loadRecursive(
   filePath: string,
+  projectDir: string,
   visited: Map<string, LoadedContractFile>,
   stack: string[],
   depth: number,
@@ -73,7 +75,21 @@ async function loadRecursive(
         );
       }
 
-      loadedFiles.push(...(await loadRecursive(declaration.resolvedPath, visited, stack, depth + 1)));
+      // Import containment: reject imports that escape the project directory
+      const resolved = resolve(projectDir, declaration.resolvedPath);
+      const relPath = relative(projectDir, resolved);
+      if (relPath.startsWith("../") || isAbsolute(relPath)) {
+        throw new SteleError(
+          "E0204",
+          "Loader Error",
+          `Import "${declaration.resolvedPath}" escapes project directory.`,
+          declaration.span,
+          "Import paths must resolve inside the project root.",
+          "Use a relative path that stays within the project directory.",
+        );
+      }
+
+      loadedFiles.push(...(await loadRecursive(resolved, projectDir, visited, stack, depth + 1)));
     }
   } finally {
     stack.pop();
@@ -101,10 +117,23 @@ async function readContractFile(filePath: string): Promise<string> {
     throw new SteleError(
       "E0201",
       "Loader Error",
-      `Unable to read contract file "${filePath}".`,
+      `Unable to read contract file "${safeFilePath(filePath)}".`,
       undefined,
       detail,
       "Check that the file exists and that Stele has permission to read it.",
     );
+  }
+}
+
+function safeFilePath(filePath: string): string {
+  try {
+    const rel = relative(process.cwd(), filePath);
+    if (rel.startsWith("..")) {
+      // Outside cwd — return just the basename
+      return filePath.split(/[\\/]/).pop() ?? filePath;
+    }
+    return rel;
+  } catch {
+    return filePath;
   }
 }

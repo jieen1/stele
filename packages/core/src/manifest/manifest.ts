@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { posix as pathPosix } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
@@ -208,12 +208,38 @@ function parseManifestDocument(manifestPath: string, content: string): ContractM
 }
 
 async function readProtectedFile(filePath: string): Promise<ManifestProtectedFile> {
+  // Reject symlinks: a symlink in the manifest directory could point to
+  // an arbitrary host file, bypassing path validation.
+  const stats = await lstat(filePath);
+  if (stats.isSymbolicLink()) {
+    throw new SteleError(
+      "E0405",
+      "Manifest Error",
+      `Protected file "${safeFilePath(filePath)}" is a symbolic link.`,
+      undefined,
+      "Symbolic links are not allowed in protected files.",
+      "Remove the symlink and replace it with the actual file.",
+    );
+  }
+
   const buffer = await readFile(filePath);
 
   return {
     sha256: createHash("sha256").update(buffer).digest("hex"),
     size: buffer.byteLength,
   };
+}
+
+function safeFilePath(filePath: string): string {
+  try {
+    const rel = relative(process.cwd(), filePath);
+    if (rel.startsWith("../")) {
+      return filePath.split(/[\\/]/).pop() ?? filePath;
+    }
+    return rel;
+  } catch {
+    return filePath.split(/[\\/]/).pop() ?? filePath;
+  }
 }
 
 function isManifestDocument(value: unknown): value is ContractManifest {
