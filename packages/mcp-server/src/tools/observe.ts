@@ -1,6 +1,7 @@
-import { execFileSync } from "node:child_process";
 import type { McpResult } from "../types.js";
 import { validateProjectDir } from "../path-validation.js";
+import { runStele } from "../stele-binary.js";
+import { sanitizeError } from "../error-sanitizer.js";
 
 /**
  * MCP tool: stele-observe
@@ -42,30 +43,25 @@ export function createObserveTool(): {
       }
       const projectDir = result.path;
       const since = args.since as string | undefined;
-      const cmdArgs = ["stele", "observe", "--json"];
+      const cmdArgs = ["observe", "--json"];
 
       if (since) {
         cmdArgs.push("--since", since);
       }
 
       try {
-        const output = execFileSync("npx", cmdArgs, {
-          cwd: projectDir,
-          encoding: "utf8",
-          maxBuffer: 1024 * 1024,
-        });
+        const output = runStele(projectDir, cmdArgs);
 
         return {
           content: [{ type: "text", text: output }],
           isError: false,
         };
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
         return {
           content: [
             {
               type: "text",
-              text: `Unable to analyze observations: ${msg}\n\n` +
+              text: `Unable to analyze observations: ${sanitizeError(error)}\n\n` +
                 `Run "stele observe --json" directly to see the full report.`,
             },
           ],

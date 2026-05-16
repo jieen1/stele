@@ -1,9 +1,10 @@
-import { execFileSync } from "node:child_process";
 import type { ViolationReport } from "@stele/core";
 import type { CheckResult, McpResult } from "../types.js";
 import { toReportSummary } from "../types.js";
-import { getSessionState, type SessionState } from "../session-state.js";
+import { getSessionState } from "../session-state.js";
 import { validateProjectDir } from "../path-validation.js";
+import { runStele } from "../stele-binary.js";
+import { sanitizeError } from "../error-sanitizer.js";
 
 /**
  * MCP tool: stele-check
@@ -49,11 +50,7 @@ export function createCheckTool(): {
       const session = getSessionState(projectDir);
 
       try {
-        const output = execFileSync("npx", ["stele", "check", ...(json ? ["--json"] : [])], {
-          cwd: projectDir,
-          encoding: "utf8",
-          maxBuffer: 1024 * 1024,
-        });
+        const output = runStele(projectDir, ["check", ...(json ? ["--json"] : [])]);
 
         let report: ViolationReport;
 
@@ -98,7 +95,7 @@ export function createCheckTool(): {
           isError: !report.ok,
         };
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
+        const msg = sanitizeError(error);
         return {
           content: [{ type: "text", text: `stele check failed: ${msg}` }],
           isError: true,

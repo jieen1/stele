@@ -58,8 +58,15 @@
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
   },
   "dependencies": {
-    "@stele/cli": "workspace:*",
     "@stele/core": "workspace:*",
     "minimatch": "^10.0.0"
+  },
+  "peerDependencies": {
+    "@stele/cli": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@stele/cli": {
+      "optional": true
+    }
   }
 }

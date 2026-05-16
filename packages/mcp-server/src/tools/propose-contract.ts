@@ -1,6 +1,7 @@
-import { execFileSync } from "node:child_process";
 import type { McpResult } from "../types.js";
 import { validateProjectDir } from "../path-validation.js";
+import { runStele } from "../stele-binary.js";
+import { sanitizeError } from "../error-sanitizer.js";
 
 /**
  * MCP tool: stele-propose-contract
@@ -88,11 +89,7 @@ export function createProposeContractTool(): {
       ];
 
       try {
-        const output = execFileSync("npx", ["stele", ...cmdArgs], {
-          cwd: projectDir,
-          encoding: "utf8",
-          maxBuffer: 1024 * 1024,
-        });
+        const output = runStele(projectDir, cmdArgs);
 
         return {
           content: [
@@ -107,12 +104,11 @@ export function createProposeContractTool(): {
           isError: false,
         };
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
         return {
           content: [
             {
               type: "text",
-              text: `Unable to propose invariant ${invariantId}: ${msg}`,
+              text: `Unable to propose invariant ${invariantId}: ${sanitizeError(error)}`,
             },
           ],
           isError: true,

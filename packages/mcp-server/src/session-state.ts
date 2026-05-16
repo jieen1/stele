@@ -7,6 +7,15 @@ import { getProtectedPatterns } from "./contract-cache.js";
 
 const OBSERVATIONS_FILE = ".stele/agent/session-observations.jsonl";
 
+/** Max number of edits to retain per session. */
+const MAX_EDITS = 200;
+
+/** Max number of check results to retain per session. */
+const MAX_CHECKS = 50;
+
+/** Max number of violations to retain per session. */
+const MAX_VIOLATIONS = 100;
+
 /**
  * Track session state for a single project.
  *
@@ -36,6 +45,7 @@ export class SessionState {
 
   /**
    * Record an edit attempt.
+   * Evicts oldest entries when over MAX_EDITS capacity.
    */
   recordEdit(targetPath: string, result: ValidateEditResult): void {
     const protectedPatterns = getProtectedPatterns(this.projectDir);
@@ -47,10 +57,15 @@ export class SessionState {
       wasProtected,
       result,
     });
+
+    if (this.edits.length > MAX_EDITS) {
+      this.edits = this.edits.slice(-MAX_EDITS);
+    }
   }
 
   /**
    * Record a check result.
+   * Evicts oldest check results when over MAX_CHECKS capacity.
    */
   recordCheck(result: CheckResult): void {
     this.checks.push({
@@ -58,8 +73,16 @@ export class SessionState {
       result,
     });
 
-    for (const violation of result.violations) {
-      this.violations.set(violation.fingerprint, violation);
+    if (this.checks.length > MAX_CHECKS) {
+      this.checks = this.checks.slice(-MAX_CHECKS);
+    }
+
+    // Evict oldest violations when over capacity
+    if (this.violations.size > MAX_VIOLATIONS) {
+      const keys = Array.from(this.violations.keys());
+      for (const key of keys.slice(0, keys.length - MAX_VIOLATIONS)) {
+        this.violations.delete(key);
+      }
     }
   }
 
