@@ -12,237 +12,209 @@ import type {
   TypePolicyDeclaration,
 } from "./structure-types.js";
 
+// -- Entry point --
+
 export function parseCodeShapeDeclaration(filePath: string, node: ListNode): CodeShapeDeclaration {
-  switch (node.head) {
+  const config = CODE_SHAPE_REGISTRY[node.head as CodeShapeDeclaration["kind"]];
+
+  if (config === undefined) {
+    throw validationError(
+      "E0318",
+      `Unknown code-shape declaration "${node.head}".`,
+      node.span,
+      "Supported code-shape declarations are boundary, class-shape, function-shape, type-policy, and file-policy.",
+      "Rename or remove this declaration.",
+    );
+  }
+
+  const { id, lang, target } = parseHeader(node, config);
+  const collected = collectFields(config, id, node.items.slice(1), filePath);
+  const base = { filePath, node, span: node.span, id, lang, target };
+
+  switch (config.kind) {
     case "boundary":
-      return parseBoundaryDeclaration(filePath, node);
+      return {
+        ...base,
+        kind: "boundary",
+        denyImports: (collected.get("deny-import") as string[]) ?? [],
+        denyCalls: (collected.get("deny-call") as string[]) ?? [],
+        allowTargets: (collected.get("allow-target") as string[]) ?? [],
+      };
+
     case "class-shape":
-      return parseClassShapeDeclaration(filePath, node);
+      return {
+        ...base,
+        kind: "class-shape",
+        mustHaveFields: (collected.get("must-have-field") as ClassShapeFieldRequirement[]) ?? [],
+        mustHaveMethods: (collected.get("must-have-method") as string[]) ?? [],
+        mustExtend: (collected.get("must-extend") as string[]) ?? [],
+      };
+
     case "function-shape":
-      return parseFunctionShapeDeclaration(filePath, node);
+      return {
+        ...base,
+        kind: "function-shape",
+        mustHaveCalls: (collected.get("must-have-call") as string[]) ?? [],
+        mustHaveDecorators: (collected.get("must-have-decorator") as string[]) ?? [],
+        mustHaveParameters: (collected.get("must-have-parameter") as string[]) ?? [],
+      };
+
     case "type-policy":
-      return parseTypePolicyDeclaration(filePath, node);
+      return {
+        ...base,
+        kind: "type-policy",
+        denyTypes: (collected.get("deny-type") as string[]) ?? [],
+        requireTypes: (collected.get("require-type") as string[]) ?? [],
+      };
+
     case "file-policy":
-      return parseFilePolicyDeclaration(filePath, node);
+      return {
+        ...base,
+        kind: "file-policy",
+        mustContain: (collected.get("must-contain") as string[]) ?? [],
+        mustEndWith: (collected.get("must-end-with") as string[]) ?? [],
+      };
   }
-
-  throw validationError(
-    "E0318",
-    `Unknown code-shape declaration "${node.head}".`,
-    node.span,
-    "Supported code-shape declarations are boundary, class-shape, function-shape, type-policy, and file-policy.",
-    "Rename or remove this declaration.",
-  );
 }
 
-// -- boundary --
+// -- Registry --
 
-export function parseBoundaryDeclaration(filePath: string, node: ListNode): BoundaryDeclaration {
-  const { id, lang, target, fields } = parseCodeShapeHeader(node, "boundary");
+type FieldReader = (node: ListNode, label: string) => unknown;
 
-  const denyImports: string[] = [];
-  const denyCalls: string[] = [];
-  const allowTargets: string[] = [];
+interface FieldSpec {
+  key: string;
+  reader: FieldReader;
+}
 
-  for (const field of fields) {
-    switch (field.head) {
-      case "deny-import":
-        denyImports.push(...readCodeShapeStringList(field, `Boundary "${id}" deny-import`));
-        break;
-      case "deny-call":
-        denyCalls.push(...readCodeShapeStringList(field, `Boundary "${id}" deny-call`));
-        break;
-      case "allow-target":
-        allowTargets.push(...readCodeShapeStringList(field, `Boundary "${id}" allow-target`));
-        break;
-      default:
-        throw unknownCodeShapeFieldError(
-          "Boundary",
-          id,
-          field,
-          "lang, target, deny-import, deny-call, allow-target",
-        );
-    }
+interface DeclarationConfig {
+  kind: CodeShapeDeclaration["kind"];
+  label: string;
+  exampleId: string;
+  fields: FieldSpec[];
+}
+
+function readStrings(node: ListNode, label: string): string[] {
+  if (node.items.length === 0) {
+    throw validationError(
+      "E0318",
+      `${label} expects at least one string literal.`,
+      node.span,
+      "This field was declared without any values.",
+      "Provide one or more quoted string values inside this field.",
+    );
   }
 
-  return {
+  return node.items.map((item) => {
+    if (item.kind !== "string") {
+      throw validationError(
+        "E0318",
+        `${label} values must be string literals.`,
+        item.span,
+        `Found ${describeNode(item)} instead.`,
+        "Wrap each value in double quotes.",
+      );
+    }
+    return item.value;
+  });
+}
+
+function readNames(node: ListNode, label: string): string[] {
+  if (node.items.length === 0) {
+    throw validationError(
+      "E0318",
+      `${label} expects at least one name.`,
+      node.span,
+      "This field was declared without any values.",
+      "Provide one or more identifiers or quoted names inside this field.",
+    );
+  }
+
+  return node.items.map((item) => {
+    if (item.kind !== "identifier" && item.kind !== "string") {
+      throw validationError(
+        "E0318",
+        `${label} values must be identifiers or string literals.`,
+        item.span,
+        `Found ${describeNode(item)} instead.`,
+        "Use a plain identifier or wrap the name in double quotes.",
+      );
+    }
+    return item.value;
+  });
+}
+
+function readFieldRequirements(node: ListNode, label: string): ClassShapeFieldRequirement[] {
+  // Extract the declaration id from the full label "Class shape "service_class" must-have-field"
+  // Format: "Label "id" field" → extract just "id"
+  const match = label.match(/"([^"]+)"/);
+  const id = match ? match[1] : label;
+  return [parseClassShapeFieldRequirement(node, id)];
+}
+
+const CODE_SHAPE_REGISTRY: Record<CodeShapeDeclaration["kind"], DeclarationConfig> = {
+  boundary: {
     kind: "boundary",
-    filePath,
-    node,
-    span: node.span,
-    id,
-    lang,
-    target,
-    denyImports,
-    denyCalls,
-    allowTargets,
-  };
-}
-
-// -- class-shape --
-
-export function parseClassShapeDeclaration(filePath: string, node: ListNode): ClassShapeDeclaration {
-  const { id, lang, target, fields } = parseCodeShapeHeader(node, "class-shape");
-
-  const mustHaveFields: ClassShapeFieldRequirement[] = [];
-  const mustHaveMethods: string[] = [];
-  const mustExtend: string[] = [];
-
-  for (const field of fields) {
-    switch (field.head) {
-      case "must-have-field":
-        mustHaveFields.push(parseClassShapeFieldRequirement(field, id));
-        break;
-      case "must-have-method":
-        mustHaveMethods.push(...readCodeShapeNameList(field, `Class shape "${id}" must-have-method`));
-        break;
-      case "must-extend":
-        mustExtend.push(...readCodeShapeNameList(field, `Class shape "${id}" must-extend`));
-        break;
-      default:
-        throw unknownCodeShapeFieldError(
-          "Class shape",
-          id,
-          field,
-          "lang, target, must-have-field, must-have-method, must-extend",
-        );
-    }
-  }
-
-  return {
+    label: "Boundary",
+    exampleId: "python_boundary",
+    fields: [
+      { key: "deny-import", reader: readStrings },
+      { key: "deny-call", reader: readStrings },
+      { key: "allow-target", reader: readStrings },
+    ],
+  },
+  "class-shape": {
     kind: "class-shape",
-    filePath,
-    node,
-    span: node.span,
-    id,
-    lang,
-    target,
-    mustHaveFields,
-    mustHaveMethods,
-    mustExtend,
-  };
-}
-
-// -- function-shape --
-
-export function parseFunctionShapeDeclaration(filePath: string, node: ListNode): FunctionShapeDeclaration {
-  const { id, lang, target, fields } = parseCodeShapeHeader(node, "function-shape");
-
-  const mustHaveCalls: string[] = [];
-  const mustHaveDecorators: string[] = [];
-  const mustHaveParameters: string[] = [];
-
-  for (const field of fields) {
-    switch (field.head) {
-      case "must-have-call":
-        mustHaveCalls.push(...readCodeShapeNameList(field, `Function shape "${id}" must-have-call`));
-        break;
-      case "must-have-decorator":
-        mustHaveDecorators.push(...readCodeShapeNameList(field, `Function shape "${id}" must-have-decorator`));
-        break;
-      case "must-have-parameter":
-        mustHaveParameters.push(...readCodeShapeNameList(field, `Function shape "${id}" must-have-parameter`));
-        break;
-      default:
-        throw unknownCodeShapeFieldError(
-          "Function shape",
-          id,
-          field,
-          "lang, target, must-have-call, must-have-decorator, must-have-parameter",
-        );
-    }
-  }
-
-  return {
+    label: "Class shape",
+    exampleId: "python_class_shape",
+    fields: [
+      { key: "must-have-field", reader: readFieldRequirements },
+      { key: "must-have-method", reader: readNames },
+      { key: "must-extend", reader: readNames },
+    ],
+  },
+  "function-shape": {
     kind: "function-shape",
-    filePath,
-    node,
-    span: node.span,
-    id,
-    lang,
-    target,
-    mustHaveCalls,
-    mustHaveDecorators,
-    mustHaveParameters,
-  };
-}
-
-// -- type-policy --
-
-export function parseTypePolicyDeclaration(filePath: string, node: ListNode): TypePolicyDeclaration {
-  const { id, lang, target, fields } = parseCodeShapeHeader(node, "type-policy");
-
-  const denyTypes: string[] = [];
-  const requireTypes: string[] = [];
-
-  for (const field of fields) {
-    switch (field.head) {
-      case "deny-type":
-        denyTypes.push(...readCodeShapeStringList(field, `Type policy "${id}" deny-type`));
-        break;
-      case "require-type":
-        requireTypes.push(...readCodeShapeStringList(field, `Type policy "${id}" require-type`));
-        break;
-      default:
-        throw unknownCodeShapeFieldError("Type policy", id, field, "lang, target, deny-type, require-type");
-    }
-  }
-
-  return {
+    label: "Function shape",
+    exampleId: "python_function_shape",
+    fields: [
+      { key: "must-have-call", reader: readNames },
+      { key: "must-have-decorator", reader: readNames },
+      { key: "must-have-parameter", reader: readNames },
+    ],
+  },
+  "type-policy": {
     kind: "type-policy",
-    filePath,
-    node,
-    span: node.span,
-    id,
-    lang,
-    target,
-    denyTypes,
-    requireTypes,
-  };
-}
-
-// -- file-policy --
-
-export function parseFilePolicyDeclaration(filePath: string, node: ListNode): FilePolicyDeclaration {
-  const { id, lang, target, fields } = parseCodeShapeHeader(node, "file-policy");
-
-  const mustContain: string[] = [];
-  const mustEndWith: string[] = [];
-
-  for (const field of fields) {
-    switch (field.head) {
-      case "must-contain":
-        mustContain.push(...readCodeShapeStringList(field, `File policy "${id}" must-contain`));
-        break;
-      case "must-end-with":
-        mustEndWith.push(...readCodeShapeStringList(field, `File policy "${id}" must-end-with`));
-        break;
-      default:
-        throw unknownCodeShapeFieldError("File policy", id, field, "lang, target, must-contain, must-end-with");
-    }
-  }
-
-  return {
+    label: "Type policy",
+    exampleId: "python_type_policy",
+    fields: [
+      { key: "deny-type", reader: readStrings },
+      { key: "require-type", reader: readStrings },
+    ],
+  },
+  "file-policy": {
     kind: "file-policy",
-    filePath,
-    node,
-    span: node.span,
-    id,
-    lang,
-    target,
-    mustContain,
-    mustEndWith,
-  };
+    label: "File policy",
+    exampleId: "python_file_policy",
+    fields: [
+      { key: "must-contain", reader: readStrings },
+      { key: "must-end-with", reader: readStrings },
+    ],
+  },
+};
+
+function supportedFieldsText(config: DeclarationConfig): string {
+  const headerFields = ["lang", "target"];
+  const fieldKeys = config.fields.map((f) => f.key);
+  return [...headerFields, ...fieldKeys].join(", ");
 }
 
-// -- shared code-shape helpers --
+// -- Header parsing --
 
-function parseCodeShapeHeader(
-  node: ListNode,
-  kind: CodeShapeDeclaration["kind"],
-): { id: string; lang: CodeShapeLang; target: string; fields: ListNode[] } {
+type HeaderResult = { id: string; lang: CodeShapeLang; target: string };
+
+function parseHeader(node: ListNode, config: DeclarationConfig): HeaderResult {
   const idNode = node.items[0];
-  const label = codeShapeLabel(kind);
+  const label = config.label;
 
   if (idNode?.kind !== "identifier") {
     throw validationError(
@@ -250,13 +222,12 @@ function parseCodeShapeHeader(
       `${label} declarations must start with an identifier.`,
       node.span,
       `The first ${label.toLowerCase()} item should be the declaration id.`,
-      `Use a form like (${kind} ${exampleCodeShapeId(kind)} ...).`,
+      `Use a form like (${config.kind} ${config.exampleId} ...).`,
     );
   }
 
   let lang: CodeShapeLang | undefined;
   let target: string | undefined;
-  const fields: ListNode[] = [];
 
   for (const field of node.items.slice(1)) {
     if (field.kind !== "list") {
@@ -271,15 +242,12 @@ function parseCodeShapeHeader(
 
     switch (field.head) {
       case "lang":
-        ensureCodeShapeFieldUnset(lang, field, `${label} "${idNode.value}" lang`);
-        lang = parseCodeShapeLang(field, label, idNode.value);
+        ensureUnset(lang, field, `${label} "${idNode.value}" lang`);
+        lang = parseLang(field, label, idNode.value);
         break;
       case "target":
-        ensureCodeShapeFieldUnset(target, field, `${label} "${idNode.value}" target`);
-        target = parseCodeShapeTarget(field, label, idNode.value);
-        break;
-      default:
-        fields.push(field);
+        ensureUnset(target, field, `${label} "${idNode.value}" target`);
+        target = parseTarget(field, label, idNode.value);
         break;
     }
   }
@@ -304,15 +272,10 @@ function parseCodeShapeHeader(
     );
   }
 
-  return {
-    id: idNode.value,
-    lang,
-    target,
-    fields,
-  };
+  return { id: idNode.value, lang, target };
 }
 
-function parseCodeShapeLang(node: ListNode, label: string, id: string): CodeShapeLang {
+function parseLang(node: ListNode, label: string, id: string): CodeShapeLang {
   const langNode = readSingleExpression(node, `${label} "${id}" lang`, "E0318");
 
   if (langNode.kind !== "identifier") {
@@ -338,7 +301,7 @@ function parseCodeShapeLang(node: ListNode, label: string, id: string): CodeShap
   return "python";
 }
 
-function parseCodeShapeTarget(node: ListNode, label: string, id: string): string {
+function parseTarget(node: ListNode, label: string, id: string): string {
   const targetNode = readSingleExpression(node, `${label} "${id}" target`, "E0318");
 
   if (targetNode.kind !== "string") {
@@ -352,6 +315,75 @@ function parseCodeShapeTarget(node: ListNode, label: string, id: string): string
   }
 
   return targetNode.value;
+}
+
+// -- Field collection --
+
+function collectFields(
+  config: DeclarationConfig,
+  id: string,
+  fields: AstNode[],
+  _filePath: string,
+): Map<string, unknown> {
+  const collected = new Map<string, unknown>();
+  const label = `${config.label} "${id}"`;
+  const fieldMap = new Map(config.fields.map((f) => [f.key, f]));
+
+  for (const field of fields) {
+    if (field.kind !== "list") {
+      throw validationError(
+        "E0318",
+        `${config.label} "${id}" contains an unsupported field entry.`,
+        field.span,
+        `${config.label} fields must be nested list forms.`,
+        "Wrap this field in a supported list declaration.",
+      );
+    }
+
+    const fieldKey = field.head;
+
+    // Skip lang and target (already consumed in header)
+    if (fieldKey === "lang" || fieldKey === "target") {
+      continue;
+    }
+
+    const spec = fieldMap.get(fieldKey);
+    if (spec === undefined) {
+      throw validationError(
+        "E0318",
+        `${config.label} "${id}" has an unknown field "${fieldKey}".`,
+        field.span,
+        `Supported ${config.label.toLowerCase()} fields are: ${supportedFieldsText(config)}.`,
+        "Rename or remove this field.",
+      );
+    }
+
+    const values = spec.reader(field, `${label} ${fieldKey}`);
+    if (!collected.has(fieldKey)) {
+      collected.set(fieldKey, values);
+    } else {
+      const existing = collected.get(fieldKey);
+      if (Array.isArray(existing) && Array.isArray(values)) {
+        collected.set(fieldKey, [...existing, ...values]);
+      }
+    }
+  }
+
+  return collected;
+}
+
+// -- Helpers --
+
+function ensureUnset(value: unknown, field: ListNode, label: string): void {
+  if (value !== undefined) {
+    throw validationError(
+      "E0318",
+      `${label} may only be declared once.`,
+      field.span,
+      "This field already appeared earlier in the same code-shape declaration.",
+      "Keep a single copy of this field.",
+    );
+  }
 }
 
 export function parseClassShapeFieldRequirement(node: ListNode, id: string): ClassShapeFieldRequirement {
@@ -406,107 +438,26 @@ export function parseClassShapeFieldRequirement(node: ListNode, id: string): Cla
   };
 }
 
-export function readCodeShapeStringList(node: ListNode, label: string): string[] {
-  if (node.items.length === 0) {
-    throw validationError(
-      "E0318",
-      `${label} expects at least one string literal.`,
-      node.span,
-      "This field was declared without any values.",
-      "Provide one or more quoted string values inside this field.",
-    );
-  }
+// -- Backward compatibility: re-export individual parsers --
 
-  return node.items.map((item) => {
-    if (item.kind !== "string") {
-      throw validationError(
-        "E0318",
-        `${label} values must be string literals.`,
-        item.span,
-        `Found ${describeNode(item)} instead.`,
-        "Wrap each value in double quotes.",
-      );
-    }
-
-    return item.value;
-  });
+export function parseBoundaryDeclaration(filePath: string, node: ListNode): BoundaryDeclaration {
+  return parseCodeShapeDeclaration(filePath, node) as BoundaryDeclaration;
 }
 
-export function readCodeShapeNameList(node: ListNode, label: string): string[] {
-  if (node.items.length === 0) {
-    throw validationError(
-      "E0318",
-      `${label} expects at least one name.`,
-      node.span,
-      "This field was declared without any values.",
-      "Provide one or more identifiers or quoted names inside this field.",
-    );
-  }
-
-  return node.items.map((item) => {
-    if (item.kind !== "identifier" && item.kind !== "string") {
-      throw validationError(
-        "E0318",
-        `${label} values must be identifiers or string literals.`,
-        item.span,
-        `Found ${describeNode(item)} instead.`,
-        "Use a plain identifier or wrap the name in double quotes.",
-      );
-    }
-
-    return item.value;
-  });
+export function parseClassShapeDeclaration(filePath: string, node: ListNode): ClassShapeDeclaration {
+  return parseCodeShapeDeclaration(filePath, node) as ClassShapeDeclaration;
 }
 
-function ensureCodeShapeFieldUnset(value: unknown, field: ListNode, label: string): void {
-  if (value !== undefined) {
-    throw validationError(
-      "E0318",
-      `${label} may only be declared once.`,
-      field.span,
-      "This field already appeared earlier in the same code-shape declaration.",
-      "Keep a single copy of this field.",
-    );
-  }
+export function parseFunctionShapeDeclaration(filePath: string, node: ListNode): FunctionShapeDeclaration {
+  return parseCodeShapeDeclaration(filePath, node) as FunctionShapeDeclaration;
 }
 
-function unknownCodeShapeFieldError(label: string, id: string, field: ListNode, supportedFields: string): never {
-  throw validationError(
-    "E0318",
-    `${label} "${id}" has an unknown field "${field.head}".`,
-    field.span,
-    `Supported ${label.toLowerCase()} fields are: ${supportedFields}.`,
-    "Rename or remove this field.",
-  );
+export function parseTypePolicyDeclaration(filePath: string, node: ListNode): TypePolicyDeclaration {
+  return parseCodeShapeDeclaration(filePath, node) as TypePolicyDeclaration;
 }
 
-function codeShapeLabel(kind: CodeShapeDeclaration["kind"]): string {
-  switch (kind) {
-    case "boundary":
-      return "Boundary";
-    case "class-shape":
-      return "Class shape";
-    case "function-shape":
-      return "Function shape";
-    case "type-policy":
-      return "Type policy";
-    case "file-policy":
-      return "File policy";
-  }
+export function parseFilePolicyDeclaration(filePath: string, node: ListNode): FilePolicyDeclaration {
+  return parseCodeShapeDeclaration(filePath, node) as FilePolicyDeclaration;
 }
 
-function exampleCodeShapeId(kind: CodeShapeDeclaration["kind"]): string {
-  switch (kind) {
-    case "boundary":
-      return "python_boundary";
-    case "class-shape":
-      return "python_class_shape";
-    case "function-shape":
-      return "python_function_shape";
-    case "type-policy":
-      return "python_type_policy";
-    case "file-policy":
-      return "python_file_policy";
-  }
-}
-
+export { readStrings as readCodeShapeStringList, readNames as readCodeShapeNameList };

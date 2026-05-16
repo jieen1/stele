@@ -189,6 +189,17 @@ function validateAgentPath(path: string, span: SourceSpan, label: string): void 
     );
   }
 
+  if (path.includes("\0")) {
+    throw new SteleError(
+      "E0322",
+      "Validation Error",
+      `${label} contains a null byte.`,
+      span,
+      "Agent paths must not contain null bytes.",
+      "Remove null bytes from the path.",
+    );
+  }
+
   if (path.startsWith("/") || /^[a-zA-Z]:\//.test(path)) {
     throw new SteleError(
       "E0322",

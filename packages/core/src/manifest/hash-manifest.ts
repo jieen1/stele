@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
@@ -175,7 +175,7 @@ export async function writeAtomic(targetPath: string, content: string): Promise<
   const directory = dirname(targetPath);
   await mkdir(directory, { recursive: true });
 
-  const tmpPath = `${targetPath}.tmp.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+  const tmpPath = `${targetPath}.tmp.${process.pid}.${Date.now()}.${randomBytes(8).toString("hex")}`;
   await writeFile(tmpPath, content, "utf8");
 
   try {
