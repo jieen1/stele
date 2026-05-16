@@ -14,6 +14,7 @@ import type { ToolDef } from "./types.js";
 export class SteleMcpServer {
   private server: Server;
   private tools: ToolDef[] = [];
+  private toolMap: Map<string, ToolDef> = new Map();
 
   constructor() {
     this.server = new Server(
@@ -29,6 +30,7 @@ export class SteleMcpServer {
    */
   private setupHandlers(): void {
     this.tools = registerTools();
+    this.toolMap = new Map(this.tools.map((t) => [t.name, t]));
 
     this.server.setRequestHandler(ListToolsRequestSchema, () => ({
       tools: this.tools.map((tool) => ({
@@ -40,7 +42,7 @@ export class SteleMcpServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args = {} } = request.params;
-      const tool = this.tools.find((t) => t.name === name);
+      const tool = this.toolMap.get(name);
 
       if (!tool) {
         return {

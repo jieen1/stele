@@ -62,7 +62,7 @@ export function scanSteleFiles(directory: string): string[] {
     // Directory doesn't exist or isn't readable
   }
 
-  return results;
+  return results.sort();
 }
 
 /**

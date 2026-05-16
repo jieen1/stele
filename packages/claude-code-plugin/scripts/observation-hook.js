@@ -129,8 +129,10 @@ function isSafeGlobPattern(pattern) {
     return false;
   }
 
-  // Reject bracket glob syntax (ReDoS vector in minimatch)
-  if (pattern.includes("[")) {
+  // Reject deeply nested bracket glob syntax (ReDoS vector in minimatch).
+  // Allow up to 2 bracket pairs (sufficient for [a-z], [!xyz], etc.)
+  // but reject deeply nested patterns like [[[[[...]]]]] which cause ReDoS.
+  if (pattern.split("[").length > 3) {
     return false;
   }
 
@@ -448,11 +450,14 @@ function isMaterialChange(projectDir, protectedPatterns, targetPath) {
     return false;
   }
 
-  if (relativePath.startsWith(".stele/") || relativePath.startsWith("node_modules/") || relativePath.startsWith(".git/")) {
+  // Normalize case for comparison to handle case-insensitive filesystems
+  const normalizedPath = process.platform === "win32" ? relativePath.toLowerCase() : relativePath;
+
+  if (normalizedPath.startsWith(".stele/") || normalizedPath.startsWith("node_modules/") || normalizedPath.startsWith(".git/")) {
     return false;
   }
 
-  return !protectedPatterns.some((pattern) => matchGlob(relativePath, pattern) || matchesProtectedDirectoryRoot(relativePath, pattern));
+  return !protectedPatterns.some((pattern) => matchGlob(normalizedPath, pattern) || matchesProtectedDirectoryRoot(normalizedPath, pattern));
 }
 
 function normalizeTargetPath(projectDir, targetPath) {
@@ -495,7 +500,7 @@ function matchGlob(relativePath, pattern) {
 
   return minimatch(relativePath, pattern, {
     dot: true,
-    nocase: process.platform === "win32",
+    nocase: true,
   });
 }
 

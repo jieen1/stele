@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { matchProtectedPath } from "@stele/agent-hooks";
 import type { Violation } from "@stele/core";
-import type { CheckResult, ValidateEditResult } from "./types.js";
+import type { CheckResult, SessionSummary, ValidateEditResult } from "./types.js";
 import { getProtectedPatterns } from "./contract-cache.js";
 
 const OBSERVATIONS_FILE = ".stele/agent/session-observations.jsonl";
@@ -96,38 +96,78 @@ export class SessionState {
 }
 
 /**
- * Session summary for status reporting.
- */
-export interface SessionSummary {
-  totalEdits: number;
-  protectedEdits: number;
-  blockedEdits: number;
-  checks: number;
-  violations: number;
-  sessionDurationMs: number;
-}
-
-/**
  * In-memory session registry keyed by projectDir.
  * Uses TTL-based cleanup to prevent memory leaks.
  */
 const sessionRegistry = new Map<string, SessionState>();
 
+/** Max number of sessions in registry. LRU eviction when exceeded. */
+const MAX_SESSIONS = 100;
+
+/** Interval for background cleanup of stale sessions. */
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Background cleanup timer reference (for cleanup scheduling). */
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
 /** Sessions older than this (10 minutes) are cleaned up. */
 const SESSION_TTL_MS = 10 * 60 * 1000;
 
 /**
- * Get or create a session state for a project.
- * Automatically cleans up stale sessions on every access.
+ * Clean up stale sessions from the registry.
  */
-export function getSessionState(projectDir: string): SessionState {
-  // Clean up stale sessions
+function cleanupStaleSessions(): void {
   const now = Date.now();
   for (const [key, session] of sessionRegistry) {
     if (now - session.startTime > SESSION_TTL_MS) {
       sessionRegistry.delete(key);
     }
   }
+}
+
+/**
+ * Evict oldest sessions if registry exceeds max size.
+ */
+function evictIfOverCapacity(): void {
+  if (sessionRegistry.size <= MAX_SESSIONS) {
+    return;
+  }
+
+  // Find the oldest session and remove it
+  let oldestKey: string | null = null;
+  let oldestTime = Number.MAX_VALUE;
+
+  for (const [key, session] of sessionRegistry) {
+    if (session.startTime < oldestTime) {
+      oldestKey = key;
+      oldestTime = session.startTime;
+    }
+  }
+
+  if (oldestKey) {
+    sessionRegistry.delete(oldestKey);
+  }
+}
+
+/**
+ * Ensure the background cleanup timer is running.
+ */
+function ensureCleanupTimer(): void {
+  if (cleanupTimer !== null) {
+    return;
+  }
+
+  cleanupTimer = setInterval(cleanupStaleSessions, CLEANUP_INTERVAL_MS);
+  cleanupTimer.unref?.();
+}
+
+/**
+ * Get or create a session state for a project.
+ * Cleans up stale sessions and evicts if over capacity on every access.
+ */
+export function getSessionState(projectDir: string): SessionState {
+  cleanupStaleSessions();
+  ensureCleanupTimer();
 
   const resolved = resolve(projectDir);
   let session = sessionRegistry.get(resolved);
@@ -135,6 +175,7 @@ export function getSessionState(projectDir: string): SessionState {
   if (!session) {
     session = new SessionState(resolved);
     sessionRegistry.set(resolved, session);
+    evictIfOverCapacity();
   }
 
   return session;
@@ -175,7 +216,7 @@ export function readMaterialObservations(projectDir: string): Array<Record<strin
 
   try {
     // Size limit on file read
-    const stats = require("node:fs").statSync(observationsFile);
+    const stats = statSync(observationsFile);
     if (stats.size > MAX_OBSERVATIONS_FILE_SIZE) {
       return [];
     }
@@ -209,8 +250,6 @@ export function readMaterialObservations(projectDir: string): Array<Record<strin
 
 /**
  * Check if a path matches any protected pattern.
- * Delegates to matchProtectedPath from @stele/agent-hooks for proper glob matching.
+ * Re-exported as isProtectedPath for backward compatibility.
  */
-export function isProtectedPath(filePath: string, patterns: string[], projectDir: string): boolean {
-  return matchProtectedPath(filePath, patterns, projectDir);
-}
+export { matchProtectedPath as isProtectedPath };

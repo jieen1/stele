@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import type { ViolationReport } from "@stele/core";
 import type { CheckResult, McpResult } from "../types.js";
 import { toReportSummary } from "../types.js";
-import type { SessionState } from "../session-state.js";
+import { getSessionState, type SessionState } from "../session-state.js";
 import { validateProjectDir } from "../path-validation.js";
 
 /**
@@ -62,7 +62,7 @@ export function createCheckTool(): {
         } catch {
           return {
             content: [{ type: "text", text: output }],
-            isError: false,
+            isError: true,
           };
         }
 
@@ -106,13 +106,4 @@ export function createCheckTool(): {
       }
     },
   };
-}
-
-/**
- * Get session state for a project.
- */
-function getSessionState(projectDir: string): SessionState {
-  // Dynamic import to avoid circular dependency
-  const { getSessionState: get } = require("../session-state.js");
-  return get(projectDir);
 }

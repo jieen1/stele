@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { McpResult } from "../types.js";
 import { isSteleProject, listContractFiles } from "../contract-cache.js";
@@ -61,7 +61,7 @@ function buildStatusResult(projectDir: string): Record<string, unknown> {
 
     if (result.hasConfig) {
       try {
-        const raw = require("node:fs").readFileSync(configPath, "utf8");
+        const raw = readFileSync(configPath, "utf8");
         result.config = JSON.parse(raw);
       } catch (err) {
         result.configError = err instanceof Error ? err.message : String(err);
