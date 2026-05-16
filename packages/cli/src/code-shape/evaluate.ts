@@ -299,7 +299,7 @@ function evaluateBoundaryDeclaration(
     }
 
     for (const called of analysis.calls) {
-      const deniedCall = declaration.denyCalls.find((pattern) => minimatch(called.name, pattern, { windowsPathsNoEscape: true }));
+      const deniedCall = declaration.denyCalls.find((pattern) => minimatch(called.name, pattern));
 
       if (deniedCall !== undefined) {
         violations.push(
@@ -507,7 +507,7 @@ function evaluateFunctionShapeDeclaration(
     }
 
     for (const requiredCall of declaration.mustHaveCalls) {
-      if (!match.functionInfo.calls.some((called) => minimatch(called.name, requiredCall, { windowsPathsNoEscape: true }))) {
+      if (!match.functionInfo.calls.some((called) => minimatch(called.name, requiredCall))) {
         violations.push(
           createRuleViolation({
             declaration,
@@ -897,7 +897,7 @@ async function expandTargetPattern(projectDir: string, pattern: string): Promise
   const rootDirectory = rootPattern === "." ? resolve(projectDir) : resolve(projectDir, rootPattern);
   const files = await walkRoot(rootDirectory, resolve(projectDir));
 
-  return files.filter((file) => minimatch(file, normalizedPattern, { windowsPathsNoEscape: true }));
+  return files.filter((file) => minimatch(file, normalizedPattern));
 }
 
 async function walkRoot(directory: string, projectDir: string): Promise<string[]> {
@@ -991,7 +991,7 @@ function annotationUsesType(annotation: PythonAnnotation, expectedType: string):
 }
 
 function matchesPathPattern(path: string, pattern: string): boolean {
-  return minimatch(path, normalizeRelativePath(pattern), { windowsPathsNoEscape: true });
+  return minimatch(path, normalizeRelativePath(pattern));
 }
 
 function createScopePaths(contractPath: string, matchedFiles: string[], fallbackPath: string): string[] {

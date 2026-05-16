@@ -497,7 +497,7 @@ async function expandProtectedPattern(projectDir: string, pattern: string): Prom
   const rootDirectory = rootPattern === "." ? projectDir : resolve(projectDir, rootPattern);
   const files = await walkProtectedRoot(rootDirectory, projectDir);
 
-  return files.filter((file) => minimatch(file, pattern, { dot: true, windowsPathsNoEscape: true }));
+  return files.filter((file) => minimatch(file, pattern, { dot: true }));
 }
 
 async function walkProtectedRoot(directory: string, projectDir: string): Promise<string[]> {

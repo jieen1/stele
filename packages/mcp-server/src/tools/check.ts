@@ -1,10 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
 import type { ViolationReport } from "@stele/core";
-import type { CheckResult, McpResult, SessionState } from "../types.js";
-import { getSessionState } from "../session-state.js";
-
-const DEFAULT_PROJECT_DIR = process.cwd();
+import type { CheckResult, McpResult } from "../types.js";
+import type { SessionState } from "../session-state.js";
+import { validateProjectDir } from "../path-validation.js";
 
 /**
  * MCP tool: stele-check
@@ -38,8 +36,15 @@ export function createCheckTool(): {
       required: [],
     },
     handler: (args: Record<string, unknown>): McpResult => {
-      const projectDir = resolve(args.projectDir as string ?? DEFAULT_PROJECT_DIR);
+      const result = validateProjectDir(args.projectDir);
       const json = args.json !== false;
+      if (result.error) {
+        return {
+          content: [{ type: "text", text: result.error }],
+          isError: true,
+        };
+      }
+      const projectDir = result.path!;
       const session = getSessionState(projectDir);
 
       try {
@@ -75,7 +80,7 @@ export function createCheckTool(): {
         }
 
         const violationCount = report.violations?.length ?? 0;
-        const invariantCount = report.summary?.invariantCount ?? 0;
+        const invariantCount = report.summary?.invariant_count ?? 0;
 
         return {
           content: [

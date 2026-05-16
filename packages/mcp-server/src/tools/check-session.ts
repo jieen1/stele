@@ -1,11 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
 import type { ViolationReport } from "@stele/core";
-import type { CheckResult, McpResult, SessionState, ValidateEditResult } from "../types.js";
+import type { CheckResult, McpResult } from "../types.js";
+import { validateProjectDir } from "../path-validation.js";
 import { getSessionState, readMaterialObservations } from "../session-state.js";
 import { loadProjectState } from "../contract-cache.js";
-
-const DEFAULT_PROJECT_DIR = process.cwd();
 
 /**
  * MCP tool: stele-check-session
@@ -40,7 +38,14 @@ export function createCheckSessionTool(): {
       required: [],
     },
     handler: (args: Record<string, unknown>): McpResult => {
-      const projectDir = resolve(args.projectDir as string ?? DEFAULT_PROJECT_DIR);
+      const validated = validateProjectDir(args.projectDir);
+      if (validated.error) {
+        return {
+          content: [{ type: "text", text: validated.error }],
+          isError: true,
+        };
+      }
+      const projectDir = validated.path!;
       const json = args.json !== false;
       const session = getSessionState(projectDir);
       const materialObservations = readMaterialObservations(projectDir);
@@ -101,8 +106,8 @@ export function createCheckSessionTool(): {
 
         const violationCount = report.violations?.length ?? 0;
         let summary = report.ok
-          ? `Stele session check: PASS\n- Invariants checked: ${report.summary?.invariantCount ?? 0}\n- Violations: ${violationCount}`
-          : `Stele session check: FAIL\n- Invariants checked: ${report.summary?.invariantCount ?? 0}\n- Violations: ${violationCount}`;
+          ? `Stele session check: PASS\n- Invariants checked: ${report.summary?.invariant_count ?? 0}\n- Violations: ${violationCount}`
+          : `Stele session check: FAIL\n- Invariants checked: ${report.summary?.invariant_count ?? 0}\n- Violations: ${violationCount}`;
 
         if (needsReview) {
           summary += `\n\n⚠️ Maintenance review required: ${materialObservations.length} material observation(s) detected.`;

@@ -456,7 +456,6 @@ function matchGlob(relativePath, pattern) {
 
   return minimatch(relativePath, pattern, {
     dot: true,
-    windowsPathsNoEscape: true,
     nocase: process.platform === "win32",
   });
 }

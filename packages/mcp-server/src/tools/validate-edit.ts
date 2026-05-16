@@ -1,10 +1,8 @@
 import { resolve } from "node:path";
-import { execFileSync } from "node:child_process";
 import type { McpResult, ValidateEditResult } from "../types.js";
+import { validateProjectDir } from "../path-validation.js";
 import { getSessionState, isProtectedPath } from "../session-state.js";
-import { getProtectedPatterns, loadProjectState } from "../contract-cache.js";
-
-const DEFAULT_PROJECT_DIR = process.cwd();
+import { getProtectedPatterns } from "../contract-cache.js";
 
 /**
  * MCP tool: stele-validate-edit
@@ -45,7 +43,14 @@ export function createValidateEditTool(): {
       required: ["filePath"],
     },
     handler: (args: Record<string, unknown>): McpResult => {
-      const projectDir = resolve(args.projectDir as string ?? DEFAULT_PROJECT_DIR);
+      const validated = validateProjectDir(args.projectDir);
+      if (validated.error) {
+        return {
+          content: [{ type: "text", text: validated.error }],
+          isError: true,
+        };
+      }
+      const projectDir = validated.path!;
       const filePath = args.filePath as string;
       const session = getSessionState(projectDir);
       const protectedPatterns = getProtectedPatterns(projectDir);
@@ -54,29 +59,29 @@ export function createValidateEditTool(): {
 
       // Check if the path is protected
       if (!isProtectedPath(resolvedPath, protectedPatterns)) {
-        const result: ValidateEditResult = {
+        const editResult: ValidateEditResult = {
           allowed: true,
           reason: "Path is not protected by Stele",
         };
 
-        session.recordEdit(resolvedPath, result);
+        session.recordEdit(resolvedPath, editResult);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: "text", text: JSON.stringify(editResult, null, 2) }],
           isError: false,
         };
       }
 
       // Path is protected — check if the file is a contract file
       // For contract files, we need to check invariants
-      const result: ValidateEditResult = {
+      const editResult: ValidateEditResult = {
         allowed: false,
         reason: "File is protected by Stele. Use stele propose-contract to add new invariants or ask the user to approve a contract update.",
       };
 
-      session.recordEdit(resolvedPath, result);
+      session.recordEdit(resolvedPath, editResult);
 
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(editResult, null, 2) }],
         isError: false,
       };
     },

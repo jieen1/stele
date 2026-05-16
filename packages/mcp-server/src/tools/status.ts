@@ -1,9 +1,8 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { McpResult } from "../types.js";
 import { isSteleProject, listContractFiles } from "../contract-cache.js";
-
-const DEFAULT_PROJECT_DIR = process.cwd();
+import { validateProjectDir } from "../path-validation.js";
 
 /**
  * MCP tool: stele-status
@@ -31,7 +30,14 @@ export function createStatusTool(): {
       required: [],
     },
     handler: (args: Record<string, unknown>): McpResult => {
-      const projectDir = resolve(args.projectDir as string ?? DEFAULT_PROJECT_DIR);
+      const validated = validateProjectDir(args.projectDir);
+      if (validated.error) {
+        return {
+          content: [{ type: "text", text: validated.error }],
+          isError: true,
+        };
+      }
+      const projectDir = validated.path!;
       const result = buildStatusResult(projectDir);
 
       return {

@@ -1,9 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import type { McpResult } from "../types.js";
 import { loadProjectState, listContractFiles } from "../contract-cache.js";
-
-const DEFAULT_PROJECT_DIR = process.cwd();
+import { validateProjectDir } from "../path-validation.js";
 
 /**
  * MCP tool: stele-context
@@ -43,7 +42,14 @@ export function createContextTool(): {
       required: [],
     },
     handler: async (args: Record<string, unknown>): Promise<McpResult> => {
-      const projectDir = resolve(args.projectDir as string ?? DEFAULT_PROJECT_DIR);
+      const validated = validateProjectDir(args.projectDir);
+      if (validated.error) {
+        return {
+          content: [{ type: "text", text: validated.error }],
+          isError: true,
+        };
+      }
+      const projectDir = validated.path!;
       const focusPaths = args.focusPaths as string[] ?? [];
       const format = (args.format as string) ?? "markdown";
       const context = buildContext(projectDir, focusPaths);
