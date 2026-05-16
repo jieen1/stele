@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { McpResult } from "../types.js";
 import { loadProjectState, listContractFiles } from "../contract-cache.js";
 import { validateProjectDir } from "../path-validation.js";
@@ -52,6 +52,17 @@ export function createContextTool(): {
       const projectDir = validated.path!;
       const focusPaths = args.focusPaths as string[] ?? [];
       const format = (args.format as string) ?? "markdown";
+
+      // Validate focusPaths stay within project directory
+      for (const fp of focusPaths) {
+        const resolved = resolve(projectDir, fp);
+        if (!resolved.startsWith(projectDir)) {
+          return {
+            content: [{ type: "text", text: `focusPath escapes project directory: ${fp}` }],
+            isError: true,
+          };
+        }
+      }
       const context = buildContext(projectDir, focusPaths);
 
       if (context.error) {
