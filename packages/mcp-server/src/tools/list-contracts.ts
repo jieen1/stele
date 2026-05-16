@@ -13,7 +13,7 @@ export function createListContractsTool(): {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  handler: (args: Record<string, unknown>) => McpResult;
+  handler: (args: Record<string, unknown>) => Promise<McpResult>;
 } {
   return {
     name: "stele-list-contracts",
@@ -83,9 +83,11 @@ async function buildContractsResult(
   try {
     const contracts = await loadContractFiles(contractDir);
 
+    const parsedContracts: Array<Record<string, unknown>> = [];
+
     for (const contract of contracts) {
       const parsed = parseContractContract(contract.content);
-      result.contracts.push({
+      parsedContracts.push({
         file: contract.path,
         size: statSync(contract.path).size,
         invariantCount: parsed.invariants.length,
@@ -94,6 +96,8 @@ async function buildContractsResult(
         checkers: parsed.checkers,
       });
     }
+
+    result.contracts = parsedContracts;
   } catch (err) {
     result.parseError = err instanceof Error ? err.message : String(err);
     result.contracts = files;

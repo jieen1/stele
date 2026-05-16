@@ -15,7 +15,7 @@ export function createContextTool(): {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  handler: (args: Record<string, unknown>) => McpResult;
+  handler: (args: Record<string, unknown>) => Promise<McpResult>;
 } {
   return {
     name: "stele-context",
@@ -85,6 +85,7 @@ interface Context {
   protectedPatterns: string[];
   invariantCount: number;
   checkerCount: number;
+  error?: string;
 }
 
 function buildContext(projectDir: string, focusPaths: string[]): Context {
@@ -133,9 +134,7 @@ function buildContext(projectDir: string, focusPaths: string[]): Context {
           const parsed = parseContract(content);
 
           for (const invariant of parsed.invariants) {
-            if (focusPaths.length === 0 || invariant.description.some((p) => focusPaths.includes(p))) {
-              context.invariants.push(invariant);
-            }
+            context.invariants.push(invariant);
           }
 
           context.checkers.push(...parsed.checkers);
@@ -158,21 +157,21 @@ function parseContract(content: string): {
   invariants: Array<{
     id: string;
     severity: string;
-    description: string[];
+    description: string;
   }>;
   checkers: Array<{
     id: string;
-    description: string[];
+    description: string;
   }>;
 } {
   const invariants: Array<{
     id: string;
     severity: string;
-    description: string[];
+    description: string;
   }> = [];
   const checkers: Array<{
     id: string;
-    description: string[];
+    description: string;
   }> = [];
 
   // Parse (invariant NAME ...) blocks
