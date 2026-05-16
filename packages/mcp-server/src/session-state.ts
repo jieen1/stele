@@ -126,26 +126,26 @@ function cleanupStaleSessions(): void {
 }
 
 /**
- * Evict oldest sessions if registry exceeds max size.
+ * Evict oldest sessions while registry exceeds max size.
  */
 function evictIfOverCapacity(): void {
-  if (sessionRegistry.size <= MAX_SESSIONS) {
-    return;
-  }
+  while (sessionRegistry.size > MAX_SESSIONS) {
+    // Find the oldest session and remove it
+    let oldestKey: string | null = null;
+    let oldestTime = Number.MAX_VALUE;
 
-  // Find the oldest session and remove it
-  let oldestKey: string | null = null;
-  let oldestTime = Number.MAX_VALUE;
-
-  for (const [key, session] of sessionRegistry) {
-    if (session.startTime < oldestTime) {
-      oldestKey = key;
-      oldestTime = session.startTime;
+    for (const [key, session] of sessionRegistry) {
+      if (session.startTime < oldestTime) {
+        oldestKey = key;
+        oldestTime = session.startTime;
+      }
     }
-  }
 
-  if (oldestKey) {
-    sessionRegistry.delete(oldestKey);
+    if (oldestKey) {
+      sessionRegistry.delete(oldestKey);
+    } else {
+      break;
+    }
   }
 }
 

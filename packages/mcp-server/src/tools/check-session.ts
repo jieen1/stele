@@ -66,7 +66,7 @@ export function createCheckSessionTool(): {
         } catch {
           return {
             content: [{ type: "text", text: output }],
-            isError: false,
+            isError: true,
           };
         }
 

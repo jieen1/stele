@@ -450,14 +450,11 @@ function isMaterialChange(projectDir, protectedPatterns, targetPath) {
     return false;
   }
 
-  // Normalize case for comparison to handle case-insensitive filesystems
-  const normalizedPath = process.platform === "win32" ? relativePath.toLowerCase() : relativePath;
-
-  if (normalizedPath.startsWith(".stele/") || normalizedPath.startsWith("node_modules/") || normalizedPath.startsWith(".git/")) {
+  if (relativePath.startsWith(".stele/") || relativePath.startsWith("node_modules/") || relativePath.startsWith(".git/")) {
     return false;
   }
 
-  return !protectedPatterns.some((pattern) => matchGlob(normalizedPath, pattern) || matchesProtectedDirectoryRoot(normalizedPath, pattern));
+  return !protectedPatterns.some((pattern) => matchGlob(relativePath, pattern) || matchesProtectedDirectoryRoot(relativePath, pattern));
 }
 
 function normalizeTargetPath(projectDir, targetPath) {
@@ -500,7 +497,7 @@ function matchGlob(relativePath, pattern) {
 
   return minimatch(relativePath, pattern, {
     dot: true,
-    nocase: true,
+    nocase: process.platform === "win32",
   });
 }
 
