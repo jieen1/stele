@@ -159,6 +159,16 @@ function parseCheckerSpecs(value: unknown): CheckerSpec[] {
       continue;
     }
 
+    // Reject path traversal: no directory separators, no dot segments, no special chars
+    if (file.includes("/") || file.includes("\\") || file.includes("..") || file.startsWith(".")) {
+      continue;
+    }
+
+    // Reject function name path traversal
+    if (fn.includes("/") || fn.includes("\\") || fn.includes("..")) {
+      continue;
+    }
+
     specs.push({ id, file, function: fn });
   }
 

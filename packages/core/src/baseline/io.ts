@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
+import { writeAtomic } from "../manifest/hash-manifest.js";
 import { isPlainRecord } from "../util/types.js";
 import type { BaselineViolation, ViolationBaseline } from "./types.js";
 
@@ -22,8 +23,7 @@ export async function tryReadViolationBaseline(path: string): Promise<ViolationB
 
 export async function writeViolationBaseline(path: string, baseline: ViolationBaseline): Promise<void> {
   const absolutePath = resolve(path);
-  await mkdir(dirname(absolutePath), { recursive: true });
-  await writeFile(absolutePath, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
+  await writeAtomic(absolutePath, `${JSON.stringify(baseline, null, 2)}\n`);
 }
 
 function parseViolationBaseline(path: string, content: string): ViolationBaseline {

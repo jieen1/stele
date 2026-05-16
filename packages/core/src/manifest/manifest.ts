@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { posix as pathPosix } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
 import { isPlainRecord } from "../util/types.js";
+import { writeAtomic } from "./hash-manifest.js";
 
 const MANIFEST_VERSION = "1";
 const STELE_VERSION = "0.1.0";
@@ -84,8 +85,7 @@ export async function writeManifest(paths: string[], manifestPath: string, contr
     contract_hash: contractHash,
   };
 
-  await mkdir(manifestDirectory, { recursive: true });
-  await writeFile(absoluteManifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await writeAtomic(absoluteManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 export async function verifyManifest(manifestPath: string): Promise<VerificationResult> {

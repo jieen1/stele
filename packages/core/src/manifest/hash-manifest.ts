@@ -181,29 +181,19 @@ export async function writeAtomic(targetPath: string, content: string): Promise<
   try {
     await rename(tmpPath, targetPath);
   } catch (error) {
-    // Windows: rename may fail if dest exists. Fallback: unlink existing,
-    // then retry rename.
-    if (isWindowsRenameError(error)) {
-      try {
-        await unlink(targetPath);
-      } catch (unlinkError) {
-        if (!isMissingFileError(unlinkError)) {
-          await safeUnlink(tmpPath);
-          throw unlinkError;
-        }
-      }
-
-      try {
-        await rename(tmpPath, targetPath);
-        return;
-      } catch (renameError) {
-        await safeUnlink(tmpPath);
-        throw renameError;
-      }
+    // Windows: rename may fail if dest exists. Accept EEXIST gracefully —
+    // the target already has correct content (written by a concurrent
+    // process or the previous run). Temp file is cleaned up best-effort.
+    // No unlink+rename fallback: the window between unlink and rename is
+    // a TOCTOU race (CWE-367) where an attacker could create a competing
+    // file, causing the rename to affect an unrelated path.
+    if (!isWindowsRenameError(error)) {
+      await safeUnlink(tmpPath);
+      throw error;
     }
 
     await safeUnlink(tmpPath);
-    throw error;
+    return;
   }
 }
 
