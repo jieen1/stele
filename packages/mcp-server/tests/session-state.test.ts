@@ -257,7 +257,25 @@ describe("readMaterialObservations", () => {
 // ----------------------------------------------------------------
 
 describe("isProtectedPath", () => {
-  it("is exported and callable", () => {
-    expect(typeof isProtectedPath).toBe("function");
+  it("matches contract directory patterns", () => {
+    expect(isProtectedPath("contract/main.stele", ["contract/**/*.stele"], "/project")).toBe(true);
+    expect(isProtectedPath("contract/nested/deep.stele", ["contract/**/*.stele"], "/project")).toBe(true);
+  });
+
+  it("matches tests/contract patterns", () => {
+    expect(isProtectedPath("tests/contract/test_main.py", ["tests/contract/**/*"], "/project")).toBe(true);
+  });
+
+  it("does not match non-protected paths", () => {
+    expect(isProtectedPath("src/index.ts", ["contract/**/*.stele"], "/project")).toBe(false);
+    expect(isProtectedPath("README.md", ["contract/**/*.stele"], "/project")).toBe(false);
+  });
+
+  it("matches manifest files", () => {
+    expect(isProtectedPath("contract/.manifest.json", ["contract/.manifest.json"], "/project")).toBe(true);
+  });
+
+  it("handles path separators correctly", () => {
+    expect(isProtectedPath("contract/checker_impls/checker.py", ["contract/checker_impls/**/*"], "/project")).toBe(true);
   });
 });

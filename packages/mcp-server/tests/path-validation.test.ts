@@ -43,10 +43,10 @@ describe("validateProjectDir", () => {
     expect(result.error).toBeUndefined();
   });
 
-  it("rejects symlinks", () => {
-    // We can't easily create a temp symlink in tests, but the logic exists.
-    // The lstatSync check rejects isSymbolicLink().
-    // Verified by code inspection — lstats.isSymbolicLink() returns error.
+  it("rejects files that are not directories (path-validation file check)", () => {
+    const result = validateProjectDir(__filename);
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain("is not a directory");
   });
 
   it("rejects files that are not directories", () => {
