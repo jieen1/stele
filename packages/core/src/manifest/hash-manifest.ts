@@ -347,12 +347,12 @@ function isWindowsRenameError(error: unknown): boolean {
   return code === "EEXIST" || code === "EPERM" || code === "EACCES";
 }
 
+// Best-effort cleanup: silently ignore missing files and other non-critical errors.
+// This is called during temp-file teardown; shadowing is intentional.
 async function safeUnlink(filePath: string): Promise<void> {
   try {
     await unlink(filePath);
-  } catch (error) {
-    if (!isMissingFileError(error)) {
-      // Best-effort cleanup: don't shadow the original failure.
-    }
+  } catch {
+    // no-op: missing files and permission errors are expected during cleanup
   }
 }

@@ -172,7 +172,7 @@ function renderArithmeticExpressionLines(node: ListNode, indentLevel: number, co
   const symbol = arithmeticSymbol(node.head);
   const prefix = INDENT.repeat(indentLevel);
 
-  return node.items.map((item: any, index: number) => `${prefix}${index === 0 ? "" : `${symbol} `}${translateExpression(item, context)}`);
+  return node.items.map((item: AstNode, index: number) => `${prefix}${index === 0 ? "" : `${symbol} `}${translateExpression(item, context)}`);
 }
 
 function arithmeticSymbol(operator: string): string {
