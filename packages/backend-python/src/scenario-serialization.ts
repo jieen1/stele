@@ -1,4 +1,9 @@
 import { SteleError, type AstNode, type ListNode, type ScenarioDeclaration, type ScenarioOperation } from "@stele/core";
+import { readPathPart, toPythonString } from "./translation-utils.js";
+
+function isListNode(node: AstNode): node is ListNode {
+  return node.kind === "list";
+}
 
 // ---------------------------------------------------------------------------
 // Scenario serialization
@@ -103,16 +108,12 @@ export function serializeScenarioValue(node: AstNode): unknown {
     return Object.fromEntries(node.items.map(serializeScenarioObjectField));
   }
 
-  if (node.head === "ref") {
-    return {
-      $ref: serializeScenarioRef(node as any),
-    };
+  if (isListNode(node) && node.head === "ref") {
+    return { $ref: serializeScenarioRef(node) };
   }
 
-  if (node.head === "gen") {
-    return {
-      $gen: serializeScenarioGenerator(node as any),
-    };
+  if (isListNode(node) && node.head === "gen") {
+    return { $gen: serializeScenarioGenerator(node) };
   }
 
   throw new SteleError(
@@ -197,25 +198,6 @@ function serializeScenarioGenerator(node: ListNode): Record<string, unknown> {
     kind: "unique-name",
     prefix: prefixNode.value,
   };
-}
-
-function readPathPart(node: AstNode): string {
-  if (node.kind === "identifier") {
-    return node.value;
-  }
-
-  if (node.kind === "keyword") {
-    return `:${node.value}`;
-  }
-
-  throw new SteleError(
-    "E0606",
-    "Backend Error",
-    'Scenario path segments must be identifiers or keywords.',
-    node.span,
-    `Found ${node.kind} in a scenario ref path.`,
-    "Use identifiers or keywords for scenario ref path parts.",
-  );
 }
 
 function describeScenarioNode(node: AstNode): string {
@@ -328,6 +310,3 @@ function renderInlinePythonValue(value: unknown): string | undefined {
   return undefined;
 }
 
-function toPythonString(value: string): string {
-  return JSON.stringify(value);
-}

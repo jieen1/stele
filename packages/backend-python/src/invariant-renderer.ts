@@ -3,6 +3,7 @@ import {
   type ScenarioDeclaration,
   type Contract,
   type AstNode,
+  type ListNode,
 } from "@stele/core";
 import { SteleError } from "@stele/core";
 import {
@@ -52,6 +53,14 @@ export function buildPytestImportLine(contract: Contract, generatedBody = ""): s
   });
 
   return `from ._stele_runtime import ${[...helpers, ...referencedEp04Helpers].join(", ")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Type guards
+// ---------------------------------------------------------------------------
+
+function isListNode(node: AstNode): node is ListNode {
+  return node.kind === "list";
 }
 
 // ---------------------------------------------------------------------------
@@ -118,21 +127,22 @@ export function renderInvariantTest(
 
 function renderAssertionLines(node: AstNode, context: ReturnType<typeof createTranslationContext>): string[] {
   if (node.kind === "list" && node.head === "eq" && node.items.length === 2 && isMultilineArithmetic(node.items[1])) {
+    const rhs: ListNode = node.items[1]!;
     return [
       `${INDENT}assert ${translateExpression(node.items[0]!, context)} == (`,
-      ...renderArithmeticExpressionLines(node.items[1] as any, 2, context),
+      ...renderArithmeticExpressionLines(rhs, 2, context),
       `${INDENT})`,
     ];
   }
 
   if (node.kind === "list" && node.head === "forall" && node.items.length === 3) {
-    return renderForallAssertionLines(node as any, context);
+    return renderForallAssertionLines(node, context);
   }
 
   return [`${INDENT}assert ${translateExpression(node, context)}`];
 }
 
-function renderForallAssertionLines(node: any, context: ReturnType<typeof createTranslationContext>): string[] {
+function renderForallAssertionLines(node: ListNode, context: ReturnType<typeof createTranslationContext>): string[] {
   const binding = node.items[0];
 
   if (binding?.kind !== "identifier") {
@@ -158,7 +168,7 @@ function renderForallAssertionLines(node: any, context: ReturnType<typeof create
   ];
 }
 
-function renderArithmeticExpressionLines(node: any, indentLevel: number, context: ReturnType<typeof createTranslationContext>): string[] {
+function renderArithmeticExpressionLines(node: ListNode, indentLevel: number, context: ReturnType<typeof createTranslationContext>): string[] {
   const symbol = arithmeticSymbol(node.head);
   const prefix = INDENT.repeat(indentLevel);
 
@@ -180,7 +190,7 @@ function arithmeticSymbol(operator: string): string {
   }
 }
 
-function isMultilineArithmetic(node: AstNode | undefined): boolean {
+function isMultilineArithmetic(node: AstNode | undefined): node is ListNode {
   return node?.kind === "list" && (node.head === "add" || node.head === "mul" || node.head === "sub" || node.head === "div");
 }
 
