@@ -262,7 +262,8 @@ function validateManifestProtectedPath(path: string): void {
     path.includes("\\") ||
     pathPosix.isAbsolute(path) ||
     /^[A-Za-z]:\//.test(path) ||
-    segments.includes("..")
+    segments.includes("..") ||
+    segments.includes(".")
   ) {
     throw new SteleError(
       "E0404",

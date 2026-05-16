@@ -204,7 +204,7 @@ function parseImportDeclaration(filePath: string, node: ListNode): ImportDeclara
 
   if (!isPathWithin(resolvedPath, contractDir) && !isPathWithin(resolvedPath, projectRoot)) {
     throw new SteleError(
-      "E0202",
+      "E0204",
       "Loader Error",
       'Import path escapes the contract directory and project root.',
       node.span,

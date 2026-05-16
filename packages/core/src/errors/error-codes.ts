@@ -62,7 +62,7 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     source: "parser/parser.ts",
   },
 
-  // --- Loader errors (E0201-E0203) ---
+  // --- Loader errors (E0201-E0204) ---
 
   E0201: {
     name: "Loader Error",
@@ -72,7 +72,7 @@ export const ErrorCodes: Record<string, ErrorCode> = {
   },
   E0202: {
     name: "Loader Error",
-    message: "Invalid import declaration or path containment violation",
+    message: "Invalid import declaration syntax",
     category: 2,
     source: "validator/structure-parse.ts",
   },
@@ -81,6 +81,12 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     message: "Circular import detected",
     category: 2,
     source: "loader/loadContract.ts",
+  },
+  E0204: {
+    name: "Loader Error",
+    message: "Import path containment violation",
+    category: 2,
+    source: "validator/structure-parse.ts",
   },
 
   // --- Validation errors (E0301-E0322) ---

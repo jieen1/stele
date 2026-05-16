@@ -436,14 +436,14 @@ describe("collectImportDeclarations", () => {
     }
   });
 
-  it("throws E0202 when an import path escapes the contract directory and project root", () => {
+  it("throws E0204 when an import path escapes the contract directory and project root", () => {
     const parsed = parseFile('(import "../../../etc/passwd")', ROOT_PATH);
 
     try {
       collectImportDeclarations(ROOT_PATH, parsed);
       throw new Error("expected SteleError");
     } catch (err) {
-      expect(err).toMatchObject({ code: "E0202" });
+      expect(err).toMatchObject({ code: "E0204" });
       expect((err as SteleError).message).toContain(
         "Import path escapes the contract directory and project root",
       );

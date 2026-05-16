@@ -713,3 +713,93 @@ describe("parseScenarioCall", () => {
   });
 });
 
+// -- import target validation (security) -----------------------------------
+
+describe("import target validation", () => {
+  it("rejects path traversal in module segment", () => {
+    const outer = parseFirstList('(step setup (call "../exploit:evil"))');
+    const callField = outer.items[1] as ListNode;
+
+    expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
+      code: "E0317",
+      messageIncludes: 'call target must use "module:function"',
+    });
+  });
+
+  it("rejects module with forward slashes", () => {
+    const outer = parseFirstList('(step setup (call "os/path:evil"))');
+    const callField = outer.items[1] as ListNode;
+
+    expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
+      code: "E0317",
+      messageIncludes: 'call target must use "module:function"',
+    });
+  });
+
+  it("rejects module starting with dot", () => {
+    const outer = parseFirstList('(step setup (call ".hidden:evil"))');
+    const callField = outer.items[1] as ListNode;
+
+    expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
+      code: "E0317",
+      messageIncludes: 'call target must use "module:function"',
+    });
+  });
+
+  it("rejects module starting with number", () => {
+    const outer = parseFirstList('(step setup (call "2module:func"))');
+    const callField = outer.items[1] as ListNode;
+
+    expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
+      code: "E0317",
+      messageIncludes: 'call target must use "module:function"',
+    });
+  });
+
+  it("rejects module with spaces", () => {
+    const outer = parseFirstList('(step setup (call "bad module:func"))');
+    const callField = outer.items[1] as ListNode;
+
+    expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
+      code: "E0317",
+      messageIncludes: 'call target must use "module:function"',
+    });
+  });
+
+  it("rejects function name with invalid characters", () => {
+    const outer = parseFirstList('(step setup (call "module:bad-name"))');
+    const callField = outer.items[1] as ListNode;
+
+    expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
+      code: "E0317",
+      messageIncludes: 'call target must use "module:function"',
+    });
+  });
+
+  it("rejects function name starting with number", () => {
+    const outer = parseFirstList('(step setup (call "module:2func"))');
+    const callField = outer.items[1] as ListNode;
+
+    expectSteleError(() => parseScenarioCall(callField, 'Scenario step "setup"'), {
+      code: "E0317",
+      messageIncludes: 'call target must use "module:function"',
+    });
+  });
+
+  it("accepts valid dotted module path", () => {
+    const outer = parseFirstList('(step setup (call "tests.contract_scenarios:create_fund"))');
+    const callField = outer.items[1] as ListNode;
+
+    const result = parseScenarioCall(callField, 'Scenario step "setup"');
+    expect(result.target).toBe("tests.contract_scenarios:create_fund");
+  });
+
+  it("accepts valid module:function format", () => {
+    const outer = parseFirstList('(step setup (call "my_module:create_fund"))');
+    const callField = outer.items[1] as ListNode;
+
+    const result = parseScenarioCall(callField, 'Scenario step "setup"');
+    expect(result.target).toBe("my_module:create_fund");
+  });
+});
+

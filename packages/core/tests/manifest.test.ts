@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SteleError, type Contract } from "../src/index";
 import * as stele from "../src/index";
+import { verifyManifest, writeManifest } from "../src/manifest/manifest.js";
 
 const tempDirs: string[] = [];
 
@@ -231,6 +232,31 @@ describe("manifest", () => {
 
     await writeManifestFixture(manifestPath, {
       "../../external-secret.txt": {
+        sha256: "abc123",
+        size: 1,
+      },
+    });
+
+    await expect(verifyManifest(manifestPath)).rejects.toThrowError(SteleError);
+
+    try {
+      await verifyManifest(manifestPath);
+    } catch (error) {
+      expect(error).toBeInstanceOf(SteleError);
+      expect(error).toMatchObject({
+        code: "E0404",
+        category: "Manifest Error",
+      });
+      expect((error as SteleError).message).toContain("invalid protected path");
+    }
+  });
+
+  it("rejects manifest protected paths with dot segments", async () => {
+    const project = await createTempProject({});
+    const manifestPath = join(project.directory, "contract", "dot-segment.manifest.json");
+
+    await writeManifestFixture(manifestPath, {
+      "./relative.txt": {
         sha256: "abc123",
         size: 1,
       },

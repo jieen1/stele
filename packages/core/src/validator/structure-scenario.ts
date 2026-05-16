@@ -363,6 +363,20 @@ function isValidPythonImportTarget(target: string): boolean {
     return false;
   }
 
-  return separatorIndex < target.length - 1;
+  if (separatorIndex >= target.length - 1) {
+    return false;
+  }
+
+  const moduleSegment = target.slice(0, separatorIndex);
+  const functionPart = target.slice(separatorIndex + 1);
+
+  // Only allow Python-import-safe identifiers for the module segment.
+  // This prevents "../exploit:evil" or "os:system" style paths.
+  if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(moduleSegment)) {
+    return false;
+  }
+
+  // Function segment must be a valid Python identifier
+  return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(functionPart);
 }
 
