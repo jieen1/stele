@@ -44,14 +44,14 @@ export function createContextTool(): {
     },
     handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const validated = validateProjectDir(args.projectDir);
-      if (validated.error) {
+      if ("error" in validated) {
         return {
           content: [{ type: "text", text: validated.error }],
           isError: true,
         };
       }
       // validated.error is checked above; safe to use path
-      const projectDir = validated.path!;
+      const projectDir = validated.path;
       const focusPaths = args.focusPaths as string[] ?? [];
       const format = (args.format as string) ?? "markdown";
 

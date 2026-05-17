@@ -36,13 +36,13 @@ export function createListContractsTool(): {
     },
     handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const validated = validateProjectDir(args.projectDir);
-      if (validated.error) {
+      if ("error" in validated) {
         return {
           content: [{ type: "text", text: validated.error }],
           isError: true,
         };
       }
-      const projectDir = validated.path!;
+      const projectDir = validated.path;
       const summary = args.summary === true;
       const result = await buildContractsResult(projectDir, summary);
 

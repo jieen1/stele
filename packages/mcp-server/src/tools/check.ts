@@ -40,13 +40,13 @@ export function createCheckTool(): {
     handler: (args: Record<string, unknown>): McpResult => {
       const result = validateProjectDir(args.projectDir);
       const json = args.json !== false;
-      if (result.error) {
+      if ("error" in result) {
         return {
           content: [{ type: "text", text: result.error }],
           isError: true,
         };
       }
-      const projectDir = result.path!;
+      const projectDir = result.path;
       const session = getSessionState(projectDir);
 
       try {

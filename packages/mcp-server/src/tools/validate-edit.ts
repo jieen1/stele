@@ -45,14 +45,14 @@ export function createValidateEditTool(): {
     },
     handler: (args: Record<string, unknown>): McpResult => {
       const validated = validateProjectDir(args.projectDir);
-      if (validated.error) {
+      if ("error" in validated) {
         return {
           content: [{ type: "text", text: validated.error }],
           isError: true,
         };
       }
       // validated.error is checked above; safe to use path
-      const projectDir = validated.path!; // validated.error checked above, path is guaranteed
+      const projectDir = validated.path; // validated.error checked above, path is guaranteed
       const filePath = args.filePath as string;
 
       if (!filePath || typeof filePath !== "string") {

@@ -31,13 +31,13 @@ export function createStatusTool(): {
     },
     handler: (args: Record<string, unknown>): McpResult => {
       const validated = validateProjectDir(args.projectDir);
-      if (validated.error) {
+      if ("error" in validated) {
         return {
           content: [{ type: "text", text: validated.error }],
           isError: true,
         };
       }
-      const projectDir = validated.path!;
+      const projectDir = validated.path;
       const result = buildStatusResult(projectDir);
 
       return {

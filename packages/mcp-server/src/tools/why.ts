@@ -35,13 +35,13 @@ export function createWhyTool(): {
     },
     handler: (args: Record<string, unknown>): McpResult => {
       const result = validateProjectDir(args.projectDir);
-      if (result.error) {
+      if ("error" in result) {
         return {
           content: [{ type: "text", text: result.error }],
           isError: true,
         };
       }
-      const projectDir = result.path!;
+      const projectDir = result.path;
       const fingerprint = args.fingerprint as string | undefined;
       if (typeof fingerprint !== "string") {
         return {

@@ -161,7 +161,7 @@ function matchGlob(relativePath: string, pattern: string): boolean {
 }
 
 function hasGlobMeta(segment: string): boolean {
-  return /[*?]/.test(segment);
+  return /[*?]/u.test(segment);
 }
 
 function isWithinProject(projectDir: string, candidatePath: string): boolean {

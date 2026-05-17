@@ -3,13 +3,11 @@ import { resolve } from "node:path";
 
 /**
  * Result of project directory validation.
+ * Discriminated union: exactly one of `path` or `error` is present.
  */
-export interface ValidateProjectDirResult {
-  /** Resolved absolute path, or undefined if validation failed. */
-  path?: string;
-  /** Error message if validation failed. */
-  error?: string;
-}
+export type ValidateProjectDirResult =
+  | { path: string }
+  | { error: string };
 
 /**
  * Validate and resolve a project directory argument.
@@ -56,8 +54,8 @@ export function validateProjectDir(raw: unknown): ValidateProjectDirResult {
  */
 export function requireProjectDir(raw: unknown): string {
   const result = validateProjectDir(raw);
-  if (result.error) {
+  if ("error" in result) {
     throw new Error(`Invalid projectDir: ${result.error}`);
   }
-  return result.path!;
+  return result.path;
 }

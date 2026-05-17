@@ -59,13 +59,13 @@ export function createProposeContractTool(): {
     },
     handler: (args: Record<string, unknown>): McpResult => {
       const result = validateProjectDir(args.projectDir);
-      if (result.error) {
+      if ("error" in result) {
         return {
           content: [{ type: "text", text: result.error }],
           isError: true,
         };
       }
-      const projectDir = result.path!;
+      const projectDir = result.path;
       const invariantId = args.invariantId as string;
       const severity = args.severity as string;
       const description = args.description as string;

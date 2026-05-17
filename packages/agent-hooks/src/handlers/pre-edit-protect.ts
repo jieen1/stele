@@ -5,15 +5,18 @@ import { matchProtectedPath } from "../util/path-glob.js";
 import type { SteleConfig } from "../util/stele-config-types.js";
 
 /**
- * Returns true when the command contains bash compound operators (||, &&, ;).
+ * Returns true when the command contains bash metacharacters that can chain
+ * commands, spawn subshells, or invoke command substitution. Covers:
+ * pipes (|), background (&), command separators (;), subshells (()),
+ * backtick substitution (`), and $-substitution ($() / ${}).
  * These allow multi-command chains where a safe first command masks an unsafe
  * second command (e.g., `ls || cat /etc/passwd`). We deny any command with
  * these operators because the allowlist can only verify the first token.
  */
 function hasCompoundOperators(command: string): boolean {
-  // Match |, &, ;, (, ), ` — any bash metacharacter that can chain commands
-  // or spawn new execution contexts.
-  return /[|;&()`]/u.test(command);
+  // Match |, &, ;, (, ), `, $ — bash metacharacters that can chain commands,
+  // spawn subshells, or invoke command substitution ($() or ${}  syntax).
+  return /[|;&()`$]/u.test(command);
 }
 
 /**
@@ -52,7 +55,7 @@ export function createPreEditProtect(config: SteleConfig): PreEditHook {
         return {
           action: "deny",
           reason:
-            "Bash command contains compound operators (|, &, ;, (, ), `). " +
+            "Bash command contains shell metacharacters (|, &, ;, (, ), `, $). " +
             "These allow chaining commands that bypass the allowlist. Denying by default.",
         };
       }

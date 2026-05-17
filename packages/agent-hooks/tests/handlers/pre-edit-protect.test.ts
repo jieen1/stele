@@ -151,7 +151,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("compound");
+    expect(decision.reason).toContain("metacharacters");
   });
 
   it("denies sed -i bash command (not in allowlist)", async () => {
@@ -175,7 +175,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("compound");
+    expect(decision.reason).toContain("metacharacters");
   });
 
   it("allows grep (known-safe command)", async () => {
@@ -210,7 +210,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("compound");
+    expect(decision.reason).toContain("metacharacters");
   });
 
   it("denies node -e bash command (compound operators from parens)", async () => {
@@ -222,7 +222,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("compound");
+    expect(decision.reason).toContain("metacharacters");
   });
 
   it("denies vi (text editor, not in allowlist)", async () => {
@@ -275,7 +275,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("compound");
+    expect(decision.reason).toContain("metacharacters");
   });
 
   it("denies process substitution", async () => {
@@ -287,8 +287,8 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    // Either compound operator check or protected path check fires — both deny
-    expect(decision.reason).toMatch(/(compound|protected)/);
+    // Either metacharacter check or protected path check fires — both deny
+    expect(decision.reason).toMatch(/(metacharacters|protected)/);
   });
 
   it("denies subshell compound command", async () => {
@@ -300,7 +300,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    // Either compound operator check or protected path check fires — both deny
-    expect(decision.reason).toMatch(/(compound|protected)/);
+    // Either metacharacter check or protected path check fires — both deny
+    expect(decision.reason).toMatch(/(metacharacters|protected)/);
   });
 });
