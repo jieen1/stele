@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchProtectedPath } from "../../src/util/path-glob.js";
+import { matchProtectedPath, isSafeGlobPattern } from "../../src/util/path-glob.js";
 
 const PROJECT_ROOT = "/project";
 const DEFAULT_PATTERNS = [
@@ -139,5 +139,56 @@ describe("matchProtectedPath", () => {
     it("matches recursive wildcard pattern", () => {
       expect(matchProtectedPath("/project/src/sub/config.json", ["src/**/*.json"], PROJECT_ROOT)).toBe(true);
     });
+  });
+});
+
+describe("isSafeGlobPattern", () => {
+  it("accepts normal glob patterns", () => {
+    expect(isSafeGlobPattern("src/**/*.py")).toBe(true);
+    expect(isSafeGlobPattern("contract/**/*")).toBe(true);
+    expect(isSafeGlobPattern("src/*.js")).toBe(true);
+  });
+
+  it("rejects excessively long patterns", () => {
+    expect(isSafeGlobPattern("a".repeat(4097))).toBe(false);
+  });
+
+  it("accepts patterns at max length", () => {
+    expect(isSafeGlobPattern("a".repeat(4096))).toBe(true);
+  });
+
+  it("rejects deeply nested bracket patterns", () => {
+    expect(isSafeGlobPattern("[a-[b-[c-[d-[e-[f]]]]]")).toBe(false);
+  });
+
+  it("accepts bracket patterns within depth limit", () => {
+    expect(isSafeGlobPattern("[a-[b-[c-[d-[e]]]]]")).toBe(true);
+  });
+
+  it("accepts single bracket pattern", () => {
+    expect(isSafeGlobPattern("[abc]")).toBe(true);
+  });
+
+  it("rejects unbalanced bracket patterns exceeding depth", () => {
+    expect(isSafeGlobPattern("[[[[[[")).toBe(false);
+  });
+
+  it("handles empty pattern", () => {
+    expect(isSafeGlobPattern("")).toBe(true);
+  });
+
+  it("matches normal pattern with safe glob", () => {
+    expect(matchProtectedPath("/project/src/test.py", ["src/**/*.py"], PROJECT_ROOT)).toBe(true);
+  });
+
+  it("rejects unsafe pattern in matchProtectedPath", () => {
+    // Pattern with excessive bracket nesting should silently fail to match
+    const longPattern = "src/[a-[b-[c-[d-[e-[f]]]]].py";
+    expect(matchProtectedPath("/project/src/test.py", [longPattern], PROJECT_ROOT)).toBe(false);
+  });
+
+  it("rejects very long pattern in matchProtectedPath", () => {
+    const longPattern = "src/" + "a".repeat(4097);
+    expect(matchProtectedPath("/project/src/test.py", [longPattern], PROJECT_ROOT)).toBe(false);
   });
 });

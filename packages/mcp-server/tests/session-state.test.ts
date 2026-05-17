@@ -339,6 +339,92 @@ describe("readMaterialObservations", () => {
     expect(result[0]).toEqual({ type: "observation", material_change: true, path: "a.txt" });
     expect(result[1]).toEqual({ type: "observation", material_change: true, path: "c.txt" });
   });
+
+  // Schema validation tests — exercises isValidObservationEntry indirectly
+
+  it("rejects entries with non-boolean material_change", () => {
+    // Write raw JSON to avoid JSON.stringify converting types
+    const content = '{"type":"observation","material_change":"true"}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
+
+  it("rejects array entries", () => {
+    const content = '[1,2,3]\n{"type":"observation","material_change":true}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ type: "observation", material_change: true });
+  });
+
+  it("rejects null entries", () => {
+    const content = "null\n{null}\n";
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
+
+  it("rejects string entries", () => {
+    const content = '"just a string"\n{"type":"observation","material_change":true}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toHaveLength(1);
+  });
+
+  it("rejects number entries", () => {
+    const content = "42\n{" + '"type":"observation","material_change":true}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toHaveLength(1);
+  });
+
+  it("rejects entries with nested object values", () => {
+    const content = '{"type":"observation","material_change":true,"nested":{"a":1}}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    // Nested objects are not JSON-safe primitives (they are objects, not null/primitive)
+    expect(result).toEqual([]);
+  });
+
+  it("rejects entries with array values", () => {
+    const content = '{"type":"observation","material_change":true,"tags":["a","b"]}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
+
+  it("accepts entries with null values", () => {
+    const content = '{"type":"observation","material_change":true,"detail":null}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ type: "observation", material_change: true, detail: null });
+  });
+
+  it("accepts entries with mixed primitive values", () => {
+    const line = JSON.stringify({
+      type: "observation",
+      material_change: true,
+      count: 42,
+      active: false,
+      message: "test",
+      detail: null,
+    });
+    tempDir = createTempProject(line + "\n");
+    const result = readMaterialObservations(tempDir);
+    expect(result).toHaveLength(1);
+    expect(result[0].count).toBe(42);
+  });
+
+  it("handles entries without material_change field", () => {
+    // Entries without material_change are valid schema entries but won't be returned
+    // because they aren't material observations
+    const content = '{"type":"log","message":"info"}\n';
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
 });
 
 // ----------------------------------------------------------------

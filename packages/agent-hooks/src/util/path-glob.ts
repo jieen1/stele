@@ -149,8 +149,44 @@ function getProtectedDirectoryRootPattern(pattern: string): string | null {
   return rootPattern.length > 0 ? rootPattern : null;
 }
 
+/**
+ * Maximum pattern length for minimatch. Prevents ReDoS where an adversarial
+ * pattern forces the regex engine into exponential backtracking.
+ */
+const MAX_PATTERN_LENGTH = 4096;
+
+/**
+ * Maximum bracket nesting depth. Deeply nested bracket expressions
+ * (`[a-[b-[c-...]`) are a classic ReDoS vector for glob engines.
+ */
+const MAX_BRACKET_DEPTH = 5;
+
+/**
+ * Check if a glob pattern is safe to pass to minimatch.
+ * Returns false for patterns that could cause ReDoS.
+ */
+export function isSafeGlobPattern(pattern: string): boolean {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    return false;
+  }
+
+  let depth = 0;
+  for (const char of pattern) {
+    if (char === "[") {
+      depth++;
+      if (depth > MAX_BRACKET_DEPTH) {
+        return false;
+      }
+    } else if (char === "]") {
+      depth--;
+    }
+  }
+
+  return true;
+}
+
 function matchGlob(relativePath: string, pattern: string): boolean {
-  if (relativePath.length === 0) {
+  if (relativePath.length === 0 || !isSafeGlobPattern(pattern)) {
     return false;
   }
 

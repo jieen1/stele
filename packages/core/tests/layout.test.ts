@@ -5,13 +5,15 @@ import {
   normalizeGeneratedFiles,
   assertGeneratedFilesMatchExpectedLayout,
 } from "../src/generator/layout.js";
-import type { Contract, ContractFile, ParsedFile, ListNode } from "../src/validator/structure.js";
+import type { Contract, ContractFile } from "../src/validator/structure.js";
+import type { ListNode } from "../src/ast/types.js";
+import type { ParsedFile } from "../src/parser/parser.js";
 import type { LanguageBackend, GeneratedFile } from "../src/generator/types.js";
 
 function makeContract(overrides: Partial<Contract> = {}): Contract {
   const span = { file: "t.stele", line: 1, column: 1 };
   const node: ListNode = { kind: "list", head: "invariant", items: [], span };
-  const parsed: ParsedFile = { body: [] };
+  const parsed: ParsedFile = { kind: "file", body: [], file: "t.stele" };
   const file: ContractFile = {
     path: "t.stele",
     parsed,
@@ -57,10 +59,7 @@ const pythonBackend: LanguageBackend = {
 
 describe("buildCanonicalGeneratedPaths", () => {
   it("returns runtime path for python backend", () => {
-    const paths = buildCanonicalGeneratedPaths(makeContract(), {
-      ...pythonBackend,
-      generate: async () => [],
-    }, "tests/contract");
+    const paths = buildCanonicalGeneratedPaths(makeContract(), pythonBackend, "tests/contract");
     expect(paths).toContain("tests/contract/_stele_runtime.py");
   });
 
@@ -77,26 +76,17 @@ describe("buildCanonicalGeneratedPaths", () => {
       assertExpression: { kind: "identifier" as const, value: "True", span },
       dependsOn: [],
     };
-    const paths = buildCanonicalGeneratedPaths(makeContract({ invariants: [inv] }), {
-      ...pythonBackend,
-      generate: async () => [],
-    }, "tests/contract");
+    const paths = buildCanonicalGeneratedPaths(makeContract({ invariants: [inv] }), pythonBackend, "tests/contract");
     expect(paths).toContain("tests/contract/test_contract.py");
   });
 
   it("no test_contract when no invariants", () => {
-    const paths = buildCanonicalGeneratedPaths(makeContract(), {
-      ...pythonBackend,
-      generate: async () => [],
-    }, "tests/contract");
+    const paths = buildCanonicalGeneratedPaths(makeContract(), pythonBackend, "tests/contract");
     expect(paths).not.toContain("test_contract");
   });
 
   it("paths are sorted", () => {
-    const paths = buildCanonicalGeneratedPaths(makeContract(), {
-      ...pythonBackend,
-      generate: async () => [],
-    }, "tests/contract");
+    const paths = buildCanonicalGeneratedPaths(makeContract(), pythonBackend, "tests/contract");
     const sorted = [...paths].sort();
     expect(paths).toEqual(sorted);
   });

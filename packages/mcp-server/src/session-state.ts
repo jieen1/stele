@@ -249,6 +249,38 @@ const MAX_OBSERVATIONS_FILE_SIZE = 1 * 1024 * 1024;
 /** Maximum line length for JSONL entries (64 KB). */
 const MAX_LINE_LENGTH = 64 * 1024;
 
+/**
+ * Validate that a parsed JSONL observation entry has the expected schema.
+ * Rejects entries with circular refs, null prototypes, or missing required fields.
+ */
+function isValidObservationEntry(raw: unknown): boolean {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return false;
+  }
+
+  // Must be a plain object (not a Date, RegExp, etc.)
+  const proto = Object.getPrototypeOf(raw);
+  if (proto !== Object.prototype && proto !== null) {
+    return false;
+  }
+
+  // material_change is the filter key; if absent, still valid for general queries
+  // but if present, must be boolean
+  const record = raw as Record<string, unknown>;
+  if (Object.hasOwn(raw, "material_change") && typeof record.material_change !== "boolean") {
+    return false;
+  }
+
+  // All values must be JSON-safe primitives (string, number, boolean, null)
+  for (const value of Object.values(record)) {
+    if (value !== null && typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function readMaterialObservations(projectDir: string): Array<Record<string, unknown>> {
   const resolvedDir = resolve(projectDir);
   const observationsFile = join(resolvedDir, OBSERVATIONS_FILE);
@@ -272,9 +304,15 @@ export function readMaterialObservations(projectDir: string): Array<Record<strin
       }
 
       try {
-        const obs = JSON.parse(line);
-        if (obs && typeof obs === "object") {
-          observations.push(obs);
+        const obs = JSON.parse(line, (key, value) => {
+          // Reject functions, symbols, and other non-JSON values during parse
+          if (typeof value === "function" || typeof value === "symbol") {
+            return undefined;
+          }
+          return value;
+        });
+        if (isValidObservationEntry(obs)) {
+          observations.push(obs as Record<string, unknown>);
         }
       } catch {
         // Skip malformed lines
