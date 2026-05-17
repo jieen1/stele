@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { execFile, type ExecFileOptions } from "node:child_process";
+import { sanitizeError } from "./error-sanitizer.js";
 
 /** Cache for resolved binary path. */
 let cachedBinary: string | null = null;
@@ -85,6 +86,14 @@ export function verifyPackageIdentity(binaryPath: string): boolean {
 }
 
 /**
+ * Sanitize CLI stdout to prevent information leakage.
+ * Applies the same redaction patterns as error sanitization.
+ */
+function sanitizeOutput(output: string): string {
+  return sanitizeError(output);
+}
+
+/**
  * Execute the local stele CLI with given arguments.
  * Async — does NOT block the event loop.
  * Requires local installation — does NOT fall back to npx.
@@ -115,7 +124,7 @@ export async function runStele(cwd: string, args: string[], options: Partial<Exe
         if (error) {
           reject(Object.assign(new Error(stderr?.trim() ?? `stele command failed`), { code: error.code, signal: error.signal }));
         } else {
-          resolve(stdout);
+          resolve(sanitizeOutput(stdout));
         }
       });
     } else {
@@ -123,7 +132,7 @@ export async function runStele(cwd: string, args: string[], options: Partial<Exe
         if (error) {
           reject(Object.assign(new Error(stderr?.trim() ?? `stele command failed`), { code: error.code, signal: error.signal }));
         } else {
-          resolve(stdout);
+          resolve(sanitizeOutput(stdout));
         }
       });
     }
