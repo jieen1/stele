@@ -190,7 +190,7 @@ describe("createPreEditProtect", () => {
     expect(decision.action).toBe("allow");
   });
 
-  it("allows git status (known-safe command)", async () => {
+  it("denies git status (git not in allowlist — can overwrite protected files)", async () => {
     const hook = createPreEditProtect(makeConfig());
     const decision = await hook(
       makeCtx({
@@ -198,7 +198,8 @@ describe("createPreEditProtect", () => {
         args: { command: "git status" },
       }),
     );
-    expect(decision.action).toBe("allow");
+    expect(decision.action).toBe("deny");
+    expect(decision.reason).toContain("git");
   });
 
   it("denies ruby -c bash command (not in allowlist)", async () => {
