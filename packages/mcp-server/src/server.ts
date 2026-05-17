@@ -8,8 +8,15 @@ import type { ToolDef } from "./types.js";
 /**
  * Sanitize MCP tool arguments against prototype pollution.
  * Copies only own enumerable properties onto a null-proto object.
+ * Recursion depth-limited to prevent stack overflow.
  */
-function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
+const MAX_SANITIZE_DEPTH = 10;
+
+function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<string, unknown> {
+  if (depth > MAX_SANITIZE_DEPTH) {
+    return Object.create(null);
+  }
+
   const DANGEROUS = new Set(["__proto__", "constructor", "__defineGetter__", "__defineSetter__"]);
   const safe = Object.create(null);
   for (const key of Object.keys(args ?? {})) {
@@ -18,11 +25,11 @@ function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
       safe[key] = Array.isArray(value)
         ? value.map((item) =>
           typeof item === "object" && item !== null
-            ? sanitizeArgs(item as Record<string, unknown>)
+            ? sanitizeArgs(item as Record<string, unknown>, depth + 1)
             : item,
         )
         : typeof value === "object" && value !== null
-          ? sanitizeArgs(value as Record<string, unknown>)
+          ? sanitizeArgs(value as Record<string, unknown>, depth + 1)
           : value;
     }
   }

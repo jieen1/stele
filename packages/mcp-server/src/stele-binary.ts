@@ -55,15 +55,11 @@ function verifyPackageIdentity(binaryPath: string): boolean {
     let dir = resolve(binaryPath, "..", "..");
     for (let depth = 0; depth < 10; depth += 1) {
       const pkgPath = resolve(dir, "package.json");
-      if (existsSync(pkgPath)) {
-        // Also reject symlinks on package.json
-        try {
-          const lstats = lstatSync(pkgPath);
-          if (lstats.isSymbolicLink()) {
-            dir = resolve(dir, "..");
-            continue;
-          }
-        } catch {
+      // Use readFileSync directly in try/catch — no TOCTOU vs existsSync
+      try {
+        // Reject symlinks on package.json
+        const lstats = lstatSync(pkgPath);
+        if (lstats.isSymbolicLink()) {
           dir = resolve(dir, "..");
           continue;
         }
@@ -72,13 +68,17 @@ function verifyPackageIdentity(binaryPath: string): boolean {
         if (pkg.name === "@stele/cli") {
           return true;
         }
+      } catch {
+        // ENOENT or parse error — not the right package, continue walking
+        dir = resolve(dir, "..");
+        continue;
       }
-      dir = resolve(dir, "..");
     }
     return false;
   } catch {
     return false;
   }
+
 }
 
 /**
