@@ -161,7 +161,7 @@ describe("encodeCheckerArgs", () => {
   });
 
   it("skips malformed arg (not list)", () => {
-    const badNode = { kind: "number", value: 5, raw: "5", span: { file: "", line: 1, column: 1 } };
+    const badNode = { kind: "number", value: 5, raw: "5", span: { file: "", line: 1, column: 1 } } as AstNode;
     const result = encodeCheckerArgs([badNode], ctx);
     expect(result).toBe("{}");
   });
@@ -201,7 +201,7 @@ describe("encodeCheckerArgs", () => {
 
   it("mixed valid and invalid args", () => {
     const goodNode = makeCheckerArg("count", makeNumberNode("5", 5));
-    const badNode = { kind: "number", value: 5, raw: "5", span: { file: "", line: 1, column: 1 } };
+    const badNode = { kind: "number", value: 5, raw: "5", span: { file: "", line: 1, column: 1 } } as AstNode;
     const result = encodeCheckerArgs([goodNode, badNode], ctx);
     expect(result).toBe('{"count": 5}');
   });
@@ -396,17 +396,17 @@ describe("sanitizePythonIdentifier", () => {
 
 describe("readPathPart", () => {
   it("identifier returns value", () => {
-    const node = { kind: "identifier", value: "account", span: { file: "", line: 1, column: 1 } };
+    const node = { kind: "identifier", value: "account", span: { file: "", line: 1, column: 1 } } as AstNode;
     expect(readPathPart(node)).toBe("account");
   });
 
   it("keyword returns colon-prefixed value", () => {
-    const node = { kind: "keyword", value: "account", span: { file: "", line: 1, column: 1 } };
+    const node = { kind: "keyword", value: "account", span: { file: "", line: 1, column: 1 } } as AstNode;
     expect(readPathPart(node)).toBe(":account");
   });
 
   it("throws for unsupported node kind", () => {
-    const node = { kind: "number", value: 5, raw: "5", span: { file: "", line: 1, column: 1 } };
+    const node = { kind: "number", value: 5, raw: "5", span: { file: "", line: 1, column: 1 } } as AstNode;
     expect(() => readPathPart(node)).toThrow("Path segments must be identifiers or keywords");
   });
 });

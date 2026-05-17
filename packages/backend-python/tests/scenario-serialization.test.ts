@@ -215,14 +215,14 @@ describe("serializeScenarioValue", () => {
 
 describe("serializeScenario", () => {
   it("serializes minimal scenario", () => {
-    const scenario: ScenarioDeclaration = {
+    const scenario = {
       id: "sc1",
       filePath: "test.stele",
       span: { file: "test.stele", line: 1, column: 1 },
       executor: "python-import",
       sandbox: "transactional",
       steps: [],
-    };
+    } as unknown as ScenarioDeclaration;
     const result = serializeScenario(scenario);
     expect(result.id).toBe("sc1");
     expect(result.executor).toBe("python-import");
@@ -231,7 +231,7 @@ describe("serializeScenario", () => {
 
   it("serializes scenario with step", () => {
     const callTarget = "tests.scenarios:create_fund";
-    const scenario: ScenarioDeclaration = {
+    const scenario = {
       id: "sc1",
       filePath: "test.stele",
       span: { file: "test.stele", line: 1, column: 1 },
@@ -245,7 +245,7 @@ describe("serializeScenario", () => {
           call: { target: callTarget, body: undefined },
         },
       ],
-    };
+    } as unknown as ScenarioDeclaration;
     const result = serializeScenario(scenario);
     expect(result.steps).toHaveLength(1);
     expect(result.steps[0]?.kind).toBe("step");
@@ -253,7 +253,7 @@ describe("serializeScenario", () => {
   });
 
   it("serializes scenario with capture-state", () => {
-    const scenario: ScenarioDeclaration = {
+    const scenario = {
       id: "sc1",
       filePath: "test.stele",
       span: { file: "test.stele", line: 1, column: 1 },
@@ -266,7 +266,7 @@ describe("serializeScenario", () => {
           call: { target: "tests.scenarios:get_state" },
         },
       ],
-    };
+    } as unknown as ScenarioDeclaration;
     const result = serializeScenario(scenario);
     expect(result.steps[0]?.kind).toBe("capture-state");
     expect(result.steps[0]?.capture).toBe("state-before");
