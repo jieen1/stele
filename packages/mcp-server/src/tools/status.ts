@@ -62,7 +62,10 @@ function buildStatusResult(projectDir: string): Record<string, unknown> {
     if (result.hasConfig) {
       try {
         const raw = readFileSync(configPath, "utf8");
-        result.config = JSON.parse(raw);
+        const config = JSON.parse(raw);
+        // Only expose the fields needed for status — not the full config
+        result.configTargetLanguage = typeof config?.targetLanguage === "string" ? config.targetLanguage : undefined;
+        result.configProtectedCount = Array.isArray(config?.protected) ? config.protected.length : 0;
       } catch (err) {
         result.configError = err instanceof Error ? err.message : String(err);
       }

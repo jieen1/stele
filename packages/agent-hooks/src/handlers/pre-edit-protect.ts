@@ -16,7 +16,7 @@ import type { SteleConfig } from "../util/stele-config-types.js";
 function hasCompoundOperators(command: string): boolean {
   // Match |, &, ;, (, ), `, $ — bash metacharacters that can chain commands,
   // spawn subshells, or invoke command substitution ($() or ${}  syntax).
-  return /[|;&()`$]/u.test(command);
+  return /[|;&()`$\n\r]/u.test(command);
 }
 
 /**
@@ -55,8 +55,8 @@ export function createPreEditProtect(config: SteleConfig): PreEditHook {
         return {
           action: "deny",
           reason:
-            "Bash command contains shell metacharacters (|, &, ;, (, ), `, $). " +
-            "These allow chaining commands that bypass the allowlist. Denying by default.",
+            "Bash command contains shell metacharacters (|, &, ;, (, ), `, $, newline). " +
+            "These enable command chaining or substitution that bypasses the allowlist. Denying by default.",
         };
       }
 

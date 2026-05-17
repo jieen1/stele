@@ -250,11 +250,8 @@ const MAX_OBSERVATIONS_FILE_SIZE = 1 * 1024 * 1024;
 const MAX_LINE_LENGTH = 64 * 1024;
 
 export function readMaterialObservations(projectDir: string): Array<Record<string, unknown>> {
-  const observationsFile = join(projectDir, OBSERVATIONS_FILE);
-
-  if (!existsSync(observationsFile)) {
-    return [];
-  }
+  const resolvedDir = resolve(projectDir);
+  const observationsFile = join(resolvedDir, OBSERVATIONS_FILE);
 
   try {
     // Size limit on file read

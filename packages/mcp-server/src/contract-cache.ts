@@ -79,7 +79,7 @@ export function scanSteleFiles(directory: string): string[] {
       }
     }
   } catch {
-    console.error(`[stele] scanSteleFiles failed for "${directory}"`);
+    console.error("[stele] Failed to scan contract directory");
   }
 
   return results.sort();
@@ -180,7 +180,7 @@ export function getProtectedPatterns(projectDir: string): string[] {
       return config.protected;
     }
   } catch (err) {
-    console.error(`[stele] Failed to parse config: ${String(err)}`);
+    console.error("[stele] Failed to parse project config");
   }
 
   return [...DEFAULT_PROTECTED_PATTERNS];
@@ -220,7 +220,7 @@ export async function parseContractFromFile(filePath: string): Promise<ParsedCon
     }
     return { invariants, checkers: [] };
   } catch (err) {
-    console.error(`[stele] parseContractFromFile failed for "${filePath}": ${String(err)}`);
+    console.error("[stele] Failed to parse contract file");
     return { invariants: [], checkers: [] };
   }
 }
