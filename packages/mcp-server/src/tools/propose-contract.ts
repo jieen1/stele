@@ -66,11 +66,11 @@ export function createProposeContractTool(): {
         };
       }
       const projectDir = result.path;
-      const invariantId = args.invariantId as string;
-      const severity = args.severity as string;
-      const description = args.description as string;
-      const assert = args.assert as string;
-      const category = args.category as string | undefined;
+      const invariantId = String(args.invariantId ?? "");
+      const severity = String(args.severity ?? "");
+      const description = String(args.description ?? "");
+      const assert = String(args.assert ?? "");
+      const category = typeof args.category === "string" ? args.category : undefined;
       const apply = args.apply === true;
 
       const cmdArgs = [

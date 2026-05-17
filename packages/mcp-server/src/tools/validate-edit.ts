@@ -53,9 +53,9 @@ export function createValidateEditTool(): {
       }
       // validated.error is checked above; safe to use path
       const projectDir = validated.path; // validated.error checked above, path is guaranteed
-      const filePath = args.filePath as string;
+      const filePath = typeof args.filePath === "string" ? args.filePath : "";
 
-      if (!filePath || typeof filePath !== "string") {
+      if (filePath.length === 0) {
         return {
           content: [{ type: "text", text: "Missing required argument: filePath" }],
           isError: true,

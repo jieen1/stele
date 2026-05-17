@@ -42,7 +42,7 @@ export function createWhyTool(): {
         };
       }
       const projectDir = result.path;
-      const fingerprint = args.fingerprint as string | undefined;
+      const fingerprint = typeof args.fingerprint === "string" ? args.fingerprint : undefined;
       if (typeof fingerprint !== "string") {
         return {
           content: [{ type: "text", text: "Missing required parameter: fingerprint" }],

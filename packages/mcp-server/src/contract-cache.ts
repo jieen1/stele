@@ -7,9 +7,36 @@ const CONTRACT_DIR = "contract";
 const CONFIG_FILE = "stele.config.json";
 
 /**
+ * Maximum number of cached project states.
+ */
+const MAX_CACHE_ENTRIES = 100;
+
+/**
  * Cache of project states keyed by projectDir.
  */
 const projectCache = new Map<string, ProjectState>();
+
+/** Cache TTL in milliseconds. */
+const CACHE_TTL_MS = 30_000;
+
+/**
+ * Evict entries that exceed TTL. Called on every cache access.
+ */
+function evictCache(): void {
+  const now = Date.now();
+  for (const [key, value] of projectCache) {
+    if (now - value.lastLoadTime > CACHE_TTL_MS) {
+      projectCache.delete(key);
+    }
+  }
+  // Evict oldest entries if cache is too large
+  if (projectCache.size > MAX_CACHE_ENTRIES) {
+    const sorted = [...projectCache.entries()].sort((a, b) => a[1].lastLoadTime - b[1].lastLoadTime);
+    for (let i = 0; i < sorted.length - MAX_CACHE_ENTRIES; i += 1) {
+      projectCache.delete(sorted[i][0]);
+    }
+  }
+}
 
 /**
  * Get cached project state, or null if not cached.
@@ -52,7 +79,7 @@ export function scanSteleFiles(directory: string): string[] {
       }
     }
   } catch {
-    // Directory doesn't exist or isn't readable
+    console.error(`[stele] scanSteleFiles failed for "${directory}"`);
   }
 
   return results.sort();
@@ -95,11 +122,14 @@ export function listContractFiles(contractDir: string): Array<{
  * Caches the result for subsequent calls.
  */
 export async function loadProjectState(projectDir: string): Promise<ProjectState> {
+  // Evict expired entries on every cache access
+  evictCache();
+
   const resolved = resolve(projectDir);
   const cached = projectCache.get(resolved);
 
   // Return cached state if valid (< 30s old)
-  if (cached && Date.now() - cached.lastLoadTime < 30_000) {
+  if (cached && Date.now() - cached.lastLoadTime < CACHE_TTL_MS) {
     return cached;
   }
 
@@ -149,8 +179,8 @@ export function getProtectedPatterns(projectDir: string): string[] {
     if (config?.protected && Array.isArray(config.protected)) {
       return config.protected;
     }
-  } catch {
-    // Ignore parse errors
+  } catch (err) {
+    console.error(`[stele] Failed to parse config: ${String(err)}`);
   }
 
   return [...DEFAULT_PROTECTED_PATTERNS];
@@ -189,7 +219,8 @@ export async function parseContractFromFile(filePath: string): Promise<ParsedCon
       } satisfies ParsedInvariant);
     }
     return { invariants, checkers: [] };
-  } catch {
+  } catch (err) {
+    console.error(`[stele] parseContractFromFile failed for "${filePath}": ${String(err)}`);
     return { invariants: [], checkers: [] };
   }
 }

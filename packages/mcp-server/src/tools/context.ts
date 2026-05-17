@@ -50,10 +50,10 @@ export function createContextTool(): {
           isError: true,
         };
       }
-      // validated.error is checked above; safe to use path
+      // Discriminated union: after "error" in validated check, path is guaranteed
       const projectDir = validated.path;
-      const focusPaths = args.focusPaths as string[] ?? [];
-      const format = (args.format as string) ?? "markdown";
+      const focusPaths: string[] = Array.isArray(args.focusPaths) ? args.focusPaths : [];
+      const format = typeof args.format === "string" ? args.format : "markdown";
 
       // Validate focusPaths stay within project directory
       for (const fp of focusPaths) {

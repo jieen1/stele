@@ -42,7 +42,7 @@ export function createExplainViolationTool(): {
         };
       }
       const projectDir = result.path;
-      const violationId = args.violationId as string | undefined;
+      const violationId = typeof args.violationId === "string" ? args.violationId : undefined;
       if (typeof violationId !== "string") {
         return {
           content: [{ type: "text", text: "Missing required parameter: violationId" }],

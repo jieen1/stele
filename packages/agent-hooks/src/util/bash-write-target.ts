@@ -91,50 +91,71 @@ export function extractBashWriteTarget(command: string | undefined): string | nu
 function tokenize(command: string): string[] {
   const tokens: string[] = [];
   let current = "";
-  let quote: '"' | "'" | null = null;
+  let quote: '"' | null = null;
 
   for (let index = 0; index < command.length; index += 1) {
     const char = command[index];
 
-    if (quote !== null) {
-      if (char === quote) {
+    // Inside single quotes: literal mode — nothing escapes except the closing '
+    if (quote === null) {
+      // Single-quote: literal mode (no escape sequences)
+      if (char === "'") {
+        let end = index + 1;
+        while (end < command.length && command[end] !== "'") {
+          end += 1;
+        }
+        current += command.slice(index, end + 1);
+        index = end;
+        continue;
+      }
+
+      // Double-quote: allow backslash escapes
+      if (char === '"') {
+        quote = '"';
+        current += char;
+        continue;
+      }
+
+      if (/\s/u.test(char)) {
+        pushIfNonEmpty(tokens, current);
+        current = "";
+        continue;
+      }
+
+      const twoChar = command.slice(index, index + 2);
+      if (twoChar === ">>") {
+        pushIfNonEmpty(tokens, current);
+        current = "";
+        tokens.push(">>");
+        index += 1;
+        continue;
+      }
+
+      if (char === ">" || char === "<" || char === "|" || char === ";" || char === "&") {
+        pushIfNonEmpty(tokens, current);
+        current = "";
+        tokens.push(char);
+        continue;
+      }
+
+      current += char;
+    } else {
+      // Inside double quotes: backslash-escapes \", \\, \$, \`, \!
+      if (char === "\\" && index + 1 < command.length) {
+        const next = command[index + 1];
+        if (next === '"' || next === "\\" || next === "$" || next === "`" || next === "!") {
+          current += char + next;
+          index += 1;
+          continue;
+        }
+      }
+      if (char === '"') {
         current += char;
         quote = null;
       } else {
         current += char;
       }
-      continue;
     }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      current += char;
-      continue;
-    }
-
-    if (/\s/u.test(char)) {
-      pushIfNonEmpty(tokens, current);
-      current = "";
-      continue;
-    }
-
-    const twoChar = command.slice(index, index + 2);
-    if (twoChar === ">>") {
-      pushIfNonEmpty(tokens, current);
-      current = "";
-      tokens.push(">>");
-      index += 1;
-      continue;
-    }
-
-    if (char === ">" || char === "<" || char === "|" || char === ";" || char === "&") {
-      pushIfNonEmpty(tokens, current);
-      current = "";
-      tokens.push(char);
-      continue;
-    }
-
-    current += char;
   }
 
   pushIfNonEmpty(tokens, current);
