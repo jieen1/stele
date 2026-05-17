@@ -41,7 +41,7 @@ export function createObserveTool(): {
           isError: true,
         };
       }
-      const projectDir = result.path;
+      const projectDir = result.path!;
       const since = args.since as string | undefined;
       const cmdArgs = ["observe", "--json"];
 

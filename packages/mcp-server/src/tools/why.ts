@@ -41,11 +41,17 @@ export function createWhyTool(): {
           isError: true,
         };
       }
-      const projectDir = result.path;
-      const fingerprint = args.fingerprint as string;
+      const projectDir = result.path!;
+      const fingerprint = args.fingerprint as string | undefined;
+      if (typeof fingerprint !== "string") {
+        return {
+          content: [{ type: "text", text: "Missing required parameter: fingerprint" }],
+          isError: true,
+        };
+      }
 
       try {
-        const output = runStele(projectDir, ["why", fingerprint]);
+        const output = runStele(projectDir, ["why", fingerprint!]);
 
         return {
           content: [{ type: "text", text: output }],

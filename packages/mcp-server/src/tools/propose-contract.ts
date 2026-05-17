@@ -65,7 +65,7 @@ export function createProposeContractTool(): {
           isError: true,
         };
       }
-      const projectDir = result.path;
+      const projectDir = result.path!;
       const invariantId = args.invariantId as string;
       const severity = args.severity as string;
       const description = args.description as string;

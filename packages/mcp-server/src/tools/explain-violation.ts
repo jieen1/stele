@@ -41,11 +41,17 @@ export function createExplainViolationTool(): {
           isError: true,
         };
       }
-      const projectDir = result.path;
-      const violationId = args.violationId as string;
+      const projectDir = result.path!;
+      const violationId = args.violationId as string | undefined;
+      if (typeof violationId !== "string") {
+        return {
+          content: [{ type: "text", text: "Missing required parameter: violationId" }],
+          isError: true,
+        };
+      }
 
       try {
-        const output = runStele(projectDir, ["explain", violationId]);
+        const output = runStele(projectDir, ["explain", violationId!]);
 
         return {
           content: [{ type: "text", text: output }],

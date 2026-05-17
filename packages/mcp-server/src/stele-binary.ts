@@ -8,7 +8,7 @@ let cachedCwd: string | null = null;
 let cachedMtime: number | null = null;
 
 /** Default options for stele CLI execution. */
-const DEFAULT_EXEC_OPTIONS: ExecFileOptions & { encoding: BufferEncoding; maxBuffer: number } = {
+const DEFAULT_EXEC_OPTIONS: { encoding: BufferEncoding; maxBuffer: number } = {
   encoding: "utf8",
   maxBuffer: 1024 * 1024,
 };
@@ -98,20 +98,17 @@ export function runStele(cwd: string, args: string[], options: Partial<ExecFileO
     );
   }
 
-  // Run via node for .js files, direct exec for .cmd/.sh
-  if (binary.endsWith(".js")) {
-    return execFileSync("node", [binary, ...args], {
-      ...DEFAULT_EXEC_OPTIONS,
-      cwd,
-      ...options,
-    });
-  }
-
-  return execFileSync(binary, args, {
+  const execOpts: { encoding: BufferEncoding; maxBuffer: number; cwd: string } = {
     ...DEFAULT_EXEC_OPTIONS,
     cwd,
-    ...options,
-  });
+  };
+
+  // Run via node for .js files, direct exec for .cmd/.sh
+  if (binary.endsWith(".js")) {
+    return execFileSync("node", [binary, ...args], execOpts);
+  }
+
+  return execFileSync(binary, args, execOpts);
 }
 
 /**

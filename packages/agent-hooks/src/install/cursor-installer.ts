@@ -1,7 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { loadContract, SteleError } from "@stele/core";
-import { loadConfig } from "@stele/cli";
 import type { SteleConfig } from "../util/stele-config-types.js";
 
 /**
@@ -29,9 +28,56 @@ export interface CursorInstallOptions {
   force?: boolean;
 }
 
+/**
+ * Read Stele config from the project directory.
+ * Reads only the fields needed by cursor-installer, avoiding a hard
+ * dependency on `@stele/cli` and the circular import it would create.
+ */
+async function loadSteleConfig(projectRoot: string): Promise<SteleConfig> {
+  const defaults: SteleConfig = {
+    version: "0.1",
+    contractDir: "contract",
+    entry: "contract/main.stele",
+    generatedDir: "tests/contract",
+    checkerImplDir: "contract/checker_impls",
+    manifestPath: "contract/.manifest.json",
+    targetLanguage: "python",
+    testFramework: "pytest",
+    pathMode: "auto",
+    protected: [
+      "contract/**/*.stele",
+      "contract/checker_impls/**/*",
+      "contract/.baseline.json",
+      "contract/.manifest.json",
+      "tests/contract/**/*",
+    ],
+  };
+
+  let parsed: Record<string, unknown> = {};
+  try {
+    const raw = await readFile(path.join(projectRoot, "stele.config.json"), "utf-8");
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    // No config file — use defaults
+  }
+
+  return {
+    version: typeof parsed.version === "string" && parsed.version.length > 0 ? parsed.version : defaults.version,
+    contractDir: String(parsed.contractDir ?? defaults.contractDir),
+    entry: String(parsed.entry ?? defaults.entry),
+    generatedDir: String(parsed.generatedDir ?? defaults.generatedDir),
+    checkerImplDir: String(parsed.checkerImplDir ?? defaults.checkerImplDir),
+    manifestPath: String(parsed.manifestPath ?? defaults.manifestPath),
+    targetLanguage: String(parsed.targetLanguage ?? defaults.targetLanguage),
+    testFramework: String(parsed.testFramework ?? defaults.testFramework),
+    pathMode: String(parsed.pathMode ?? defaults.pathMode),
+    protected: Array.isArray(parsed.protected) ? parsed.protected : defaults.protected,
+  };
+}
+
 /** Install Stele Cursor integration into `projectRoot`. */
 export async function install(projectRoot: string, opts: CursorInstallOptions = {}): Promise<void> {
-  const config = await loadConfig(projectRoot);
+  const config = await loadSteleConfig(projectRoot);
   const rulesDir = path.join(projectRoot, ".cursor", "rules");
   const rulesFile = path.join(rulesDir, "stele.md");
 
