@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   SessionState,
   getSessionState,
@@ -240,7 +244,25 @@ describe("session registry", () => {
 // readMaterialObservations
 // ----------------------------------------------------------------
 
+/** Create a temp project directory with the observations file path pre-created. */
+function createTempProject(observationsContent: string): string {
+  const dir = join(tmpdir(), `stele-obs-test-${randomUUID()}`);
+  const obsDir = join(dir, ".stele", "agent");
+  mkdirSync(obsDir, { recursive: true });
+  writeFileSync(join(obsDir, "session-observations.jsonl"), observationsContent, "utf8");
+  return dir;
+}
+
 describe("readMaterialObservations", () => {
+  let tempDir: string | null = null;
+
+  afterEach(() => {
+    if (tempDir) {
+      try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* already gone */ }
+      tempDir = null;
+    }
+  });
+
   it("returns empty array for non-existent observations file", () => {
     const result = readMaterialObservations("/tmp/nonexistent-project-12345");
     expect(result).toEqual([]);
@@ -249,6 +271,73 @@ describe("readMaterialObservations", () => {
   it("returns empty array for non-existent directory", () => {
     const result = readMaterialObservations("/nonexistent/path/that/does/not/exist");
     expect(result).toEqual([]);
+  });
+
+  it("rejects file exceeding MAX_OBSERVATIONS_FILE_SIZE (1 MB)", () => {
+    // Create a file just over 1 MB (~1 048 577 bytes)
+    const payload = '{"type":"observation","data":"' + "x".repeat(1048560) + '"}\n';
+    tempDir = createTempProject(payload);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
+
+  it("skips lines exceeding MAX_LINE_LENGTH (64 KB)", () => {
+    const longLine = '{"type":"observation","data":"' + "x".repeat(65536) + '"}';
+    const shortLine = '{"type":"observation","material_change":true}';
+    const content = `${longLine}\n${shortLine}`;
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    // The long line is skipped; only the short line remains
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ type: "observation", material_change: true });
+  });
+
+  it("silently skips malformed JSON lines", () => {
+    const content = "not-json\n{broken\n123\n[invalid";
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
+
+  it("parses valid lines and skips invalid lines in mixed content", () => {
+    const line1 = JSON.stringify({ type: "observation", material_change: true, id: 1 });
+    const line2 = "this-is-not-json";
+    const line3 = JSON.stringify({ type: "observation", material_change: false, id: 2 });
+    const line4 = "{bad json here";
+    const content = `${line1}\n${line2}\n${line3}\n${line4}`;
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    // Only line1 qualifies (material_change === true)
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ type: "observation", material_change: true, id: 1 });
+  });
+
+  it("returns empty array for empty file", () => {
+    tempDir = createTempProject("");
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array when no entries have material_change=true", () => {
+    const line1 = JSON.stringify({ type: "observation", material_change: false });
+    const line2 = JSON.stringify({ type: "edit", material_change: false });
+    const line3 = JSON.stringify({ type: "log" });
+    const content = `${line1}\n${line2}\n${line3}`;
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toEqual([]);
+  });
+
+  it("returns only entries with material_change=true", () => {
+    const line1 = JSON.stringify({ type: "observation", material_change: true, path: "a.txt" });
+    const line2 = JSON.stringify({ type: "observation", material_change: false, path: "b.txt" });
+    const line3 = JSON.stringify({ type: "observation", material_change: true, path: "c.txt" });
+    const content = `${line1}\n${line2}\n${line3}`;
+    tempDir = createTempProject(content);
+    const result = readMaterialObservations(tempDir);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ type: "observation", material_change: true, path: "a.txt" });
+    expect(result[1]).toEqual({ type: "observation", material_change: true, path: "c.txt" });
   });
 });
 

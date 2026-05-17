@@ -243,10 +243,10 @@ export function resetAllSessions(): void {
  * Returns the count of material observations that are relevant for
  * maintenance review decisions.
  */
-/** Maximum file size for JSONL parsing (1 MB) */
+/** Maximum file size for JSONL parsing (1 MB). */
 const MAX_OBSERVATIONS_FILE_SIZE = 1 * 1024 * 1024;
 
-/** Maximum line length for JSONL entries (64 KB) */
+/** Maximum line length for JSONL entries (64 KB). */
 const MAX_LINE_LENGTH = 64 * 1024;
 
 export function readMaterialObservations(projectDir: string): Array<Record<string, unknown>> {

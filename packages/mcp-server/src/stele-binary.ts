@@ -54,6 +54,22 @@ export function verifyPackageIdentity(binaryPath: string): boolean {
     return false;
   }
 
+  // Also check the @stele/cli package directly in node_modules
+  // (sibling of .bin directory)
+  const nodeModulesDir = resolve(binaryPath, "..", "..");
+  const cliPkgPath = resolve(nodeModulesDir, "@stele", "cli", "package.json");
+  try {
+    const lstats = lstatSync(cliPkgPath);
+    if (!lstats.isSymbolicLink()) {
+      const pkg = JSON.parse(readFileSync(cliPkgPath, "utf8"));
+      if (pkg.name === "@stele/cli") {
+        return true;
+      }
+    }
+  } catch {
+    // Not found or parse error — continue with parent walk
+  }
+
   // Walk up to find the package.json for @stele/cli
   try {
     let dir = resolve(binaryPath, "..", "..");
@@ -82,7 +98,6 @@ export function verifyPackageIdentity(binaryPath: string): boolean {
   } catch {
     return false;
   }
-
 }
 
 /**
@@ -188,7 +203,7 @@ export function resolveSteleBinary(cwd: string): string | null {
 
   // Check parent directories up to 3 levels
   for (let depth = 1; depth <= 3; depth += 1) {
-    const parent = resolve(cwd, "..".repeat(depth));
+    const parent = resolve(cwd, ...Array(depth).fill(".."));
     const parentBin = resolve(parent, "node_modules", ".bin", process.platform === "win32" ? "stele.cmd" : "stele");
     if (existsSync(parentBin) && verifyPackageIdentity(parentBin)) {
       cachedBinary = parentBin;
