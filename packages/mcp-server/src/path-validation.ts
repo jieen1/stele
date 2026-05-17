@@ -35,11 +35,6 @@ export function validateProjectDir(raw: unknown): ValidateProjectDirResult {
     return { error: "Windows namespace paths are not allowed" };
   }
 
-  // Check the path exists
-  if (!existsSync(resolved)) {
-    return { error: `Path does not exist: ${resolved}` };
-  }
-
   // Reject symlinks + verify directory in single lstat call (no TOCTOU)
   try {
     const lstats = lstatSync(resolved);
@@ -50,7 +45,7 @@ export function validateProjectDir(raw: unknown): ValidateProjectDirResult {
       return { error: `${resolved} is not a directory` };
     }
   } catch {
-    return { error: `${resolved} is not accessible` };
+    return { error: `Path does not exist or is not accessible: ${resolved}` };
   }
 
   return { path: resolved };

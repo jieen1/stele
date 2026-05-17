@@ -47,6 +47,10 @@ function sanitizeString(msg: string): string {
   msg = msg.replace(/at\s+[^)]+\([^\)]+\)/g, "[redacted]");
   msg = msg.replace(/at\s+\S+:\d+:\d+/g, "[redacted]");
 
+  // Environment variables (common patterns) — must run before path redaction
+  // to avoid path regex partially consuming credential values
+  msg = msg.replace(/\b(?:API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY|CREDENTIAL)\s*[=:]\s*\S+/gi, "[env-credential]");
+
   // URLs with credentials (must run before path redaction to preserve credential marker)
   msg = msg.replace(/(\w+:\/\/)(\S+:\S+@)/g, "$1[credentials]@");
 
@@ -59,9 +63,6 @@ function sanitizeString(msg: string): string {
 
   // Network errors with addresses
   msg = msg.replace(/\b(?:EAI_AGAIN|ECONNREFUSED|ENOTFOUND)\s+\S+/gi, "[network-error]");
-
-  // Environment variables (common patterns)
-  msg = msg.replace(/\b(?:API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY|CREDENTIAL)\s*[=:]\s*\S+/gi, "[env-credential]");
 
   // Memory addresses
   msg = msg.replace(/\b0x[0-9a-f]{8,}\b/gi, "0x[redacted]");
