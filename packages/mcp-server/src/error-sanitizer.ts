@@ -58,16 +58,13 @@ function sanitizeString(msg: string): string {
   msg = msg.replace(/\bpid\s+[0-9]+/gi, "pid [redacted]");
 
   // Network errors with addresses
-  msg = msg.replace(/\b(?:EAI_AGAIN|ECONNREFUSED|ENOTFOUND)\s+\S+/gi, "$& [redacted]");
+  msg = msg.replace(/\b(?:EAI_AGAIN|ECONNREFUSED|ENOTFOUND)\s+\S+/gi, "[network-error]");
 
   // Environment variables (common patterns)
-  msg = msg.replace(/\b(?:API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY|CREDENTIAL)\s*[=:]\s*\S+/gi, "$& [redacted]");
+  msg = msg.replace(/\b(?:API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY|CREDENTIAL)\s*[=:]\s*\S+/gi, "[env-credential]");
 
   // Memory addresses
   msg = msg.replace(/\b0x[0-9a-f]{8,}\b/gi, "0x[redacted]");
-
-  // URLs with credentials
-  msg = msg.replace(/(\w+:\/\/)(\S+:\S+@)/g, "$1[credentials]@");
 
   // Email addresses (privacy)
   msg = msg.replace(/\b[\w.-]+@[\w.-]+\.\w+\b/g, "[email]");

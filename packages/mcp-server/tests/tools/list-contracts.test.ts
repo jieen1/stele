@@ -7,15 +7,14 @@ vi.mock("../../src/path-validation.js", () => ({
 
 vi.mock("@stele/agent-hooks", () => ({ matchProtectedPath: vi.fn() }));
 
-const mockParseContract = vi.fn();
+const mockParseContractFromFile = vi.fn();
 const mockListContractFiles = vi.fn();
 vi.mock("../../src/contract-cache.js", () => ({
-  parseContract: mockParseContract,
+  parseContractFromFile: mockParseContractFromFile,
   listContractFiles: mockListContractFiles,
   getProtectedPatterns: vi.fn(),
   getContractFiles: vi.fn(),
   isSteleProject: vi.fn(),
-  loadContractFiles: vi.fn(),
 }));
 
 const { createListContractsTool } = await import("../../src/tools/list-contracts.js");
@@ -51,7 +50,7 @@ describe("stele-list-contracts tool", () => {
     const tool = createListContractsTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
     mockListContractFiles.mockReturnValue([{ path: "main.stele", size: 100, modified: "2026-01-01" }]);
-    mockParseContract.mockReturnValue({ invariants: [], checkers: [] });
+    mockParseContractFromFile.mockResolvedValue({ invariants: [], checkers: [] });
     const result = await tool.handler({ projectDir: "/project", summary: true });
     expect(result.isError).toBe(false);
     const parsed = JSON.parse(result.content[0].text);

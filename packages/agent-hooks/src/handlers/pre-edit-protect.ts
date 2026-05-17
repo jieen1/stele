@@ -5,6 +5,17 @@ import { matchProtectedPath } from "../util/path-glob.js";
 import type { SteleConfig } from "../util/stele-config-types.js";
 
 /**
+ * Returns true when the command contains bash compound operators (||, &&, ;).
+ * These allow multi-command chains where a safe first command masks an unsafe
+ * second command (e.g., `ls || cat /etc/passwd`). We deny any command with
+ * these operators because the allowlist can only verify the first token.
+ */
+function hasCompoundOperators(command: string): boolean {
+  // Match || and && outside of quotes (simple heuristic)
+  return /\|\||&&|;/u.test(command);
+}
+
+/**
  * Build a {@link PreEditHook} that denies edits to paths matching
  * `config.protected`. Mirrors the behaviour of the Claude Code plugin's
  * `pre-tool-protect.js` script, but expressed in terms of the
@@ -32,6 +43,18 @@ export function createPreEditProtect(config: SteleConfig): PreEditHook {
       const command = typeof ctx.args.command === "string" ? ctx.args.command : "";
       const bashTarget = extractBashWriteTarget(command);
       if (!bashTarget) {
+        // Compound operators allow multi-command chains where a safe first
+        // command masks an unsafe second command (e.g., `ls || cat /etc/passwd`).
+        // Deny these outright since the allowlist only verifies the first token.
+        if (hasCompoundOperators(command)) {
+          return {
+            action: "deny",
+            reason:
+              "Bash command contains compound operators (||, &&, ;). " +
+              "These allow chaining commands that bypass the allowlist. Denying by default.",
+          };
+        }
+
         // Write target could not be determined. Deny unless the command is
         // a known read-only command. This closes the bypass where heredocs,
         // $() substitution, python3 -c, sed -i, etc. would slip through.

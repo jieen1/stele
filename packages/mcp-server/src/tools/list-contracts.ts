@@ -1,7 +1,7 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { McpResult } from "../types.js";
-import { loadContractFiles, listContractFiles, parseContract } from "../contract-cache.js";
+import { listContractFiles, parseContractFromFile } from "../contract-cache.js";
 import { validateProjectDir } from "../path-validation.js";
 
 /**
@@ -81,15 +81,14 @@ async function buildContractsResult(
 
   // Parse contracts for detailed listing
   try {
-    const contracts = await loadContractFiles(contractDir);
-
     const parsedContracts: Array<Record<string, unknown>> = [];
 
-    for (const contract of contracts) {
-      const parsed = parseContract(contract.content);
+    for (const file of files) {
+      const parsed = await parseContractFromFile(file.path);
       parsedContracts.push({
-        file: contract.path,
-        size: statSync(contract.path).size,
+        file: file.path,
+        size: file.size,
+        modified: file.modified,
         invariantCount: parsed.invariants.length,
         checkerCount: parsed.checkers.length,
         invariants: parsed.invariants,

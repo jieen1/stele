@@ -249,7 +249,7 @@ describe("createPreEditProtect", () => {
     expect(decision.action).toBe("allow");
   });
 
-  it("allows pnpm test (known-safe command)", async () => {
+  it("denies pnpm test (pnpm can write to disk)", async () => {
     const hook = createPreEditProtect(makeConfig());
     const decision = await hook(
       makeCtx({
@@ -257,7 +257,7 @@ describe("createPreEditProtect", () => {
         args: { command: "pnpm test" },
       }),
     );
-    expect(decision.action).toBe("allow");
+    expect(decision.action).toBe("deny");
   });
 
   it("allows non-subtree-protected siblings under contract/", async () => {

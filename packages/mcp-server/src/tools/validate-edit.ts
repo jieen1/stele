@@ -68,7 +68,8 @@ export function createValidateEditTool(): {
 
       // Containment check: reject paths that escape the project directory
       const relPath = relative(projectDir, resolvedPath);
-      if (relPath.startsWith("../") || relPath.startsWith("\\..") || (process.platform !== "win32" && relPath.startsWith("/"))) {
+      const normalized = relPath.replace(/\\/g, "/");
+      if (normalized.startsWith("../") || (process.platform !== "win32" && normalized.startsWith("/"))) {
         return {
           content: [{
             type: "text",

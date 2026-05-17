@@ -54,14 +54,12 @@ export const KNOWN_SAFE_COMMANDS: ReadonlySet<string> = new Set([
   // overwrite protected contract files, and the safe-command allowlist has
   // no subcommand awareness.
 
-  // Package / build tooling (fetch, list, version, or run tests)
-  // NOTE: `npm`, `npx`, `make` are NOT included — they can write files to disk
-  // (npm install, npx downloads, make builds). Use `stele check` at session stop
+  // Package / build tooling (read-only subcommands only)
+  // NOTE: `npm`, `npx`, `make`, `cargo`, `pnpm` are NOT included — they can
+  // write files to disk (install, build, add). Use `stele check` at session stop
   // to catch any drift from these commands.
-  "cargo",
   "go",
   "pip",
-  "pnpm",
   "py_compile",
   "pytest",
 
@@ -70,6 +68,5 @@ export const KNOWN_SAFE_COMMANDS: ReadonlySet<string> = new Set([
   "df",
   "du",
   "sleep",
-  "ssh",
   "which",
 ]);

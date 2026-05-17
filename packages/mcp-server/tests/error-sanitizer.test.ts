@@ -82,13 +82,15 @@ describe("sanitizeError", () => {
   it("redacts API_KEY", () => {
     const msg = "API_KEY=sk-12345 failed";
     const result = sanitizeError(msg);
-    expect(result).toContain("[redacted]");
+    expect(result).toContain("[env-credential]");
+    expect(result).not.toContain("sk-12345");
   });
 
   it("redacts TOKEN", () => {
     const msg = "TOKEN=abc123 expired";
     const result = sanitizeError(msg);
-    expect(result).toContain("[redacted]");
+    expect(result).toContain("[env-credential]");
+    expect(result).not.toContain("abc123");
   });
 
   // Memory address redaction
@@ -119,7 +121,8 @@ describe("sanitizeError", () => {
     const result = sanitizeError(msg);
     expect(result).toContain("pid [redacted]");
     expect(result).toContain("[path]");
-    expect(result).toContain("[redacted]");
+    expect(result).toContain("[env-credential]");
+    expect(result).not.toContain("secret");
   });
 
   it("handles deeply nested cause chains", () => {

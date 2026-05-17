@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const mockValidateProjectDir = vi.fn();
@@ -9,11 +10,11 @@ vi.mock("@stele/agent-hooks", () => ({
   matchProtectedPath: vi.fn(),
 }));
 
-const mockParseContract = vi.fn();
+const mockParseContractFromFile = vi.fn();
 const mockListContractFiles = vi.fn();
 const mockGetProtectedPatterns = vi.fn();
 vi.mock("../../src/contract-cache.js", () => ({
-  parseContract: mockParseContract,
+  parseContractFromFile: mockParseContractFromFile,
   listContractFiles: mockListContractFiles,
   getProtectedPatterns: mockGetProtectedPatterns,
   getContractFiles: vi.fn(),
@@ -21,6 +22,9 @@ vi.mock("../../src/contract-cache.js", () => ({
 }));
 
 const { createContextTool } = await import("../../src/tools/context.js");
+
+// Use a real Windows path so resolve/relative behave correctly in tests
+const testProjectDir = resolve(__dirname, "..", "..", "test-project", "src");
 
 describe("stele-context tool", () => {
   beforeEach(() => {
@@ -49,11 +53,11 @@ describe("stele-context tool", () => {
 
     it("returns markdown format by default", async () => {
       const tool = createContextTool();
-      mockValidateProjectDir.mockReturnValue({ path: "/project" });
+      mockValidateProjectDir.mockReturnValue({ path: testProjectDir });
       mockListContractFiles.mockReturnValue([]);
-      mockParseContract.mockReturnValue({ invariants: [], checkers: [] });
+      mockParseContractFromFile.mockResolvedValue({ invariants: [], checkers: [] });
 
-      const result = await tool.handler({ projectDir: "/project" });
+      const result = await tool.handler({ projectDir: testProjectDir });
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain("# Stele Contract Context");
@@ -61,25 +65,25 @@ describe("stele-context tool", () => {
 
     it("returns json format when requested", async () => {
       const tool = createContextTool();
-      mockValidateProjectDir.mockReturnValue({ path: "/project" });
+      mockValidateProjectDir.mockReturnValue({ path: testProjectDir });
       mockListContractFiles.mockReturnValue([]);
-      mockParseContract.mockReturnValue({ invariants: [], checkers: [] });
+      mockParseContractFromFile.mockResolvedValue({ invariants: [], checkers: [] });
 
-      const result = await tool.handler({ projectDir: "/project", format: "json" });
+      const result = await tool.handler({ projectDir: testProjectDir, format: "json" });
 
       expect(result.isError).toBe(false);
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.projectDir).toBe("/project");
+      expect(parsed.projectDir).toBe(testProjectDir);
     });
 
     it("validates focusPaths stay within projectDir", async () => {
       const tool = createContextTool();
-      mockValidateProjectDir.mockReturnValue({ path: "/project" });
+      mockValidateProjectDir.mockReturnValue({ path: testProjectDir });
       mockListContractFiles.mockReturnValue([]);
-      mockParseContract.mockReturnValue({ invariants: [], checkers: [] });
+      mockParseContractFromFile.mockResolvedValue({ invariants: [], checkers: [] });
 
       const result = await tool.handler({
-        projectDir: "/project",
+        projectDir: testProjectDir,
         focusPaths: ["../../etc/passwd"],
       });
 

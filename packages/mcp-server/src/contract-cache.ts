@@ -123,28 +123,6 @@ export async function loadProjectState(projectDir: string): Promise<ProjectState
 }
 
 /**
- * Load contract file contents from the contract directory.
- */
-export function loadContractFiles(contractDir: string): Array<{
-  path: string;
-  content: string;
-}> {
-  const files = scanSteleFiles(contractDir);
-  const results: Array<{ path: string; content: string }> = [];
-
-  for (const filePath of files) {
-    try {
-      const content = readFileSync(filePath, "utf8");
-      results.push({ path: filePath, content });
-    } catch {
-      // Skip unreadable files
-    }
-  }
-
-  return results;
-}
-
-/**
  * Check if a project has Stele configured.
  */
 export function isSteleProject(projectDir: string): boolean {
@@ -195,51 +173,8 @@ export interface ParsedContract {
 }
 
 /**
- * Parse Stele contract content into invariants and checkers.
- *
- * Lightweight regex-based preview parser. For production code, prefer
- * {@link parseContractFromFile} which uses {@link loadContract} from
- * {@link @stele/core} for consistent CDL parsing.
- */
-export function parseContract(content: string): ParsedContract {
-  const invariants: ParsedInvariant[] = [];
-  const checkers: ParsedChecker[] = [];
-
-  const invariantRegex = /\(invariant\s+([A-Z_]+)\s*\n?([\s\S]*?)\)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = invariantRegex.exec(content))) {
-    const id = match[1];
-    const body = match[2] ?? "";
-    const severityMatch = /\(severity\s+(error|warning|info)\)/.exec(body);
-    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
-
-    invariants.push({
-      id,
-      severity: severityMatch?.[1] ?? "error",
-      description: descMatch?.[1] ?? "",
-    });
-  }
-
-  const checkerRegex = /\(checker\s+([a-zA-Z0-9_-]+)\s*\n?([\s\S]*?)\)/g;
-  while ((match = checkerRegex.exec(content))) {
-    const id = match[1];
-    const body = match[2] ?? "";
-    const descMatch = /\(description\s+"([^"]*)"/.exec(body);
-
-    checkers.push({
-      id,
-      description: descMatch?.[1] ?? "",
-    });
-  }
-
-  return { invariants, checkers };
-}
-
-/**
  * Parse contract from a file path using @stele/core loadContract.
- * Preferred over parseContract() for production code to avoid parser
- * divergence when CDL grammar evolves.
+ * Uses the authoritative CDL parser — no regex divergence risk.
  */
 export async function parseContractFromFile(filePath: string): Promise<ParsedContract> {
   try {

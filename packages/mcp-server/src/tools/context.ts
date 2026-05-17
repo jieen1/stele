@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { DEFAULT_PROTECTED_PATTERNS } from "@stele/core";
 import type { McpResult } from "../types.js";
-import { parseContract, listContractFiles } from "../contract-cache.js";
+import { parseContractFromFile, listContractFiles } from "../contract-cache.js";
 import { validateProjectDir } from "../path-validation.js";
 
 /**
@@ -57,14 +57,16 @@ export function createContextTool(): {
       // Validate focusPaths stay within project directory
       for (const fp of focusPaths) {
         const resolved = resolve(projectDir, fp);
-        if (!resolved.startsWith(projectDir)) {
+        const relPath = relative(projectDir, resolved);
+        const normalized = relPath.replace(/\\/g, "/");
+        if (normalized.startsWith("../") || (process.platform !== "win32" && normalized.startsWith("/"))) {
           return {
             content: [{ type: "text", text: `focusPath escapes project directory: ${fp}` }],
             isError: true,
           };
         }
       }
-      const context = buildContext(projectDir, focusPaths);
+      const context = await buildContext(projectDir, focusPaths);
 
       if (context.error) {
         return {
@@ -107,7 +109,7 @@ interface Context {
   error?: string;
 }
 
-function buildContext(projectDir: string, focusPaths: string[]): Context {
+async function buildContext(projectDir: string, focusPaths: string[]): Promise<Context> {
   const contractDir = join(projectDir, "contract");
   const context: Context = {
     projectDir,
@@ -144,8 +146,7 @@ function buildContext(projectDir: string, focusPaths: string[]): Context {
 
       for (const file of files) {
         try {
-          const content = readFileSync(file.path, "utf8");
-          const parsed = parseContract(content);
+          const parsed = await parseContractFromFile(file.path);
 
           for (const invariant of parsed.invariants) {
             context.invariants.push(invariant);

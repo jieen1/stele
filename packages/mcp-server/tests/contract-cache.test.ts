@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   scanSteleFiles,
   listContractFiles,
-  loadContractFiles,
   isSteleProject,
   getCachedState,
   setCachedState,
@@ -22,13 +21,6 @@ describe("contract-cache", () => {;
   describe("listContractFiles", () => {
     it("returns empty array for non-existent directory", () => {
       const result = listContractFiles("/nonexistent/path");
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe("loadContractFiles", () => {
-    it("returns empty array for non-existent directory", () => {
-      const result = loadContractFiles("/nonexistent/path");
       expect(result).toEqual([]);
     });
   });

@@ -20,11 +20,10 @@ export {
 } from "./session-state.js";
 export {
   loadProjectState,
-  loadContractFiles,
   listContractFiles,
   getProtectedPatterns,
   isSteleProject,
-  parseContract,
+  parseContractFromFile,
   invalidateCache,
   getCachedState,
   setCachedState,
