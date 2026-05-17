@@ -15,7 +15,7 @@ export function createProposeContractTool(): {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  handler: (args: Record<string, unknown>) => McpResult;
+  handler: (args: Record<string, unknown>) => Promise<McpResult>;
 } {
   return {
     name: "stele-propose-contract",

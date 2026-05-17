@@ -82,14 +82,14 @@ function escapeHtml(s: string): string {
 function generateHtml(contract: Contract): string {
   const invariants = contract.invariants;
   const severities = uniqueString(invariants.map((i) => i.severity));
-  const categories = uniqueString(invariants.map((i) => i.category?.description ?? "none"));
+  const categories = uniqueString(invariants.map((i) => (i.category ? formatNode(i.category.valueNode) : "none")));
 
   const rows = invariants
     .map((inv) => {
-      const cat = inv.category?.description ?? "none";
+      const cat = inv.category ? formatNode(inv.category.valueNode) : "none";
       const sev = inv.severity;
       const desc = inv.description ?? "";
-      const rationale = inv.rationale?.description ?? "";
+      const rationale = inv.rationale ? formatNode(inv.rationale.valueNode) : "";
       const code = inv.assertExpression ? escapeHtml(formatNode(inv.assertExpression)) : "";
       return `<tr class="inv-row" data-severity="${escapeHtml(sev)}" data-category="${escapeHtml(cat)}">
 <td><a href="#${escapeHtml(inv.id)}">${escapeHtml(inv.id)}</a></td>
@@ -102,10 +102,10 @@ function generateHtml(contract: Contract): string {
 
   const detailSections = invariants
     .map((inv) => {
-      const cat = inv.category?.description ?? "none";
+      const cat = inv.category ? formatNode(inv.category.valueNode) : "none";
       const sev = inv.severity;
       const desc = inv.description ?? "";
-      const rationale = inv.rationale?.description ?? "";
+      const rationale = inv.rationale ? formatNode(inv.rationale.valueNode) : "";
       const code = inv.assertExpression ? escapeHtml(formatNode(inv.assertExpression)) : "";
       return `<section id="${escapeHtml(inv.id)}" class="detail" data-severity="${escapeHtml(sev)}" data-category="${escapeHtml(cat)}">
 <h2>${escapeHtml(inv.id)} <span class="badge badge-${escapeHtml(sev.toLowerCase())}">${escapeHtml(sev)}</span></h2>

@@ -265,8 +265,8 @@ describe("cursor-installer", () => {
   it("uninstall writes a message to stdout", async () => {
     const project = await createProject();
     const messages: string[] = [];
-    const writeMock = vi.spyOn(process.stdout, "write").mockImplementation((msg: string) => {
-      messages.push(msg);
+    vi.spyOn(process.stdout, "write").mockImplementation((msg: string | Uint8Array) => {
+      if (typeof msg === "string") messages.push(msg);
       return true;
     });
 
@@ -280,8 +280,8 @@ describe("cursor-installer", () => {
   it("install writes a message with rules file path to stdout", async () => {
     const project = await createProject();
     const messages: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((msg: string) => {
-      messages.push(msg);
+    vi.spyOn(process.stdout, "write").mockImplementation((msg: string | Uint8Array) => {
+      if (typeof msg === "string") messages.push(msg);
       return true;
     });
 
@@ -296,8 +296,8 @@ describe("cursor-installer", () => {
   it("install with enableShell=true includes shell hook message", async () => {
     const project = await createProject();
     const messages: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((msg: string) => {
-      messages.push(msg);
+    vi.spyOn(process.stdout, "write").mockImplementation((msg: string | Uint8Array) => {
+      if (typeof msg === "string") messages.push(msg);
       return true;
     });
 

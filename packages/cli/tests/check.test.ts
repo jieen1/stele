@@ -106,24 +106,7 @@ describe("check --diff (incremental check)", () => {
   });
 
   it("CLI wires --diff option correctly", async () => {
-    const mockCheck = vi.fn(async () => ({
-      summary: {
-        invariantCount: 0,
-        generatedFileCount: 0,
-        protectedFileCount: 0,
-      },
-      report: {
-        ok: true,
-        tool: "stele",
-        command: "check",
-        summary: {
-          message: "No contract changes detected (0 files)",
-          invariant_count: 0,
-          violation_count: 0,
-        },
-        violations: [],
-      },
-    }));
+    const mockCheck = vi.fn(async () => { /* void */ });
 
     const program = createProgram({
       cwd: () => "E:/tmp/project",
