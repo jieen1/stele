@@ -7,12 +7,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
 import {
   checkProject,
-  collectDiffContractFiles,
   createDiffNoChangesResult,
-  filterContractByFiles,
   runCheck,
   type CheckCommandOptions,
 } from "../src/commands/check.js";
+import {
+  collectDiffContractFiles,
+  filterContractByFiles,
+} from "../src/commands/check-diff.js";
 import { runGenerate } from "../src/commands/generate.js";
 import { runLock } from "../src/commands/lock.js";
 import { createProgram } from "../src/index.js";
