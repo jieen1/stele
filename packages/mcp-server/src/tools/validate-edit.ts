@@ -1,4 +1,4 @@
-import { relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { matchProtectedPath } from "@stele/agent-hooks";
 import type { McpResult, ValidateEditResult } from "../types.js";
 import { validateProjectDir } from "../path-validation.js";
@@ -69,7 +69,7 @@ export function createValidateEditTool(): {
       // Containment check: reject paths that escape the project directory
       const relPath = relative(projectDir, resolvedPath);
       const normalized = relPath.replace(/\\/g, "/");
-      if (normalized.startsWith("../") || (process.platform !== "win32" && normalized.startsWith("/"))) {
+      if (normalized.startsWith("../") || isAbsolute(relPath)) {
         return {
           content: [{
             type: "text",

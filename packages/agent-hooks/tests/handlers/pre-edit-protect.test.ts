@@ -142,7 +142,7 @@ describe("createPreEditProtect", () => {
     expect(decision.action).toBe("deny");
   });
 
-  it("denies python3 -c bash command (not in allowlist)", async () => {
+  it("denies python3 -c bash command (compound operators from parens)", async () => {
     const hook = createPreEditProtect(makeConfig());
     const decision = await hook(
       makeCtx({
@@ -151,8 +151,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("python3");
-    expect(decision.reason).toContain("not in the known-safe-commands allowlist");
+    expect(decision.reason).toContain("compound");
   });
 
   it("denies sed -i bash command (not in allowlist)", async () => {
@@ -167,7 +166,7 @@ describe("createPreEditProtect", () => {
     expect(decision.reason).toContain("sed");
   });
 
-  it("denies curl | bash command (not in allowlist)", async () => {
+  it("denies curl | bash command (pipe operator)", async () => {
     const hook = createPreEditProtect(makeConfig());
     const decision = await hook(
       makeCtx({
@@ -176,7 +175,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("curl");
+    expect(decision.reason).toContain("compound");
   });
 
   it("allows grep (known-safe command)", async () => {
@@ -202,7 +201,7 @@ describe("createPreEditProtect", () => {
     expect(decision.reason).toContain("git");
   });
 
-  it("denies ruby -c bash command (not in allowlist)", async () => {
+  it("denies ruby -c bash command (compound operators from parens)", async () => {
     const hook = createPreEditProtect(makeConfig());
     const decision = await hook(
       makeCtx({
@@ -211,10 +210,10 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("ruby");
+    expect(decision.reason).toContain("compound");
   });
 
-  it("denies node -e bash command (not in allowlist)", async () => {
+  it("denies node -e bash command (compound operators from parens)", async () => {
     const hook = createPreEditProtect(makeConfig());
     const decision = await hook(
       makeCtx({
@@ -223,7 +222,7 @@ describe("createPreEditProtect", () => {
       }),
     );
     expect(decision.action).toBe("deny");
-    expect(decision.reason).toContain("node");
+    expect(decision.reason).toContain("compound");
   });
 
   it("denies vi (text editor, not in allowlist)", async () => {
@@ -265,5 +264,43 @@ describe("createPreEditProtect", () => {
     expect(
       (await hook(makeCtx({ tool: "write", args: { filePath: "contract/notes.txt" } }))).action,
     ).toBe("allow");
+  });
+
+  it("denies pipe operator (|) compound command", async () => {
+    const hook = createPreEditProtect(makeConfig());
+    const decision = await hook(
+      makeCtx({
+        tool: "bash",
+        args: { command: "echo hello | dd of=contract/main.stele" },
+      }),
+    );
+    expect(decision.action).toBe("deny");
+    expect(decision.reason).toContain("compound");
+  });
+
+  it("denies process substitution", async () => {
+    const hook = createPreEditProtect(makeConfig());
+    const decision = await hook(
+      makeCtx({
+        tool: "bash",
+        args: { command: "cat <(echo hack) > contract/main.stele" },
+      }),
+    );
+    expect(decision.action).toBe("deny");
+    // Either compound operator check or protected path check fires — both deny
+    expect(decision.reason).toMatch(/(compound|protected)/);
+  });
+
+  it("denies subshell compound command", async () => {
+    const hook = createPreEditProtect(makeConfig());
+    const decision = await hook(
+      makeCtx({
+        tool: "bash",
+        args: { command: "(echo hack) > contract/main.stele" },
+      }),
+    );
+    expect(decision.action).toBe("deny");
+    // Either compound operator check or protected path check fires — both deny
+    expect(decision.reason).toMatch(/(compound|protected)/);
   });
 });

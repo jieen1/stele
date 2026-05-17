@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { DEFAULT_PROTECTED_PATTERNS } from "@stele/core";
 import type { McpResult } from "../types.js";
 import { parseContractFromFile, listContractFiles } from "../contract-cache.js";
@@ -59,7 +59,7 @@ export function createContextTool(): {
         const resolved = resolve(projectDir, fp);
         const relPath = relative(projectDir, resolved);
         const normalized = relPath.replace(/\\/g, "/");
-        if (normalized.startsWith("../") || (process.platform !== "win32" && normalized.startsWith("/"))) {
+        if (normalized.startsWith("../") || isAbsolute(relPath)) {
           return {
             content: [{ type: "text", text: `focusPath escapes project directory: ${fp}` }],
             isError: true,

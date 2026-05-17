@@ -11,8 +11,9 @@ import type { SteleConfig } from "../util/stele-config-types.js";
  * these operators because the allowlist can only verify the first token.
  */
 function hasCompoundOperators(command: string): boolean {
-  // Match || and && outside of quotes (simple heuristic)
-  return /\|\||&&|;/u.test(command);
+  // Match ||, &&, ;, |, process substitution >(), <()
+  // These allow multi-command chains or async writes that bypass the allowlist.
+  return /[|;&()]|&&/u.test(command);
 }
 
 /**

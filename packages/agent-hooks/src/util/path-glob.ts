@@ -166,7 +166,10 @@ function hasGlobMeta(segment: string): boolean {
 
 function isWithinProject(projectDir: string, candidatePath: string): boolean {
   const relativePath = path.relative(projectDir, candidatePath);
-  return relativePath.length === 0 || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+  if (relativePath.length === 0) return true;
+  // On Windows, path.relative("C:\\project", "D:\\other") returns "D:\\other"
+  // (full path, not starting with ".."). Catch this via isAbsolute.
+  return !relativePath.startsWith("..") && !path.isAbsolute(relativePath);
 }
 
 function toPosixPath(value: string): string {

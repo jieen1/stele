@@ -179,14 +179,15 @@ export interface ParsedContract {
 export async function parseContractFromFile(filePath: string): Promise<ParsedContract> {
   try {
     const contract = await loadContract(resolve(filePath));
-    return {
-      invariants: contract.invariants.map((inv) => ({
+    const invariants: ParsedInvariant[] = [];
+    for (const inv of contract.invariants) {
+      invariants.push({
         id: inv.id,
-        severity: inv.severity,
-        description: inv.description,
-      })),
-      checkers: [],
-    };
+        severity: inv.severity as string,
+        description: inv.description as string,
+      } satisfies ParsedInvariant);
+    }
+    return { invariants, checkers: [] };
   } catch {
     return { invariants: [], checkers: [] };
   }

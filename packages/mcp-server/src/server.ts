@@ -10,10 +10,14 @@ import type { ToolDef } from "./types.js";
  * Copies only own enumerable properties onto a null-proto object.
  */
 function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const DANGEROUS = new Set(["__proto__", "constructor", "__defineGetter__", "__defineSetter__"]);
   const safe = Object.create(null);
   for (const key of Object.keys(args ?? {})) {
-    if (key !== "__proto__" && key !== "constructor" && key !== "__defineGetter__" && key !== "__defineSetter__") {
-      safe[key] = args[key];
+    if (!DANGEROUS.has(key)) {
+      const value = args[key];
+      safe[key] = typeof value === "object" && value !== null && !Array.isArray(value)
+        ? sanitizeArgs(value as Record<string, unknown>)
+        : value;
     }
   }
   return safe;
