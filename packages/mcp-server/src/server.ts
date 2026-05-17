@@ -6,6 +6,20 @@ import { sanitizeError } from "./error-sanitizer.js";
 import type { ToolDef } from "./types.js";
 
 /**
+ * Sanitize MCP tool arguments against prototype pollution.
+ * Copies only own enumerable properties onto a null-proto object.
+ */
+function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const safe = Object.create(null);
+  for (const key of Object.keys(args ?? {})) {
+    if (key !== "__proto__" && key !== "constructor" && key !== "__defineGetter__" && key !== "__defineSetter__") {
+      safe[key] = args[key];
+    }
+  }
+  return safe;
+}
+
+/**
  * Stele MCP Server
  *
  * Contract-aware MCP server for AI agent integration.
@@ -42,7 +56,8 @@ export class SteleMcpServer {
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args = {} } = request.params;
+      const { name, arguments: rawArgs = {} } = request.params;
+      const args = sanitizeArgs(rawArgs);
       const tool = this.toolMap.get(name);
 
       if (!tool) {

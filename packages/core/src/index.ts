@@ -93,6 +93,7 @@ export type {
   OperatorSpec,
 } from "./registry/operators.js";
 export { CORE_OPERATOR_SPECS, createCoreOperatorRegistry, createOperatorRegistry } from "./registry/operators.js";
+export { DEFAULT_PROTECTED_PATTERNS } from "./config/defaults.js";
 export { uniqueSortedStrings } from "./util/array.js";
 export { sanitizeIdentifier } from "./util/identifier.js";
 export {

@@ -27,9 +27,12 @@ export function validateProjectDir(raw: unknown): ValidateProjectDirResult {
 
   const resolved = resolve(raw.trim());
 
-  // Reject Windows UNC paths
+  // Reject Windows UNC paths (including namespace and admin shares)
   if (resolved.startsWith("//") || resolved.startsWith("\\\\")) {
     return { error: "UNC paths are not allowed" };
+  }
+  if (resolved.startsWith("\\\\?\\") || resolved.startsWith("//./") || resolved.startsWith("\\\\.\\admin")) {
+    return { error: "Windows namespace paths are not allowed" };
   }
 
   // Check the path exists

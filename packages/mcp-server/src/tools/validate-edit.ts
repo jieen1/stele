@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { matchProtectedPath } from "@stele/agent-hooks";
 import type { McpResult, ValidateEditResult } from "../types.js";
 import { validateProjectDir } from "../path-validation.js";
@@ -64,7 +64,22 @@ export function createValidateEditTool(): {
       const session = getSessionState(projectDir);
       const protectedPatterns = getProtectedPatterns(projectDir);
 
-      let resolvedPath = resolve(projectDir, filePath);
+      const resolvedPath = resolve(projectDir, filePath);
+
+      // Containment check: reject paths that escape the project directory
+      const relPath = relative(projectDir, resolvedPath);
+      if (relPath.startsWith("../") || relPath.startsWith("\\..") || (process.platform !== "win32" && relPath.startsWith("/"))) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              allowed: false,
+              reason: `filePath resolves outside project directory (${projectDir})`,
+            }, null, 2),
+          }],
+          isError: true,
+        };
+      }
 
       // Check if the path is protected (delegated to agent-hooks glob matcher)
       if (!matchProtectedPath(resolvedPath, protectedPatterns, projectDir)) {

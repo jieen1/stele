@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { DEFAULT_PROTECTED_PATTERNS } from "@stele/core";
 import type { McpResult } from "../types.js";
 import { parseContract, listContractFiles } from "../contract-cache.js";
 import { validateProjectDir } from "../path-validation.js";
@@ -129,12 +130,7 @@ function buildContext(projectDir: string, focusPaths: string[]): Context {
         if (config?.protected && Array.isArray(config.protected)) {
           context.protectedPatterns = config.protected;
         } else {
-          context.protectedPatterns = [
-            "contract/**/*.stele",
-            "contract/checker_impls/**/*",
-            "contract/.manifest.json",
-            "tests/contract/**/*",
-          ];
+          context.protectedPatterns = [...DEFAULT_PROTECTED_PATTERNS];
         }
       } catch {
         // Ignore parse errors

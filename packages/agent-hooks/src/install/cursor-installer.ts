@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { loadContract, SteleError } from "@stele/core";
+import { DEFAULT_PROTECTED_PATTERNS, loadContract, SteleError } from "@stele/core";
 import type { SteleConfig } from "../util/stele-config-types.js";
 
 /**
@@ -44,13 +44,7 @@ async function loadSteleConfig(projectRoot: string): Promise<SteleConfig> {
     targetLanguage: "python",
     testFramework: "pytest",
     pathMode: "auto",
-    protected: [
-      "contract/**/*.stele",
-      "contract/checker_impls/**/*",
-      "contract/.baseline.json",
-      "contract/.manifest.json",
-      "tests/contract/**/*",
-    ],
+    protected: [...DEFAULT_PROTECTED_PATTERNS],
   };
 
   let parsed: Record<string, unknown> = {};

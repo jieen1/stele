@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { DEFAULT_PROTECTED_PATTERNS, loadContract } from "@stele/core";
 import type { ProjectState } from "./types.js";
 
 const CONTRACT_DIR = "contract";
@@ -160,12 +161,7 @@ export function getProtectedPatterns(projectDir: string): string[] {
   const configFile = join(projectDir, CONFIG_FILE);
 
   if (!existsSync(configFile)) {
-    return [
-      "contract/**/*.stele",
-      "contract/checker_impls/**/*",
-      "contract/.manifest.json",
-      "tests/contract/**/*",
-    ];
+    return [...DEFAULT_PROTECTED_PATTERNS];
   }
 
   try {
@@ -179,12 +175,7 @@ export function getProtectedPatterns(projectDir: string): string[] {
     // Ignore parse errors
   }
 
-  return [
-    "contract/**/*.stele",
-    "contract/checker_impls/**/*",
-    "contract/.manifest.json",
-    "tests/contract/**/*",
-  ];
+  return [...DEFAULT_PROTECTED_PATTERNS];
 }
 
 export interface ParsedInvariant {
@@ -205,7 +196,10 @@ export interface ParsedContract {
 
 /**
  * Parse Stele contract content into invariants and checkers.
- * Uses regex extraction — not a full CDL parser.
+ *
+ * Lightweight regex-based preview parser. For production code, prefer
+ * {@link parseContractFromFile} which uses {@link loadContract} from
+ * {@link @stele/core} for consistent CDL parsing.
  */
 export function parseContract(content: string): ParsedContract {
   const invariants: ParsedInvariant[] = [];
@@ -240,4 +234,25 @@ export function parseContract(content: string): ParsedContract {
   }
 
   return { invariants, checkers };
+}
+
+/**
+ * Parse contract from a file path using @stele/core loadContract.
+ * Preferred over parseContract() for production code to avoid parser
+ * divergence when CDL grammar evolves.
+ */
+export async function parseContractFromFile(filePath: string): Promise<ParsedContract> {
+  try {
+    const contract = await loadContract(resolve(filePath));
+    return {
+      invariants: contract.invariants.map((inv) => ({
+        id: inv.id,
+        severity: inv.severity,
+        description: inv.description,
+      })),
+      checkers: [],
+    };
+  } catch {
+    return { invariants: [], checkers: [] };
+  }
 }

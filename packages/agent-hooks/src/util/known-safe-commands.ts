@@ -50,16 +50,16 @@ export const KNOWN_SAFE_COMMANDS: ReadonlySet<string> = new Set([
   "test",
   "true",
 
-  // Git (read-only subcommands are the vast majority; git itself does not
-  // write to protected contract paths in normal usage)
-  "git",
+  // NOTE: `git` is NOT included — `git checkout -- <protected-file>` can
+  // overwrite protected contract files, and the safe-command allowlist has
+  // no subcommand awareness.
 
   // Package / build tooling (fetch, list, version, or run tests)
+  // NOTE: `npm`, `npx`, `make` are NOT included — they can write files to disk
+  // (npm install, npx downloads, make builds). Use `stele check` at session stop
+  // to catch any drift from these commands.
   "cargo",
   "go",
-  "make",
-  "npm",
-  "npx",
   "pip",
   "pnpm",
   "py_compile",

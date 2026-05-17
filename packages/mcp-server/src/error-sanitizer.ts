@@ -47,7 +47,10 @@ function sanitizeString(msg: string): string {
   msg = msg.replace(/at\s+[^)]+\([^\)]+\)/g, "[redacted]");
   msg = msg.replace(/at\s+\S+:\d+:\d+/g, "[redacted]");
 
-  // File system paths (any length — not just 4+ segments)
+  // URLs with credentials (must run before path redaction to preserve credential marker)
+  msg = msg.replace(/(\w+:\/\/)(\S+:\S+@)/g, "$1[credentials]@");
+
+  // File system paths (at least 2 segments to avoid matching URL paths)
   msg = msg.replace(/\/(?:[\w.-]+\/){1,}[\w.-]+/g, "[path]");
   msg = msg.replace(/[A-Z]:\\(?:[\w.-]+\\){1,}[\w.-]+/g, "[path]");
 

@@ -212,6 +212,25 @@ export function resetSession(projectDir: string): void {
 }
 
 /**
+ * Destroy a specific session and release its references.
+ * Call when a project directory is deleted or no longer relevant.
+ */
+export function destroySession(projectDir: string): void {
+  sessionRegistry.delete(resolve(projectDir));
+}
+
+/**
+ * Destroy all sessions whose project directories no longer exist.
+ */
+export function destroyStaleSessions(): void {
+  for (const [key, session] of sessionRegistry) {
+    if (!existsSync(session.projectDir)) {
+      sessionRegistry.delete(key);
+    }
+  }
+}
+
+/**
  * Reset all sessions.
  */
 export function resetAllSessions(): void {

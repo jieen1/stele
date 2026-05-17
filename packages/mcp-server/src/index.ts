@@ -13,6 +13,8 @@ export {
   getSessionState,
   resetSession,
   resetAllSessions,
+  destroySession,
+  destroyStaleSessions,
   readMaterialObservations,
   isProtectedPath,
 } from "./session-state.js";
