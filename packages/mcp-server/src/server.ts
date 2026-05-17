@@ -15,9 +15,15 @@ function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
   for (const key of Object.keys(args ?? {})) {
     if (!DANGEROUS.has(key)) {
       const value = args[key];
-      safe[key] = typeof value === "object" && value !== null && !Array.isArray(value)
-        ? sanitizeArgs(value as Record<string, unknown>)
-        : value;
+      safe[key] = Array.isArray(value)
+        ? value.map((item) =>
+          typeof item === "object" && item !== null
+            ? sanitizeArgs(item as Record<string, unknown>)
+            : item,
+        )
+        : typeof value === "object" && value !== null
+          ? sanitizeArgs(value as Record<string, unknown>)
+          : value;
     }
   }
   return safe;

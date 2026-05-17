@@ -37,7 +37,6 @@ export const KNOWN_SAFE_COMMANDS: ReadonlySet<string> = new Set([
 
   // Shell builtins (commonly used for flow control)
   "cd",
-  "export",
   "return",
   "set",
   "shift",
@@ -63,6 +62,5 @@ export const KNOWN_SAFE_COMMANDS: ReadonlySet<string> = new Set([
   "date",
   "df",
   "du",
-  "sleep",
   "which",
 ]);

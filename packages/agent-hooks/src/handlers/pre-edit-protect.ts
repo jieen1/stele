@@ -11,9 +11,9 @@ import type { SteleConfig } from "../util/stele-config-types.js";
  * these operators because the allowlist can only verify the first token.
  */
 function hasCompoundOperators(command: string): boolean {
-  // Match |, &, ;, (, ) — any bash metacharacter that can chain commands
+  // Match |, &, ;, (, ), ` — any bash metacharacter that can chain commands
   // or spawn new execution contexts.
-  return /[|;&()]/u.test(command);
+  return /[|;&()`]/u.test(command);
 }
 
 /**
@@ -42,20 +42,23 @@ export function createPreEditProtect(config: SteleConfig): PreEditHook {
 
     if (target.length === 0 && ctx.tool === "bash") {
       const command = typeof ctx.args.command === "string" ? ctx.args.command : "";
+
+      // CRITICAL: Compound operator check runs FIRST, before any write-target
+      // extraction. A command like `echo data > /safe; echo evil >> contract/main.stele`
+      // would extract `/safe` as the write target and allow if not protected,
+      // but the second chained command still executes. Deny compound operators
+      // unconditionally.
+      if (hasCompoundOperators(command)) {
+        return {
+          action: "deny",
+          reason:
+            "Bash command contains compound operators (|, &, ;, (, ), `). " +
+            "These allow chaining commands that bypass the allowlist. Denying by default.",
+        };
+      }
+
       const bashTarget = extractBashWriteTarget(command);
       if (!bashTarget) {
-        // Compound operators allow multi-command chains where a safe first
-        // command masks an unsafe second command (e.g., `ls || cat /etc/passwd`).
-        // Deny these outright since the allowlist only verifies the first token.
-        if (hasCompoundOperators(command)) {
-          return {
-            action: "deny",
-            reason:
-              "Bash command contains compound operators (||, &&, ;). " +
-              "These allow chaining commands that bypass the allowlist. Denying by default.",
-          };
-        }
-
         // Write target could not be determined. Deny unless the command is
         // a known read-only command. This closes the bypass where heredocs,
         // $() substitution, python3 -c, sed -i, etc. would slip through.
