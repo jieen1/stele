@@ -47,8 +47,10 @@ describe("createSessionStartContext", () => {
     const result = await hook(mockCtx);
 
     expect(result.context).toContain("2 invariants");
-    expect(result.context).toContain("**INV1**");
-    expect(result.context).toContain("**INV2**");
+    expect(result.context).toContain("INV1");
+    expect(result.context).toContain("INV2");
+    // Sanitized output: no markdown in invariant IDs/severity/description
+    expect(result.context).not.toContain("**INV1**");
   });
 
   it("handles zero invariants", async () => {

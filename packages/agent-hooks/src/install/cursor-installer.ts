@@ -20,6 +20,15 @@ import type { SteleConfig } from "../util/stele-config-types.js";
 /** First-line sentinel used to detect Stele-managed cursor rules files. */
 export const AUTO_MARKER = "<!-- stele-auto:v1 -->";
 
+/**
+ * Sanitize invariant text for safe rendering in agent-facing markdown.
+ * Whitelist ASCII alphanumeric, basic punctuation, and whitespace.
+ */
+function sanitizeInvariantText(raw: string, maxLength = 200): string {
+  const truncated = raw.slice(0, maxLength);
+  return truncated.replace(/[^A-Za-z0-9_\- ./(),;:!?']/g, "");
+}
+
 /** Options accepted by {@link install}. */
 export interface CursorInstallOptions {
   /** Also write a composer-rule shell hook to `.cursor/composer/stele-check.sh`. */
@@ -125,7 +134,7 @@ export function renderRulesMarkdown(
     "",
     invariants.length === 0
       ? "_(none currently defined)_"
-      : head.map((inv) => `- **${inv.id}** (${inv.severity}): ${inv.description}`).join("\n") + overflow,
+      : head.map((inv) => `- **${sanitizeInvariantText(inv.id, 64)}** (${sanitizeInvariantText(inv.severity, 32)}): ${sanitizeInvariantText(inv.description)}`).join("\n") + overflow,
     "",
     "## Rules for Agent",
     "",
