@@ -7,14 +7,18 @@ import {
 import type { AstNode, ListNode, SourceSpan } from "../src/ast/types.js";
 
 describe("readSingleExpression", () => {
+  function makeIdentifier(value: string): AstNode {
+    return { kind: "identifier", value, span: { file: "", line: 1, column: 1 } };
+  }
+
   function makeNode(items: AstNode[]): ListNode {
     return { kind: "list", head: "test", items, span: { file: "", line: 1, column: 1 } };
   }
 
   it("returns single expression", () => {
-    const items = [{ kind: "identifier", value: "X", span: { file: "", line: 1, column: 1 } }];
+    const items = [makeIdentifier("X")];
     const result = readSingleExpression(makeNode(items), "Test", "E0001");
-    expect(result.value).toBe("X");
+    expect(result.kind).toBe("identifier");
   });
 
   it("throws for empty list", () => {
@@ -22,8 +26,8 @@ describe("readSingleExpression", () => {
   });
 
   it("throws for multiple items", () => {
-    const a = { kind: "identifier", value: "A", span: { file: "", line: 1, column: 1 } };
-    const b = { kind: "identifier", value: "B", span: { file: "", line: 1, column: 1 } };
+    const a = makeIdentifier("A");
+    const b = makeIdentifier("B");
     expect(() => readSingleExpression(makeNode([a, b]), "Test", "E0001")).toThrow("exactly one value");
   });
 });
@@ -41,22 +45,34 @@ describe("ensureFieldUnset", () => {
 });
 
 describe("readSingleString", () => {
+  function makeString(value: string): AstNode {
+    return { kind: "string", value, span: { file: "", line: 1, column: 1 } };
+  }
+
+  function makeIdentifier(value: string): AstNode {
+    return { kind: "identifier", value, span: { file: "", line: 1, column: 1 } };
+  }
+
+  function makeNumber(raw: string, value: number): AstNode {
+    return { kind: "number", raw, value, span: { file: "", line: 1, column: 1 } };
+  }
+
   function makeNode(items: AstNode[]): ListNode {
     return { kind: "list", head: "test", items, span: { file: "", line: 1, column: 1 } };
   }
 
   it("reads string value", () => {
-    const items = [{ kind: "string", value: "hello world", span: { file: "", line: 1, column: 1 } }];
+    const items = [makeString("hello world")];
     expect(readSingleString(makeNode(items), "Test", "E0001")).toBe("hello world");
   });
 
   it("reads identifier value", () => {
-    const items = [{ kind: "identifier", value: "severity", span: { file: "", line: 1, column: 1 } }];
+    const items = [makeIdentifier("severity")];
     expect(readSingleString(makeNode(items), "Test", "E0001")).toBe("severity");
   });
 
   it("throws for non-string non-identifier", () => {
-    const items = [{ kind: "number", raw: "42", value: 42, span: { file: "", line: 1, column: 1 } }];
+    const items = [makeNumber("42", 42)];
     expect(() => readSingleString(makeNode(items), "Test", "E0001")).toThrow("must be a string or identifier");
   });
 

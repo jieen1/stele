@@ -2,25 +2,37 @@ import { describe, expect, it } from "vitest";
 import { describeNode, validationError } from "../src/validator/structure-error.js";
 import type { AstNode, ListNode, SourceSpan } from "../src/ast/types.js";
 
+function makeIdentifier(value: string): AstNode {
+  return { kind: "identifier", value, span: { file: "", line: 1, column: 1 } };
+}
+
+function makeKeyword(value: string): AstNode {
+  return { kind: "keyword", value, span: { file: "", line: 1, column: 1 } };
+}
+
+function makeString(value: string): AstNode {
+  return { kind: "string", value, span: { file: "", line: 1, column: 1 } };
+}
+
+function makeListNode(head: string): ListNode {
+  return { kind: "list", head, items: [], span: { file: "", line: 1, column: 1 } };
+}
+
 describe("describeNode", () => {
   it("describes identifier nodes", () => {
-    const node: AstNode = { kind: "identifier", value: "myVar", span: { file: "", line: 1, column: 1 } };
-    expect(describeNode(node)).toBe('identifier "myVar"');
+    expect(describeNode(makeIdentifier("myVar"))).toBe('identifier "myVar"');
   });
 
   it("describes list nodes", () => {
-    const node: ListNode = { kind: "list", head: "invariant", items: [], span: { file: "", line: 1, column: 1 } };
-    expect(describeNode(node)).toBe('list "invariant"');
+    expect(describeNode(makeListNode("invariant"))).toBe('list "invariant"');
   });
 
   it("describes string nodes", () => {
-    const node: AstNode = { kind: "string", value: "hello", span: { file: "", line: 1, column: 1 } };
-    expect(describeNode(node)).toBe('string "hello"');
+    expect(describeNode(makeString("hello"))).toBe('string "hello"');
   });
 
   it("describes keyword nodes", () => {
-    const node: AstNode = { kind: "keyword", value: "severity", span: { file: "", line: 1, column: 1 } };
-    expect(describeNode(node)).toBe('keyword "severity"');
+    expect(describeNode(makeKeyword("severity"))).toBe('keyword "severity"');
   });
 });
 

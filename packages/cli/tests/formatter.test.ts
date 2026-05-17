@@ -7,8 +7,8 @@ describe("formatCheckReport", () => {
     const violation: Violation = {
       rule_id: "TEST_RULE",
       severity,
-      cause: { summary: "Test violation", kind: "check", detail: "Test detail" },
-      source: { kind: "check", source: "tests/contract/test_main.py" },
+      cause: { summary: "Test violation", detail: "Test detail" },
+      source: { tool: "stele", command: "check", kind: "check" },
       location: { path: "tests/contract/test_main.py", line: 1, column: 1 },
       fingerprint: "abc123",
       rule_kind: "invariant",
