@@ -57,7 +57,7 @@ export function createProposeContractTool(): {
       },
       required: ["invariantId", "severity", "description", "assert"],
     },
-    handler: (args: Record<string, unknown>): McpResult => {
+    handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const result = validateProjectDir(args.projectDir);
       if ("error" in result) {
         return {
@@ -89,7 +89,7 @@ export function createProposeContractTool(): {
       ];
 
       try {
-        const output = runStele(projectDir, cmdArgs);
+        const output = await runStele(projectDir, cmdArgs);
 
         return {
           content: [

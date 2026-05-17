@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const mockRunStele = vi.fn();
+const mockRunStele = vi.fn(() => Promise.resolve(""));
 vi.mock("../../src/stele-binary.js", () => ({
   runStele: mockRunStele,
 }));
@@ -18,7 +18,7 @@ describe("stele-check tool", () => {
   });
 
   describe("createCheckTool", () => {
-    it("returns correct tool metadata", () => {
+    it("returns correct tool metadata", async () => {
       const tool = createCheckTool();
       expect(tool.name).toBe("stele-check");
       expect(tool.description).toContain("stele check");
@@ -28,61 +28,61 @@ describe("stele-check tool", () => {
   });
 
   describe("handler", () => {
-    it("rejects invalid projectDir", () => {
+    it("rejects invalid projectDir", async () => {
       const tool = createCheckTool();
       mockValidateProjectDir.mockReturnValue({ error: "Path does not exist" });
 
-      const result = tool.handler({ projectDir: "/nonexistent" });
+      const result = await tool.handler({ projectDir: "/nonexistent" });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Path does not exist");
     });
 
-    it("runs stele check with JSON output by default", () => {
+    it("runs stele check with JSON output by default", async () => {
       const tool = createCheckTool();
       mockValidateProjectDir.mockReturnValue({ path: "/valid-project" });
-      mockRunStele.mockReturnValue(JSON.stringify({ ok: true, report: {}, summary: {} }));
+      mockRunStele.mockResolvedValue(JSON.stringify({ ok: true, report: {}, summary: {} }));
 
-      tool.handler({ projectDir: "/valid-project" });
+      await tool.handler({ projectDir: "/valid-project" });
 
       expect(mockRunStele).toHaveBeenCalledWith("/valid-project", ["check", "--json"]);
     });
 
-    it("respects json: false flag", () => {
+    it("respects json: false flag", async () => {
       const tool = createCheckTool();
       mockValidateProjectDir.mockReturnValue({ path: "/valid-project" });
-      mockRunStele.mockReturnValue(JSON.stringify({ ok: true, report: {}, summary: {} }));
+      mockRunStele.mockResolvedValue(JSON.stringify({ ok: true, report: {}, summary: {} }));
 
-      tool.handler({ projectDir: "/valid-project", json: false });
+      await tool.handler({ projectDir: "/valid-project", json: false });
 
       expect(mockRunStele).toHaveBeenCalledWith("/valid-project", ["check"]);
     });
 
-    it("uses undefined projectDir when not provided", () => {
+    it("uses undefined projectDir when not provided", async () => {
       const tool = createCheckTool();
       mockValidateProjectDir.mockReturnValue({ path: process.cwd() });
-      mockRunStele.mockReturnValue(JSON.stringify({ ok: true, report: {}, summary: {} }));
+      mockRunStele.mockResolvedValue(JSON.stringify({ ok: true, report: {}, summary: {} }));
 
-      tool.handler({});
+      await tool.handler({});
 
       expect(mockValidateProjectDir).toHaveBeenCalledWith(undefined);
     });
 
-    it("propagates runStele errors as MCP error", () => {
+    it("propagates runStele errors as MCP error", async () => {
       const tool = createCheckTool();
       mockValidateProjectDir.mockReturnValue({ path: "/valid-project" });
-      mockRunStele.mockImplementation(() => { throw new Error("Command failed"); });
+      mockRunStele.mockRejectedValueOnce(new Error("Command failed"));
 
-      const result = tool.handler({ projectDir: "/valid-project" });
+      const result = await tool.handler({ projectDir: "/valid-project" });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Command failed");
     });
 
-    it("returns violation details when violations exist", () => {
+    it("returns violation details when violations exist", async () => {
       const tool = createCheckTool();
       mockValidateProjectDir.mockReturnValue({ path: "/valid-project" });
-      mockRunStele.mockReturnValue(
+      mockRunStele.mockResolvedValue(
         JSON.stringify({
           ok: false,
           violations: [
@@ -93,7 +93,7 @@ describe("stele-check tool", () => {
         })
       );
 
-      const result = tool.handler({ projectDir: "/valid-project", json: false });
+      const result = await tool.handler({ projectDir: "/valid-project", json: false });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("INV_001");

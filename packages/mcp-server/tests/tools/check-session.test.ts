@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const mockRunStele = vi.fn();
+const mockRunStele = vi.fn(() => Promise.resolve(""));
 vi.mock("../../src/stele-binary.js", () => ({
   runStele: mockRunStele,
 }));
@@ -33,7 +33,7 @@ describe("stele-check-session tool", () => {
   });
 
   describe("createCheckSessionTool", () => {
-    it("returns correct tool metadata", () => {
+    it("returns correct tool metadata", async () => {
       const tool = createCheckSessionTool();
       expect(tool.name).toBe("stele-check-session");
       expect(tool.description).toContain("session");
@@ -41,36 +41,36 @@ describe("stele-check-session tool", () => {
   });
 
   describe("handler", () => {
-    it("rejects invalid projectDir", () => {
+    it("rejects invalid projectDir", async () => {
       const tool = createCheckSessionTool();
       mockValidateProjectDir.mockReturnValue({ error: "Path does not exist" });
 
-      const result = tool.handler({ projectDir: "/nonexistent" });
+      const result = await tool.handler({ projectDir: "/nonexistent" });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Path does not exist");
     });
 
-    it("runs check and returns JSON by default", () => {
+    it("runs check and returns JSON by default", async () => {
       const tool = createCheckSessionTool();
       mockValidateProjectDir.mockReturnValue({ path: "/project" });
       mockReadMaterialObservations.mockReturnValue([]);
-      mockRunStele.mockReturnValue(JSON.stringify({ ok: true, violations: [], summary: {} }));
+      mockRunStele.mockResolvedValue(JSON.stringify({ ok: true, violations: [], summary: {} }));
 
-      const result = tool.handler({ projectDir: "/project" });
+      const result = await tool.handler({ projectDir: "/project" });
 
       expect(result.isError).toBe(false);
       expect(mockRunStele).toHaveBeenCalledWith("/project", ["check", "--json"]);
       expect(result.content[0].text).toContain("check");
     });
 
-    it("includes maintenance review when observations exist", () => {
+    it("includes maintenance review when observations exist", async () => {
       const tool = createCheckSessionTool();
       mockValidateProjectDir.mockReturnValue({ path: "/project" });
       mockReadMaterialObservations.mockReturnValue([{ path: "src/changed.ts" }]);
-      mockRunStele.mockReturnValue(JSON.stringify({ ok: true, violations: [], summary: {} }));
+      mockRunStele.mockResolvedValue(JSON.stringify({ ok: true, violations: [], summary: {} }));
 
-      const result = tool.handler({ projectDir: "/project" });
+      const result = await tool.handler({ projectDir: "/project" });
 
       expect(result.isError).toBe(true);
       const parsed = JSON.parse(result.content[0].text);

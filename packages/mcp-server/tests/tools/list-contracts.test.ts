@@ -22,7 +22,7 @@ const { createListContractsTool } = await import("../../src/tools/list-contracts
 describe("stele-list-contracts tool", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns correct tool metadata", () => {
+  it("$1", async () => {
     const tool = createListContractsTool();
     expect(tool.name).toBe("stele-list-contracts");
     expect(tool.inputSchema.required.length).toBe(0);

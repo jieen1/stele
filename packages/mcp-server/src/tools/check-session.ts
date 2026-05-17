@@ -39,7 +39,7 @@ export function createCheckSessionTool(): {
       },
       required: [],
     },
-    handler: (args: Record<string, unknown>): McpResult => {
+    handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const validated = validateProjectDir(args.projectDir);
       if ("error" in validated) {
         return {
@@ -54,7 +54,7 @@ export function createCheckSessionTool(): {
 
       try {
         // Run stele check
-        const output = runStele(projectDir, ["check", ...(json ? ["--json"] : [])]);
+        const output = await runStele(projectDir, ["check", ...(json ? ["--json"] : [])]);
 
         let report: ViolationReport;
 

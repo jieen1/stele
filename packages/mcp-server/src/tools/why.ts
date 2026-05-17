@@ -33,7 +33,7 @@ export function createWhyTool(): {
       },
       required: ["fingerprint"],
     },
-    handler: (args: Record<string, unknown>): McpResult => {
+    handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const result = validateProjectDir(args.projectDir);
       if ("error" in result) {
         return {
@@ -51,7 +51,7 @@ export function createWhyTool(): {
       }
 
       try {
-        const output = runStele(projectDir, ["why", fingerprint!]);
+        const output = await runStele(projectDir, ["why", fingerprint!]);
 
         return {
           content: [{ type: "text", text: output }],

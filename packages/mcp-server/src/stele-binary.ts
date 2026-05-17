@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { execFileSync, type ExecFileOptions } from "node:child_process";
+import { execFile, type ExecFileOptions } from "node:child_process";
 
 /** Cache for resolved binary path. */
 let cachedBinary: string | null = null;
@@ -12,6 +12,9 @@ const DEFAULT_EXEC_OPTIONS: { encoding: BufferEncoding; maxBuffer: number } = {
   encoding: "utf8",
   maxBuffer: 1024 * 1024,
 };
+
+/** Default timeout for CLI invocations (30 seconds). */
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 /** Maximum allowed length for a single CLI argument. */
 const MAX_ARG_LENGTH = 4096;
@@ -83,9 +86,10 @@ function verifyPackageIdentity(binaryPath: string): boolean {
 
 /**
  * Execute the local stele CLI with given arguments.
+ * Async — does NOT block the event loop.
  * Requires local installation — does NOT fall back to npx.
  */
-export function runStele(cwd: string, args: string[], options: Partial<ExecFileOptions> = {}): string {
+export async function runStele(cwd: string, args: string[], options: Partial<ExecFileOptions> = {}): Promise<string> {
   // Validate arguments before passing to child process
   validateArgs(args);
 
@@ -98,17 +102,32 @@ export function runStele(cwd: string, args: string[], options: Partial<ExecFileO
     );
   }
 
-  const execOpts: { encoding: BufferEncoding; maxBuffer: number; cwd: string } = {
+  const execOpts: { encoding: BufferEncoding; maxBuffer: number; cwd: string; timeout: number } = {
     ...DEFAULT_EXEC_OPTIONS,
     cwd,
+    timeout: options.timeout ?? DEFAULT_TIMEOUT_MS,
   };
 
-  // Run via node for .js files, direct exec for .cmd/.sh
-  if (binary.endsWith(".js")) {
-    return execFileSync("node", [binary, ...args], execOpts);
-  }
-
-  return execFileSync(binary, args, execOpts);
+  return new Promise((resolve, reject) => {
+    // Run via node for .js files, direct exec for .cmd/.sh
+    if (binary.endsWith(".js")) {
+      execFile("node", [binary, ...args], execOpts, (error, stdout, stderr) => {
+        if (error) {
+          reject(Object.assign(new Error(stderr?.trim() ?? `stele command failed`), { code: error.code, signal: error.signal }));
+        } else {
+          resolve(stdout);
+        }
+      });
+    } else {
+      execFile(binary, args, execOpts, (error, stdout, stderr) => {
+        if (error) {
+          reject(Object.assign(new Error(stderr?.trim() ?? `stele command failed`), { code: error.code, signal: error.signal }));
+        } else {
+          resolve(stdout);
+        }
+      });
+    }
+  });
 }
 
 /**

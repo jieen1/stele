@@ -33,7 +33,7 @@ export function createObserveTool(): {
       },
       required: [],
     },
-    handler: (args: Record<string, unknown>): McpResult => {
+    handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const result = validateProjectDir(args.projectDir);
       if ("error" in result) {
         return {
@@ -57,7 +57,7 @@ export function createObserveTool(): {
       }
 
       try {
-        const output = runStele(projectDir, cmdArgs);
+        const output = await runStele(projectDir, cmdArgs);
 
         return {
           content: [{ type: "text", text: output }],

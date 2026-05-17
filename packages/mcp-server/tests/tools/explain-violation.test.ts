@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const mockRunStele = vi.fn();
+const mockRunStele = vi.fn(() => Promise.resolve(""));
 vi.mock("../../src/stele-binary.js", () => ({
   runStele: mockRunStele,
 }));
@@ -15,34 +15,34 @@ const { createExplainViolationTool } = await import("../../src/tools/explain-vio
 describe("stele-explain-violation tool", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it("returns correct tool metadata", () => {
+  it("returns correct tool metadata", async () => {
     const tool = createExplainViolationTool();
     expect(tool.name).toBe("stele-explain-violation");
     expect(tool.inputSchema.required).toContain("violationId");
   });
 
-  it("rejects invalid projectDir", () => {
+  it("rejects invalid projectDir", async () => {
     const tool = createExplainViolationTool();
     mockValidateProjectDir.mockReturnValue({ error: "Path does not exist" });
-    const result = tool.handler({ violationId: "INV_001" });
+    const result = await tool.handler({ violationId: "INV_001" });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Path does not exist");
   });
 
-  it("runs stele explain with violation ID", () => {
+  it("runs stele explain with violation ID", async () => {
     const tool = createExplainViolationTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
-    mockRunStele.mockReturnValue("Explanation for INV_001");
-    const result = tool.handler({ projectDir: "/project", violationId: "INV_001" });
+    mockRunStele.mockResolvedValue("Explanation for INV_001");
+    const result = await tool.handler({ projectDir: "/project", violationId: "INV_001" });
     expect(mockRunStele).toHaveBeenCalledWith("/project", ["explain", "INV_001"]);
     expect(result.isError).toBe(false);
   });
 
-  it("propagates errors with violationId context", () => {
+  it("propagates errors with violationId context", async () => {
     const tool = createExplainViolationTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
-    mockRunStele.mockImplementation(() => { throw new Error("Not found"); });
-    const result = tool.handler({ projectDir: "/project", violationId: "INV_001" });
+    mockRunStele.mockRejectedValueOnce(new Error("Not found"));
+    const result = await tool.handler({ projectDir: "/project", violationId: "INV_001" });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("INV_001");
   });

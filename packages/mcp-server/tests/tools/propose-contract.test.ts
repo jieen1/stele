@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const mockRunStele = vi.fn();
+const mockRunStele = vi.fn(() => Promise.resolve(""));
 vi.mock("../../src/stele-binary.js", () => ({ runStele: mockRunStele }));
 
 const mockValidateProjectDir = vi.fn();
@@ -17,25 +17,25 @@ const { createProposeContractTool } = await import("../../src/tools/propose-cont
 describe("stele-propose-contract tool", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns correct tool metadata", () => {
+  it("returns correct tool metadata", async () => {
     const tool = createProposeContractTool();
     expect(tool.name).toBe("stele-propose-contract");
     expect(tool.inputSchema.required).toContain("invariantId");
   });
 
-  it("rejects invalid projectDir", () => {
+  it("rejects invalid projectDir", async () => {
     const tool = createProposeContractTool();
     mockValidateProjectDir.mockReturnValue({ error: "Path does not exist" });
-    const result = tool.handler({ invariantId: "TEST", severity: "error", description: "Test", assert: "true" });
+    const result = await tool.handler({ invariantId: "TEST", severity: "error", description: "Test", assert: "true" });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Path does not exist");
   });
 
-  it("builds propose invariant command", () => {
+  it("builds propose invariant command", async () => {
     const tool = createProposeContractTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
-    mockRunStele.mockReturnValue("Preview generated successfully");
-    tool.handler({
+    mockRunStele.mockResolvedValue("Preview generated successfully");
+    await tool.handler({
       projectDir: "/project",
       invariantId: "TEST_INV",
       severity: "error",
@@ -51,11 +51,11 @@ describe("stele-propose-contract tool", () => {
     ]);
   });
 
-  it("includes --apply when requested", () => {
+  it("includes --apply when requested", async () => {
     const tool = createProposeContractTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
-    mockRunStele.mockReturnValue("Applied successfully");
-    tool.handler({
+    mockRunStele.mockResolvedValue("Applied successfully");
+    await tool.handler({
       projectDir: "/project",
       invariantId: "TEST_INV",
       severity: "error",
@@ -66,11 +66,11 @@ describe("stele-propose-contract tool", () => {
     expect(mockRunStele).toHaveBeenCalledWith("/project", expect.arrayContaining(["--apply"]));
   });
 
-  it("includes category when provided", () => {
+  it("includes category when provided", async () => {
     const tool = createProposeContractTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
-    mockRunStele.mockReturnValue("OK");
-    tool.handler({
+    mockRunStele.mockResolvedValue("OK");
+    await tool.handler({
       projectDir: "/project",
       invariantId: "TEST",
       severity: "error",
@@ -81,11 +81,11 @@ describe("stele-propose-contract tool", () => {
     expect(mockRunStele).toHaveBeenCalledWith("/project", expect.arrayContaining(["--category", "security"]));
   });
 
-  it("appends apply confirmation when apply=true", () => {
+  it("appends apply confirmation when apply=true", async () => {
     const tool = createProposeContractTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
-    mockRunStele.mockReturnValue("Preview");
-    const result = tool.handler({
+    mockRunStele.mockResolvedValue("Preview");
+    const result = await tool.handler({
       projectDir: "/project",
       invariantId: "TEST_INV",
       severity: "error",
@@ -96,11 +96,11 @@ describe("stele-propose-contract tool", () => {
     expect(result.content[0].text).toContain("has been applied");
   });
 
-  it("propagates runStele errors", () => {
+  it("propagates runStele errors", async () => {
     const tool = createProposeContractTool();
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
-    mockRunStele.mockImplementation(() => { throw new Error("Command failed"); });
-    const result = tool.handler({
+    mockRunStele.mockRejectedValueOnce(new Error("Command failed"));
+    const result = await tool.handler({
       projectDir: "/project",
       invariantId: "TEST",
       severity: "error",

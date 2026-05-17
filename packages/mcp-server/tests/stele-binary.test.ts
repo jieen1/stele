@@ -7,18 +7,18 @@ describe("stele-binary", () => {
   });
 
   describe("resolveSteleBinary", () => {
-    it("returns null when no local installation exists", () => {
+    it("returns null when no local installation exists", async () => {
       const result = resolveSteleBinary("/nonexistent-project-dir-xyz");
       expect(result).toBeNull();
     });
 
-    it("resolves binary from monorepo root node_modules", () => {
+    it("resolves binary from monorepo root node_modules", async () => {
       // The monorepo root has @stele/cli installed
       const result = resolveSteleBinary(process.cwd());
       expect(result).toBeDefined();
     });
 
-    it("caches results for same directory", () => {
+    it("caches results for same directory", async () => {
       clearBinaryCache();
       const r1 = resolveSteleBinary(process.cwd());
       const r2 = resolveSteleBinary(process.cwd());
@@ -27,7 +27,7 @@ describe("stele-binary", () => {
   });
 
   describe("clearBinaryCache", () => {
-    it("invalidates cached results", () => {
+    it("invalidates cached results", async () => {
       resolveSteleBinary(process.cwd());
       clearBinaryCache();
       const result = resolveSteleBinary(process.cwd());
@@ -37,22 +37,22 @@ describe("stele-binary", () => {
   });
 
   describe("runStele", () => {
-    it("validates arguments for newlines", () => {
-      expect(() => runStele(process.cwd(), ["check\nmalicious"])).toThrow("Invalid character");
+    it("validates arguments for newlines", async () => {
+      await expect(runStele(process.cwd(), ["check\nmalicious"])).rejects.toThrow("Invalid character");
     });
 
-    it("validates arguments for null bytes", () => {
-      expect(() => runStele(process.cwd(), ["check\x00malicious"])).toThrow("Invalid character");
+    it("validates arguments for null bytes", async () => {
+      await expect(runStele(process.cwd(), ["check\x00malicious"])).rejects.toThrow("Invalid character");
     });
 
-    it("validates argument length", () => {
+    it("validates argument length", async () => {
       const longArg = "x".repeat(4097);
-      expect(() => runStele(process.cwd(), [longArg])).toThrow("exceeds maximum length");
+      await expect(runStele(process.cwd(), [longArg])).rejects.toThrow("exceeds maximum length");
     });
 
-    it("throws when no local installation exists", () => {
+    it("throws when no local installation exists", async () => {
       clearBinaryCache();
-      expect(() => runStele("/nonexistent-dir", ["check"])).toThrow("Cannot execute stele");
+      await expect(runStele("/nonexistent-dir", ["check"])).rejects.toThrow("Cannot execute stele");
     });
   });
 });

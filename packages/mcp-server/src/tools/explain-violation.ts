@@ -33,7 +33,7 @@ export function createExplainViolationTool(): {
       },
       required: ["violationId"],
     },
-    handler: (args: Record<string, unknown>): McpResult => {
+    handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const result = validateProjectDir(args.projectDir);
       if ("error" in result) {
         return {
@@ -51,7 +51,7 @@ export function createExplainViolationTool(): {
       }
 
       try {
-        const output = runStele(projectDir, ["explain", violationId!]);
+        const output = await runStele(projectDir, ["explain", violationId!]);
 
         return {
           content: [{ type: "text", text: output }],

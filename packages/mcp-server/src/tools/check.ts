@@ -37,7 +37,7 @@ export function createCheckTool(): {
       },
       required: [],
     },
-    handler: (args: Record<string, unknown>): McpResult => {
+    handler: async (args: Record<string, unknown>): Promise<McpResult> => {
       const result = validateProjectDir(args.projectDir);
       const json = args.json !== false;
       if ("error" in result) {
@@ -50,7 +50,7 @@ export function createCheckTool(): {
       const session = getSessionState(projectDir);
 
       try {
-        const output = runStele(projectDir, ["check", ...(json ? ["--json"] : [])]);
+        const output = await runStele(projectDir, ["check", ...(json ? ["--json"] : [])]);
 
         let report: ViolationReport;
 

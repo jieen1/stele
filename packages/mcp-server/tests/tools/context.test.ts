@@ -32,7 +32,7 @@ describe("stele-context tool", () => {
   });
 
   describe("createContextTool", () => {
-    it("returns correct tool metadata", () => {
+    it("$1", async () => {
       const tool = createContextTool();
       expect(tool.name).toBe("stele-context");
       expect(tool.description).toContain("agent");
