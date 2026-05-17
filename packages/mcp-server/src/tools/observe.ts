@@ -46,6 +46,13 @@ export function createObserveTool(): {
       const cmdArgs = ["observe", "--json"];
 
       if (since) {
+        // Validate ISO-date format as defense-in-depth
+        if (isNaN(Date.parse(since))) {
+          return {
+            content: [{ type: "text", text: `Invalid since parameter: "${since}". Expected ISO-8601 date.` }],
+            isError: true,
+          };
+        }
         cmdArgs.push("--since", since);
       }
 

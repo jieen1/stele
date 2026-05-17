@@ -60,20 +60,32 @@ export function invalidateCache(projectDir: string): void {
   projectCache.delete(resolve(projectDir));
 }
 
+/** Maximum recursion depth for directory scanning. */
+const MAX_SCAN_DEPTH = 5;
+
 /**
  * Scan for .stele contract files in a directory.
+ * Depth-limited to prevent stack overflow on adversarially crafted directory structures.
  */
 export function scanSteleFiles(directory: string): string[] {
+  return scanSteleFilesInternal(directory, 0);
+}
+
+function scanSteleFilesInternal(directory: string, depth: number): string[] {
   const results: string[] = [];
 
   try {
+    if (depth > MAX_SCAN_DEPTH) {
+      return results;
+    }
+
     const entries = readdirSync(directory, { withFileTypes: true });
 
     for (const entry of entries) {
       const fullPath = join(directory, entry.name);
 
       if (entry.isDirectory()) {
-        results.push(...scanSteleFiles(fullPath));
+        results.push(...scanSteleFilesInternal(fullPath, depth + 1));
       } else if (entry.isFile() && entry.name.endsWith(".stele")) {
         results.push(fullPath);
       }
