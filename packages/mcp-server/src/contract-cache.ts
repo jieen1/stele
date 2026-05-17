@@ -60,8 +60,8 @@ export function invalidateCache(projectDir: string): void {
   projectCache.delete(resolve(projectDir));
 }
 
-/** Maximum recursion depth for directory scanning. */
-const MAX_SCAN_DEPTH = 5;
+/** Maximum recursion depth for directory scanning. Prevents stack overflow on adversarially crafted directory structures. */
+const MAX_SCAN_DEPTH = 10;
 
 /**
  * Scan for .stele contract files in a directory.
