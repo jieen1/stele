@@ -12,7 +12,7 @@ import type { ToolDef } from "./types.js";
  */
 const MAX_SANITIZE_DEPTH = 10;
 
-function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<string, unknown> {
+export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<string, unknown> {
   if (depth > MAX_SANITIZE_DEPTH) {
     return Object.create(null);
   }

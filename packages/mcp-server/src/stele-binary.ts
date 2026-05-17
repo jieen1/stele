@@ -42,7 +42,7 @@ function validateArgs(args: string[]): void {
  * Verify the binary belongs to the legitimate @stele/cli package.
  * Checks package.json identity, rejects symlinks, and validates the package directory.
  */
-function verifyPackageIdentity(binaryPath: string): boolean {
+export function verifyPackageIdentity(binaryPath: string): boolean {
   // Reject symlinks to prevent supply chain bypass
   try {
     const lstats = lstatSync(binaryPath);
