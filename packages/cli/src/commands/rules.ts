@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { sanitizePythonIdentifier } from "@stele/backend-python";
+import { sanitizeIdentifier } from "@stele/core";
 import {
   loadContract,
   type BoundaryDeclaration,
@@ -168,7 +168,7 @@ function indexInvariant(projectDir: string, generatedDir: string, invariant: Inv
     generated_test_path:
       invariant.groupId === undefined
         ? `${generatedDir}/test_contract.py`
-        : `${generatedDir}/test_${sanitizePythonIdentifier(invariant.groupId, "group")}.py`,
+        : `${generatedDir}/test_${sanitizeIdentifier(invariant.groupId, "group")}.py`,
     dependencies: invariant.dependsOn.map((dependency) => dependency.id),
     checker_id: invariant.usesChecker?.checkerId ?? null,
     scenario_id: invariant.usesScenario?.scenarioId ?? null,

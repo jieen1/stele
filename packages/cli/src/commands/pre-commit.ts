@@ -151,9 +151,9 @@ function isSteleHookId(value: unknown): value is SteleHookId {
 }
 
 function cloneHook(hook: PreCommitHook): PreCommitHook {
-  return JSON.parse(JSON.stringify(hook)) as PreCommitHook;
+  return structuredClone(hook);
 }
 
 function cloneRepo(repo: PreCommitRepo): PreCommitRepo {
-  return JSON.parse(JSON.stringify(repo)) as PreCommitRepo;
+  return structuredClone(repo);
 }

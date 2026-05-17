@@ -1,15 +1,12 @@
-import { type AstNode, type ListNode } from "@stele/core";
+import { sanitizeIdentifier, type AstNode, type ListNode } from "@stele/core";
 import { SteleError } from "@stele/core";
 import {
   type TranslationContext,
   PYTHON_RESERVED_WORDS,
 } from "./types.js";
 
-export function sanitizePythonIdentifier(identifier: string, fallbackPrefix = "value"): string {
-  const sanitized = identifier.replace(/[^A-Za-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
-  const withPrefix = sanitized.length === 0 ? fallbackPrefix : sanitized;
-  return /^[0-9]/.test(withPrefix) ? `${fallbackPrefix}_${withPrefix}` : withPrefix;
-}
+// Alias for backward compatibility. Delegates to @stele/core sanitizeIdentifier.
+export const sanitizePythonIdentifier = sanitizeIdentifier;
 
 // ---------------------------------------------------------------------------
 // Translation context

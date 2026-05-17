@@ -94,6 +94,7 @@ export type {
 } from "./registry/operators.js";
 export { CORE_OPERATOR_SPECS, createCoreOperatorRegistry, createOperatorRegistry } from "./registry/operators.js";
 export { uniqueSortedStrings } from "./util/array.js";
+export { sanitizeIdentifier } from "./util/identifier.js";
 export {
   buildInvariantTrace,
   formatExplainTrace,

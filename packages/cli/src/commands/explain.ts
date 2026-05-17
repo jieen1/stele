@@ -5,10 +5,10 @@ import {
   formatExplainTrace,
   invariantExplanation,
   loadContract,
+  sanitizeIdentifier,
   type InvariantDeclaration,
   type SourceSpan,
 } from "@stele/core";
-import { sanitizePythonIdentifier } from "@stele/backend-python";
 import { loadConfig } from "../config/loadConfig.js";
 import { buildRuleIndex, findIndexedRule } from "./rules.js";
 import { formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
@@ -40,7 +40,7 @@ export async function runExplain(projectDir: string, invariantId: string, option
   const generatedTestPath =
     invariant.groupId === undefined
       ? posix.join(config.generatedDir, "test_contract.py")
-      : posix.join(config.generatedDir, `test_${sanitizePythonIdentifier(invariant.groupId, "group")}.py`);
+      : posix.join(config.generatedDir, `test_${sanitizeIdentifier(invariant.groupId, "group")}.py`);
 
   const lines = [
     `ID: ${invariant.id}`,
