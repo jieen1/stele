@@ -30,7 +30,9 @@ describe("lexer", () => {
     const tokens = lex("(invariant X) ; comment here");
     const content = tokens.filter((t) => t.kind !== "eof");
     expect(content.find((t) => t.kind === "rparen")).toBeDefined();
-    expect(content.find((t) => t.kind === "comment")).toBeUndefined();
+    // Comments are consumed during lexing, not emitted as tokens
+    const kinds = content.map((t) => t.kind);
+    expect(kinds).not.toContain("comment" as any);
   });
 
   it("handles strings", () => {

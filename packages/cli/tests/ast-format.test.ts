@@ -19,12 +19,12 @@ describe("formatAstNode", () => {
   });
 
   it("formats number", () => {
-    const node: AstNode = { kind: "number", raw: "42", span: { file: "", line: 1, column: 1 } };
+    const node: AstNode = { kind: "number", raw: "42", value: 42, span: { file: "", line: 1, column: 1 } };
     expect(formatAstNode(node)).toBe("42");
   });
 
   it("formats float number", () => {
-    const node: AstNode = { kind: "number", raw: "3.14", span: { file: "", line: 1, column: 1 } };
+    const node: AstNode = { kind: "number", raw: "3.14", value: 3.14, span: { file: "", line: 1, column: 1 } };
     expect(formatAstNode(node)).toBe("3.14");
   });
 

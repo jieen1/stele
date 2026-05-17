@@ -7,7 +7,7 @@ import {
   sanitizeGeneratedPathSegment,
 } from "../src/generator/path-safety.js";
 
-describe("normalizeRelativeDirectoryPath", "normalizeRelativeDirectoryPath", () => {
+describe("normalizeRelativeDirectoryPath", () => {
   it("rejects root directory (.)", () => {
     expect(() => normalizeRelativeDirectoryPath(".", "path")).toThrow("Invalid");
   });
