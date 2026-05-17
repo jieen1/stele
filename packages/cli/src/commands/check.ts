@@ -1,10 +1,7 @@
-import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, relative, resolve, win32 } from "node:path";
-import { promisify } from "node:util";
+import { dirname, resolve } from "node:path";
 import {
   SteleError,
-  createViolation,
   createViolationReport,
   filterViolationReport,
   formatViolationReportHuman,
@@ -22,7 +19,7 @@ import {
   type ViolationReport,
 } from "@stele/core";
 import { loadBackend } from "../backend-registry.js";
-import { STELE_BASELINE_FILE, STELE_CONFIG_FILE, type SteleConfig } from "../config/defaults.js";
+import { STELE_BASELINE_FILE, type SteleConfig } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { evaluateCodeShapes } from "../code-shape/evaluate.js";
 import { CliCommandError, ExitCode, getExitCode } from "../errors.js";
@@ -37,8 +34,22 @@ import {
   verifyManagedGeneratedFiles,
 } from "./generate.js";
 import { aggregateExitCode, formatRecursiveHeader, formatRecursiveSummary, type SubReport } from "./recursive.js";
+import {
+  collectDiffContractFiles,
+  collectGitDiffScope,
+  filterContractByFiles,
+} from "./check-diff.js";
+import {
+  createGeneratedDriftViolation,
+  createManifestDriftViolation,
+  createProtectedFileDriftViolation,
+  createContractHashMismatchViolation,
+  createExecutionViolation,
+} from "./check-violations.js";
 
-const execFileAsync = promisify(execFile);
+// ----------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------
 
 export type CheckSummary = {
   invariantCount: number;
@@ -85,6 +96,10 @@ type CheckFilters = {
   baseline?: ViolationBaseline;
   diffScopePaths?: string[];
 };
+
+// ----------------------------------------------------------------
+// Entry points
+// ----------------------------------------------------------------
 
 export async function runCheck(projectDir: string, options: CheckCommandOptions = {}): Promise<void> {
   await checkProject(projectDir, options);
@@ -145,33 +160,10 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   };
 }
 
-/**
- * Persist the most recent violation report to `contract/.last-check-report.json`.
- *
- * `stele why <id>` reads this to surface the failure witness from the last
- * check run. Failures are non-fatal: if persistence fails (e.g. read-only FS),
- * we swallow the error rather than masking the underlying check exit code.
- * EP07 §6.1.
- */
-async function persistLastReport(projectDir: string, report: ViolationReport): Promise<void> {
-  try {
-    await writeLastReport(projectDir, report);
-  } catch {
-    // Swallow persistence errors so the check command's primary exit signal is
-    // not perturbed by I/O quirks (read-only mount, permission denied). The
-    // worst case is a stale `stele why` snapshot.
-  }
-}
+// ----------------------------------------------------------------
+// Recursive check
+// ----------------------------------------------------------------
 
-/**
- * Run `stele check` across every project found under `rootDir` (recursive mode).
- *
- * Discovers all `stele.config.json` files, sorts them deterministically, then
- * invokes single-project `checkProject` on each (with `--recursive` removed from
- * the per-project options). Per-project output is written via `output` (stdout
- * for human format, captured for JSON aggregation). Aggregates exit codes per
- * the EP08 spec (any 1 → 1; else max of 2/3 drift; else max of any non-zero).
- */
 export async function runCheckRecursive(
   rootDir: string,
   options: CheckCommandOptions,
@@ -284,15 +276,16 @@ async function runSingleProjectCheck(projectDir: string, options: CheckCommandOp
   }
 }
 
+// ----------------------------------------------------------------
+// Context preparation
+// ----------------------------------------------------------------
+
 export async function prepareCheckContext(projectDir: string): Promise<PreparedCheckContext> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
   return prepareCheckContextWithContract(projectDir, contract);
 }
 
-/**
- * Prepare the check context with a pre-loaded (optionally filtered) contract.
- */
 export async function prepareCheckContextWithContract(projectDir: string, contract: Contract): Promise<PreparedCheckContext> {
   const config = await loadConfig(projectDir);
   const backend = await loadBackend(config.targetLanguage, config.testFramework);
@@ -327,6 +320,10 @@ export async function collectProtectedCheckState(
   };
 }
 
+// ----------------------------------------------------------------
+// Raw check (programmatic API)
+// ----------------------------------------------------------------
+
 export async function buildRawCheckReport(context: PreparedCheckContext, command = "check"): Promise<ViolationReport> {
   const generatedReport = buildGeneratedStageReport(context, command);
 
@@ -356,6 +353,10 @@ export async function buildRawCheckReport(context: PreparedCheckContext, command
   }
 }
 
+// ----------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------
+
 export function isCheckCommandError(error: unknown): error is CheckCommandError {
   return error instanceof CheckCommandError;
 }
@@ -368,45 +369,8 @@ export function isBaselineEligibleViolation(violation: Violation): boolean {
   );
 }
 
-export function formatCheckSummary(summary: CheckSummary, report?: ViolationReport): string {
-  const suffixes: string[] = [];
-  const suppressedCount = report?.summary.suppressed_violation_count ?? 0;
-  const outOfScopeCount = report?.summary.out_of_scope_violation_count ?? 0;
-
-  if (suppressedCount > 0) {
-    suffixes.push(`${suppressedCount} baseline violation${suppressedCount === 1 ? "" : "s"} suppressed`);
-  }
-
-  if (outOfScopeCount > 0) {
-    suffixes.push(`${outOfScopeCount} out-of-scope violation${outOfScopeCount === 1 ? "" : "s"} ignored`);
-  }
-
-  return `OK ${summary.invariantCount} invariant${summary.invariantCount === 1 ? "" : "s"} checked; ${summary.generatedFileCount} generated file${summary.generatedFileCount === 1 ? "" : "s"} and ${summary.protectedFileCount} protected file${summary.protectedFileCount === 1 ? "" : "s"} verified${suffixes.length > 0 ? ` (${suffixes.join(", ")})` : ""}.\n`;
-}
-
-export function formatCheckReportHuman(report: ViolationReport): string {
-  return formatViolationReportHuman(report);
-}
-
-export function formatCheckReportJson(report: ViolationReport): string {
-  return formatViolationReportJson(report);
-}
-
-export async function writeCheckReportFile(projectDir: string, reportFile: string, report: ViolationReport): Promise<void> {
-  const absoluteReportPath = validateOutputPath(projectDir, reportFile);
-  await mkdir(dirname(absoluteReportPath), { recursive: true });
-  await writeFile(absoluteReportPath, formatViolationReportJson(report), "utf8");
-}
-
-class CheckCommandError extends CliCommandError {
-  constructor(
-    exitCode: ExitCode,
-    readonly report: ViolationReport,
-    cause?: unknown,
-  ) {
-    super(formatViolationReportHuman(report).trimEnd(), exitCode, cause);
-    this.name = "CheckCommandError";
-  }
+function isCheckSuppressibleViolation(violation: Violation): boolean {
+  return isBaselineEligibleViolation(violation) && violation.scope_paths.length > 0;
 }
 
 async function prepareCheckFilters(context: PreparedCheckContext, options: CheckCommandOptions): Promise<CheckFilters> {
@@ -423,6 +387,10 @@ function applyFiltersToReport(report: ViolationReport, filters: CheckFilters): V
     isSuppressible: isCheckSuppressibleViolation,
   });
 }
+
+// ----------------------------------------------------------------
+// Report building
+// ----------------------------------------------------------------
 
 function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
   const violations = reports.flatMap((report) => report.violations);
@@ -555,6 +523,10 @@ async function buildCodeShapeStageReport(
   });
 }
 
+// ----------------------------------------------------------------
+// Summary and formatting
+// ----------------------------------------------------------------
+
 function withCheckSummary(report: ViolationReport, summary: CheckSummary): ViolationReport {
   return {
     ...report,
@@ -575,130 +547,48 @@ function getCheckExitCode(report: ViolationReport): ExitCode {
     : ExitCode.TAMPER_DETECTED;
 }
 
-function isCheckSuppressibleViolation(violation: Violation): boolean {
-  return isBaselineEligibleViolation(violation) && violation.scope_paths.length > 0;
-}
+function formatCheckSummary(summary: CheckSummary, report?: ViolationReport): string {
+  const suffixes: string[] = [];
+  const suppressedCount = report?.summary.suppressed_violation_count ?? 0;
+  const outOfScopeCount = report?.summary.out_of_scope_violation_count ?? 0;
 
-async function collectGitDiffScope(projectDir: string, baseRef: string): Promise<string[]> {
-  const repoRoot = await runGit(
-    projectDir,
-    ["rev-parse", "--show-toplevel"],
-    `Git is required for --diff-from ${baseRef}, but no repository root was found.`,
-  );
-  await runGit(
-    repoRoot,
-    ["rev-parse", "--verify", `${baseRef}^{commit}`],
-    `Git base "${baseRef}" was not found. Choose an existing branch, tag, or commit for --diff-from.`,
-  );
-
-  const outputs = await Promise.all([
-    runGit(repoRoot, ["diff", "--name-only", "--diff-filter=ACMRTUXB", `${baseRef}...HEAD`], "Unable to compute the branch diff."),
-    runGit(repoRoot, ["diff", "--name-only", "--diff-filter=ACMRTUXB"], "Unable to compute unstaged diff scope."),
-    runGit(repoRoot, ["diff", "--name-only", "--diff-filter=ACMRTUXB", "--cached"], "Unable to compute staged diff scope."),
-    runGit(repoRoot, ["ls-files", "--others", "--exclude-standard"], "Unable to list untracked files for diff scope."),
-  ]);
-  const projectRoot = resolve(projectDir);
-  const diffPaths = new Set<string>();
-
-  for (const output of outputs) {
-    for (const line of output.split(/\r?\n/)) {
-      const candidate = line.trim();
-
-      if (candidate.length === 0) {
-        continue;
-      }
-
-      const absolutePath = resolve(repoRoot, candidate);
-      const relativePath = relative(projectRoot, absolutePath).replaceAll("\\", "/");
-
-      if (relativePath.length === 0 || isOutsideProject(relativePath)) {
-        continue;
-      }
-
-      diffPaths.add(relativePath);
-    }
+  if (suppressedCount > 0) {
+    suffixes.push(`${suppressedCount} baseline violation${suppressedCount === 1 ? "" : "s"} suppressed`);
   }
 
-  return [...diffPaths].sort((left, right) => left.localeCompare(right));
-}
-
-async function runGit(cwd: string, args: string[], errorMessage: string): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync("git", args, { cwd });
-    return stdout.trim();
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`${errorMessage} ${detail}`.trim());
+  if (outOfScopeCount > 0) {
+    suffixes.push(`${outOfScopeCount} out-of-scope violation${outOfScopeCount === 1 ? "" : "s"} ignored`);
   }
+
+  return `OK ${summary.invariantCount} invariant${summary.invariantCount === 1 ? "" : "s"} checked; ${summary.generatedFileCount} generated file${summary.generatedFileCount === 1 ? "" : "s"} and ${summary.protectedFileCount} protected file${summary.protectedFileCount === 1 ? "" : "s"} verified${suffixes.length > 0 ? ` (${suffixes.join(", ")})` : ""}.\n`;
 }
 
-function isOutsideProject(relativePath: string): boolean {
-  return relativePath.startsWith("../") || relativePath === ".." || win32.isAbsolute(relativePath);
+// ----------------------------------------------------------------
+// Public formatting API
+// ----------------------------------------------------------------
+
+export function formatCheckSummaryPublic(summary: CheckSummary, report?: ViolationReport): string {
+  return formatCheckSummary(summary, report);
 }
 
-/**
- * Collect the relative paths of changed `.stele` contract files since the given
- * git ref.  Falls back to an empty list when git is unavailable.
- */
-export async function collectDiffContractFiles(projectDir: string, ref: string): Promise<string[]> {
-  try {
-    const repoRoot = await runGit(projectDir, ["rev-parse", "--show-toplevel"], "Unable to find git repository root.");
-    const output = await runGit(
-      repoRoot,
-      ["diff", "--name-only", `${ref}...HEAD`, "--", "contract/"],
-      "Unable to compute diff.",
-    );
-
-    const projectRoot = resolve(projectDir);
-    const changedFiles = new Set<string>();
-
-    for (const line of output.split(/\r?\n/)) {
-      const candidate = line.trim();
-      if (!candidate || !candidate.endsWith(".stele")) continue;
-
-      const absolutePath = resolve(repoRoot, candidate);
-      const relativePath = relative(projectRoot, absolutePath).replaceAll("\\", "/");
-
-      if (relativePath.length > 0 && !isOutsideProject(relativePath)) {
-        changedFiles.add(relativePath);
-      }
-    }
-
-    return [...changedFiles].sort((a, b) => a.localeCompare(b));
-  } catch {
-    return [];
-  }
+export function formatCheckReportHuman(report: ViolationReport): string {
+  return formatViolationReportHuman(report);
 }
 
-/**
- * Return a new Contract object whose invariants are limited to those whose
- * filePath appears in `changedFileSet`.  Non-invariant declarations are
- * preserved so downstream generators still see the full contract shape.
- */
-export function filterContractByFiles(contract: Contract, changedFileSet: Set<string>): Contract {
-  const filteredFiles = contract.files.map((file) => {
-    if (!changedFileSet.has(file.path)) {
-      return {
-        ...file,
-        invariants: [],
-        groups: file.groups.map((g) => ({ ...g, invariants: [] })),
-        codeShapes: [],
-      } as ContractFile;
-    }
-    return file;
-  });
-
-  return {
-    ...contract,
-    files: filteredFiles,
-    invariants: contract.invariants.filter((inv) => changedFileSet.has(inv.filePath)),
-    codeShapes: contract.codeShapes.filter((cs) => changedFileSet.has(cs.filePath)),
-  };
+export function formatCheckReportJson(report: ViolationReport): string {
+  return formatViolationReportJson(report);
 }
 
-/**
- * Create a successful check command result for the "no contract changes" case.
- */
+export async function writeCheckReportFile(projectDir: string, reportFile: string, report: ViolationReport): Promise<void> {
+  const absoluteReportPath = validateOutputPath(projectDir, reportFile);
+  await mkdir(dirname(absoluteReportPath), { recursive: true });
+  await writeFile(absoluteReportPath, formatViolationReportJson(report), "utf8");
+}
+
+// ----------------------------------------------------------------
+// Diff helpers
+// ----------------------------------------------------------------
+
 export function createDiffNoChangesResult(changedFiles: string[]): CheckCommandResult {
   const report = createViolationReport({
     tool: "stele",
@@ -724,140 +614,31 @@ export function createDiffNoChangesResult(changedFiles: string[]): CheckCommandR
   };
 }
 
-function createGeneratedDriftViolation(
-  entryPath: string,
-  generatedDir: string,
-  generated: GeneratedVerificationResult,
-  command: string,
-): Violation {
-  return createViolation({
-    rule_id: "stele.check.generated_drift",
-    rule_kind: "generated_drift",
-    severity: "error",
-    source: {
-      tool: "stele",
-      command,
-      kind: "generated",
-    },
-    location: {
-      generated_dir: generatedDir,
-    },
-    cause: {
-      summary: "Generated files do not match the contract.",
-      missing: generated.missing,
-      changed: generated.changed,
-      extra: generated.extra,
-    },
-    scope_paths: [entryPath, ...generated.missing, ...generated.changed, ...generated.extra],
-    fix: {
-      summary: "Re-run stele generate --force to replace them.",
-      command: "stele generate --force",
-    },
-  });
+// ----------------------------------------------------------------
+// Error classes
+// ----------------------------------------------------------------
+
+class CheckCommandError extends CliCommandError {
+  constructor(
+    exitCode: ExitCode,
+    readonly report: ViolationReport,
+    cause?: unknown,
+  ) {
+    super(formatViolationReportHuman(report).trimEnd(), exitCode, cause);
+    this.name = "CheckCommandError";
+  }
 }
 
-function createManifestDriftViolation(manifestPath: string, manifest: VerificationResult, command: string): Violation {
-  return createViolation({
-    rule_id: "stele.check.manifest_drift",
-    rule_kind: "manifest_drift",
-    severity: "error",
-    source: {
-      tool: "stele",
-      command,
-      kind: "manifest",
-    },
-    location: {
-      manifest_path: manifestPath,
-    },
-    cause: {
-      summary: "Manifest verification failed.",
-      missing: manifest.missing,
-      changed: manifest.changed,
-    },
-    scope_paths: [manifestPath, ...manifest.missing, ...manifest.changed],
-    fix: {
-      summary: "Run stele lock after approval to refresh the manifest.",
-      command: "stele lock --reason <reason>",
-    },
-  });
-}
+// ----------------------------------------------------------------
+// Persistence
+// ----------------------------------------------------------------
 
-function createProtectedFileDriftViolation(manifestPath: string, newProtectedPaths: string[], command: string): Violation {
-  return createViolation({
-    rule_id: "stele.check.protected_file_drift",
-    rule_kind: "protected_file_drift",
-    severity: "error",
-    source: {
-      tool: "stele",
-      command,
-      kind: "protected",
-    },
-    location: {
-      manifest_path: manifestPath,
-    },
-    cause: {
-      summary: "Found new/unlocked protected files.",
-      new_files: newProtectedPaths,
-    },
-    scope_paths: [manifestPath, ...newProtectedPaths],
-    fix: {
-      summary: "Run stele lock after approval to capture the approved protected files.",
-      command: "stele lock --reason <reason>",
-    },
-  });
-}
-
-function createContractHashMismatchViolation(
-  entryPath: string,
-  manifestPath: string,
-  expectedHash: string,
-  actualHash: string,
-  command: string,
-): Violation {
-  return createViolation({
-    rule_id: "stele.check.contract_hash_mismatch",
-    rule_kind: "contract_hash_mismatch",
-    severity: "error",
-    source: {
-      tool: "stele",
-      command,
-      kind: "contract",
-    },
-    location: {
-      path: entryPath,
-      manifest_path: manifestPath,
-    },
-    cause: {
-      summary: "Manifest contract hash does not match the current contract.",
-      expected_hash: expectedHash,
-      actual_hash: actualHash,
-    },
-    scope_paths: [entryPath, manifestPath],
-    fix: {
-      summary: "Run stele lock after approval to capture the updated contract hash.",
-      command: "stele lock --reason <reason>",
-    },
-  });
-}
-
-function createExecutionViolation(error: unknown, entryPath: string | undefined, command: string): Violation {
-  const message = error instanceof Error ? error.message : String(error);
-
-  return createViolation({
-    rule_id: "stele.check.execution_error",
-    rule_kind: "execution_error",
-    severity: "error",
-    source: {
-      tool: "stele",
-      command,
-      kind: "execution",
-    },
-    location: {
-      path: entryPath ?? STELE_CONFIG_FILE,
-    },
-    cause: {
-      summary: message,
-    },
-    scope_paths: [entryPath ?? STELE_CONFIG_FILE],
-  });
+async function persistLastReport(projectDir: string, report: ViolationReport): Promise<void> {
+  try {
+    await writeLastReport(projectDir, report);
+  } catch {
+    // Swallow persistence errors so the check command's primary exit signal is
+    // not perturbed by I/O quirks (read-only mount, permission denied). The
+    // worst case is a stale `stele why` snapshot.
+  }
 }
