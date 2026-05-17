@@ -150,8 +150,13 @@ describe("extractBashWriteTarget", () => {
   });
 
   describe("edge cases for parseLiteral", () => {
-    it("rejects paths with backslashes", () => {
-      expect(extractBashWriteTarget("echo > path\\with\\backslash")).toBeNull();
+    it("handles paths with backslashes (normalize on Windows, reject on Unix)", () => {
+      const result = extractBashWriteTarget("echo > path\\with\\backslash");
+      if (process.platform === "win32") {
+        expect(result).toBe("path/with/backslash");
+      } else {
+        expect(result).toBeNull();
+      }
     });
 
     it("rejects paths with shell metacharacters", () => {

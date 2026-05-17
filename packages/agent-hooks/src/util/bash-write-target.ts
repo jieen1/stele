@@ -153,17 +153,26 @@ function parseLiteral(token: string | undefined): string | null {
   }
 
   let value = token;
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+  const isQuoted =
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"));
+  if (isQuoted) {
     value = value.slice(1, -1);
   }
 
-  if (
-    value.length === 0 ||
-    value.includes("\\") ||
-    /[$`*?[\]{}()|&;]/u.test(value) ||
-    value.includes("\n") ||
-    value.includes("\r")
-  ) {
+  if (value.length === 0 || value.includes("\n") || value.includes("\r")) {
+    return null;
+  }
+
+  // On Windows, normalize backslashes to forward slashes for comparison
+  if (process.platform === "win32" && value.includes("\\")) {
+    value = value.replaceAll("\\", "/");
+  } else if (value.includes("\\")) {
+    // On Unix, a lone backslash in a path is suspicious — reject to be safe
+    return null;
+  }
+
+  if (/[$`*?[\]{}()|&;]/u.test(value)) {
     return null;
   }
 

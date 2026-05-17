@@ -53,11 +53,9 @@ export const KNOWN_SAFE_COMMANDS: ReadonlySet<string> = new Set([
   // no subcommand awareness.
 
   // Package / build tooling (read-only subcommands only)
-  // NOTE: `npm`, `npx`, `make`, `cargo`, `pnpm` are NOT included — they can
-  // write files to disk (install, build, add). Use `stele check` at session stop
-  // to catch any drift from these commands.
-  "go",
-  "pip",
+  // NOTE: `go`, `pip` are NOT included — they can write artifacts to disk
+  // (go build, go install, pip install, pip install -e .).
+  // Use `stele check` at session stop to catch any drift from these commands.
   "py_compile",
   "pytest",
 

@@ -181,10 +181,11 @@ export async function parseContractFromFile(filePath: string): Promise<ParsedCon
     const contract = await loadContract(resolve(filePath));
     const invariants: ParsedInvariant[] = [];
     for (const inv of contract.invariants) {
+      // Use ?? to handle undefined fields safely (avoids unsafe `as string` cast)
       invariants.push({
-        id: inv.id,
-        severity: inv.severity as string,
-        description: inv.description as string,
+        id: inv.id ?? "",
+        severity: inv.severity ?? "",
+        description: inv.description ?? "",
       } satisfies ParsedInvariant);
     }
     return { invariants, checkers: [] };

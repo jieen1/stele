@@ -51,7 +51,8 @@ export function createValidateEditTool(): {
           isError: true,
         };
       }
-      const projectDir = validated.path!;
+      // validated.error is checked above; safe to use path
+      const projectDir = validated.path!; // validated.error checked above, path is guaranteed
       const filePath = args.filePath as string;
 
       if (!filePath || typeof filePath !== "string") {

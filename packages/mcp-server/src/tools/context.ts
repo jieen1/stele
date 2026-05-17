@@ -50,6 +50,7 @@ export function createContextTool(): {
           isError: true,
         };
       }
+      // validated.error is checked above; safe to use path
       const projectDir = validated.path!;
       const focusPaths = args.focusPaths as string[] ?? [];
       const format = (args.format as string) ?? "markdown";
