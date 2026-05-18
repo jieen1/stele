@@ -1,0 +1,4 @@
+(invariant FALSE_ASSERTION
+  (severity error)
+  (description "This invariant intentionally fails to test negative reporting.")
+  (assert (eq 1 2)))

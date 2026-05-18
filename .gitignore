@@ -61,3 +61,7 @@ local-packages/*.tgz
 
 # Stele agent session data
 .stele/agent/
+
+# Cursor rules (IDE-specific, not tracked)
+.cursor/
+packages/**/.cursor/

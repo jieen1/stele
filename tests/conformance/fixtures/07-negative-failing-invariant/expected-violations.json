@@ -1,0 +1,29 @@
+{
+  "schema_version": "1",
+  "tool": "@stele/cli",
+  "command": "check",
+  "ok": false,
+  "summary": {
+    "violation_count": 1,
+    "active_violation_count": 1
+  },
+  "violations": [
+    {
+      "rule_id": "stele.conformance.test_runner_failure",
+      "rule_kind": "invariant",
+      "severity": "error",
+      "source": {
+        "tool": "@stele/cli",
+        "command": "check",
+        "kind": "test-runner"
+      },
+      "location": {
+        "path": "tests/contract"
+      },
+      "cause": {
+        "summary": "Test runner reported invariant failures."
+      },
+      "scope_paths": ["tests/contract"]
+    }
+  ]
+}
