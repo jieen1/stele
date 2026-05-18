@@ -3,6 +3,7 @@ export type {
   BaselineViolation,
   CreateViolationBaselineOptions,
   FilterViolationReportOptions,
+  HumanState,
   ViolationBaseline,
 } from "./baseline/types.js";
 export {

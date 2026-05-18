@@ -51,23 +51,35 @@ describe("baseline and diff checks", () => {
     await expect(runCheck(projectDir, { diffFrom: "HEAD~1" })).rejects.toThrow(/manifest|protected/i);
   });
 
-  it("baseline remains manifest-protected even when custom protected config omits it", async () => {
-    const projectDir = await createFixtureProject({
-      protected: DEFAULT_CONFIG.protected.filter((pattern) => pattern !== "contract/.baseline.json"),
-    });
+it("baseline is excluded from manifest and uses human_state for human file drift resolution", async () => {
+    const projectDir = await createFixtureProject();
 
-    await runGenerate(projectDir, { force: false });
-    await runLock(projectDir, { reason: "initial contract baseline" });
+    await runGenerateAndLock(projectDir, "initial contract baseline");
     await runBaselineInit(projectDir, { reason: "initial legacy adoption" });
+    await expect(pathExists(join(projectDir, "contract", ".baseline.json"))).resolves.toBe(true);
 
     const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
-    expect(Object.keys(manifest.protected_files)).toContain("contract/.baseline.json");
+    // .baseline.json must NOT appear in the manifest — it's a control-plane file
+    // protected by git, not by manifest fingerprint.
+    expect(Object.keys(manifest.protected_files)).not.toContain("contract/.baseline.json");
 
     const baseline = await readJson(join(projectDir, "contract", ".baseline.json"));
-    baseline.reason = "manual edit";
-    await writeProjectFile(projectDir, "contract/.baseline.json", `${JSON.stringify(baseline, null, 2)}\n`);
+    // human_state must be recorded
+    expect(baseline.human_state).toBeDefined();
+    expect(baseline.human_state.files).toBeDefined();
+    expect(baseline.human_state.contract_hash).toBeDefined();
 
-    await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
+    // Check should pass when human files match baseline
+    await runCheck(projectDir);
+
+    // Tamper a human file — check should fail with human_file_drift
+    // Tamper the checker impl (doesn't affect generated test output, so generated check passes)
+    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "# tampered checker implementation\n");
+    await expect(runCheck(projectDir)).rejects.toThrow(/human.*file.*drift/i);
+
+    // Update baseline — check should pass again
+    await runBaselineInit(projectDir, { reason: "approved human change" });
+    await runCheck(projectDir);
   });
 
   it("CLI check --json and --report-file include suppressed baseline metadata for synthetic rule violations", async () => {

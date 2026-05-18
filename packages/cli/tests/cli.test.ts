@@ -373,7 +373,7 @@ describe("stele CLI", () => {
     await expect(runBaselineUpdate(projectDir, { reason: "   " })).rejects.toThrow(/reason/i);
   });
 
-  it("check fails with manifest drift after the baseline file is edited directly", async () => {
+  it("check passes when baseline is edited but human_state remains valid", async () => {
     const projectDir = await createFixtureProject();
     await runGenerateAndLock(projectDir, "initial contract baseline");
     await runBaselineInit(projectDir, { reason: "initial legacy adoption" });
@@ -382,7 +382,9 @@ describe("stele CLI", () => {
     baseline.reason = "manually edited";
     await writeProjectFile(projectDir, "contract/.baseline.json", `${JSON.stringify(baseline, null, 2)}\n`);
 
-    await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
+    // Baseline is excluded from manifest; protected by human_state.
+    // Editing the baseline reason field does not affect human file integrity.
+    await runCheck(projectDir);
   });
 
   it("check fails when a generated file is missing", async () => {

@@ -395,6 +395,7 @@ async function isDriftExternalToCache(
 export async function collectProtectedPaths(projectDir: string, options: ProtectedPathOptions): Promise<string[]> {
   const normalizedProjectRoot = resolve(projectDir);
   const normalizedManifestPath = resolve(projectDir, options.manifestPath);
+  const normalizedBaselinePath = resolve(projectDir, STELE_BASELINE_FILE);
   const matchedPaths = new Set<string>();
 
   for (const protectedPattern of options.protected) {
@@ -408,6 +409,13 @@ export async function collectProtectedPaths(projectDir: string, options: Protect
         continue;
       }
 
+      if (absolutePath === normalizedBaselinePath) {
+        // Exclude .baseline.json from manifest: it's a control-plane file
+        // tracked by git, not a file whose fingerprint should be hashed.
+        // Its integrity is verified by the baseline's human_state section.
+        continue;
+      }
+
       if (isIgnoredProtectedArtifact(projectRelativePath, options.generatedDir, options.checkerImplDir)) {
         continue;
       }
@@ -415,8 +423,6 @@ export async function collectProtectedPaths(projectDir: string, options: Protect
       matchedPaths.add(absolutePath);
     }
   }
-
-  await includeRequiredProtectedFile(normalizedProjectRoot, normalizedManifestPath, STELE_BASELINE_FILE, matchedPaths);
 
   return uniqueSortedPaths([...matchedPaths]);
 }

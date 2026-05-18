@@ -12,11 +12,31 @@ export type BaselineViolation = {
   scope_paths: string[];
 };
 
+/**
+ * Human-authored file state recorded by `stele baseline init/update`.
+ *
+ * When present, `stele check` uses this as the authoritative reference
+ * for human-authored protected files instead of (or in addition to) the
+ * manifest fingerprint. See PRD: Baseline-manifest coexistence.
+ */
+export type HumanState = {
+  /** Per-file SHA-256 hashes of human-authored protected files
+   *  (e.g. `contract/main.stele`, `contract/checker_impls/*.py`).
+   *  Keys are POSIX-normalized project-relative paths. */
+  files: Record<string, string>;
+  /** SHA-256 of `normalizeContract(contract)` at the time of recording. */
+  contract_hash: string;
+};
+
 export type ViolationBaseline = {
   version: BaselineVersion;
   generated_at: string;
   reason: string;
   violations: Record<string, BaselineViolation>;
+  /** Optional — recorded by `stele baseline init/update`.
+   *  When present, human-authored protected files are compared against
+   *  this state during `stele check` instead of the manifest fingerprint. */
+  human_state?: HumanState;
 };
 
 export type CreateViolationBaselineOptions = {
@@ -24,6 +44,8 @@ export type CreateViolationBaselineOptions = {
   violations: Violation[];
   existing?: ViolationBaseline;
   generatedAt?: string;
+  /** Override or set human_state (recorded by `stele baseline init/update`). */
+  humanState?: HumanState;
 };
 
 export type FilterViolationReportOptions = {
@@ -60,6 +82,7 @@ export function createViolationBaseline(options: CreateViolationBaselineOptions)
     generated_at: generatedAt,
     reason: options.reason,
     violations: entries,
+    human_state: options.humanState ?? options.existing?.human_state,
   };
 }
 

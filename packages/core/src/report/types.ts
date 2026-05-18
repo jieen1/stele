@@ -15,6 +15,7 @@ export type ViolationLocation = {
   path?: string;
   manifest_path?: string;
   generated_dir?: string;
+  baseline_path?: string;
   line?: number;
   column?: number;
 };
@@ -169,6 +170,7 @@ export function buildViolationFingerprint(violation: Omit<Violation, "fingerprin
  */
 function buildFingerprintCause(cause: ViolationCause): ViolationCause {
   return {
+    summary: "",
     missing: cause.missing === undefined ? undefined : uniqueSortedStrings(cause.missing),
     changed: cause.changed === undefined ? undefined : uniqueSortedStrings(cause.changed),
     extra: cause.extra === undefined ? undefined : uniqueSortedStrings(cause.extra),

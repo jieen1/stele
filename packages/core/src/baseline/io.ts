@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
 import { writeAtomic } from "../manifest/hash-manifest.js";
 import { isPlainRecord } from "../util/types.js";
-import type { BaselineViolation, ViolationBaseline } from "./types.js";
+import type { BaselineViolation, HumanState, ViolationBaseline } from "./types.js";
 
 export async function readViolationBaseline(path: string): Promise<ViolationBaseline> {
   return parseViolationBaseline(path, await readFile(resolve(path), "utf8"));
@@ -57,7 +57,25 @@ function isViolationBaseline(value: unknown): value is ViolationBaseline {
     return false;
   }
 
+  if (value.human_state !== undefined && !isHumanState(value.human_state)) {
+    return false;
+  }
+
   return Object.entries(value.violations).every(([fingerprint, violation]) => isBaselineViolation(fingerprint, violation));
+}
+
+function isHumanState(value: unknown): value is HumanState {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  if (!isPlainRecord(value.files) || typeof value.contract_hash !== "string") {
+    return false;
+  }
+
+  return Object.entries(value.files).every(
+    ([path, hash]) => typeof path === "string" && typeof hash === "string" && /^[a-f0-9]{64}$/.test(hash),
+  );
 }
 
 function isBaselineViolation(fingerprint: string, value: unknown): value is BaselineViolation {
