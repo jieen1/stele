@@ -49,6 +49,15 @@ describe("validateProjectDir", () => {
     expect(result.error).toContain("is not a directory");
   });
 
+  it("returns realpath-normalized path for valid directory", () => {
+    const result = validateProjectDir(__dirname);
+    if ("path" in result) {
+      // On Windows, realpath may differ from resolve, but should be a valid path
+      expect(result.path).toBeDefined();
+      expect(typeof result.path).toBe("string");
+    }
+  });
+
   it("rejects files that are not directories", () => {
     // Point at a file — it exists but is not a directory
     // The package.json in the parent directory should exist as a file

@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { registerTools } from "./tools/index.js";
 import { sanitizeError } from "./error-sanitizer.js";
+import { setWorkspaceRoot } from "./stele-binary.js";
 import type { ToolDef } from "./types.js";
 
 /**
@@ -48,11 +49,16 @@ export class SteleMcpServer {
   private tools: ToolDef[] = [];
   private toolMap: Map<string, ToolDef> = new Map();
 
-  constructor() {
+  constructor(workspaceRoot?: string) {
     this.server = new Server(
       { name: "stele-mcp", version: "0.1.0" },
       { capabilities: { tools: {} } }
     );
+
+    // Bind workspace root for binary trust constraints
+    if (workspaceRoot !== undefined) {
+      setWorkspaceRoot(workspaceRoot);
+    }
 
     this.setupHandlers();
   }

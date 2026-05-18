@@ -21,16 +21,11 @@ function removeDir(dir: string): void {
   }
 }
 
-/**
- * Build a minimal @stele/cli directory tree:
- *   <base>/node_modules/@stele/cli/dist/index.js  (binary)
- *   <base>/node_modules/@stele/cli/package.json   (package)
- *
- * Returns { base, binaryPath, pkgPath }.
- */
-function createCliStructure(
+/** Build a minimal @stele/cli directory tree with a specific version. */
+function createCliStructureWithVersion(
   base: string,
-  pkgName: string = "@stele/cli",
+  pkgName: string,
+  version: string,
 ): { base: string; binaryPath: string; pkgPath: string } {
   const cliDir = join(base, "node_modules", "@stele", "cli");
   const binDir = join(cliDir, "dist");
@@ -40,9 +35,17 @@ function createCliStructure(
   writeFileSync(binaryPath, "#!/usr/bin/env node\nconsole.log('stele');\n");
 
   const pkgPath = join(cliDir, "package.json");
-  writeFileSync(pkgPath, JSON.stringify({ name: pkgName, version: "0.1.0" }));
+  writeFileSync(pkgPath, JSON.stringify({ name: pkgName, version }));
 
   return { base, binaryPath, pkgPath };
+}
+
+/** Build a minimal @stele/cli directory tree with default version. */
+function createCliStructure(
+  base: string,
+  pkgName: string = "@stele/cli",
+): { base: string; binaryPath: string; pkgPath: string } {
+  return createCliStructureWithVersion(base, pkgName, "0.1.0");
 }
 
 describe("verifyPackageIdentity", () => {
@@ -91,6 +94,16 @@ describe("verifyPackageIdentity", () => {
 
   it("rejects when package.json has wrong name", () => {
     const { binaryPath } = createCliStructure(tempDir, "@evil/cli");
+    expect(verifyPackageIdentity(binaryPath)).toBe(false);
+  });
+
+  it("rejects when version doesn't match expected (wrong version)", () => {
+    const { binaryPath } = createCliStructureWithVersion(tempDir, "@stele/cli", "0.0.1");
+    expect(verifyPackageIdentity(binaryPath)).toBe(false);
+  });
+
+  it("rejects when version doesn't match expected (future version)", () => {
+    const { binaryPath } = createCliStructureWithVersion(tempDir, "@stele/cli", "0.2.0");
     expect(verifyPackageIdentity(binaryPath)).toBe(false);
   });
 

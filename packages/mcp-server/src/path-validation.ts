@@ -1,4 +1,4 @@
-import { existsSync, lstatSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
@@ -46,7 +46,20 @@ export function validateProjectDir(raw: unknown): ValidateProjectDirResult {
     return { error: `Path does not exist or is not accessible: ${resolved}` };
   }
 
-  return { path: resolved };
+  // Canonicalize via realpath for session key stability
+  const canonical = tryRealpath(resolved);
+  return { path: canonical };
+}
+
+/**
+ * Canonicalize a path via realpath. Returns original on failure.
+ */
+function tryRealpath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
 }
 
 /**
