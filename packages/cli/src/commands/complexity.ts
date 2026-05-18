@@ -1,6 +1,6 @@
-import { glob } from "node:fs";
-import { existsSync, readFileSync } from "node:fs";
-import { extname, dirname, join as pathJoin } from "node:path";
+import { readdir } from "node:fs/promises";
+import { readFileSync, existsSync } from "node:fs";
+import { dirname, join as pathJoin } from "node:path";
 import { join, resolve } from "node:path";
 import {
   ComplexityMeasureOutput,
@@ -73,11 +73,7 @@ export async function runComplexitySuggest(projectDir: string, options: Complexi
 
 async function discoverCandidates(projectDir: string, _config: { targetLanguage?: string }): Promise<SuggestCandidate[]> {
   const sourceFiles: string[] = [];
-  const tsPattern = join(projectDir, "**/*.{ts,tsx}");
-
-  for await (const file of glob(tsPattern, { ignore: ["**/node_modules/**", "**/dist/**", "**/*.d.ts"] })) {
-    sourceFiles.push(file);
-  }
+  await walkTypeScriptFiles(projectDir, sourceFiles);
 
   if (sourceFiles.length === 0) {
     return [];
@@ -362,3 +358,30 @@ function formatMeasureHuman(output: ComplexityMeasureOutput): void {
   }
   process.stdout.write("\n");
 }
+
+// ----------------------------------------------------------------
+// TypeScript file walker (replaces glob dependency)
+// ----------------------------------------------------------------
+
+async function walkTypeScriptFiles(dir: string, results: string[]): Promise<void> {
+  const entries = await readdir(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    // Skip node_modules, dist, and hidden directories
+    if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") {
+      continue;
+    }
+
+    const fullPath = join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      await walkTypeScriptFiles(fullPath, results);
+    } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx"))) {
+      // Skip declaration files
+      if (!entry.name.endsWith(".d.ts")) {
+        results.push(fullPath);
+      }
+    }
+  }
+}
+
