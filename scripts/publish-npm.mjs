@@ -14,6 +14,7 @@ const publishPackageDirs = [
   join(repoRoot, "packages", "backend-rust"),
   join(repoRoot, "packages", "backend-java"),
   join(repoRoot, "packages", "backend-typescript"),
+  join(repoRoot, "packages", "agent-hooks"),
   join(repoRoot, "packages", "mcp-server"),
   join(repoRoot, "packages", "cli"),
   join(repoRoot, "packages", "claude-code-plugin"),

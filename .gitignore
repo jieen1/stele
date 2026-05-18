@@ -1,5 +1,8 @@
 node_modules/
 dist/
+!packages/github-action/dist/
+packages/github-action/dist/__tests__/
+packages/github-action/dist/src/
 coverage/
 .worktrees/
 .pnpm-store/

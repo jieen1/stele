@@ -21,36 +21,33 @@ async function runGit(cwd: string, args: string[], errorMessage: string): Promis
 
 /**
  * Collect the relative paths of changed `.stele` contract files since the given
- * git ref.  Falls back to an empty list when git is unavailable.
+ * git ref.  Throws when git is unavailable or the diff cannot be computed —
+ * fail closed so --diff does not silently skip all checks.
  */
 export async function collectDiffContractFiles(projectDir: string, ref: string): Promise<string[]> {
-  try {
-    const repoRoot = await runGit(projectDir, ["rev-parse", "--show-toplevel"], "Unable to find git repository root.");
-    const output = await runGit(
-      repoRoot,
-      ["diff", "--name-only", `${ref}...HEAD`, "--", "contract/"],
-      "Unable to compute diff.",
-    );
+  const repoRoot = await runGit(projectDir, ["rev-parse", "--show-toplevel"], "Unable to find git repository root.");
+  const output = await runGit(
+    repoRoot,
+    ["diff", "--name-only", `${ref}...HEAD`, "--", "contract/"],
+    "Unable to compute diff.",
+  );
 
-    const projectRoot = resolve(projectDir);
-    const changedFiles = new Set<string>();
+  const projectRoot = resolve(projectDir);
+  const changedFiles = new Set<string>();
 
-    for (const line of output.split(/\r?\n/)) {
-      const candidate = line.trim();
-      if (!candidate || !candidate.endsWith(".stele")) continue;
+  for (const line of output.split(/\r?\n/)) {
+    const candidate = line.trim();
+    if (!candidate || !candidate.endsWith(".stele")) continue;
 
-      const absolutePath = resolve(repoRoot, candidate);
-      const relativePath = relative(projectRoot, absolutePath).replaceAll("\\", "/");
+    const absolutePath = resolve(repoRoot, candidate);
+    const relativePath = relative(projectRoot, absolutePath).replaceAll("\\", "/");
 
-      if (relativePath.length > 0 && !isOutsideProject(relativePath)) {
-        changedFiles.add(relativePath);
-      }
+    if (relativePath.length > 0 && !isOutsideProject(relativePath)) {
+      changedFiles.add(relativePath);
     }
-
-    return [...changedFiles].sort((a, b) => a.localeCompare(b));
-  } catch {
-    return [];
   }
+
+  return [...changedFiles].sort((a, b) => a.localeCompare(b));
 }
 
 /**

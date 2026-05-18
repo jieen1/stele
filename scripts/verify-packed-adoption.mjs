@@ -17,7 +17,13 @@ const publishPackageDirs = [
   join(repoRoot, "packages", "cli"),
   join(repoRoot, "packages", "claude-code-plugin"),
 ];
-const adoptionPackageDirs = publishPackageDirs.slice(0, 3);
+// adoptionPackageDirs must include CLI, core, and backend-python for a
+// complete init → generate → check loop in a fresh project.
+const adoptionPackageDirs = [
+  publishPackageDirs[0],  // core
+  publishPackageDirs[1], // backend-python
+  publishPackageDirs[6], // cli
+];
 const pnpmTool = resolveTool("pnpm", ["node_modules", "pnpm", "bin", "pnpm.cjs"]);
 const npmTool = resolveTool("npm", ["node_modules", "npm", "bin", "npm-cli.js"]);
 const npxTool = resolveTool("npx", ["node_modules", "npm", "bin", "npx-cli.js"]);

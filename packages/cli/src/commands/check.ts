@@ -112,10 +112,6 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
     const ref = options.diff === true ? "HEAD" : options.diff;
     const changedFiles = await collectDiffContractFiles(projectDir, ref);
 
-    if (changedFiles.length === 0) {
-      return createDiffNoChangesResult([]);
-    }
-
     changedFileSet = new Set(changedFiles);
   }
 

@@ -28,7 +28,7 @@ describe("check --diff (incremental check)", () => {
     await Promise.allSettled(tempDirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
-  it("returns no changes when no contract files changed", async () => {
+  it("still verifies generated + protected files even when no contract files changed", async () => {
     const projectDir = await createFixtureProject();
     await runGenerateAndLock(projectDir, "initial contract baseline");
     await initializeGitRepo(projectDir);
@@ -36,10 +36,11 @@ describe("check --diff (incremental check)", () => {
     await git(projectDir, "add", ".");
     await git(projectDir, "commit", "-m", "clean baseline");
 
-    // No changes committed since HEAD, so --diff HEAD should report no changes.
+    // --diff HEAD finds no contract changes, but generated + protected integrity
+    // checks still run against the full contract (1 invariant).
     const result = await checkProject(projectDir, { diff: "HEAD" });
 
-    expect(result.summary.invariantCount).toBe(0);
+    expect(result.summary.invariantCount).toBe(1);
     expect(result.report.ok).toBe(true);
     expect(result.report.summary.violation_count).toBe(0);
   });
@@ -90,21 +91,20 @@ describe("check --diff (incremental check)", () => {
     await git(projectDir, "commit", "-m", "clean baseline");
 
     // --diff without a value defaults to HEAD.
+    // No contract file changes since HEAD, so diff has 0 changed invariants for code-shape check,
+    // but generated + protected checks still run against the full contract (1 invariant).
     const result = await checkProject(projectDir, { diff: true });
 
-    expect(result.summary.invariantCount).toBe(0);
+    expect(result.summary.invariantCount).toBe(1);
     expect(result.report.ok).toBe(true);
   });
 
-  it("falls back to empty diff when git is not available", async () => {
+  it("throws when git is not available (fail-closed)", async () => {
     const projectDir = await createFixtureProject();
     await runGenerateAndLock(projectDir, "initial contract baseline");
 
-    // Simulate git being unavailable by providing a non-existent directory.
-    const changedFiles = await collectDiffContractFiles(projectDir, "HEAD");
-
-    // In a temp dir without a git repo, it should return an empty list (fallback).
-    expect(changedFiles).toEqual([]);
+    // In a temp dir without a git repo, collectDiffContractFiles should throw.
+    await expect(collectDiffContractFiles(projectDir, "HEAD")).rejects.toThrow(/Unable to find git repository root/i);
   });
 
   it("CLI wires --diff option correctly", async () => {
