@@ -398,6 +398,37 @@ describe("code-shape evaluation", () => {
     );
   });
 
+  it("boundary no-match: fails when target pattern matches no files", async () => {
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(boundary nonexistent_boundary",
+        "  (lang python)",
+        '  (target "nonexistent/**/*.py")',
+        '  (deny-import "app.infrastructure"))',
+      ].join("\n"),
+      files: {
+        "src/handlers.py": "def handle() -> None:\n    return None\n",
+      },
+    });
+
+    const contract = await loadContract(join(projectDir, "contract", "main.stele"));
+    const violations = await evaluateCodeShapes(projectDir, contract, "check");
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule_id: "nonexistent_boundary",
+          rule_kind: "rule_violation",
+          severity: "error",
+        }),
+      ]),
+    );
+    const noMatchViolation = violations.find((v) =>
+      v.cause?.summary.includes("matched no files"),
+    );
+    expect(noMatchViolation).toBeDefined();
+  });
+
   it("rejects absolute code-shape targets during check and baseline init", async () => {
     const projectDir = await createCodeShapeProject({
       contractSource: [

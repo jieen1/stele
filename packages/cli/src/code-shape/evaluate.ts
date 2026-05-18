@@ -128,6 +128,7 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
     contract.files.map((file) => [file.path, toProjectRelativePath(projectDir, file.path)] as const),
   );
   const targetMap = new Map<string, string[]>();
+  const targetErrorIds = new Set<string>();
   const pythonFiles = new Set<string>();
   const violations: Violation[] = [];
 
@@ -137,6 +138,7 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
     const targetError = validateTargetPathPattern(projectDir, parsedTarget.pathPattern);
 
     if (targetError !== undefined) {
+      targetErrorIds.add(declaration.id);
       targetMap.set(declaration.id, []);
       violations.push(createConfigurationViolation(contractPath, declaration.id, targetError, command));
       continue;
@@ -157,6 +159,10 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
   violations.push(...analysis.errors.map((error) => createExecutionErrorViolation(projectDir, error, command)));
 
   for (const declaration of contract.codeShapes) {
+    if (targetErrorIds.has(declaration.id)) {
+      continue;
+    }
+
     const contractPath = relativeContractPaths.get(declaration.filePath) ?? declaration.filePath;
     const matchedFiles = targetMap.get(declaration.id) ?? [];
 
@@ -265,6 +271,21 @@ function evaluateBoundaryDeclaration(
   contractPath: string,
   command: string,
 ): Violation[] {
+  if (matchedFiles.length === 0) {
+    return [
+      createRuleViolation({
+        declaration,
+        command,
+        contractPath,
+        filePath: declaration.target.split("::")[0],
+        summary: `Boundary "${declaration.id}" matched no files.`,
+        detail: `Target pattern "${declaration.target}" did not match any Python files in the project.`,
+        fixSummary: `Update the target pattern or ensure matching files exist.`,
+        scopePaths: createScopePaths(contractPath, matchedFiles, declaration.target),
+      }),
+    ];
+  }
+
   const violations: Violation[] = [];
 
   for (const filePath of matchedFiles) {
