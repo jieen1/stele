@@ -56,5 +56,11 @@
     "@stele/agent-hooks": {
       "optional": true
     }
+  },
+  "license": "MIT",
+  "repository": "github:stelehq/stele",
+  "homepage": "https://github.com/stelehq/stele",
+  "bugs": {
+    "url": "https://github.com/stelehq/stele/issues"
   }
 }

@@ -24,5 +24,11 @@
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
+  },
+  "license": "MIT",
+  "repository": "github:stelehq/stele",
+  "homepage": "https://github.com/stelehq/stele",
+  "bugs": {
+    "url": "https://github.com/stelehq/stele/issues"
   }
 }

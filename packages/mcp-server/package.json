@@ -28,5 +28,11 @@
     "tsup": "^8.3.6",
     "typescript": "^5.7.3",
     "vitest": "^4.0.0"
+  },
+  "license": "MIT",
+  "repository": "github:stelehq/stele",
+  "homepage": "https://github.com/stelehq/stele",
+  "bugs": {
+    "url": "https://github.com/stelehq/stele/issues"
   }
 }
