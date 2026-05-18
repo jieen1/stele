@@ -148,18 +148,33 @@ export function createViolationReport(input: ViolationReportInput): ViolationRep
 }
 
 export function buildViolationFingerprint(violation: Omit<Violation, "fingerprint" | "status" | "suppressed_by">): string {
+  // Only stable fields participate in fingerprint — human-readable text (cause.summary/detail,
+  // fix.summary) are excluded so baseline drift is not triggered by copywriting changes.
   const payload = {
     rule_id: violation.rule_id,
     rule_kind: violation.rule_kind,
     severity: violation.severity,
     source: violation.source,
     location: violation.location,
-    cause: normalizeCause(violation.cause),
+    cause: buildFingerprintCause(violation.cause),
     scope_paths: uniqueSortedStrings(violation.scope_paths),
-    fix: violation.fix,
   };
 
   return createHash("sha256").update(stableStringify(payload)).digest("hex");
+}
+
+/**
+ * Extract only stable identifiers from the cause for fingerprinting.
+ * Human-readable summary/detail are deliberately excluded.
+ */
+function buildFingerprintCause(cause: ViolationCause): ViolationCause {
+  return {
+    missing: cause.missing === undefined ? undefined : uniqueSortedStrings(cause.missing),
+    changed: cause.changed === undefined ? undefined : uniqueSortedStrings(cause.changed),
+    extra: cause.extra === undefined ? undefined : uniqueSortedStrings(cause.extra),
+    new_files: cause.new_files === undefined ? undefined : uniqueSortedStrings(cause.new_files),
+    failure_witness: cause.failure_witness === undefined ? undefined : { ...cause.failure_witness },
+  };
 }
 
 function normalizeCause(cause: ViolationCause): ViolationCause {
