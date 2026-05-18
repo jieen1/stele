@@ -13,6 +13,10 @@
     "./backend-registry": {
       "types": "./dist/backend-registry.d.ts",
       "import": "./dist/backend-registry.js"
+    },
+    "./architecture-runtime": {
+      "types": "./dist/architecture-runtime.d.ts",
+      "import": "./dist/architecture-runtime.js"
     }
   },
   "bin": {
@@ -26,7 +30,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/backend-registry.ts --format esm --dts --clean && node -e \"import('fs').then(f=>f.default.cpSync('templates','dist/templates',{recursive:true}))\"",
+    "build": "tsup && node -e \"import('fs').then(f=>f.default.cpSync('templates','dist/templates',{recursive:true}))\"",
     "prepack": "npm run build",
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
@@ -37,6 +41,7 @@
     "@types/js-yaml": "^4.0.9"
   },
   "dependencies": {
+    "@stele/architecture-core": "workspace:*",
     "@stele/backend-go": "workspace:*",
     "@stele/backend-java": "workspace:*",
     "@stele/backend-python": "workspace:*",
@@ -47,7 +52,8 @@
     "commander": "^12.1.0",
     "glob-parent": "^6.0.2",
     "js-yaml": "4.1.0",
-    "minimatch": "^10.0.0"
+    "minimatch": "^10.0.0",
+    "typescript": "^5.7.3"
   },
   "peerDependencies": {
     "@stele/agent-hooks": "workspace:*"

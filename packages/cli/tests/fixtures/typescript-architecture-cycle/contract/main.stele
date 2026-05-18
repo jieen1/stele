@@ -1,0 +1,6 @@
+(architecture "cycle-arch"
+  (lang typescript)
+  (module a (path "src/a/**"))
+  (module b (path "src/b/**"))
+  (deny-cycles true)
+)

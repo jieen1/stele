@@ -18,6 +18,7 @@ import {
   prepareCheckContext,
 } from "./check.js";
 import { isMissingFileError } from "../utils/shared-utils.js";
+import { createEvent, writeEvent } from "../events/write-event.js";
 
 export type BaselineCommandOptions = {
   reason?: string;
@@ -175,6 +176,14 @@ async function baselineProject(projectDir: string, options: BaselineCommandOptio
   });
   await writeViolationBaseline(baselinePath, finalBaseline);
   await writeManifest(finalProtectedState.protectedPaths, resolve(projectDir, finalContext.config.manifestPath), finalProtectedState.contractHash);
+
+  await writeEvent(
+    projectDir,
+    createEvent("baseline-update", projectDir, {
+      violation_count: Object.keys(finalBaseline.violations).length,
+      reason,
+    }),
+  );
 
   return {
     baselinePath: STELE_BASELINE_FILE,

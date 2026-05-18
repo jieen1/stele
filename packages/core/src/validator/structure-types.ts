@@ -18,6 +18,8 @@ export const TOP_LEVEL_DECLARATIONS = new Set([
   "scope",
   "inter-agent-contract",
   "conflict",
+  "architecture",
+  "core-node",
 ]);
 
 export const ALLOWED_INVARIANT_FIELDS = new Set([
@@ -354,6 +356,71 @@ export type ConflictDeclaration = {
  */
 export type AgentDeclarationKind = AgentDeclaration | ScopeDeclaration | InterAgentContractDeclaration | ConflictDeclaration;
 
+// -- Architecture declarations --
+
+export type ArchitectureLang = "typescript";
+
+export type ArchitectureModuleDeclaration = {
+  id: string;
+  paths: string[];
+  publicEntries: string[];
+  span: SourceSpan;
+};
+
+export type ArchitectureLayerDeclaration = {
+  id: string;
+  modules: string[];
+  span: SourceSpan;
+};
+
+export type ArchitectureAllowDependencyDeclaration = {
+  from: string;
+  to: string[];
+  span: SourceSpan;
+};
+
+export type ArchitectureDeclaration = {
+  kind: "architecture";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  lang: ArchitectureLang;
+  tsconfig?: string;
+  description?: string;
+  modules: ArchitectureModuleDeclaration[];
+  layers: ArchitectureLayerDeclaration[];
+  allowDependencies: ArchitectureAllowDependencyDeclaration[];
+  denyCycles: boolean;
+  fix?: string;
+};
+
+// -- Core-node declarations --
+
+export type CoreNodeRole = "business-core-service";
+
+export type CoreNodeMetricName = "sloc" | "public-method-count" | "max-cyclomatic";
+
+export type CoreNodeMetricBoundary = {
+  name: CoreNodeMetricName;
+  ideal: number;
+  max: number;
+};
+
+export type CoreNodeDeclaration = {
+  kind: "core-node";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  lang: "typescript";
+  role: CoreNodeRole;
+  target: string;
+  description?: string;
+  rationale?: string;
+  metrics: CoreNodeMetricBoundary[];
+};
+
 export type ContractFile = {
   path: string;
   parsed: ParsedFile;
@@ -369,6 +436,8 @@ export type ContractFile = {
   scopes: ScopeDeclaration[];
   interAgentContracts: InterAgentContractDeclaration[];
   conflicts: ConflictDeclaration[];
+  architectures: ArchitectureDeclaration[];
+  coreNodes: CoreNodeDeclaration[];
 };
 
 export type ContractWarning = {
@@ -392,5 +461,7 @@ export type Contract = {
   scopes: ScopeDeclaration[];
   interAgentContracts: InterAgentContractDeclaration[];
   conflicts: ConflictDeclaration[];
+  architectures: ArchitectureDeclaration[];
+  coreNodes: CoreNodeDeclaration[];
   warnings: ContractWarning[];
 };

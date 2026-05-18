@@ -206,6 +206,8 @@ function createSingleFileContract(contract: Contract, file: Contract["files"][nu
     scopes: [...(file.scopes ?? [])],
     interAgentContracts: [...(file.interAgentContracts ?? [])],
     conflicts: [...(file.conflicts ?? [])],
+    coreNodes: [...(file.coreNodes ?? [])],
+    architectures: [...(file.architectures ?? [])],
     warnings: [...(contract.warnings ?? [])],
   };
 }

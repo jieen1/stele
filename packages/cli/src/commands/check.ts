@@ -23,6 +23,8 @@ import { loadBackend } from "../backend-registry.js";
 import { STELE_BASELINE_FILE, type SteleConfig } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { evaluateCodeShapes } from "../code-shape/evaluate.js";
+import { buildArchitectureStageReport } from "../architecture/stage.js";
+import { evaluateCoreNodes } from "../complexity/evaluate.js";
 import { computeHumanState } from "./baseline.js";
 import { CliCommandError, ExitCode, getExitCode } from "../errors.js";
 import { validateOutputPath } from "../utils/output-path.js";
@@ -49,6 +51,7 @@ import {
   createManifestDriftViolation,
   createProtectedFileDriftViolation,
 } from "./check-violations.js";
+import { createEvent, writeEvent } from "../events/write-event.js";
 
 // ----------------------------------------------------------------
 // Types
@@ -68,6 +71,9 @@ export type CheckCommandOptions = {
   reportFile?: string;
   lenient?: boolean;
   recursive?: boolean;
+  architectureOnly?: boolean;
+  complexityOnly?: boolean;
+  complexity?: boolean;
 };
 
 export type RecursiveCheckResult = {
@@ -124,6 +130,7 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   const generatedReport = applyFiltersToReport(buildGeneratedStageReport(context, "check"), filters);
 
   if (!generatedReport.ok) {
+    await recordViolationEvent(projectDir, generatedReport);
     await persistLastReport(projectDir, generatedReport);
     throw new CheckCommandError(getCheckExitCode(generatedReport), generatedReport);
   }
@@ -143,9 +150,20 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
     reports.push(applyFiltersToReport(await buildCodeShapeStageReport(codeShapeContext, protectedState, "check"), filters));
   }
 
+  // Architecture stage (always runs unless --complexity-only)
+  if (!options.complexityOnly) {
+    reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
+  }
+
+  // Complexity stage (always runs unless --architecture-only or --no-complexity)
+  if (!options.architectureOnly && options.complexity !== false) {
+    reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
+  }
+
   const report = mergeCheckReports(reports);
 
   if (!report.ok) {
+    await recordViolationEvent(projectDir, report);
     await persistLastReport(projectDir, report);
     throw new CheckCommandError(getCheckExitCode(report), report);
   }
@@ -336,6 +354,8 @@ export async function buildRawCheckReport(context: PreparedCheckContext, command
       generatedReport,
       await buildProtectedStageReport(context, protectedState, command),
       await buildCodeShapeStageReport(context, protectedState, command),
+      await buildArchitectureStage(context, protectedState, command),
+      await buildComplexityStage(context, protectedState, command),
     ]);
   } catch (error) {
     return createViolationReport({
@@ -603,6 +623,67 @@ async function buildCodeShapeStageReport(
   });
 }
 
+async function buildArchitectureStage(
+  context: PreparedCheckContext,
+  protectedState: ProtectedCheckState,
+  command: string,
+): Promise<ViolationReport> {
+  return buildArchitectureStageReport(context, protectedState, command);
+}
+
+async function buildComplexityStage(
+  context: PreparedCheckContext,
+  protectedState: ProtectedCheckState,
+  command: string,
+): Promise<ViolationReport> {
+  const coreNodes = context.contract.coreNodes;
+
+  if (coreNodes.length === 0) {
+    return createViolationReport({
+      tool: "stele",
+      command,
+      ok: true,
+      summary: {
+        invariant_count: protectedState.summary.invariantCount,
+        violation_count: 0,
+      },
+      violations: [],
+    });
+  }
+
+  const results = await evaluateCoreNodes(context.projectDir, coreNodes);
+
+  const violations: Violation[] = [];
+  for (const result of results) {
+    for (const v of result.violations) {
+      const detail = `Complexity violation: ${v.metric} value ${v.value} exceeds max ${v.max} for core-node "${result.measurement.id}"`;
+      violations.push({
+        rule_id: `complexity.${result.measurement.id}.${v.metric}`,
+        rule_kind: "rule_violation" as const,
+        severity: "error" as const,
+        source: { tool: "stele", command, kind: "rule" },
+        location: { path: result.measurement.filePath },
+        cause: { summary: detail },
+        fingerprint: `complexity.${result.measurement.id}.${v.metric}`,
+        scope_paths: [result.measurement.filePath],
+        status: "active" as const,
+        fix: { summary: `Reduce ${v.metric} of "${result.measurement.className}" below ${v.max}.` },
+      });
+    }
+  }
+
+  return createViolationReport({
+    tool: "stele",
+    command,
+    ok: violations.length === 0,
+    summary: {
+      invariant_count: protectedState.summary.invariantCount,
+      violation_count: violations.length,
+    },
+    violations,
+  });
+}
+
 // ----------------------------------------------------------------
 // Summary and formatting
 // ----------------------------------------------------------------
@@ -712,6 +793,17 @@ class CheckCommandError extends CliCommandError {
 // ----------------------------------------------------------------
 // Persistence
 // ----------------------------------------------------------------
+
+async function recordViolationEvent(projectDir: string, report: ViolationReport): Promise<void> {
+  const activeViolations = report.violations.filter((v) => (v.status ?? "active") === "active");
+  await writeEvent(
+    projectDir,
+    createEvent("violation-detected", projectDir, {
+      violation_count: activeViolations.length,
+      violation_ids: activeViolations.map((v) => v.rule_id),
+    }),
+  );
+}
 
 async function persistLastReport(projectDir: string, report: ViolationReport): Promise<void> {
   try {

@@ -688,6 +688,9 @@ describe("stele CLI", () => {
     await program.parseAsync(["node", "stele", "init", "--language", "python"]);
 
     expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project", {
+      architectureOnly: false,
+      complexity: false,
+      complexityOnly: false,
       diffFrom: "main",
       format: "human",
       json: true,

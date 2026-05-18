@@ -39,6 +39,7 @@ import { runWhy, type WhyOptions } from "./commands/why.js";
 import { runDev, type DevOptions } from "./commands/dev.js";
 import { runDoc, type DocOptions } from "./commands/doc.js";
 import { unlockProject, type UnlockOptions, type UnlockSummary } from "./commands/unlock.js";
+import { runComplexitySuggest, runComplexityMeasure, type ComplexityOptions } from "./commands/complexity.js";
 import { getExitCode } from "./errors.js";
 import { runScore } from "./commands/score.js";
 import { STELE_VERSION } from "./version.js";
@@ -127,6 +128,9 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--json", "deprecated; use --format json")
     .option("--report-file <path>", "write the JSON check report to a file")
     .option("--lenient", "skip code-shape checks (faster)")
+    .option("--architecture-only", "only check architecture constraints (skip code-shape)", false)
+    .option("--complexity-only", "only check complexity metrics (skip code-shape)", false)
+    .option("--no-complexity", "skip complexity checks", false)
     .option("--recursive", "auto-discover stele.config.json files and check each project", false)
     .action(async (options: CheckCommandOptions) => {
       const fmt = options.json ? "json" : (options.format ?? "human");
@@ -369,6 +373,28 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--threshold <n>", "fail with exit code 6 if score is below threshold", parseFloat)
     .action(async (options: { json?: boolean; threshold?: number }) => {
       await runScore(cwd(), options);
+    });
+
+  const complexityCommand = program
+    .command("complexity")
+    .description("Analyze code complexity and core-node metrics.");
+
+  complexityCommand
+    .command("suggest")
+    .description("Scan project for classes that should have core-node contracts.")
+    .option("--json", "emit JSON output")
+    .option("--output <path>", "write results to a file")
+    .action(async (options: ComplexityOptions) => {
+      await runComplexitySuggest(cwd(), options);
+    });
+
+  complexityCommand
+    .command("measure")
+    .description("Measure declared core-node metrics.")
+    .option("--json", "emit JSON output")
+    .option("--output <path>", "write results to a file")
+    .action(async (options: ComplexityOptions) => {
+      await runComplexityMeasure(cwd(), options);
     });
 
   program

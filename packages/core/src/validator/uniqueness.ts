@@ -1,5 +1,5 @@
 import { SteleError } from "../errors/SteleError.js";
-import type { Contract } from "./structure-types.js";
+import type { ArchitectureDeclaration, Contract, CoreNodeDeclaration } from "./structure-types.js";
 
 export function validateUniqueness(contract: Contract): Contract {
   validateDuplicateIds(
@@ -44,6 +44,18 @@ export function validateUniqueness(contract: Contract): Contract {
     "Agent",
     "Use a globally unique agent id across all loaded contract files.",
   );
+  validateDuplicateIds(
+    contract.architectures,
+    "E0325",
+    "Architecture",
+    "Use a globally unique architecture id across all loaded contract files.",
+  );
+  validateDuplicateIds(
+    contract.coreNodes,
+    "E0326",
+    "Core-node",
+    "Use a globally unique core-node id across all loaded contract files.",
+  );
 
   return contract;
 }
@@ -51,7 +63,7 @@ export function validateUniqueness(contract: Contract): Contract {
 function validateDuplicateIds<T extends { id: string; span: { file: string; line: number; column: number }; filePath: string }>(
   items: T[],
   code: string,
-  label: "Invariant" | "Checker" | "Group" | "Scenario" | "Operator" | "Code-shape" | "Agent",
+  label: "Invariant" | "Checker" | "Group" | "Scenario" | "Operator" | "Code-shape" | "Agent" | "Architecture" | "Core-node",
   hint: string,
 ): void {
   const seen = new Map<string, { filePath: string }>();

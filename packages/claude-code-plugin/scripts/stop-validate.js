@@ -5,6 +5,18 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 const STOP_BLOCK_EXIT_CODE = 2;
+const RESEARCH_TEMPLATE = [
+  "",
+  "=== RESEARCH MODE ===",
+  "A contract violation occurred. Before asking to modify the contract:",
+  "1. Read the failing source file",
+  "2. Understand why the violation triggered",
+  "3. If the code is wrong: fix the code",
+  "4. If the contract is wrong: use 'stele propose invariant --apply' or ask human",
+  "DO NOT edit contract files directly.",
+  "",
+].join("\n");
+
 const CONTRACT_RECOVERY_GUIDANCE = [
   "",
   "Stele guidance for this failure:",
@@ -21,6 +33,7 @@ const CONTRACT_RECOVERY_GUIDANCE = [
   "Explain which protected files need to change, why source-code-only repair is not enough, and what new invariant or baseline update is proposed.",
   "Do not bypass Stele by editing hooks, config, manifest, baseline, or generated tests to make the failure disappear.",
   "",
+  RESEARCH_TEMPLATE,
 ].join("\n");
 const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
 const steleLocalCommandNames = process.platform === "win32" ? ["stele.cmd", "stele.bat"] : ["stele"];

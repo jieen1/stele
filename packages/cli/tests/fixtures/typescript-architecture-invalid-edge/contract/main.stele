@@ -1,0 +1,7 @@
+(architecture "core-arch"
+  (lang typescript)
+  (module api (path "src/api/**"))
+  (module core (path "src/core/**"))
+  (module infra (path "src/infra/**"))
+  (allow-dependency api core)
+)

@@ -49,6 +49,11 @@ export {
 export type {
   AgentDeclaration,
   AgentSingleValueField,
+  ArchitectureDeclaration,
+  ArchitectureLang,
+  ArchitectureModuleDeclaration,
+  ArchitectureLayerDeclaration,
+  ArchitectureAllowDependencyDeclaration,
   ConflictDeclaration,
   ConflictResolutionStrategy,
   InterAgentContractDeclaration,
@@ -84,5 +89,9 @@ export type {
   CodeShapeDeclaration,
   ContractFile,
   Contract,
+  CoreNodeDeclaration,
+  CoreNodeMetricBoundary,
+  CoreNodeMetricName,
+  CoreNodeRole,
 } from "./structure-types.js";
 

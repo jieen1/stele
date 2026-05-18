@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { SteleError, loadContract, normalizeContract, writeManifest } from "@stele/core";
+import { createEvent, writeEvent } from "../events/write-event.js";
 import { loadBackend } from "../backend-registry.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { getExitCode } from "../errors.js";
@@ -48,6 +49,14 @@ export async function lockProject(projectDir: string, _options: LockOptions): Pr
   await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
   await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
+
+  await writeEvent(
+    projectDir,
+    createEvent("lock-update", projectDir, {
+      invariant_count: contract.invariants.length,
+      protected_file_count: protectedPaths.length,
+    }),
+  );
 
   return {
     invariantCount: contract.invariants.length,

@@ -100,6 +100,11 @@ function formatRuleHuman(explanation: Extract<WhyExplanation, { kind: "rule" }>)
   appendLastCheckLines(lines, lastReport, violation);
   lines.push("Agent guidance:", ...guidance.map((line) => `- ${line}`));
 
+  if (violation !== undefined) {
+    lines.push("");
+    lines.push(...researchTemplate(violation));
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -190,6 +195,23 @@ function ruleGuidance(): string[] {
   ];
 }
 
+function researchTemplate(violation: Violation): string[] {
+  const lines: string[] = [
+    "--- RESEARCH TEMPLATE ---",
+    "When a contract violation blocks you, use this template to investigate:",
+    "",
+    "1. READ the violation source file to understand the current state",
+    `2. The rule (${violation.rule_id}) enforces: "${(violation.cause.detail ?? violation.cause.summary).substring(0, 80)}..."`,
+    "3. Check if the business requirement still holds",
+    "4. If yes: fix the code to comply",
+    "5. If no: ask human to update the contract via `stele propose`",
+    "",
+    "Do NOT modify protected contract files directly.",
+    "Do NOT bypass violations by editing checker implementations.",
+  ];
+  return lines;
+}
+
 function violationGuidance(ruleKind: string): string[] {
   if (ruleKind === "generated_drift") {
     return [
@@ -202,6 +224,31 @@ function violationGuidance(ruleKind: string): string[] {
     return [
       "Protected contract state changed.",
       "Do not refresh locks automatically; ask the user to review the contract change and reason first.",
+    ];
+  }
+
+  if (ruleKind === "architecture_dependency") {
+    return [
+      "Module dependency violated an architecture constraint.",
+      "Move the dependency behind an allowed module boundary or ask the user to approve an architecture contract change.",
+      "Do not add imports that cross architecture module boundaries.",
+    ];
+  }
+
+  if (ruleKind === "architecture_cycle") {
+    return [
+      "Dependency cycle detected between architecture modules.",
+      "Break the cycle by reorganizing dependencies or adding an abstraction layer.",
+      "Architecture cycles are always violations — they cannot be suppressed.",
+    ];
+  }
+
+  if (ruleKind === "complexity_exceeded") {
+    return [
+      "Core node complexity exceeds the configured boundary.",
+      "Refactor the class: extract methods, reduce SLOC, lower cyclomatic complexity.",
+      "If the boundary is too aggressive, ask human to update the core-node contract.",
+      "Do NOT suppress the violation by raising the max value without review.",
     ];
   }
 

@@ -12,3 +12,16 @@ export {
 } from "./translator.js";
 export type { TranslationContext } from "./translator.js";
 export { default, default as backend } from "./backend.js";
+export {
+  renderArchitectureTest,
+  toMinimalArchitecture,
+} from "./architecture-renderer.js";
+export type {
+  MinimalArchitecture,
+  MinimalModule,
+  MinimalAllowDependency,
+} from "./architecture-renderer.js";
+export type {
+  ArchitectureContractOptions,
+  ArchitectureViolation,
+} from "./architecture-runtime.js";

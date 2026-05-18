@@ -2,6 +2,7 @@ import { posix } from "node:path";
 import type { LanguageBackend } from "@stele/core";
 import { getTypeScriptRuntimeSource, getTypeScriptSetupSource } from "./runtime.js";
 import { generateVitestSource, sanitizeTsIdentifier } from "./translator.js";
+import { renderArchitectureTest, toMinimalArchitecture } from "./architecture-renderer.js";
 
 const backend: LanguageBackend = {
   name: "typescript",
@@ -35,6 +36,14 @@ const backend: LanguageBackend = {
           ...contract,
           invariants: group.invariants,
         }),
+      });
+    }
+
+    for (const architecture of contract.architectures) {
+      const minimal = toMinimalArchitecture(architecture);
+      files.push({
+        path: posix.join(generatedDir, `test_arch_${sanitizeTsIdentifier(architecture.id, "arch")}.ts`),
+        content: renderArchitectureTest({ architecture: minimal }),
       });
     }
 

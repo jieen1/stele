@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { sanitizeIdentifier } from "@stele/core";
 import {
   loadContract,
+  type ArchitectureDeclaration,
   type BoundaryDeclaration,
   type ClassShapeDeclaration,
   type CodeShapeDeclaration,
@@ -105,6 +106,19 @@ export type IndexedCodeShape =
       must_end_with: string[];
     };
 
+export type IndexedArchitectureRule = {
+  type: "architecture";
+  architecture_id: string;
+  rule: string;
+  from: string;
+  to: string[];
+  allowed: string[];
+  deny_cycles: boolean;
+  file_path: string;
+  line: number;
+  modules: Array<{ id: string; paths: string[] }>;
+};
+
 export type RuleIndex = {
   schema_version: "1";
   project_dir: string;
@@ -116,10 +130,12 @@ export type RuleIndex = {
     checker_count: number;
     scenario_count: number;
     code_shape_count: number;
+    architecture_count: number;
   };
   rules: IndexedRule[];
   scenarios: IndexedScenario[];
   code_shapes: IndexedCodeShape[];
+  architectures: IndexedArchitectureRule[];
 };
 
 export async function runRules(projectDir: string, options: RulesOptions = {}): Promise<void> {
@@ -143,10 +159,12 @@ export async function buildRuleIndex(projectDir: string): Promise<RuleIndex> {
       checker_count: contract.checkers.length,
       scenario_count: contract.scenarios.length,
       code_shape_count: contract.codeShapes.length,
+      architecture_count: contract.architectures.length,
     },
     rules: contract.invariants.slice().sort(compareInvariants).map((invariant) => indexInvariant(projectDir, config.generatedDir, invariant)),
     scenarios: contract.scenarios.slice().sort(compareInvariants).map((scenario) => indexScenario(projectDir, scenario)),
     code_shapes: contract.codeShapes.slice().sort(compareInvariants).map((shape) => indexCodeShape(projectDir, shape)),
+    architectures: contract.architectures.map((arch) => indexArchitecture(projectDir, arch)),
   };
 }
 
@@ -275,9 +293,24 @@ function indexFilePolicy(
   };
 }
 
+function indexArchitecture(projectDir: string, arch: ArchitectureDeclaration): IndexedArchitectureRule {
+  return {
+    type: "architecture",
+    architecture_id: arch.id,
+    rule: "no-dependency",
+    from: arch.modules.map((m) => m.id).join(", "),
+    to: arch.allowDependencies.flatMap((d) => d.to),
+    allowed: arch.allowDependencies.map((d) => `${d.from}->${d.to.join(",")}`),
+    deny_cycles: arch.denyCycles,
+    file_path: toProjectRelativePath(projectDir, arch.filePath),
+    line: arch.span.line,
+    modules: arch.modules.map((m) => ({ id: m.id, paths: m.paths })),
+  };
+}
+
 function formatRuleIndexHuman(index: RuleIndex): string {
   const lines = [
-    `Stele rules: ${index.summary.invariant_count} invariants, ${index.summary.code_shape_count} code-shape rules, ${index.summary.scenario_count} scenarios.`,
+    `Stele rules: ${index.summary.invariant_count} invariants, ${index.summary.code_shape_count} code-shape rules, ${index.summary.scenario_count} scenarios, ${index.summary.architecture_count} architectures.`,
     "ID\tKind\tSeverity\tCategory\tFile",
     ...index.rules.map((rule) => [rule.id, rule.kind, rule.severity, rule.category ?? "<none>", `${rule.file_path}:${rule.line}`].join("\t")),
     ...index.code_shapes.map((shape) => [shape.id, shape.kind, "<none>", "<none>", `${shape.file_path}:${shape.line}`].join("\t")),

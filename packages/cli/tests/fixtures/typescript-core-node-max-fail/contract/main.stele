@@ -1,0 +1,6 @@
+(core-node "my-service"
+  (lang typescript)
+  (role business-core-service)
+  (target "src/MyService.ts::MyService")
+  (metric sloc (ideal 10) (max 15))
+)

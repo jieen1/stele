@@ -12,13 +12,17 @@ import {
   parseInterAgentContractDeclaration,
   parseConflictDeclaration,
 } from "./structure-agent.js";
+import { parseArchitectureDeclaration } from "./structure-architecture.js";
+import { parseCoreNodeDeclaration } from "./structure-core-node.js";
 import { TOP_LEVEL_DECLARATIONS } from "./structure-types.js";
 import { readSingleExpression } from "./structure-shared.js";
 import type {
   AgentDeclaration,
+  ArchitectureDeclaration,
   ConflictDeclaration,
   Contract,
   ContractFile,
+  CoreNodeDeclaration,
   GroupDeclaration,
   ImportDeclaration,
   InterAgentContractDeclaration,
@@ -47,6 +51,8 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     scopes: contractFiles.flatMap((file) => file.scopes),
     interAgentContracts: contractFiles.flatMap((file) => file.interAgentContracts),
     conflicts: contractFiles.flatMap((file) => file.conflicts),
+    architectures: contractFiles.flatMap((file) => file.architectures),
+    coreNodes: contractFiles.flatMap((file) => file.coreNodes),
     warnings: [],
   };
 }
@@ -74,6 +80,8 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   const scopes: ScopeDeclaration[] = [];
   const interAgentContracts: InterAgentContractDeclaration[] = [];
   const conflicts: ConflictDeclaration[] = [];
+  const architectures: ArchitectureDeclaration[] = [];
+  const coreNodes: CoreNodeDeclaration[] = [];
 
   for (const node of file.parsed.body) {
     if (node.kind !== "list") {
@@ -157,6 +165,12 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
       case "conflict":
         conflicts.push(parseConflictDeclaration(file.path, node));
         break;
+      case "architecture":
+        architectures.push(parseArchitectureDeclaration(file.path, node));
+        break;
+      case "core-node":
+        coreNodes.push(parseCoreNodeDeclaration(file.path, node));
+        break;
     }
   }
 
@@ -175,6 +189,8 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
     scopes,
     interAgentContracts,
     conflicts,
+    architectures,
+    coreNodes,
   };
 }
 

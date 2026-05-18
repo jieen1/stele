@@ -28,6 +28,8 @@ function makeContract(overrides: Partial<Contract> = {}): Contract {
     scopes: [],
     interAgentContracts: [],
     conflicts: [],
+    coreNodes: [],
+    architectures: [],
   };
   return {
     rootPath: ".",
@@ -44,6 +46,8 @@ function makeContract(overrides: Partial<Contract> = {}): Contract {
     scopes: [],
     interAgentContracts: [],
     conflicts: [],
+    coreNodes: [],
+    architectures: [],
     warnings: [],
     ...overrides,
   };

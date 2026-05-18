@@ -6,6 +6,7 @@ import {
   invariantExplanation,
   loadContract,
   sanitizeIdentifier,
+  type ArchitectureDeclaration,
   type InvariantDeclaration,
   type SourceSpan,
 } from "@stele/core";
@@ -20,6 +21,25 @@ export type ExplainOptions = {
 export async function runExplain(projectDir: string, invariantId: string, options: ExplainOptions = {}): Promise<void> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
+
+  // Check for architecture:<arch-id> syntax
+  if (invariantId.startsWith("architecture:")) {
+    const archId = invariantId.slice("architecture:".length);
+    const architecture = contract.architectures.find((candidate) => candidate.id === archId);
+
+    if (architecture === undefined) {
+      throw new Error(`Architecture "${archId}" was not found in the loaded contract.`);
+    }
+
+    if (options.json) {
+      process.stdout.write(`${JSON.stringify(buildArchitectureExplainJson(architecture, projectDir), null, 2)}\n`);
+      return;
+    }
+
+    process.stdout.write(formatArchitectureExplain(architecture, projectDir));
+    return;
+  }
+
   const invariant = contract.invariants.find((candidate) => candidate.id === invariantId);
 
   if (invariant === undefined) {
@@ -42,6 +62,8 @@ export async function runExplain(projectDir: string, invariantId: string, option
       ? posix.join(config.generatedDir, "test_contract.py")
       : posix.join(config.generatedDir, `test_${sanitizeIdentifier(invariant.groupId, "group")}.py`);
 
+  const trace = buildInvariantTrace(invariant, null);
+
   const lines = [
     `ID: ${invariant.id}`,
     `File Path: ${toProjectRelativePath(projectDir, invariant.filePath)}`,
@@ -52,16 +74,11 @@ export async function runExplain(projectDir: string, invariantId: string, option
     `Explanation: ${explanation ?? "<none>"}`,
     "",
     "## Expression Trace",
+    ...formatExplainTrace(trace),
+    "",
+    "## Source",
+    source,
   ];
-
-  // Build and format the expression trace
-  const trace = buildInvariantTrace(invariant, null);
-  const traceLines = formatExplainTrace(trace);
-  lines.push(...traceLines);
-
-  lines.push("");
-  lines.push("## Source");
-  lines.push(source);
 
   process.stdout.write(`${lines.join("\n")}\n`);
 }
@@ -155,4 +172,57 @@ function offsetForSpan(source: string, span: SourceSpan): number {
   }
 
   return lineOffset + Math.max(span.column - 1, 0);
+}
+
+// ----------------------------------------------------------------
+// Architecture explain
+// ----------------------------------------------------------------
+
+function formatArchitectureExplain(arch: ArchitectureDeclaration, projectDir: string): string {
+  const lines = [
+    `Architecture: ${arch.id}`,
+    `Language: ${arch.lang}`,
+    `Description: ${arch.description ?? "<none>"}`,
+    `Deny cycles: ${arch.denyCycles}`,
+    `Fix: ${arch.fix ?? "<none>"}`,
+    "",
+    "## Modules",
+    ...arch.modules.map((mod) => `- ${mod.id}: ${mod.paths.join(", ")}`),
+    "",
+    "## Allowed dependencies",
+  ];
+
+  if (arch.allowDependencies.length === 0) {
+    lines.push("- <none>");
+  } else {
+    for (const dep of arch.allowDependencies) {
+      lines.push(`- ${dep.from} -> ${dep.to.join(", ")}`);
+    }
+  }
+
+  if (arch.layers.length > 0) {
+    lines.push("", "## Layers", ...arch.layers.map((layer) => `- ${layer.id}: ${layer.modules.join(", ")}`));
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function buildArchitectureExplainJson(arch: ArchitectureDeclaration, projectDir: string): Record<string, unknown> {
+  return {
+    schema_version: "1",
+    tool: "@stele/cli",
+    command: "explain",
+    type: "architecture",
+    architecture_id: arch.id,
+    language: arch.lang,
+    description: arch.description ?? null,
+    deny_cycles: arch.denyCycles,
+    fix: arch.fix ?? null,
+    tsconfig: arch.tsconfig ?? null,
+    file_path: toProjectRelativePath(projectDir, arch.filePath),
+    line: arch.span.line,
+    modules: arch.modules.map((mod) => ({ id: mod.id, paths: mod.paths, public_entries: mod.publicEntries })),
+    layers: arch.layers.map((layer) => ({ id: layer.id, modules: layer.modules })),
+    allow_dependencies: arch.allowDependencies.map((dep) => ({ from: dep.from, to: dep.to })),
+  };
 }

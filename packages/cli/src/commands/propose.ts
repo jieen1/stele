@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { loadContract, parseFile } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
 import { readOptionalFile } from "../utils/shared-utils.js";
+import { createEvent, writeEvent } from "../events/write-event.js";
 
 const PROPOSAL_FILE = "contract/proposals/agent-additions.stele";
 const PROPOSAL_IMPORT = '(import "./proposals/agent-additions.stele")';
@@ -28,6 +29,13 @@ export async function runPropose(projectDir: string, options: ProposeOptions): P
   }
 
   await appendProposal(projectDir, proposal);
+  await writeEvent(
+    projectDir,
+    createEvent("contract-evolution", projectDir, {
+      invariant_id: options.id,
+      action: "proposed",
+    }),
+  );
   process.stdout.write(`OK proposed invariant ${options.id} in ${PROPOSAL_FILE}. Run stele generate --force, pytest, and stele lock only after user review.\n`);
 }
 
