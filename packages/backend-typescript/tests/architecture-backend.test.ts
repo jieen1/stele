@@ -37,8 +37,8 @@ describe("backend generates architecture tests", () => {
 
     const archFile = files.find((f) => f.path === "tests/contract/test_arch_core_arch.ts");
     expect(archFile).toBeDefined();
-    expect(archFile.content).toContain('describe("Architecture: core-arch"');
-    expect(archFile.content).toContain("evaluateArchitectureContract");
+    expect(archFile!.content).toContain('describe("Architecture: core-arch"');
+    expect(archFile!.content).toContain("evaluateArchitectureContract");
   });
 
   it("emits multiple architecture test files for multiple architectures", async () => {
@@ -104,7 +104,7 @@ describe("backend generates architecture tests", () => {
 
     const archFile = files.find((f) => f.path === "tests/contract/test_arch_no_cycles.ts");
     expect(archFile).toBeDefined();
-    expect(archFile.content).toContain('"denyCycles": false');
+    expect(archFile!.content).toContain('"denyCycles": false');
   });
 
   it("combines invariant tests with architecture tests", async () => {

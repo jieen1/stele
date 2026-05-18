@@ -241,12 +241,12 @@ function lineHasCode(line: string): boolean {
 // ----------------------------------------------------------------
 
 function isPrivate(node: ts.Node): boolean {
-  const mods = (node as { modifiers?: ts.NodeArray<ts.ModifierSymbolNode> }).modifiers;
+  const mods = (node as { modifiers?: ts.NodeArray<ts.Modifier> }).modifiers;
   return mods?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword) ?? false;
 }
 
 function isProtected(node: ts.Node): boolean {
-  const mods = (node as { modifiers?: ts.NodeArray<ts.ModifierSymbolNode> }).modifiers;
+  const mods = (node as { modifiers?: ts.NodeArray<ts.Modifier> }).modifiers;
   return mods?.some((m) => m.kind === ts.SyntaxKind.ProtectedKeyword) ?? false;
 }
 
@@ -391,11 +391,7 @@ export function findClassByName(
   let found: ts.ClassDeclaration | undefined;
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isClassDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === className
-    ) {
+    if (ts.isClassDeclaration(node) && node.name !== undefined && node.name.text === className) {
       found = node;
       return;
     }

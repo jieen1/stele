@@ -170,6 +170,8 @@ function createTestContract(): Contract {
     agents: [],
     scopes: [],
     interAgentContracts: [],
+    architectures: [],
+    coreNodes: [],
     conflicts: [],
     warnings: [],
   };
@@ -221,6 +223,8 @@ function createContractWithGroup(groupId: string, invariants: any[]): Contract {
     agents: [],
     scopes: [],
     interAgentContracts: [],
+    architectures: [],
+    coreNodes: [],
     conflicts: [],
     warnings: [],
   };

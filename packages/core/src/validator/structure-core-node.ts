@@ -319,7 +319,6 @@ function parseMetricBoundary(node: ListNode, role: CoreNodeRole): CoreNodeMetric
     name: metricName as CoreNodeMetricName,
     ideal,
     max,
-    span: node.span,
   };
 }
 
