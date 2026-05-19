@@ -1,10 +1,15 @@
-import type { Violation, ViolationReport } from "./types.js";
+import type { ContractNotice, Violation, ViolationReport } from "./types.js";
 
 export function formatViolationReportHuman(report: ViolationReport): string {
   const activeViolations = report.violations.filter((violation) => (violation.status ?? "active") === "active");
 
   if (report.ok) {
-    return `${report.summary.message ?? "OK"}\n`;
+    const lines = [`${report.summary.message ?? "OK"}\n`];
+    const notices = report.notices ?? [];
+    if (notices.length > 0) {
+      lines.push("Notices:", ...formatNotices(notices));
+    }
+    return lines.join("");
   }
 
   const lines = activeViolations.map(formatViolationHuman);
@@ -12,6 +17,11 @@ export function formatViolationReportHuman(report: ViolationReport): string {
 
   if (suppressionSummary !== undefined) {
     lines.push(suppressionSummary);
+  }
+
+  const notices = report.notices ?? [];
+  if (notices.length > 0) {
+    lines.push("", "Notices:", ...formatNotices(notices));
   }
 
   return `${lines.join("\n")}\n`;
@@ -116,6 +126,10 @@ function formatCauseDetails(violation: Violation): string[] {
   }
 
   return details;
+}
+
+function formatNotices(notices: ContractNotice[]): string[] {
+  return notices.map((n) => `  [notice] ${n.id}: ${n.summary}`);
 }
 
 function formatSuppressionSummary(report: ViolationReport): string | undefined {

@@ -44,9 +44,9 @@ export async function buildArchitectureStageReport(
       const detail = `Architecture violation: module "${v.fromModule}" imports from "${v.toModule}" via ${v.specifier} at ${v.fromFile}:${v.line}:${v.column}`;
       const violation: Violation = {
         rule_id: `architecture.${arch.id}.${v.fromModule}.${v.toModule}`,
-        rule_kind: "rule_violation" as const,
+        rule_kind: "architecture_dependency" as const,
         severity: "error" as const,
-        source: { tool: "stele", command, kind: "rule" },
+        source: { tool: "stele", command, kind: "architecture" },
         location: { path: v.fromFile, line: v.line, column: v.column },
         cause: { summary: detail },
         fingerprint: `${v.fromModule}→${v.toModule}:${v.fromFile}`,

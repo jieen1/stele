@@ -12,6 +12,7 @@ import {
   verifyManifest,
   type Contract,
   type ContractFile,
+  type ContractNotice,
   type GeneratedVerificationResult,
   type HumanState,
   type VerificationResult,
@@ -381,11 +382,18 @@ export function isCheckCommandError(error: unknown): error is CheckCommandError 
 }
 
 export function isBaselineEligibleViolation(violation: Violation): boolean {
-  return (
-    violation.source.kind === "rule" &&
-    violation.rule_kind === "rule_violation" &&
-    !violation.rule_id.startsWith("stele.check.")
-  );
+  if (violation.rule_id.startsWith("stele.check.")) {
+    return false;
+  }
+  if (violation.source.kind === "rule" && violation.rule_kind === "rule_violation") {
+    return true;
+  }
+  if (violation.source.kind === "architecture" &&
+      (violation.rule_kind === "architecture_dependency" ||
+       violation.rule_kind === "architecture_cycle")) {
+    return true;
+  }
+  return false;
 }
 
 function isCheckSuppressibleViolation(violation: Violation): boolean {
@@ -413,6 +421,7 @@ function applyFiltersToReport(report: ViolationReport, filters: CheckFilters): V
 
 function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
   const violations = reports.flatMap((report) => report.violations);
+  const notices = reports.flatMap((report) => report.notices);
   const activeViolationCount = violations.filter((violation) => (violation.status ?? "active") === "active").length;
   const suppressedViolationCount = violations.filter((violation) => violation.status === "suppressed").length;
   const outOfScopeViolationCount = violations.filter((violation) => violation.status === "out_of_scope").length;
@@ -434,6 +443,7 @@ function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
       out_of_scope_violation_count: outOfScopeViolationCount,
     },
     violations,
+    notices,
   });
 }
 
@@ -648,12 +658,15 @@ async function buildComplexityStage(
         violation_count: 0,
       },
       violations: [],
+      notices: [],
     });
   }
 
   const results = await evaluateCoreNodes(context.projectDir, coreNodes);
 
   const violations: Violation[] = [];
+  const notices: ContractNotice[] = [];
+
   for (const result of results) {
     for (const v of result.violations) {
       const detail = `Complexity violation: ${v.metric} value ${v.value} exceeds max ${v.max} for core-node "${result.measurement.id}"`;
@@ -670,6 +683,20 @@ async function buildComplexityStage(
         fix: { summary: `Reduce ${v.metric} of "${result.measurement.className}" below ${v.max}.` },
       });
     }
+
+    for (const n of result.notices) {
+      notices.push({
+        id: `notice.${result.measurement.id}.${n.metric}`,
+        kind: "above-ideal",
+        nodeId: n.nodeId,
+        target: n.target,
+        metric: n.metric,
+        value: n.value,
+        ideal: n.ideal,
+        max: n.max,
+        summary: `${n.metric} value ${n.value} exceeds ideal ${n.ideal} for core-node "${result.measurement.id}"`,
+      });
+    }
   }
 
   return createViolationReport({
@@ -681,6 +708,7 @@ async function buildComplexityStage(
       violation_count: violations.length,
     },
     violations,
+    notices,
   });
 }
 

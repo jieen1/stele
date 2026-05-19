@@ -72,6 +72,7 @@ export type {
   ViolationFix,
   ViolationInput,
   ViolationLocation,
+  ContractNotice,
   ViolationReport,
   ViolationReportSummary,
   ViolationSeverity,

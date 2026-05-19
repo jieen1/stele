@@ -26,6 +26,7 @@ export function makeReport(violations: Violation[], extras: Partial<ViolationRep
       active_violation_count: violations.filter((v) => v.status !== "suppressed").length,
     },
     violations,
+    notices: [],
     ...extras,
   };
 }

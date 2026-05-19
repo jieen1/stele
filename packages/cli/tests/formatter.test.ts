@@ -22,6 +22,7 @@ describe("formatCheckReport", () => {
       command: "check",
       ok: false,
       violations: [violation],
+      notices: [],
       summary: {
         violation_count: 1,
       },

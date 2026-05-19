@@ -361,6 +361,63 @@ Valid resolution strategies: `last-writer-wins`, `manual-review`, `merge-strateg
 
 Agent declarations are consumed by the MCP server's `stele-validate-edit` tool and the agent policy evaluation engine. They do not affect invariant verification or test generation in v0.1.
 
+### `architecture`
+
+Form:
+
+```lisp
+(architecture "core-arch"
+  (lang typescript)
+  (module "domain" (path "src/domain/**/*.ts"))
+  (module "api" (path "src/api/**/*.ts"))
+  (module "infra" (path "src/infra/**/*.ts"))
+  (allow "domain" (depends-on "infra"))
+  (allow "api" (depends-on "domain"))
+  (deny-cycles true))
+```
+
+The first item must be an identifier or string literal representing the architecture id. Fields:
+
+- `lang`: exactly one language string or identifier (required). Currently only `typescript` is supported.
+- `module`: one or more module declarations (required). Each `(module "id" (path "pattern") (path "pattern2"))` form declares a module with one or more glob patterns.
+- `layer`: zero or more layer declarations (optional). Layers define ordering constraints between module groups: `(layer "top" "domain" "api")` means "top" modules may depend on "domain" and "api" modules, but not vice versa.
+- `allow`: one or more dependency allowance declarations (required). Each `(allow "from-module" (depends-on "to-module1" "to-module2"))` form declares which modules the "from" module is permitted to import from.
+- `deny-cycles`: exactly one boolean (required). When `true`, circular dependencies between modules are violations.
+
+Architecture contracts are evaluated at runtime by `evaluateArchitectureContract()` using the TypeScript compiler API to extract import relationships. They produce `architecture_dependency` and `architecture_cycle` violation kinds.
+
+### `core-node`
+
+Form:
+
+```lisp
+(core-node "order-service"
+  (lang typescript)
+  (role business-core-service)
+  (target "src/domain/order/OrderService.ts::OrderService")
+  (description "Core order processing service")
+  (rationale "Order processing is a business critical path that must remain maintainable")
+  (metric sloc (ideal 220) (max 360))
+  (metric public-method-count (ideal 8) (max 15))
+  (metric max-cyclomatic (ideal 10) (max 20)))
+```
+
+The first item must be an identifier or string literal representing the core-node id. Fields:
+
+- `lang`: exactly one language string or identifier (required). Currently only `typescript` is supported.
+- `role`: exactly one role string or identifier (required). Currently only `business-core-service` is supported.
+- `target`: exactly one target string (required). Format: `path/to/file.ts::ClassName`. The `::` separator divides the file path from the class name.
+- `description`: exactly one string or identifier (optional).
+- `rationale`: exactly one string or identifier (optional).
+- `metric`: one to three metric declarations (at least one required). Each metric specifies a metric name, ideal boundary, and max boundary:
+  - `sloc`: Source Lines of Code (excluding comments and blanks)
+  - `public-method-count`: number of public methods (including getters/setters, excluding private/protected)
+  - `max-cyclomatic`: maximum cyclomatic complexity across all public methods
+
+Metric boundaries must satisfy `ideal <= max`. Metric names must be valid for the declared role.
+
+Complexity violations occur when a metric value exceeds its `max` boundary. Notices are emitted when values exceed `ideal` but remain below `max`. Notices do not cause non-zero exit codes.
+
 ## Expressions and operator semantics
 
 Expressions are either atoms or operator lists.

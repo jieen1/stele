@@ -1,20 +1,55 @@
 import { randomUUID } from "node:crypto";
 import {
-  chmod,
+  appendFile,
   lstat,
   mkdir,
-  readFile,
   rename,
   rm,
   stat,
-  writeFile,
 } from "node:fs/promises";
 import { join } from "node:path";
 import { SteleEvent } from "./types.js";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_ROTATIONS = 5;
-const FILE_MODE = 0o644;
+
+/**
+ * Patterns for secret redaction in event payloads.
+ * Uses word boundaries to avoid false positives on compound keys.
+ */
+const SECRET_PATTERNS =
+  /\b(?:password|token|secret|api_key|apikey|authorization)\b/i;
+
+/**
+ * Recursively redact secrets in nested structures.
+ */
+function redactValue(value: unknown): unknown {
+  if (value === null || value === undefined) {
+    return value;
+  }
+  if (typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(redactValue);
+  }
+  return redactPayload(value as Record<string, unknown>);
+}
+
+/**
+ * Redact potential secrets in event payload values.
+ */
+export function redactPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (SECRET_PATTERNS.test(key)) {
+      result[key] = "<redacted>";
+    } else {
+      result[key] = redactValue(value);
+    }
+  }
+  return result;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -111,55 +146,12 @@ export function createEvent(
 }
 
 /**
- * Append a structured event to a JSONL file.
- * Write failures are caught and silently swallowed (do not break the caller).
+ * Append a single event line to a date-partitioned JSONL file.
+ *
+ * Returns early (no-op) if a symlink is detected on the events directory
+ * or the target file. Write failures are swallowed by default.
  */
-export async function writeEvent(
-  projectRoot: string,
-  event: SteleEvent,
-): Promise<void> {
-  try {
-    const eventsDir = join(projectRoot, ".stele", "events");
-
-    // Symlink detection: refuse to write through symlinks
-    if (await isSymlink(eventsDir)) {
-      return;
-    }
-
-    const filePath = getDateFilePath(projectRoot, event.timestamp);
-
-    // Check if we need to rotate
-    const currentSize = await getFileSize(filePath);
-    if (currentSize >= MAX_FILE_SIZE) {
-      await rotateFile(filePath);
-    }
-
-    // Ensure the events directory exists
-    await mkdir(eventsDir, { recursive: true });
-
-    const line = JSON.stringify(event) + "\n";
-
-    // Atomic append: read existing content (if any), append, write to temp, rename
-    const tmpPath = `${filePath}.tmp`;
-    let existing = "";
-    try {
-      existing = await readFile(filePath, "utf8");
-    } catch {
-      // File does not exist yet
-    }
-
-    await writeFile(tmpPath, existing + line, { mode: FILE_MODE });
-    await rename(tmpPath, filePath);
-    await chmod(filePath, FILE_MODE);
-  } catch {
-    // Write failures must not break the calling operation
-  }
-}
-
-/**
- * For testing only: write event but throw errors instead of swallowing them.
- */
-export async function writeEventStrict(
+async function appendEventLine(
   projectRoot: string,
   event: SteleEvent,
 ): Promise<void> {
@@ -172,7 +164,12 @@ export async function writeEventStrict(
 
   const filePath = getDateFilePath(projectRoot, event.timestamp);
 
-  // Check if we need to rotate
+  // Symlink detection on individual file
+  if (await isSymlink(filePath)) {
+    return;
+  }
+
+  // Rotate if file exceeds size limit
   const currentSize = await getFileSize(filePath);
   if (currentSize >= MAX_FILE_SIZE) {
     await rotateFile(filePath);
@@ -181,18 +178,35 @@ export async function writeEventStrict(
   // Ensure the events directory exists
   await mkdir(eventsDir, { recursive: true });
 
-  const line = JSON.stringify(event) + "\n";
+  const redactedEvent = { ...event, payload: redactPayload(event.payload) };
+  const line = JSON.stringify(redactedEvent) + "\n";
 
-  // Atomic append: read existing content (if any), append, write to temp, rename
-  const tmpPath = `${filePath}.tmp`;
-  let existing = "";
+  // Append a single line (not atomic for large payloads; acceptable for
+  // telemetry where small loss is tolerated).
+  await appendFile(filePath, line);
+}
+
+/**
+ * Append a structured event to a JSONL file.
+ * Write failures are caught and silently swallowed (do not break the caller).
+ */
+export async function writeEvent(
+  projectRoot: string,
+  event: SteleEvent,
+): Promise<void> {
   try {
-    existing = await readFile(filePath, "utf8");
+    await appendEventLine(projectRoot, event);
   } catch {
-    // File does not exist yet
+    // Write failures must not break the calling operation
   }
+}
 
-  await writeFile(tmpPath, existing + line, { mode: FILE_MODE });
-  await rename(tmpPath, filePath);
-  await chmod(filePath, FILE_MODE);
+/**
+ * For testing only: write event but throw errors instead of swallowing them.
+ */
+export async function writeEventStrict(
+  projectRoot: string,
+  event: SteleEvent,
+): Promise<void> {
+  await appendEventLine(projectRoot, event);
 }

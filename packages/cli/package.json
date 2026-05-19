@@ -37,6 +37,7 @@
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "~1.29.0",
     "@types/glob-parent": "^5.1.0",
     "@types/js-yaml": "^4.0.9"
   },

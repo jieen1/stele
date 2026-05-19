@@ -24,6 +24,7 @@ function makeReport(): ViolationReport {
     command: "check",
     ok: false,
     violations: [],
+    notices: [],
     summary: {
       violation_count: 0,
     },

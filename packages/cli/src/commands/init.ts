@@ -421,6 +421,9 @@ function buildGitignoreContent(): string {
     "# Generated tests",
     "tests/contract/",
     "",
+    "# Local events",
+    ".stele/events/",
+    "",
   ].join("\n");
 }
 

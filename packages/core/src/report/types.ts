@@ -86,6 +86,25 @@ export type ViolationReportSummary = {
   out_of_scope_violation_count?: number;
 };
 
+export type ContractNoticeKind = "above-ideal";
+
+/**
+ * Advisory notice: emitted when a metric exceeds the ideal boundary but
+ * remains within the max boundary. Unlike violations, notices do not cause
+ * non-zero exit codes.
+ */
+export type ContractNotice = {
+  id: string;
+  kind: ContractNoticeKind;
+  nodeId: string;
+  target: string;
+  metric: string;
+  value: number;
+  ideal: number;
+  max: number;
+  summary: string;
+};
+
 export type ViolationReport = {
   schema_version: "1";
   tool: string;
@@ -93,10 +112,12 @@ export type ViolationReport = {
   ok: boolean;
   summary: ViolationReportSummary;
   violations: Violation[];
+  notices: ContractNotice[];
 };
 
-export type ViolationReportInput = Omit<ViolationReport, "schema_version" | "violations"> & {
+export type ViolationReportInput = Omit<ViolationReport, "schema_version" | "violations" | "notices"> & {
   violations: Array<Violation | ViolationInput>;
+  notices?: ContractNotice[];
 };
 
 /**
@@ -138,13 +159,16 @@ export function createViolation(input: ViolationInput): Violation {
 
 export function createViolationReport(input: ViolationReportInput): ViolationReport {
   return {
-    ...input,
     schema_version: "1",
+    tool: input.tool,
+    command: input.command,
+    ok: input.ok,
     summary: {
       ...input.summary,
       violation_count: input.violations.length,
     },
     violations: input.violations.map((violation) => ("fingerprint" in violation ? cloneViolation(violation) : createViolation(violation))),
+    notices: input.notices ?? [],
   };
 }
 
