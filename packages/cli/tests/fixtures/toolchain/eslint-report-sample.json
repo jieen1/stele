@@ -1,0 +1,44 @@
+[
+  {
+    "filePath": "src/billing/domain/invoice/Invoice.ts",
+    "messages": [
+      {
+        "ruleId": "@typescript-eslint/no-explicit-any",
+        "severity": 2,
+        "message": "Unexpected any. Specify a different type.",
+        "line": 42,
+        "column": 17
+      },
+      {
+        "ruleId": "@typescript-eslint/no-non-null-assertion",
+        "severity": 1,
+        "message": "Unexpected.unnecessary non null assertion.",
+        "line": 55,
+        "column": 10
+      },
+      {
+        "ruleId": "no-console",
+        "severity": 1,
+        "message": "Unexpected console usage.",
+        "line": 100,
+        "column": 5
+      }
+    ],
+    "errorCount": 1,
+    "warningCount": 2
+  },
+  {
+    "filePath": "src/customer/public/CustomerId.ts",
+    "messages": [
+      {
+        "ruleId": "@typescript-eslint/switch-exhaustiveness-check",
+        "severity": 2,
+        "message": "Switch must be exhaustive.",
+        "line": 20,
+        "column": 3
+      }
+    ],
+    "errorCount": 1,
+    "warningCount": 0
+  }
+]
