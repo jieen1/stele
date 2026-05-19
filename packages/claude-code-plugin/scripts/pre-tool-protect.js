@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { matchProtectedPath } from "@stele/agent-hooks";
 import { TARGET_KEYS } from "./path-utils.js";
@@ -11,8 +11,19 @@ import {
 } from "./shell-utils.js";
 
 const BLOCK_EXIT_CODE = 2;
-const PROTECTED_REASON =
-  "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.";
+const PROTECTED_REASON = [
+  "This file is protected by Stele.",
+  "Prefer fixing ordinary source code, fixtures, or scenario setup before changing protected contract material.",
+  "Before changing protected files, answer:",
+  "1. Is the existing contract still correct and my source change wrong?",
+  "2. Can I satisfy the contract without editing contract/, tests/contract/, manifest, or baseline files?",
+  "3. Has the user explicitly approved a contract change after reviewing the affected protected files?",
+  "For new invariant knowledge, use the CLI command `stele propose invariant --id <id> --severity <error|warning|info> --description <text> --assert <cdl> --apply`.",
+  "For modifying or deleting existing protected rules, stop and ask the user to review the contract change.",
+  "Do not use a skill invocation for this; this plugin exposes CLI commands and slash-command docs, not a callable add skill.",
+].join("\n");
+const PROTECTED_REPEAT_REASON =
+  "Protected Stele edit is still blocked; detailed guidance was already shown earlier in this session. Ask the user to review the contract change, or add new invariant knowledge with `stele propose invariant --id <id> --severity <error|warning|info> --description <text> --assert <cdl> --apply`. Do not use a skill invocation for this.";
 const BASH_COMMAND_KEYS = ["command"];
 const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
 const DEFAULT_PROTECTED = [
@@ -38,15 +49,16 @@ try {
     process.exit(0);
   }
 
-  const decision = targetPaths.some((targetPath) => shouldDenyTarget(projectDir, config.protected, targetPath));
+  const deniedTargets = targetPaths.filter((targetPath) => shouldDenyTarget(projectDir, config.protected, targetPath));
 
-  if (decision) {
+  if (deniedTargets.length > 0) {
+    const reason = await getProtectedEditReason(projectDir, payload, deniedTargets);
     process.stdout.write(
       `${JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
           permissionDecision: "deny",
-          permissionDecisionReason: PROTECTED_REASON,
+          permissionDecisionReason: reason,
         },
       })}\n`,
     );
@@ -471,6 +483,63 @@ function extractHeredocDelimiters(line) {
  */
 function shouldDenyTarget(projectDir, patterns, targetPath) {
   return matchProtectedPath(targetPath, patterns, projectDir);
+}
+
+async function getProtectedEditReason(projectDir, payload, deniedTargets) {
+  const sessionId = resolveSessionId(payload);
+
+  if (sessionId === null) {
+    return PROTECTED_REASON;
+  }
+
+  const markerPath = path.join(projectDir, ".stele", "agent", `${safeFileName(sessionId)}.protected-edit-guidance.json`);
+
+  if (await fileExists(markerPath)) {
+    return PROTECTED_REPEAT_REASON;
+  }
+
+  try {
+    await mkdir(path.dirname(markerPath), { recursive: true });
+    await writeFile(
+      markerPath,
+      `${JSON.stringify({
+        session_id: sessionId,
+        first_seen_at: new Date().toISOString(),
+        target_paths: deniedTargets,
+      })}\n`,
+      "utf8",
+    );
+  } catch {
+    // Guidance state is best-effort. If it cannot be written, keep blocking
+    // with the full reason instead of failing the hook for an auxiliary file.
+  }
+
+  return PROTECTED_REASON;
+}
+
+function resolveSessionId(payload) {
+  if (isObject(payload) && typeof payload.session_id === "string" && payload.session_id.trim().length > 0) {
+    return payload.session_id;
+  }
+
+  if (isObject(payload) && typeof payload.sessionId === "string" && payload.sessionId.trim().length > 0) {
+    return payload.sessionId;
+  }
+
+  return null;
+}
+
+async function fileExists(filePath) {
+  try {
+    await readFile(filePath, "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeFileName(value) {
+  return value.replace(/[^A-Za-z0-9._-]/gu, "_");
 }
 
 function toPosixPath(value) {

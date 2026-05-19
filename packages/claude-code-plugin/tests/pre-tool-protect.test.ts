@@ -9,12 +9,24 @@ const tempDirs: string[] = [];
 const pluginDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scriptPath = join(pluginDir, "scripts", "pre-tool-protect.js");
 const windowsOnly = process.platform === "win32" ? it : it.skip;
+const protectedReason = [
+  "This file is protected by Stele.",
+  "Prefer fixing ordinary source code, fixtures, or scenario setup before changing protected contract material.",
+  "Before changing protected files, answer:",
+  "1. Is the existing contract still correct and my source change wrong?",
+  "2. Can I satisfy the contract without editing contract/, tests/contract/, manifest, or baseline files?",
+  "3. Has the user explicitly approved a contract change after reviewing the affected protected files?",
+  "For new invariant knowledge, use the CLI command `stele propose invariant --id <id> --severity <error|warning|info> --description <text> --assert <cdl> --apply`.",
+  "For modifying or deleting existing protected rules, stop and ask the user to review the contract change.",
+  "Do not use a skill invocation for this; this plugin exposes CLI commands and slash-command docs, not a callable add skill.",
+].join("\n");
+const protectedRepeatReason =
+  "Protected Stele edit is still blocked; detailed guidance was already shown earlier in this session. Ask the user to review the contract change, or add new invariant knowledge with `stele propose invariant --id <id> --severity <error|warning|info> --description <text> --assert <cdl> --apply`. Do not use a skill invocation for this.";
 const denyResponse = {
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
-    permissionDecisionReason:
-      "This file is protected by Stele. Use /stele:add or ask the user to approve a contract update.",
+    permissionDecisionReason: protectedReason,
   },
 };
 
@@ -33,6 +45,25 @@ describe("pre-tool-protect hook", () => {
     });
 
     expectDenied(result);
+  });
+
+  it("does not repeat the long protected-edit guidance in the same session", async () => {
+    const projectDir = await createProject();
+    const payload = {
+      session_id: "session-1",
+      tool_input: {
+        file_path: "contract/main.stele",
+      },
+    };
+
+    const first = runHook(projectDir, payload);
+    const second = runHook(projectDir, payload);
+
+    expectDenied(first);
+    expectDeniedWithReason(second, protectedRepeatReason);
+    expect(second.stdout).not.toContain("Before changing protected files, answer:");
+    expect(first.stdout).not.toContain("/stele:add");
+    expect(second.stdout).not.toContain("/stele:add");
   });
 
   it("allows contract directories and non-stele files that are not subtree-protected roots", async () => {
@@ -929,9 +960,20 @@ function runRawHook(projectDir: string, input: string) {
 }
 
 function expectDenied(result: ReturnType<typeof runHook>) {
+  expectDeniedWithReason(result, protectedReason);
+}
+
+function expectDeniedWithReason(result: ReturnType<typeof runHook>, reason: string) {
   expect(result.status).toBe(0);
   expect(result.stderr).toBe("");
-  expect(result.stdout).toBe(`${JSON.stringify(denyResponse)}\n`);
+  expect(result.stdout).toBe(
+    `${JSON.stringify({
+      hookSpecificOutput: {
+        ...denyResponse.hookSpecificOutput,
+        permissionDecisionReason: reason,
+      },
+    })}\n`,
+  );
 }
 
 function expectAllowed(result: ReturnType<typeof runHook>) {

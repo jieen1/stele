@@ -12,7 +12,7 @@ const RESEARCH_TEMPLATE = [
   "1. Read the failing source file",
   "2. Understand why the violation triggered",
   "3. If the code is wrong: fix the code",
-  "4. If the contract is wrong: use 'stele propose invariant --apply' or ask human",
+  "4. If the contract is wrong: propose new invariant knowledge with `stele propose invariant --id <id> --severity <error|warning|info> --description <text> --assert <cdl> --apply`, or ask the human to review modifying existing contract files",
   "DO NOT edit contract files directly.",
   "",
 ].join("\n");
@@ -229,7 +229,7 @@ async function maybeRequestMaintenanceReview(hookPayload, steleCommandPath) {
     [
       "Stele maintenance review required.",
       "A material source edit was observed, and Stele generated .stele/maintenance/summary.md.",
-      "Before finishing, review the summary. If you learned durable project behavior, add it with stele propose invariant --apply.",
+      "Before finishing, review the summary. If you learned durable project behavior, add it with `stele propose invariant --id <id> --severity <error|warning|info> --description <text> --assert <cdl> --apply`.",
       "If no new contract rule is needed, say why.",
       "Modifying or deleting existing contract rules still requires explicit user review.",
       "",

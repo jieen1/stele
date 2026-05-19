@@ -76,7 +76,7 @@ describe("stop-validate hook", () => {
 
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("Stele maintenance review required");
-    expect(result.stderr).toContain("stele propose invariant --apply");
+    expect(result.stderr).toContain("stele propose invariant --id <id>");
     await expect(readFile(join(projectDir, "args.txt"), "utf8")).resolves.toContain("maintenance-summary");
   });
 
