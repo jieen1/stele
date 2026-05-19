@@ -11,4 +11,8 @@ export default defineConfig({
       "@stele/core": resolve(__dirname, "../core/src/index.ts"),
     },
   },
+  test: {
+    // tsc compilation in integration tests can be slow on Windows
+    testTimeout: 15000,
+  },
 });
