@@ -142,22 +142,32 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
     applyFiltersToReport(await buildProtectedStageReport(context, protectedState, "check"), filters),
   ];
 
-  // In lenient mode, skip code-shape checks (only check generated + protected)
-  if (!options.lenient) {
-    // --diff: only evaluate code shapes for invariants in changed files.
-    const codeShapeContext = changedFileSet !== undefined
-      ? { ...context, contract: filterContractByFiles(context.contract, changedFileSet) }
-      : context;
-    reports.push(applyFiltersToReport(await buildCodeShapeStageReport(codeShapeContext, protectedState, "check"), filters));
+  // Stage selection:
+  // --architecture-only: run only architecture stage
+  // --complexity-only: run only complexity stage
+  // normal: run all stages (unless --lenient skips code-shape)
+  const architectureOnly = options.architectureOnly ?? false;
+  const complexityOnly = options.complexityOnly ?? false;
+
+  if (!architectureOnly && !complexityOnly) {
+    // In lenient mode, skip code-shape checks
+    if (!options.lenient) {
+      const codeShapeContext = changedFileSet !== undefined
+        ? { ...context, contract: filterContractByFiles(context.contract, changedFileSet) }
+        : context;
+      reports.push(applyFiltersToReport(await buildCodeShapeStageReport(codeShapeContext, protectedState, "check"), filters));
+    }
+    reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
+    if (options.complexity !== false) {
+      reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
+    }
   }
 
-  // Architecture stage (always runs unless --complexity-only)
-  if (!options.complexityOnly) {
+  if (architectureOnly) {
     reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
   }
 
-  // Complexity stage (always runs unless --architecture-only or --no-complexity)
-  if (!options.architectureOnly && options.complexity !== false) {
+  if (complexityOnly) {
     reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
   }
 

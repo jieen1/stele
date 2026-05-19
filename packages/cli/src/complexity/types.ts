@@ -80,10 +80,12 @@ export type ComplexitySuggestOutput = {
 export interface CoreNodeViolation {
   nodeId: string;
   target: string;
-  metric: CoreNodeMetricName;
+  metric: CoreNodeMetricName | "missing-target";
   value: number;
   ideal: number;
   max: number;
+  /** When true, this is a configuration violation (e.g. missing target file). */
+  isConfigurationViolation?: boolean;
 }
 
 /**

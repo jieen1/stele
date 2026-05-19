@@ -34,9 +34,18 @@ export async function evaluateCoreNode(
   const filePath = resolve(projectDir, parsed.filePath);
 
   if (!existsSync(filePath)) {
+    // Missing target file — configuration violation, not success
     return {
       measurement: createStubMeasurement(declaration),
-      violations: [],
+      violations: [{
+        nodeId: declaration.id,
+        target: declaration.target,
+        metric: "missing-target" as CoreNodeMetricName,
+        value: 0,
+        ideal: 0,
+        max: 0,
+        isConfigurationViolation: true,
+      }],
       notices: [],
     };
   }

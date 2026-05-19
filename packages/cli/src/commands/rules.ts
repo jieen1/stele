@@ -6,6 +6,8 @@ import {
   type BoundaryDeclaration,
   type ClassShapeDeclaration,
   type CodeShapeDeclaration,
+  type CoreNodeDeclaration,
+  type CoreNodeMetricBoundary,
   type FilePolicyDeclaration,
   type FunctionShapeDeclaration,
   type InvariantDeclaration,
@@ -119,6 +121,19 @@ export type IndexedArchitectureRule = {
   modules: Array<{ id: string; paths: string[] }>;
 };
 
+export type IndexedCoreNode = {
+  id: string;
+  role: string;
+  target: string;
+  file_path: string;
+  line: number;
+  metrics: Array<{
+    name: string;
+    ideal: number;
+    max: number;
+  }>;
+};
+
 export type RuleIndex = {
   schema_version: "1";
   project_dir: string;
@@ -131,11 +146,13 @@ export type RuleIndex = {
     scenario_count: number;
     code_shape_count: number;
     architecture_count: number;
+    core_node_count: number;
   };
   rules: IndexedRule[];
   scenarios: IndexedScenario[];
   code_shapes: IndexedCodeShape[];
   architectures: IndexedArchitectureRule[];
+  core_nodes: IndexedCoreNode[];
 };
 
 export async function runRules(projectDir: string, options: RulesOptions = {}): Promise<void> {
@@ -160,11 +177,13 @@ export async function buildRuleIndex(projectDir: string): Promise<RuleIndex> {
       scenario_count: contract.scenarios.length,
       code_shape_count: contract.codeShapes.length,
       architecture_count: contract.architectures.length,
+      core_node_count: contract.coreNodes.length,
     },
     rules: contract.invariants.slice().sort(compareInvariants).map((invariant) => indexInvariant(projectDir, config.generatedDir, invariant)),
     scenarios: contract.scenarios.slice().sort(compareInvariants).map((scenario) => indexScenario(projectDir, scenario)),
     code_shapes: contract.codeShapes.slice().sort(compareInvariants).map((shape) => indexCodeShape(projectDir, shape)),
     architectures: contract.architectures.map((arch) => indexArchitecture(projectDir, arch)),
+    core_nodes: contract.coreNodes.map((node) => indexCoreNode(projectDir, node)),
   };
 }
 
@@ -305,6 +324,21 @@ function indexArchitecture(projectDir: string, arch: ArchitectureDeclaration): I
     file_path: toProjectRelativePath(projectDir, arch.filePath),
     line: arch.span.line,
     modules: arch.modules.map((m) => ({ id: m.id, paths: m.paths })),
+  };
+}
+
+function indexCoreNode(projectDir: string, node: CoreNodeDeclaration): IndexedCoreNode {
+  return {
+    id: node.id,
+    role: node.role,
+    target: node.target,
+    file_path: toProjectRelativePath(projectDir, node.filePath),
+    line: node.span.line,
+    metrics: (node.metrics ?? []).map((m: CoreNodeMetricBoundary) => ({
+      name: m.name,
+      ideal: m.ideal,
+      max: m.max,
+    })),
   };
 }
 

@@ -399,7 +399,7 @@ export type ArchitectureDeclaration = {
 
 export type CoreNodeRole = "business-core-service";
 
-export type CoreNodeMetricName = "sloc" | "public-method-count" | "max-cyclomatic";
+export type CoreNodeMetricName = "sloc" | "public-method-count" | "max-cyclomatic" | "missing-target";
 
 export type CoreNodeMetricBoundary = {
   name: CoreNodeMetricName;
