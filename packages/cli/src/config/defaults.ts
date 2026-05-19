@@ -30,5 +30,9 @@ export const DEFAULT_CONFIG: SteleConfig = {
     STELE_BASELINE_FILE,
     "contract/.manifest.json",
     "tests/contract/**/*",
+    // Design profile files
+    "contract/design/**/*",
+    "contract/design/proposals/**/*",
+    "contract/generated/ddd-typedriven.stele",
   ],
 };
