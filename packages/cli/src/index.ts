@@ -38,6 +38,7 @@ import { runRules, type RulesOptions } from "./commands/rules.js";
 import { runWhy, type WhyOptions } from "./commands/why.js";
 import { runDev, type DevOptions } from "./commands/dev.js";
 import { runDoc, type DocOptions } from "./commands/doc.js";
+import { addDesignCommand } from "./commands/design/index.js";
 import { unlockProject, type UnlockOptions, type UnlockSummary } from "./commands/unlock.js";
 import { runComplexitySuggest, runComplexityMeasure, type ComplexityOptions } from "./commands/complexity.js";
 import { getExitCode } from "./errors.js";
@@ -407,6 +408,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .action(async (options: { agent: string; enableShell?: boolean; uninstall?: boolean; force?: boolean }) => {
       await runInstallCommand(cwd(), options);
     });
+  addDesignCommand(program);
 
   const cacheCommand = program
     .command("cache")
