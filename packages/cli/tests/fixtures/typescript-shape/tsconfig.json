@@ -10,6 +10,8 @@
   "include": [
     "valid/**/*.ts",
     "invalid/**/*.ts",
-    "protected/**/*.ts"
+    "protected/**/*.ts",
+    "branded/**/*.ts",
+    "branded-invalid/**/*.ts"
   ]
 }

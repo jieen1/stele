@@ -5,6 +5,9 @@ import { promisify } from "node:util";
 import { validateOutputPath } from "../utils/output-path.js";
 import { buildRawCheckReport, prepareCheckContext } from "./check.js";
 import { buildRuleIndex } from "./rules.js";
+import { profilePathExists, loadProfile } from "../design-profile/load.js";
+import { readManifest, verifyManifestIntegrity } from "../design-generator/manifest.js";
+import { hashFile } from "../design-profile/hash.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,6 +34,7 @@ async function buildMaintenanceSummary(projectDir: string, options: MaintenanceS
   const index = await buildRuleIndex(projectDir);
   const changedFiles = await collectChangedFiles(projectDir, options.from);
   const checkStatus = await collectCheckStatus(projectDir);
+  const designProfileInfo = await collectDesignProfileInfo(projectDir);
   const lines = [
     "# Stele Maintenance Summary",
     "",
@@ -39,6 +43,8 @@ async function buildMaintenanceSummary(projectDir: string, options: MaintenanceS
     `- Code-shape rules: ${index.summary.code_shape_count}`,
     `- Scenarios: ${index.summary.scenario_count}`,
     `- Protected globs: ${index.protected.join(", ")}`,
+    "",
+    designProfileInfo,
     "",
     "## Recent changed files",
     ...formatChangedFiles(changedFiles),
@@ -58,6 +64,37 @@ async function buildMaintenanceSummary(projectDir: string, options: MaintenanceS
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+async function collectDesignProfileInfo(projectDir: string): Promise<string> {
+  if (!profilePathExists(projectDir)) {
+    return "## Design profile\n\n- <none>";
+  }
+
+  let profile: ReturnType<typeof loadProfile> | undefined;
+  try {
+    profile = loadProfile(projectDir);
+  } catch {
+    return "## Design profile\n- Profile file exists but could not be parsed.";
+  }
+
+  const { valid: manifestValid, drifts: manifestDrifts } = verifyManifestIntegrity(projectDir);
+
+  const lines = [
+    "## Design profile",
+    "",
+    `- Profile hash: ${hashFile(resolve(projectDir, "contract/design/profile.yaml"))}`,
+  ];
+
+  if (profile) {
+    lines.push(`- Profile ID: ${profile.profile_id}`);
+    lines.push(`- Decisions: ${profile.decisions?.length ?? 0}`);
+  }
+
+  lines.push(`- Manifest valid: ${manifestValid}`);
+  lines.push(`- Manifest drifts: ${manifestDrifts.length > 0 ? manifestDrifts.join(", ") : "<none>"}`);
+
+  return lines.join("\n");
 }
 
 async function collectChangedFiles(projectDir: string, from: string | undefined): Promise<string[] | undefined> {

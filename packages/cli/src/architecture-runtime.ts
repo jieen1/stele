@@ -28,6 +28,7 @@ export type ArchitectureContractOptions = {
     modules: MinimalModuleDeclaration[];
     allowDependencies: Array<{ from: string; to: string[] }>;
     denyCycles: boolean;
+    tsconfig?: string;
   };
 };
 
@@ -96,8 +97,12 @@ export async function evaluateArchitectureContract(
   const moduleMap = buildModuleMap(uniqueFiles, fullModules);
 
   // Create extractor once (outside the loop) — avoids O(n * compilerInit)
-  const extractor = createExtractor({ projectDir: projectRoot });
+  const tsconfigPath = architecture.tsconfig
+    ? resolve(projectRoot, architecture.tsconfig)
+    : undefined;
+  const extractor = createExtractor({ projectDir: projectRoot, tsconfigPath });
   const allEdges: DependencyEdge[] = [];
+  const unresolvedSpecifiers: Array<{ fromFile: string; specifier: string; line: number; column: number }> = [];
 
   // Build modules record (module id -> file list) for the graph
   const modules: Record<string, string[]> = {};
@@ -123,7 +128,15 @@ export async function evaluateArchitectureContract(
           : rawTo;
 
         const targetModule = moduleMap.fileToModule.get(normalizedTo);
-        if (targetModule === undefined) continue;
+        if (targetModule === undefined) {
+          unresolvedSpecifiers.push({
+            fromFile: file,
+            specifier: edge.specifier,
+            line: edge.line,
+            column: edge.column,
+          });
+          continue;
+        }
 
         const owningModule = moduleMap.fileToModule.get(file);
         if (owningModule === undefined) continue;
@@ -152,6 +165,9 @@ export async function evaluateArchitectureContract(
     lang: "typescript",
     modules: fullModules,
     layers: [],
+    // TODO(v2): `layers` and `publicEntries` are parsed/validated by `structure-architecture.ts`
+    // but not enforced at runtime in v1. They serve as documentation and agent guidance.
+    // See docs/internal/ddd-typedriven-gap-report.md (DOC-1) for status and v2 plan.
     allowDependencies: architecture.allowDependencies.map((d) => ({
       ...d,
       span: EMPTY_SPAN,
@@ -159,14 +175,14 @@ export async function evaluateArchitectureContract(
     denyCycles: architecture.denyCycles,
   };
 
-  // Build graph — now with populated modules
+  // Build graph — propagate ambiguous files from module map
   const graph: ArchitectureGraph = {
     architectureId: architecture.id,
     modules,
     edges: allEdges,
     unownedFiles: [],
-    ambiguousFiles: [],
-    unresolvedSpecifiers: [],
+    ambiguousFiles: moduleMap.ambiguousFiles,
+    unresolvedSpecifiers,
   };
 
   // Evaluate
@@ -183,6 +199,46 @@ export async function evaluateArchitectureContract(
       specifier: violation.specifier,
       line: violation.line,
       column: violation.column,
+    });
+  }
+
+  // Convert cycle violations
+  for (const cycleViolation of result.cycleViolations) {
+    // Report each edge in the cycle as a separate violation
+    for (let i = 0; i < cycleViolation.modules.length - 1; i++) {
+      violations.push({
+        fromModule: cycleViolation.modules[i],
+        toModule: cycleViolation.modules[i + 1],
+        fromFile: cycleViolation.edgeFiles[i] ?? cycleViolation.edgeFiles[0] ?? "",
+        specifier: `cycle: ${cycleViolation.modules.join(" -> ")}`,
+        line: 0,
+        column: 0,
+      });
+    }
+  }
+
+  // Surface unresolved specifiers as configuration violations
+  for (const entry of unresolvedSpecifiers) {
+    const owningModule = moduleMap.fileToModule.get(entry.fromFile);
+    violations.push({
+      fromModule: owningModule ?? "",
+      toModule: "",
+      fromFile: entry.fromFile,
+      specifier: `unresolved: "${entry.specifier}" not mapped to any module`,
+      line: entry.line,
+      column: entry.column,
+    });
+  }
+
+  // Surface ambiguous files as configuration violations
+  for (const entry of moduleMap.ambiguousFiles) {
+    violations.push({
+      fromModule: entry.modules[0] ?? "",
+      toModule: entry.modules[1] ?? "",
+      fromFile: entry.file,
+      specifier: `ambiguous: owned by ${entry.modules.join(", ")}`,
+      line: 0,
+      column: 0,
     });
   }
 

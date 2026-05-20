@@ -386,6 +386,8 @@ The first item must be an identifier or string literal representing the architec
 
 Architecture contracts are evaluated at runtime by `evaluateArchitectureContract()` using the TypeScript compiler API to extract import relationships. They produce `architecture_dependency` and `architecture_cycle` violation kinds.
 
+**Note (v1):** `layer` and `public-entry` declarations are parsed and validated for structural correctness, but are **not enforced at runtime** in v1. They serve as documentation and agent guidance. Layer ordering enforcement and public-entry access rules are planned for v2. See `docs/internal/ddd-typedriven-gap-report.md` (DOC-1) for details.
+
 ### `core-node`
 
 Form:

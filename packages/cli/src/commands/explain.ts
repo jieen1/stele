@@ -13,6 +13,12 @@ import {
 import { loadConfig } from "../config/loadConfig.js";
 import { buildRuleIndex, findIndexedRule } from "./rules.js";
 import { formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
+import {
+  formatDesignOriginLines,
+  buildDesignOriginJson,
+  resolveDesignOrigin,
+  type DesignOriginInfo,
+} from "./design-origin.js";
 
 export type ExplainOptions = {
   json?: boolean;
@@ -48,12 +54,17 @@ export async function runExplain(projectDir: string, invariantId: string, option
 
   const source = await getInvariantSource(invariant);
   const explanation = invariantExplanation(invariant);
+  const designOrigin = resolveDesignOrigin(projectDir, invariant.id);
 
   if (options.json) {
     const index = await buildRuleIndex(projectDir);
     const rule = findIndexedRule(index, invariant.id);
 
-    process.stdout.write(`${JSON.stringify({ rule, source, explanation }, null, 2)}\n`);
+    const jsonBody: Record<string, unknown> = { rule, source, explanation };
+    if (designOrigin !== null) {
+      jsonBody.design_origin = buildDesignOriginJson(designOrigin);
+    }
+    process.stdout.write(`${JSON.stringify(jsonBody, null, 2)}\n`);
     return;
   }
 
@@ -79,6 +90,10 @@ export async function runExplain(projectDir: string, invariantId: string, option
     "## Source",
     source,
   ];
+
+  if (designOrigin !== null) {
+    lines.push("", "## Design Origin", ...formatDesignOriginLines(designOrigin));
+  }
 
   process.stdout.write(`${lines.join("\n")}\n`);
 }
@@ -204,11 +219,17 @@ function formatArchitectureExplain(arch: ArchitectureDeclaration, projectDir: st
     lines.push("", "## Layers", ...arch.layers.map((layer) => `- ${layer.id}: ${layer.modules.join(", ")}`));
   }
 
+  const origin = resolveDesignOrigin(projectDir, arch.id);
+  if (origin !== null) {
+    lines.push("", "## Design Origin", ...formatDesignOriginLines(origin));
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
 function buildArchitectureExplainJson(arch: ArchitectureDeclaration, projectDir: string): Record<string, unknown> {
-  return {
+  const origin = resolveDesignOrigin(projectDir, arch.id);
+  const body: Record<string, unknown> = {
     schema_version: "1",
     tool: "@stele/cli",
     command: "explain",
@@ -225,4 +246,8 @@ function buildArchitectureExplainJson(arch: ArchitectureDeclaration, projectDir:
     layers: arch.layers.map((layer) => ({ id: layer.id, modules: layer.modules })),
     allow_dependencies: arch.allowDependencies.map((dep) => ({ from: dep.from, to: dep.to })),
   };
+  if (origin !== null) {
+    body.design_origin = buildDesignOriginJson(origin);
+  }
+  return body;
 }

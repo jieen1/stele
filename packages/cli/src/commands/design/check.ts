@@ -1,7 +1,7 @@
 import { loadProfile, profilePathExists } from "../../design-profile/load.js";
 import { validateProfile } from "../../design-profile/validate.js";
 import { verifyManifestIntegrity } from "../../design-generator/manifest.js";
-import { validateOwnership } from "../../design-generator/ownership.js";
+import { validateOwnership, validateSourceOwnership } from "../../design-generator/ownership.js";
 
 export type DesignCheckOptions = {
   profileOnly?: boolean;
@@ -13,6 +13,7 @@ export interface DesignCheckResult {
   profileValid: boolean;
   manifestValid: boolean;
   ownershipValid: boolean;
+  sourceOwnershipValid: boolean;
   errors: string[];
   warnings: string[];
 }
@@ -27,7 +28,7 @@ export async function runDesignCheck(opts: DesignCheckOptions, projectDir: strin
   }
 }
 
-async function checkDesign(projectDir: string, opts: DesignCheckOptions): Promise<DesignCheckResult> {
+export async function checkDesign(projectDir: string, opts: DesignCheckOptions): Promise<DesignCheckResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -39,6 +40,7 @@ async function checkDesign(projectDir: string, opts: DesignCheckOptions): Promis
       profileValid: false,
       manifestValid: false,
       ownershipValid: false,
+      sourceOwnershipValid: false,
       errors,
       warnings,
     };
@@ -46,8 +48,9 @@ async function checkDesign(projectDir: string, opts: DesignCheckOptions): Promis
 
   // 2. Validate profile schema
   let profileValid = true;
+  let profile: Awaited<ReturnType<typeof loadProfile>> | null = null;
   try {
-    const profile = await loadProfile(projectDir);
+    profile = await loadProfile(projectDir);
     const validationErrors = validateProfile(profile);
     if (validationErrors.length > 0) {
       profileValid = false;
@@ -60,13 +63,27 @@ async function checkDesign(projectDir: string, opts: DesignCheckOptions): Promis
     errors.push(`[profile] Failed to load profile: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // 3. Profile-only mode: skip manifest/ownership
+  // 3. Profile-only mode: run source ownership, skip manifest/generated ownership
   if (opts.profileOnly) {
+    let sourceOwnershipValid = true;
+    if (profileValid && profile) {
+      const srcResult = runSourceOwnership(projectDir, profile);
+      if (!srcResult.valid) {
+        sourceOwnershipValid = false;
+        if (srcResult.unowned.length > 0) {
+          errors.push(`[source-ownership] ${srcResult.unowned.length} unowned file(s): ${srcResult.unowned.slice(0, 5).map((f) => f).join(", ")}${srcResult.unowned.length > 5 ? `, ...and ${srcResult.unowned.length - 5} more` : ""}`);
+        }
+        if (srcResult.ambiguous.length > 0) {
+          errors.push(`[source-ownership] ${srcResult.ambiguous.length} ambiguous file(s): ${srcResult.ambiguous.slice(0, 5).map((f) => f).join(", ")}${srcResult.ambiguous.length > 5 ? `, ...and ${srcResult.ambiguous.length - 5} more` : ""}`);
+        }
+      }
+    }
     return {
-      status: profileValid ? "pass" : "fail",
+      status: (profileValid && sourceOwnershipValid) ? "pass" : "fail",
       profileValid,
       manifestValid: true,
       ownershipValid: true,
+      sourceOwnershipValid,
       errors,
       warnings,
     };
@@ -98,11 +115,27 @@ async function checkDesign(projectDir: string, opts: DesignCheckOptions): Promis
     }
   }
 
+  // 6. Validate source-root ownership
+  let sourceOwnershipValid = true;
+  if (profileValid && profile) {
+    const srcResult = runSourceOwnership(projectDir, profile);
+    if (!srcResult.valid) {
+      sourceOwnershipValid = false;
+      if (srcResult.unowned.length > 0) {
+        errors.push(`[source-ownership] ${srcResult.unowned.length} unowned file(s): ${srcResult.unowned.slice(0, 5).map((f) => f).join(", ")}${srcResult.unowned.length > 5 ? `, ...and ${srcResult.unowned.length - 5} more` : ""}`);
+      }
+      if (srcResult.ambiguous.length > 0) {
+        errors.push(`[source-ownership] ${srcResult.ambiguous.length} ambiguous file(s): ${srcResult.ambiguous.slice(0, 5).map((f) => f).join(", ")}${srcResult.ambiguous.length > 5 ? `, ...and ${srcResult.ambiguous.length - 5} more` : ""}`);
+      }
+    }
+  }
+
   return {
-    status: (profileValid && manifestValid && ownershipValid) ? "pass" : "fail",
+    status: (profileValid && manifestValid && ownershipValid && sourceOwnershipValid) ? "pass" : "fail",
     profileValid,
     manifestValid,
     ownershipValid,
+    sourceOwnershipValid,
     errors,
     warnings,
   };
@@ -115,6 +148,7 @@ function formatDesignCheck(result: DesignCheckResult): string {
   lines.push(`  Profile: ${result.profileValid ? "valid" : "INVALID"}`);
   lines.push(`  Manifest: ${result.manifestValid ? "valid" : "INVALID"}`);
   lines.push(`  Ownership: ${result.ownershipValid ? "valid" : "INVALID"}`);
+  lines.push(`  Source Ownership: ${result.sourceOwnershipValid ? "valid" : "INVALID"}`);
 
   if (result.errors.length > 0) {
     lines.push("");
@@ -133,4 +167,30 @@ function formatDesignCheck(result: DesignCheckResult): string {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Extract parameters from a design profile and call validateSourceOwnership.
+ */
+function runSourceOwnership(
+  projectDir: string,
+  profile: Awaited<ReturnType<typeof loadProfile>>,
+): ReturnType<typeof validateSourceOwnership> {
+  const contextRoots = profile.ddd?.contexts
+    ?.map((ctx) => ctx.root)
+    .filter((root): root is string => typeof root === "string") ?? [];
+
+  const sharedKernels = profile.ddd?.shared_kernels
+    ?.flatMap((sk) => sk.paths)
+    .filter((p): p is string => typeof p === "string") ?? [];
+
+  const ignorePatterns = profile.project?.ignore ?? [];
+
+  return validateSourceOwnership(
+    projectDir,
+    profile.project?.source_roots ?? [],
+    contextRoots,
+    sharedKernels,
+    ignorePatterns,
+  );
 }

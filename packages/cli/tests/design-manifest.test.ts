@@ -58,11 +58,19 @@ function makeTestManifest(): GenerationManifest {
   return {
     schemaVersion: "1",
     profileHash: "abc123",
+    profilePath: "contract/design/profile.yaml",
+    generator: {
+      package: "@stele/cli",
+      version: "0.1.0",
+      git_sha: "abc1234",
+    },
+    templates: ["ddd-typedriven"],
     generatedRules: [
       {
         ruleId: "architecture.ddd-billing",
         ruleKind: "architecture",
         origin: "context:billing",
+        origins: [{ type: "context", context_id: "billing", context_name: "Billing" }],
         fileHash: hashString(cdl),
         cdl,
       },
@@ -327,6 +335,83 @@ describe("buildManifest", () => {
     expect(manifest.generatedRules[1].ruleKind).toBe("core-node");
     expect(manifest.generatedFiles).toHaveLength(1);
     expect(manifest.generatedFiles![0].path).toBe("contract/generated/ddd-typedriven.stele");
+  });
+
+  it("populates generator, profilePath, and templates when provided", () => {
+    const arch = '(architecture "ddd-billing"\n  (lang typescript)\n)';
+
+    const manifest = buildManifest({
+      profileHash: "profile-hash",
+      profilePath: "contract/design/profile.yaml",
+      generator: {
+        package: "@stele/cli",
+        version: "0.1.0",
+        git_sha: "abc1234",
+      },
+      templates: ["ddd-typedriven"],
+      architectures: [arch],
+      coreNodes: [],
+    });
+
+    expect(manifest.profilePath).toBe("contract/design/profile.yaml");
+    expect(manifest.generator).toEqual({
+      package: "@stele/cli",
+      version: "0.1.0",
+      git_sha: "abc1234",
+    });
+    expect(manifest.templates).toEqual(["ddd-typedriven"]);
+  });
+
+  it("populates structured origins for architecture rules", () => {
+    const arch = '(architecture "ddd-billing"\n  (lang typescript)\n)';
+
+    const manifest = buildManifest({
+      profileHash: "hash",
+      architectures: [arch],
+      coreNodes: [],
+    });
+
+    const rule = manifest.generatedRules[0];
+    expect(rule.origins).toHaveLength(1);
+    expect(rule.origins![0]).toEqual({
+      type: "context",
+      context_id: "billing",
+      context_name: "Billing",
+    });
+  });
+
+  it("populates structured origins for core-node rules", () => {
+    const cn = '(core-node "billing-invoice-aggregate"\n  (lang typescript)\n)';
+
+    const manifest = buildManifest({
+      profileHash: "hash",
+      architectures: [],
+      coreNodes: [cn],
+    });
+
+    const rule = manifest.generatedRules[0];
+    expect(rule.origins).toHaveLength(1);
+    expect(rule.origins![0]).toEqual({
+      type: "aggregate",
+      aggregate_id: "invoice",
+    });
+  });
+
+  it("populates decision origin for ddd-context-map architecture", () => {
+    const arch = '(architecture "ddd-context-map"\n  (lang typescript)\n)';
+
+    const manifest = buildManifest({
+      profileHash: "hash",
+      architectures: [arch],
+      coreNodes: [],
+    });
+
+    const rule = manifest.generatedRules[0];
+    expect(rule.origins).toHaveLength(1);
+    expect(rule.origins![0]).toEqual({
+      type: "decision",
+      decision_id: "q1-bounded-contexts",
+    });
   });
 });
 

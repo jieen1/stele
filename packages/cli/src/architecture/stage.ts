@@ -44,7 +44,8 @@ export async function buildArchitectureStageReport(
 
     // Dependency violations
     for (const v of violations) {
-      const detail = `Architecture violation: module "${v.fromModule}" imports from "${v.toModule}" via ${v.specifier} at ${v.fromFile}:${v.line}:${v.column}`;
+      const prefix = arch.description ? `${arch.description}. ` : "";
+      const detail = `${prefix}Architecture violation: module "${v.fromModule}" imports from "${v.toModule}" via ${v.specifier} at ${v.fromFile}:${v.line}:${v.column}`;
       const fixSummary = arch.fix
         ? arch.fix
         : `Remove the import of "${v.specifier}" or move the file to an allowed module.`;
@@ -126,7 +127,7 @@ async function evaluateCycleViolations(
     kind: "architecture",
     id: runtimeArch.id,
     lang: "typescript",
-    tsconfig: undefined,
+    tsconfig: runtimeArch.tsconfig,
     modules: runtimeArch.modules.map((m) => ({
       id: m.id,
       paths: m.paths,
@@ -148,7 +149,8 @@ async function evaluateCycleViolations(
   for (const cycle of result.cycleViolations) {
     const modulesStr = cycle.modules.join(" → ");
     const fileStr = cycle.edgeFiles.length > 0 ? cycle.edgeFiles.join(", ") : "multiple files";
-    const summary = `Architecture cycle: ${modulesStr} (files: ${fileStr})`;
+    const prefix = arch.description ? `${arch.description}. ` : "";
+    const summary = `${prefix}Architecture cycle: ${modulesStr} (files: ${fileStr})`;
 
     const firstFile = cycle.edgeFiles[0] ?? "";
     const fixSummary = arch.fix
@@ -180,6 +182,8 @@ function convertToRuntimeArch(arch: {
   modules: { id: string; paths: string[] }[];
   allowDependencies: Array<{ from: string; to: string[] }>;
   denyCycles: boolean;
+  tsconfig?: string;
+  description?: string;
 }): ArchitectureContractOptions["architecture"] {
   return {
     id: arch.id,
@@ -189,5 +193,6 @@ function convertToRuntimeArch(arch: {
     })),
     allowDependencies: arch.allowDependencies,
     denyCycles: arch.denyCycles,
+    tsconfig: arch.tsconfig,
   };
 }

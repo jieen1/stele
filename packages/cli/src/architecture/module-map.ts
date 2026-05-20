@@ -5,6 +5,7 @@ export interface FileToModuleMap {
   fileToModule: Map<string, string>;
   unownedFiles: string[];
   ambiguousFiles: Array<{ file: string; modules: string[] }>;
+  ambiguousModules: Map<string, string[]>;
 }
 
 /**
@@ -21,6 +22,7 @@ export function buildModuleMap(
   const fileToModule = new Map<string, string>();
   const unownedFiles: string[] = [];
   const ambiguousFiles: Array<{ file: string; modules: string[] }> = [];
+  const ambiguousModules = new Map<string, string[]>();
 
   for (const file of files) {
     const matchingModules: string[] = [];
@@ -40,10 +42,11 @@ export function buildModuleMap(
       fileToModule.set(file, matchingModules[0]);
     } else {
       ambiguousFiles.push({ file, modules: matchingModules });
+      ambiguousModules.set(file, matchingModules);
       // Assign to the first matching module to keep the graph functional
       fileToModule.set(file, matchingModules[0]);
     }
   }
 
-  return { fileToModule, unownedFiles, ambiguousFiles };
+  return { fileToModule, unownedFiles, ambiguousFiles, ambiguousModules };
 }

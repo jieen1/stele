@@ -2,6 +2,8 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from 
 import { resolve } from "node:path";
 import * as yaml from "js-yaml";
 
+import { computeDesignDiff } from "./diff.js";
+import type { AggregateRoot, BrandedId, Context, CoreInvariant, DesignProfile } from "../../design-profile/types.js";
 import { loadProfile } from "../../design-profile/load.js";
 
 export type DesignProposeOptions = {
@@ -100,5 +102,133 @@ export async function runDesignPropose(
 
   writeFileSync(filePath, yaml.stringify(content), "utf8");
 
+  // Validate: run diff to prove the proposal is additive (no weakening or restructuring)
+  const currentProfile = await loadProfile(projectDir);
+  const mergedProfile = mergeProposalIntoProfile(currentProfile, proposalType, content);
+  const diff = computeDesignDiff(currentProfile, mergedProfile);
+
+  if (diff.hasWeakening || diff.hasRestructuring) {
+    const badChanges = diff.changes.filter(
+      (c) => c.changeClass === "weakening" || c.changeClass === "restructuring",
+    );
+    process.stderr.write(
+      `[design] Proposal "${opts.id}" (${proposalType}) rejected: contains non-additive changes:\n`,
+    );
+    for (const c of badChanges) {
+      process.stderr.write(`  [${c.changeClass}] ${c.description}\n`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+
   process.stdout.write(`[design] Proposal "${opts.id}" (${proposalType}) written to ${filePath}\n`);
+}
+
+// ---------------------------------------------------------------------------
+// Proposal merge helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge a proposal into a copy of the current profile, producing a hypothetical
+ * "post-proposal" profile. Used with computeDesignDiff to verify additivity.
+ */
+function mergeProposalIntoProfile(
+  current: DesignProfile,
+  proposalType: string,
+  content: Record<string, unknown>,
+): DesignProfile {
+  const merged: DesignProfile = {
+    ...current,
+    updated_at: new Date().toISOString(),
+    project: { ...current.project },
+    ddd: current.ddd ? { ...current.ddd } : undefined,
+    type_driven: current.type_driven ? { ...current.type_driven } : undefined,
+    toolchain_contracts: current.toolchain_contracts
+      ? { ...current.toolchain_contracts }
+      : undefined,
+  };
+
+  if (proposalType === "invariant") {
+    const ddd = merged.ddd!;
+    const inv = {
+      id: String(content.id),
+      description: String(content.description ?? ""),
+      evolvability: String(content.evolvability ?? "never"),
+      status: "pending",
+    } as CoreInvariant;
+    merged.ddd = {
+      ...ddd,
+      core_invariants: [...(ddd.core_invariants ?? []), inv],
+    };
+  }
+
+  if (proposalType === "branded-id") {
+    const td = merged.type_driven!;
+    const bid = {
+      id: String(content.id),
+      type_name: String(content.type_name ?? content.id),
+      type_target: String(content.target ?? ""),
+    } as BrandedId;
+    merged.type_driven = {
+      ...td,
+      branded_ids: {
+        ...(td.branded_ids ?? { mode: "explicit" }),
+        declarations: [
+          ...(td.branded_ids?.declarations ?? []),
+          bid,
+        ],
+      },
+    };
+  }
+
+  if (proposalType === "aggregate") {
+    const ddd = merged.ddd!;
+    const newAgg = {
+      id: String(content.id),
+      class: String(content.id),
+      target: String(content.target ?? ""),
+      metrics: {},
+    } as AggregateRoot;
+
+    // Try to find an existing context with a matching aggregate class
+    const contexts = [...(ddd.contexts ?? [])];
+    let found = false;
+    for (const ctx of contexts) {
+      const existing = ctx.aggregate_roots?.find(
+        (agg) => agg.class === String(content.id),
+      );
+      if (existing) {
+        const updatedCtx: Context = {
+          ...ctx,
+          aggregate_roots: [
+            ...(ctx.aggregate_roots ?? []),
+            newAgg,
+          ],
+        };
+        const idx = contexts.indexOf(ctx);
+        contexts[idx] = updatedCtx;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      // No existing aggregate matches; the proposal is still additive
+      // (it introduces a new aggregate). Attach to first context if possible.
+      if (contexts.length > 0) {
+        const first = contexts[0];
+        contexts[0] = {
+          ...first,
+          aggregate_roots: [...(first.aggregate_roots ?? []), newAgg],
+        };
+      }
+    }
+
+    merged.ddd = {
+      ...ddd,
+      contexts,
+    };
+  }
+
+  return merged;
 }

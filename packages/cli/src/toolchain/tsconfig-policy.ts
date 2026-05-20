@@ -1,8 +1,10 @@
 // tsconfig.json policy validator — checks required compiler options.
+// Uses the TypeScript compiler API (ts.readConfigFile) to properly parse
+// tsconfig files, including extended configs.
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import type { ToolchainConfigOptions, ToolchainViolation } from "./types.js";
+import * as ts from "typescript";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -16,16 +18,12 @@ export function validateTsconfigPolicy(
   const violations: ToolchainViolation[] = [];
 
   const absolutePath = resolve(projectDir, tsconfigPath);
-  const raw = readFileSync(absolutePath, "utf8");
-  const parsed = parseTsconfig(raw);
-
-  const compilerOptions = parsed.compilerOptions ?? {};
+  const resolvedOptions = resolveTsconfig(absolutePath);
 
   for (const [key, requiredValue] of Object.entries(requiredOptions)) {
-    const actual = compilerOptions[key];
+    const actual = resolvedOptions[key];
 
     if (actual === requiredValue) {
-      // Option is present and set to the required value — no violation.
       continue;
     }
 
@@ -46,16 +44,59 @@ export function validateTsconfigPolicy(
 }
 
 // ---------------------------------------------------------------------------
-// Parsing
+// Tsconfig resolution (handles extends chain)
 // ---------------------------------------------------------------------------
 
-type TsconfigJson = {
-  compilerOptions?: Record<string, unknown>;
-};
+/**
+ * Resolve a tsconfig file using the TypeScript compiler API.
+ * Returns the merged compilerOptions, handling the extends chain recursively.
+ */
+function resolveTsconfig(absolutePath: string): Record<string, unknown> {
+  const readResult = ts.readConfigFile(absolutePath, ts.sys.readFile);
 
-function parseTsconfig(raw: string): TsconfigJson {
-  const parsed = JSON.parse(raw);
-  return typeof parsed === "object" && parsed !== null ? (parsed as TsconfigJson) : {};
+  if (readResult.error && !readResult.config) {
+    return {};
+  }
+
+  const config = readResult.config;
+  if (!config || typeof config !== "object") {
+    return {};
+  }
+
+  const currentOptions = (config.compilerOptions ?? {}) as Record<string, unknown>;
+
+  // Handle extends chain: recursively resolve parent, then overlay child
+  const extendsPath = config.extends;
+  if (typeof extendsPath === "string") {
+    const parentPath = resolveExtendsPath(absolutePath, extendsPath);
+    if (parentPath) {
+      const parentOptions = resolveTsconfig(parentPath);
+      // Child options override parent options
+      return { ...parentOptions, ...currentOptions };
+    }
+  }
+
+  return currentOptions;
+}
+
+/**
+ * Resolve the path of an extended tsconfig.
+ */
+function resolveExtendsPath(basePath: string, extendsPath: string): string | undefined {
+  if (extendsPath.startsWith(".")) {
+    return resolve(dirname(basePath), extendsPath);
+  }
+
+  // For node_modules resolution, use TypeScript's resolution
+  const result = ts.resolveCompilerOptions(
+    { extends: extendsPath },
+    (name, _compilerOptions, containingFile, _redirectCont, extension, _resolutionStack) => {
+      if (!extension) extension = ".json";
+      return resolve(dirname(containingFile), name + extension);
+    },
+  );
+
+  return result?.extendsPath;
 }
 
 // ---------------------------------------------------------------------------

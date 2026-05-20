@@ -1,6 +1,12 @@
 import type { FailureWitness, Violation, ViolationLocation } from "@stele/core";
 import { readLastReport, type LastCheckReport } from "../last-report.js";
 import { buildRuleIndex, findIndexedRule, type IndexedRule } from "./rules.js";
+import {
+  formatDesignOriginLines,
+  buildDesignOriginJson,
+  resolveDesignOrigin,
+  type DesignOriginInfo,
+} from "./design-origin.js";
 
 export type WhyOptions = {
   json?: boolean;
@@ -15,16 +21,20 @@ export async function runWhy(projectDir: string, idOrFingerprint: string, option
 type WhyExplanation =
   | {
       kind: "rule";
+      projectDir: string;
       rule: IndexedRule;
       lastReport: LastCheckReport | undefined;
       violation: Violation | undefined;
       guidance: string[];
+      designOrigin: DesignOriginInfo | null;
     }
   | {
       kind: "violation";
+      projectDir: string;
       lastReport: LastCheckReport;
       violation: Violation;
       guidance: string[];
+      designOrigin: DesignOriginInfo | null;
     };
 
 async function explainWhy(projectDir: string, idOrFingerprint: string): Promise<WhyExplanation> {
@@ -33,22 +43,30 @@ async function explainWhy(projectDir: string, idOrFingerprint: string): Promise<
   const lastReport = await readLastReport(projectDir);
   const violation = findMatchingViolation(lastReport, idOrFingerprint, rule);
 
+  // Resolve design-origin from the most specific identifier we have.
+  const resolveId = rule !== undefined ? rule.id : violation?.rule_id ?? idOrFingerprint;
+  const designOrigin = resolveDesignOrigin(projectDir, resolveId);
+
   if (rule !== undefined) {
     return {
       kind: "rule",
+      projectDir,
       rule,
       lastReport,
       violation,
       guidance: violation === undefined ? ruleGuidance() : violationGuidance(violation.rule_kind),
+      designOrigin,
     };
   }
 
   if (violation !== undefined && lastReport !== undefined) {
     return {
       kind: "violation",
+      projectDir,
       lastReport,
       violation,
       guidance: violationGuidance(violation.rule_kind),
+      designOrigin,
     };
   }
 
@@ -86,7 +104,7 @@ function formatWhyHuman(explanation: WhyExplanation): string {
 }
 
 function formatRuleHuman(explanation: Extract<WhyExplanation, { kind: "rule" }>): string {
-  const { rule, lastReport, violation, guidance } = explanation;
+  const { rule, lastReport, violation, guidance, designOrigin } = explanation;
   const lines: string[] = [
     `Rule: ${rule.id}`,
     `Severity: ${rule.severity}`,
@@ -97,19 +115,25 @@ function formatRuleHuman(explanation: Extract<WhyExplanation, { kind: "rule" }>)
     "",
   ];
 
+  const originLines = formatDesignOriginLines(designOrigin);
+  if (originLines.length > 0) {
+    lines.push(...originLines);
+    lines.push("");
+  }
+
   appendLastCheckLines(lines, lastReport, violation);
   lines.push("Agent guidance:", ...guidance.map((line) => `- ${line}`));
 
   if (violation !== undefined) {
     lines.push("");
-    lines.push(...researchTemplate(violation));
+    lines.push(...researchTemplate(violation, designOrigin));
   }
 
   return `${lines.join("\n")}\n`;
 }
 
 function formatViolationOnlyHuman(explanation: Extract<WhyExplanation, { kind: "violation" }>): string {
-  const { lastReport, violation, guidance } = explanation;
+  const { violation, guidance, designOrigin } = explanation;
   const lines: string[] = [
     `Violation: ${violation.rule_id}`,
     `Status: ${violation.status ?? "active"}`,
@@ -121,9 +145,17 @@ function formatViolationOnlyHuman(explanation: Extract<WhyExplanation, { kind: "
       lines.push(`Command: ${violation.fix.command}`);
     }
   }
+
+  const originLines = formatDesignOriginLines(designOrigin);
+  if (originLines.length > 0) {
+    lines.push(...originLines);
+  }
+
   lines.push("");
-  appendLastCheckLines(lines, lastReport, violation);
+  appendLastCheckLines(lines, explanation.lastReport, violation);
   lines.push("Agent guidance:", ...guidance.map((line) => `- ${line}`));
+  lines.push("");
+  lines.push(...researchTemplate(violation, designOrigin));
   return `${lines.join("\n")}\n`;
 }
 
@@ -195,7 +227,7 @@ function ruleGuidance(): string[] {
   ];
 }
 
-function researchTemplate(violation: Violation): string[] {
+function researchTemplate(violation: Violation, designOrigin: DesignOriginInfo | null): string[] {
   const lines: string[] = [
     "--- RESEARCH TEMPLATE ---",
     "When a contract violation blocks you, use this template to investigate:",
@@ -209,6 +241,18 @@ function researchTemplate(violation: Violation): string[] {
     "Do NOT modify protected contract files directly.",
     "Do NOT bypass violations by editing checker implementations.",
   ];
+
+  if (designOrigin !== null) {
+    lines.push(
+      "",
+      "Active violation research steps:",
+      `  - Review design profile section: ${designOrigin.profileSection}`,
+      `  - Understand why the rule was generated from: ${designOrigin.origin}`,
+      `  - Rule kind: ${designOrigin.ruleKind}`,
+      `  - Enforcement: ${designOrigin.enforcementLevel === "hard" ? "HARD — cannot bypass without updating design profile" : "ADVISORY — consider refactoring to meet the guideline"}`,
+    );
+  }
+
   return lines;
 }
 
@@ -252,6 +296,38 @@ function violationGuidance(ruleKind: string): string[] {
     ];
   }
 
+  if (ruleKind === "typescript-config-policy") {
+    return [
+      "TypeScript compiler option does not match the design profile policy.",
+      "Update tsconfig.json to set the required compiler option.",
+      "If the policy is too strict for this project, ask human to update the design profile toolchain_contracts section.",
+    ];
+  }
+
+  if (ruleKind === "typescript-diagnostic") {
+    return [
+      "TypeScript compiler diagnostic detected a type error.",
+      "Fix the TypeScript error in the reported file and line.",
+      "Do not suppress the error by adding @ts-ignore or @ts-expect-error without review.",
+    ];
+  }
+
+  if (ruleKind === "eslint") {
+    return [
+      "ESLint rule violation detected in the reported file.",
+      "Fix the lint error in the reported file and line.",
+      "If the rule is a false positive, ask human to update the ESLint config or design profile toolchain_contracts section.",
+    ];
+  }
+
+  if (ruleKind === "typescript-shape") {
+    return [
+      "Type shape violation: the target type does not match the expected shape.",
+      "Update the class or interface to satisfy the required shape constraints.",
+      "If the shape constraint is outdated, ask human to update the code shape contract.",
+    ];
+  }
+
   return [
     "Repair source code, fixtures, or scenario setup before changing contract rules.",
     "Add new contract knowledge with `stele propose invariant --apply`; modifying or deleting existing rules requires user review.",
@@ -275,7 +351,7 @@ function buildWhyJson(explanation: WhyExplanation): Record<string, unknown> {
 }
 
 function buildRuleJson(explanation: Extract<WhyExplanation, { kind: "rule" }>): Record<string, unknown> {
-  const { rule, lastReport, violation, guidance } = explanation;
+  const { rule, lastReport, violation, guidance, designOrigin } = explanation;
   const body: Record<string, unknown> = {
     schema_version: "1",
     tool: "@stele/cli",
@@ -304,12 +380,15 @@ function buildRuleJson(explanation: Extract<WhyExplanation, { kind: "rule" }>): 
     body.violation = serializeViolationForJson(violation);
   }
   body.guidance = guidance;
+  if (designOrigin !== null) {
+    body.design_origin = buildDesignOriginJson(designOrigin);
+  }
   return body;
 }
 
 function buildViolationOnlyJson(explanation: Extract<WhyExplanation, { kind: "violation" }>): Record<string, unknown> {
-  const { lastReport, violation, guidance } = explanation;
-  return {
+  const { lastReport, violation, guidance, designOrigin } = explanation;
+  const body: Record<string, unknown> = {
     schema_version: "1",
     tool: "@stele/cli",
     command: "why",
@@ -321,6 +400,10 @@ function buildViolationOnlyJson(explanation: Extract<WhyExplanation, { kind: "vi
     violation: serializeViolationForJson(violation),
     guidance,
   };
+  if (designOrigin !== null) {
+    body.design_origin = buildDesignOriginJson(designOrigin);
+  }
+  return body;
 }
 
 function describeLastCheckStatus(

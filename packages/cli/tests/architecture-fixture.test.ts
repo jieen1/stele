@@ -146,7 +146,23 @@ describe("architecture fixture: typescript-architecture-cycle", () => {
 
     expect(contract.architectures).toHaveLength(1);
     expect(contract.architectures[0].denyCycles).toBe(true);
-    expect(violations).toBeDefined();
+
+    // Filter for cycle violations (specifier contains "cycle:")
+    const cycleViolations = violations.filter((v) => v.specifier.startsWith("cycle:"));
+    expect(cycleViolations.length).toBeGreaterThanOrEqual(2);
+
+    // At least one cycle violation involves module "a" depending on "b"
+    const aToB = cycleViolations.find((v) => v.fromModule === "a" && v.toModule === "b");
+    expect(aToB).toBeDefined();
+    expect(aToB!.specifier).toContain("a");
+    expect(aToB!.specifier).toContain("b");
+
+    // At least one cycle violation involves module "b" depending on "a"
+    const bToA = cycleViolations.find((v) => v.fromModule === "b" && v.toModule === "a");
+    expect(bToA).toBeDefined();
+
+    // Cycle violations reference actual source files
+    expect(aToB!.fromFile).toBeTruthy();
   });
 });
 
@@ -170,5 +186,6 @@ describe("architecture fixture: end-to-end contract pipeline", () => {
     const cycleDir = await setupFixture(CYCLE_DIR);
     const cycleResult = await loadAndEvaluate(cycleDir);
     expect(cycleResult.contract.architectures[0].denyCycles).toBe(true);
+    expect(cycleResult.violations.length).toBeGreaterThanOrEqual(2);
   });
 });

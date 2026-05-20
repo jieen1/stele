@@ -16,6 +16,9 @@ import {
   type AstNode,
 } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
+import { readManifest, type GenerationManifest } from "../design-generator/manifest.js";
+import { loadProfile, profilePathExists } from "../design-profile/load.js";
+import type { DesignProfile } from "../design-profile/types.js";
 
 import { compareInvariants, formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
 
@@ -24,6 +27,18 @@ import { compareInvariants, formatAstNode, toProjectRelativePath } from "../util
 export type RulesOptions = {
   json?: boolean;
 };
+
+export type DesignOrigin =
+  | {
+      source: "generated";
+      profile_path: string;
+      profile_anchor: string;
+      decision_id: string | null;
+      enforcement_level: "hard" | "advisory";
+    }
+  | {
+      source: "manual";
+    };
 
 export type IndexedRule = {
   id: string;
@@ -42,6 +57,7 @@ export type IndexedRule = {
   rationale: string | null;
   applies_to: string | null;
   group_id: string | null;
+  design_origin: DesignOrigin;
 };
 
 export type IndexedScenario = {
@@ -64,6 +80,7 @@ export type IndexedCodeShape =
       deny_imports: string[];
       deny_calls: string[];
       allow_targets: string[];
+      design_origin: DesignOrigin;
     }
   | {
       id: string;
@@ -75,6 +92,7 @@ export type IndexedCodeShape =
       must_have_fields: Array<{ name: string; type: string | null }>;
       must_have_methods: string[];
       must_extend: string[];
+      design_origin: DesignOrigin;
     }
   | {
       id: string;
@@ -86,6 +104,7 @@ export type IndexedCodeShape =
       must_have_calls: string[];
       must_have_decorators: string[];
       must_have_parameters: string[];
+      design_origin: DesignOrigin;
     }
   | {
       id: string;
@@ -96,6 +115,7 @@ export type IndexedCodeShape =
       target: string;
       deny_types: string[];
       require_types: string[];
+      design_origin: DesignOrigin;
     }
   | {
       id: string;
@@ -106,6 +126,7 @@ export type IndexedCodeShape =
       target: string;
       must_contain: string[];
       must_end_with: string[];
+      design_origin: DesignOrigin;
     };
 
 export type IndexedArchitectureRule = {
@@ -119,6 +140,7 @@ export type IndexedArchitectureRule = {
   file_path: string;
   line: number;
   modules: Array<{ id: string; paths: string[] }>;
+  design_origin: DesignOrigin;
 };
 
 export type IndexedCoreNode = {
@@ -132,6 +154,7 @@ export type IndexedCoreNode = {
     ideal: number;
     max: number;
   }>;
+  design_origin: DesignOrigin;
 };
 
 export type RuleIndex = {
@@ -165,6 +188,10 @@ export async function buildRuleIndex(projectDir: string): Promise<RuleIndex> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
 
+  const manifest = readManifest(projectDir);
+  const profile = profilePathExists(projectDir) ? loadProfile(projectDir) : null;
+  const provenance = buildProvenanceMap(manifest, profile);
+
   return {
     schema_version: "1",
     project_dir: resolve(projectDir),
@@ -179,11 +206,11 @@ export async function buildRuleIndex(projectDir: string): Promise<RuleIndex> {
       architecture_count: contract.architectures.length,
       core_node_count: contract.coreNodes.length,
     },
-    rules: contract.invariants.slice().sort(compareInvariants).map((invariant) => indexInvariant(projectDir, config.generatedDir, invariant)),
+    rules: contract.invariants.slice().sort(compareInvariants).map((invariant) => indexInvariant(projectDir, config.generatedDir, invariant, provenance)),
     scenarios: contract.scenarios.slice().sort(compareInvariants).map((scenario) => indexScenario(projectDir, scenario)),
-    code_shapes: contract.codeShapes.slice().sort(compareInvariants).map((shape) => indexCodeShape(projectDir, shape)),
-    architectures: contract.architectures.map((arch) => indexArchitecture(projectDir, arch)),
-    core_nodes: contract.coreNodes.map((node) => indexCoreNode(projectDir, node)),
+    code_shapes: contract.codeShapes.slice().sort(compareInvariants).map((shape) => indexCodeShape(projectDir, shape, provenance)),
+    architectures: contract.architectures.map((arch) => indexArchitecture(projectDir, arch, provenance)),
+    core_nodes: contract.coreNodes.map((node) => indexCoreNode(projectDir, node, provenance)),
   };
 }
 
@@ -191,7 +218,12 @@ export function findIndexedRule(index: RuleIndex, id: string): IndexedRule | und
   return index.rules.find((rule) => rule.id === id);
 }
 
-function indexInvariant(projectDir: string, generatedDir: string, invariant: InvariantDeclaration): IndexedRule {
+function indexInvariant(
+  projectDir: string,
+  generatedDir: string,
+  invariant: InvariantDeclaration,
+  provenance: Map<string, DesignOrigin>,
+): IndexedRule {
   return {
     id: invariant.id,
     kind: "invariant",
@@ -212,6 +244,7 @@ function indexInvariant(projectDir: string, generatedDir: string, invariant: Inv
     rationale: invariant.rationale === undefined ? null : formatAstNode(invariant.rationale.valueNode),
     applies_to: invariant.appliesTo === undefined ? null : formatAstNode(invariant.appliesTo.valueNode),
     group_id: invariant.groupId ?? null,
+    design_origin: provenance.get(invariant.id) ?? { source: "manual" },
   };
 }
 
@@ -226,13 +259,18 @@ function indexScenario(projectDir: string, scenario: ScenarioDeclaration): Index
   };
 }
 
-function indexCodeShape(projectDir: string, shape: CodeShapeDeclaration): IndexedCodeShape {
+function indexCodeShape(
+  projectDir: string,
+  shape: CodeShapeDeclaration,
+  provenance: Map<string, DesignOrigin>,
+): IndexedCodeShape {
   const base = {
     id: shape.id,
     file_path: toProjectRelativePath(projectDir, shape.filePath),
     line: shape.span.line,
     lang: shape.lang,
     target: shape.target,
+    design_origin: provenance.get(shape.id) ?? { source: "manual" },
   };
 
   switch (shape.kind) {
@@ -312,7 +350,11 @@ function indexFilePolicy(
   };
 }
 
-function indexArchitecture(projectDir: string, arch: ArchitectureDeclaration): IndexedArchitectureRule {
+function indexArchitecture(
+  projectDir: string,
+  arch: ArchitectureDeclaration,
+  provenance: Map<string, DesignOrigin>,
+): IndexedArchitectureRule {
   return {
     type: "architecture",
     architecture_id: arch.id,
@@ -324,10 +366,15 @@ function indexArchitecture(projectDir: string, arch: ArchitectureDeclaration): I
     file_path: toProjectRelativePath(projectDir, arch.filePath),
     line: arch.span.line,
     modules: arch.modules.map((m) => ({ id: m.id, paths: m.paths })),
+    design_origin: provenance.get(arch.id) ?? { source: "manual" },
   };
 }
 
-function indexCoreNode(projectDir: string, node: CoreNodeDeclaration): IndexedCoreNode {
+function indexCoreNode(
+  projectDir: string,
+  node: CoreNodeDeclaration,
+  provenance: Map<string, DesignOrigin>,
+): IndexedCoreNode {
   return {
     id: node.id,
     role: node.role,
@@ -339,7 +386,78 @@ function indexCoreNode(projectDir: string, node: CoreNodeDeclaration): IndexedCo
       ideal: m.ideal,
       max: m.max,
     })),
+    design_origin: provenance.get(node.id) ?? { source: "manual" },
   };
+}
+
+function buildProvenanceMap(
+  manifest: GenerationManifest | null,
+  profile: DesignProfile | null,
+): Map<string, DesignOrigin> {
+  const map = new Map<string, DesignOrigin>();
+  if (!manifest) return map;
+
+  const profilePath = "contract/design/profile.yaml";
+  const profileAnchors = buildProfileAnchors(profile);
+
+  for (const entry of manifest.generatedRules) {
+    const anchor = profileAnchors.get(entry.origin);
+    const originEntry: DesignOrigin = {
+      source: "generated",
+      profile_path: profilePath,
+      profile_anchor: anchor?.anchor ?? entry.origin,
+      decision_id: anchor?.decisionRef ?? null,
+      enforcement_level: anchor?.enforcementLevel ?? "advisory",
+    };
+    // Index by both full manifest ruleId ("architecture.ddd-billing") and bare ID ("ddd-billing")
+    map.set(entry.ruleId, originEntry);
+    const bareId = entry.ruleId.includes(".") ? entry.ruleId.split(".").slice(1).join(".") : entry.ruleId;
+    if (bareId) {
+      map.set(bareId, originEntry);
+    }
+  }
+
+  return map;
+}
+
+interface ProfileAnchorInfo {
+  anchor: string;
+  decisionRef: string | null;
+  enforcementLevel: "hard" | "advisory";
+}
+
+function buildProfileAnchors(profile: DesignProfile | null): Map<string, ProfileAnchorInfo> {
+  const map = new Map<string, ProfileAnchorInfo>();
+  if (!profile?.ddd) return map;
+
+  for (const ctx of profile.ddd.contexts) {
+    const enforcementLevel = ctx.subdomain_type === "core" ? "hard" : "advisory";
+    map.set("context:" + ctx.id, {
+      anchor: "ddd.contexts." + ctx.id,
+      decisionRef: ctx.decision_ref ?? null,
+      enforcementLevel,
+    });
+    for (const agg of ctx.aggregate_roots ?? []) {
+      map.set("aggregate:" + agg.id, {
+        anchor: "ddd.contexts." + ctx.id + ".aggregate_roots." + agg.id,
+        decisionRef: agg.decision_ref ?? ctx.decision_ref ?? null,
+        enforcementLevel,
+      });
+    }
+  }
+
+  if (profile.ddd.integrations) {
+    for (const integration of profile.ddd.integrations) {
+      const key = "integration:" + integration.from + "->" + integration.to;
+      map.set(key, {
+        anchor: "ddd.integrations." + integration.from + "_" + integration.to,
+        decisionRef: integration.decision_ref ?? null,
+        enforcementLevel: "advisory",
+      });
+    }
+  }
+
+  return map;
 }
 
 function formatRuleIndexHuman(index: RuleIndex): string {

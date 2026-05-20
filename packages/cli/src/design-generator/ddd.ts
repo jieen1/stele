@@ -8,6 +8,7 @@ import {
   renderAggregateCoreNode,
   renderAllDeclarations,
 } from "./render-stele.js";
+import type { ProvenanceOutput, ProvenanceRule } from "./manifest.js";
 
 // ---------------------------------------------------------------------------
 // Generator result
@@ -26,6 +27,7 @@ export interface GeneratorResult {
       rule_count: number;
     }>;
   };
+  provenanceOutputs: ProvenanceOutput[]; // Rule-level provenance with enforcement_level
 }
 
 // ---------------------------------------------------------------------------
@@ -35,6 +37,7 @@ export interface GeneratorResult {
 export function generateFromProfile(profile: DesignProfile): GeneratorResult {
   const architectures: string[] = [];
   const coreNodes: string[] = [];
+  const provenanceRules: ProvenanceRule[] = [];
 
   const tsconfig = profile.project?.tsconfig ?? "tsconfig.json";
 
@@ -43,6 +46,13 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
     for (const ctx of profile.ddd.contexts) {
       const arch = renderContextArchitecture(ctx, tsconfig);
       architectures.push(arch);
+      provenanceRules.push({
+        id: `ddd-${ctx.id}`,
+        kind: "architecture",
+        origins: [],
+        enforcement_level: "hard",
+        source: "generated",
+      });
     }
   }
 
@@ -51,6 +61,13 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
   if (profile.ddd?.integrations && profile.ddd.integrations.length > 0 && profile.ddd?.contexts) {
     aclArch = renderAclIntegration(profile.ddd.contexts, profile.ddd.integrations, tsconfig);
     architectures.push(aclArch);
+    provenanceRules.push({
+      id: "ddd-context-map",
+      kind: "architecture",
+      origins: [],
+      enforcement_level: "hard",
+      source: "generated",
+    });
   }
 
   // Generate core-node declarations from aggregate roots
@@ -60,6 +77,13 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
         for (const agg of ctx.aggregate_roots) {
           const cn = renderAggregateCoreNode(ctx.id, agg);
           coreNodes.push(cn);
+          provenanceRules.push({
+            id: `${ctx.id}-${agg.id}-aggregate`,
+            kind: "core-node",
+            origins: [],
+            enforcement_level: "hard",
+            source: "generated",
+          });
         }
       }
     }
@@ -70,6 +94,14 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
     aclArch,
     coreNodes,
   );
+
+  const provenanceOutputs: ProvenanceOutput[] = [
+    {
+      path: "contract/generated/ddd-typedriven.stele",
+      sha256: "", // Computed by caller
+      rules: provenanceRules,
+    },
+  ];
 
   return {
     architectures,
@@ -86,5 +118,6 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
         },
       ],
     },
+    provenanceOutputs,
   };
 }

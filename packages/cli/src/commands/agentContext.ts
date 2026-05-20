@@ -11,6 +11,7 @@ import {
   type CoreNodeDeclaration,
 } from "@stele/core";
 import { buildRuleIndex, type IndexedCodeShape, type IndexedRule, type RuleIndex } from "./rules.js";
+import { readManifest, type StructuredOrigin } from "../design-generator/manifest.js";
 
 export type AgentContextOptions = {
   json?: boolean;
@@ -22,6 +23,13 @@ export type ArchitectureContextEntry = {
   module_id: string;
   allowed_dependencies: string[];
   deny_cycles: boolean;
+};
+
+export type GeneratedRuleSource = {
+  rule_id: string;
+  profile_anchor: string;
+  decision_id: string;
+  enforcement_level: "hard" | "partial" | "advisory";
 };
 
 export type AgentContext = {
@@ -40,6 +48,7 @@ export type AgentContext = {
   architectures: ArchitectureDeclaration[];
   coreNodes: CoreNodeDeclaration[];
   summary: RuleIndex["summary"];
+  generated_rule_sources?: GeneratedRuleSource[];
 };
 
 export async function runAgentContext(projectDir: string, options: AgentContextOptions = {}): Promise<void> {
@@ -57,6 +66,8 @@ export async function buildAgentContext(projectDir: string, options: AgentContex
   const relevantCodeShapes = selectRelevantCodeShapes(index.code_shapes, focus);
   const architectureContext = selectArchitectureContext(contract.architectures, focus);
 
+  const generatedRuleSources = loadGeneratedRuleSources(projectDir);
+
   return {
     schema_version: "1",
     policy: {
@@ -73,6 +84,7 @@ export async function buildAgentContext(projectDir: string, options: AgentContex
     architectures: contract.architectures,
     coreNodes: contract.coreNodes,
     summary: index.summary,
+    generated_rule_sources: generatedRuleSources.length > 0 ? generatedRuleSources : undefined,
   };
 }
 
@@ -106,6 +118,10 @@ function formatAgentContextMarkdown(context: AgentContext): string {
 
   if (context.coreNodes.length > 0) {
     lines.push("", ...formatCoreNodeContext(context.coreNodes));
+  }
+
+  if (context.generated_rule_sources !== undefined && context.generated_rule_sources.length > 0) {
+    lines.push("", ...formatGeneratedRuleSources(context.generated_rule_sources));
   }
 
   return `${lines.join("\n")}\n`;
@@ -192,6 +208,21 @@ function formatCoreNodeContext(coreNodes: Contract["coreNodes"]): string[] {
     }
 
     lines.push("");
+  }
+
+  return lines;
+}
+
+function formatGeneratedRuleSources(sources: GeneratedRuleSource[]): string[] {
+  const lines: string[] = [
+    "## Generated Rule Sources",
+    "",
+  ];
+
+  for (const src of sources) {
+    lines.push(
+      `${src.rule_id}: anchor=${src.profile_anchor}, decision=${src.decision_id}, enforcement=${src.enforcement_level}`
+    );
   }
 
   return lines;
@@ -286,4 +317,60 @@ function pathOverlapsPattern(path: string, pattern: string): boolean {
 
 function normalizeFocusPath(path: string): string {
   return path.replaceAll("\\", "/").replace(/^\.\//, "");
+}
+// ---------------------------------------------------------------------------
+// Generated rule sources
+// ---------------------------------------------------------------------------
+
+function loadGeneratedRuleSources(projectDir: string): GeneratedRuleSource[] {
+  const manifest = readManifest(projectDir);
+  if (!manifest) return [];
+
+  const sources: GeneratedRuleSource[] = [];
+
+  if (manifest.outputs && manifest.outputs.length > 0) {
+    for (const output of manifest.outputs) {
+      for (const rule of output.rules) {
+        for (const origin of rule.origins) {
+          sources.push({
+            rule_id: rule.id,
+            profile_anchor: origin.profile_anchor,
+            decision_id: origin.decision_id,
+            enforcement_level: rule.enforcement_level,
+          });
+        }
+      }
+    }
+  }
+
+  if (sources.length === 0 && manifest.generatedRules.length > 0) {
+    for (const entry of manifest.generatedRules) {
+      const origin = entry.origin ?? "unknown";
+      const enforcementLevel = entry.ruleKind === "architecture" ? "hard" : "advisory";
+      const decisionId = extractDecisionIdFromOrigins(entry.origins);
+      sources.push({
+        rule_id: entry.ruleId,
+        profile_anchor: origin,
+        decision_id: decisionId,
+        enforcement_level: enforcementLevel,
+      });
+    }
+  }
+
+  return sources;
+}
+
+function extractDecisionIdFromOrigins(origins: StructuredOrigin[] | undefined): string {
+  if (!origins || origins.length === 0) return "";
+  const origin = origins[0];
+  switch (origin.type) {
+    case "decision":
+      return origin.decision_id;
+    case "context":
+      return origin.context_id;
+    case "aggregate":
+      return origin.aggregate_id;
+    default:
+      return "";
+  }
 }

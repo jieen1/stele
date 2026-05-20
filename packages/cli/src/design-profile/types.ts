@@ -175,10 +175,17 @@ export type ToolchainContracts = {
   typescript_config?: {
     decision_ref?: string;
     required_options?: Record<string, unknown>;
+    tsconfig_path?: string;
   };
   typescript_diagnostics?: {
     enabled: boolean;
     command: string;
+  };
+  eslint?: {
+    enabled: boolean;
+    format: string;
+    rules: string[];
+    command?: string;
   };
 };
 

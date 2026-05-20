@@ -11,7 +11,6 @@ import {
   tryReadViolationBaseline,
   verifyManifest,
   type Contract,
-  type ContractFile,
   type ContractNotice,
   type GeneratedVerificationResult,
   type HumanState,
@@ -52,7 +51,18 @@ import {
   createManifestDriftViolation,
   createProtectedFileDriftViolation,
 } from "./check-violations.js";
+import { checkDesign } from "./design/check.js";
+import { profilePathExists } from "../design-profile/load.js";
 import { createEvent, writeEvent } from "../events/write-event.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { loadProfile } from "../design-profile/load.js";
+import { validateTsconfigPolicy } from "../toolchain/tsconfig-policy.js";
+import { parseTscOutputToViolations, DEFAULT_TSC_COMMAND } from "../toolchain/typescript.js";
+import { parseEslintReport } from "../toolchain/eslint.js";
+import type { ToolchainViolation } from "../toolchain/types.js";
+
+const execFileAsync = promisify(execFile);
 
 // ----------------------------------------------------------------
 // Types
@@ -157,6 +167,8 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
         : context;
       reports.push(applyFiltersToReport(await buildCodeShapeStageReport(codeShapeContext, protectedState, "check"), filters));
     }
+    reports.push(applyFiltersToReport(await buildDesignStage(context, protectedState, "check"), filters));
+    reports.push(applyFiltersToReport(await buildToolchainStage(context, protectedState, "check"), filters));
     reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
     if (options.complexity !== false) {
       reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
@@ -164,6 +176,7 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   }
 
   if (architectureOnly) {
+    reports.push(applyFiltersToReport(await buildDesignStage(context, protectedState, "check"), filters));
     reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
   }
 
@@ -364,7 +377,9 @@ export async function buildRawCheckReport(context: PreparedCheckContext, command
     return mergeCheckReports([
       generatedReport,
       await buildProtectedStageReport(context, protectedState, command),
+      await buildDesignStage(context, protectedState, command),
       await buildCodeShapeStageReport(context, protectedState, command),
+      await buildToolchainStage(context, protectedState, command),
       await buildArchitectureStage(context, protectedState, command),
       await buildComplexityStage(context, protectedState, command),
     ]);
@@ -401,6 +416,9 @@ export function isBaselineEligibleViolation(violation: Violation): boolean {
   if (violation.source.kind === "architecture" &&
       (violation.rule_kind === "architecture_dependency" ||
        violation.rule_kind === "architecture_cycle")) {
+    return true;
+  }
+  if (violation.source.kind === "design" && violation.rule_kind === "design_integrity") {
     return true;
   }
   return false;
@@ -622,6 +640,53 @@ async function buildProtectedReportWithManifest(
   });
 }
 
+async function buildDesignStage(
+  context: PreparedCheckContext,
+  protectedState: ProtectedCheckState,
+  command: string,
+): Promise<ViolationReport> {
+  if (!profilePathExists(context.projectDir)) {
+    return createViolationReport({
+      tool: "stele",
+      command,
+      ok: true,
+      summary: {
+        invariant_count: protectedState.summary.invariantCount,
+        violation_count: 0,
+      },
+      violations: [],
+    });
+  }
+
+  const result = await checkDesign(context.projectDir, {});
+
+  const violations: Violation[] = [];
+  for (const error of result.errors) {
+    violations.push({
+      rule_id: "design_integrity.violation",
+      rule_kind: "design_integrity",
+      severity: "error",
+      source: { tool: "stele", command, kind: "design" },
+      location: { path: "contract/design/profile.yaml" },
+      cause: { summary: error },
+      fingerprint: `design_integrity.${result.profileValid ? "profile_fail" : "pass"}.${result.manifestValid ? "manifest_ok" : "manifest_fail"}.${result.ownershipValid ? "ownership_ok" : "ownership_fail"}`,
+      scope_paths: ["contract/design/profile.yaml"],
+      status: "active",
+    });
+  }
+
+  return createViolationReport({
+    tool: "stele",
+    command,
+    ok: violations.length === 0,
+    summary: {
+      invariant_count: protectedState.summary.invariantCount,
+      violation_count: violations.length,
+    },
+    violations,
+  });
+}
+
 async function buildCodeShapeStageReport(
   context: PreparedCheckContext,
   protectedState: ProtectedCheckState,
@@ -719,6 +784,202 @@ async function buildComplexityStage(
     },
     violations,
     notices,
+  });
+}
+
+async function buildToolchainStage(
+  context: PreparedCheckContext,
+  protectedState: ProtectedCheckState,
+  command: string,
+): Promise<ViolationReport> {
+  if (!profilePathExists(context.projectDir)) {
+    return createEmptyViolationReport(protectedState.summary.invariantCount);
+  }
+
+  let profile: ReturnType<typeof loadProfile>;
+  try {
+    profile = loadProfile(context.projectDir);
+  } catch {
+    return createEmptyViolationReport(protectedState.summary.invariantCount);
+  }
+
+  const toolchain = profile.toolchain_contracts;
+  if (!toolchain) {
+    return createEmptyViolationReport(protectedState.summary.invariantCount);
+  }
+
+  const violations: Violation[] = [];
+
+  // Sub-stage 1: TypeScript config policy
+  if (toolchain.typescript_config?.required_options) {
+    try {
+      const tsconfigPath = toolchain.typescript_config.tsconfig_path ?? "tsconfig.json";
+      const policyViolations = validateTsconfigPolicy(
+        context.projectDir,
+        tsconfigPath,
+        toolchain.typescript_config.required_options,
+      );
+      violations.push(...policyViolations.map(toolchainViolationToViolation(context.projectDir, command)));
+    } catch {
+      // tsconfig not found or unreadable — skip silently
+    }
+  }
+
+  // Sub-stage 2: TypeScript diagnostics
+  if (toolchain.typescript_diagnostics?.enabled) {
+    const tscCommand = toolchain.typescript_diagnostics.command ?? DEFAULT_TSC_COMMAND;
+    try {
+      const { stdout, stderr } = await runCommandFromShell(tscCommand, context.projectDir);
+      const raw = stdout + stderr;
+      const tscViolations = parseTscOutputToViolations(raw, context.projectDir);
+      violations.push(...tscViolations.map(toolchainViolationToViolation(context.projectDir, command)));
+    } catch {
+      // tsc not available or failed to run — skip silently
+    }
+  }
+
+  // Sub-stage 3: ESLint
+  if (toolchain.eslint?.enabled) {
+    const eslintConfig = toolchain.eslint;
+    const eslintCommand = eslintConfig.command ??
+      `npx eslint --format ${eslintConfig.format ?? "json"} --no-eslintrc --no-ignore .`;
+    try {
+      const { stdout } = await runCommandFromShell(eslintCommand, context.projectDir);
+      const report = JSON.parse(stdout);
+      const eslintViolations = parseEslintReport(report, eslintConfig.rules ?? []);
+      violations.push(...eslintViolations.map(toolchainViolationToViolation(context.projectDir, command)));
+    } catch {
+      // ESLint not available or failed to run — skip silently
+    }
+  }
+
+  return createViolationReport({
+    tool: "stele",
+    command,
+    ok: violations.length === 0,
+    summary: {
+      invariant_count: protectedState.summary.invariantCount,
+      violation_count: violations.length,
+    },
+    violations,
+  });
+}
+
+function toolchainViolationToViolation(
+  projectDir: string,
+  command: string,
+): (t: ToolchainViolation) => Violation {
+  return (t) => {
+    const path = t.file.includes(projectDir) ? t.file : t.file;
+    return {
+      rule_id: t.ruleId,
+      rule_kind: t.ruleKind,
+      severity: t.severity,
+      source: { tool: "stele", command, kind: "rule" },
+      location: { path, line: t.line, column: t.column },
+      cause: { summary: t.message },
+      fingerprint: t.ruleId,
+      scope_paths: [path],
+      status: "active" as const,
+      fix: { summary: t.fix },
+    };
+  };
+}
+
+/**
+ * Parse a shell command into [command, args] for execFile.
+ * Handles quoted arguments.
+ */
+function parseShellCommand(cmd: string): { command: string; args: string[] } {
+  const tokens: string[] = [];
+  let current = "";
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escaped = false;
+
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+
+    if (escaped) {
+      current += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (ch === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+
+    if (ch === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if ((ch === " " || ch === "\t") && !inSingleQuote && !inDoubleQuote) {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += ch;
+  }
+
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+
+  return {
+    command: tokens[0] ?? "",
+    args: tokens.slice(1),
+  };
+}
+
+function runCommandFromShell(
+  cmd: string,
+  cwd: string,
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const { command, args } = parseShellCommand(cmd);
+    const child = execFile(command, args, {
+      cwd,
+      maxBuffer: 16 * 1024 * 1024,
+      windowsHide: true,
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (data: Buffer) => { stdout += data.toString(); });
+    child.stderr?.on("data", (data: Buffer) => { stderr += data.toString(); });
+
+    child.on("error", reject);
+    child.on("close", (code) => {
+      // We don't fail on non-zero exit — callers (tsc, eslint) are expected
+      // to return non-zero when violations exist. We capture the output and
+      // parse it ourselves.
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+function createEmptyViolationReport(invariantCount: number): ViolationReport {
+  return createViolationReport({
+    tool: "stele",
+    command: "check",
+    ok: true,
+    summary: {
+      invariant_count: invariantCount,
+      violation_count: 0,
+    },
+    violations: [],
   });
 }
 

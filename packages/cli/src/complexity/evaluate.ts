@@ -51,6 +51,23 @@ export async function evaluateCoreNode(
   }
 
   const metrics = await collectMetrics(filePath, parsed.className);
+
+  if (metrics.sloc === -1) {
+    return {
+      measurement: createStubMeasurement(declaration),
+      violations: [{
+        nodeId: declaration.id,
+        target: declaration.target,
+        metric: "missing-target" as CoreNodeMetricName,
+        value: 0,
+        ideal: 0,
+        max: 0,
+        isConfigurationViolation: true,
+      }],
+      notices: [],
+    };
+  }
+
   const measurement = buildMeasurement(declaration, metrics, filePath, parsed.className);
   const { violations, notices } = classifyMetrics(measurement);
 
@@ -106,7 +123,7 @@ async function collectMetrics(
     const classNode = findClassByName(sourceFile, className);
 
     if (classNode === undefined) {
-      return { sloc: 0, publicMethodCount: 0, maxCyclomatic: 0 };
+      return { sloc: -1, publicMethodCount: -1, maxCyclomatic: -1 };
     }
 
     const sloc = countSLOC(text, classNode);

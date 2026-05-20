@@ -84,6 +84,52 @@ describe("isBaselineEligibleViolation — architecture violations", () => {
 // Edge cases
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Design integrity violations
+// ---------------------------------------------------------------------------
+
+describe("isBaselineEligibleViolation — design integrity violations", () => {
+  it("accepts design_integrity violations with design source kind", () => {
+    const violation = makeViolation({
+      rule_id: "design_integrity.violation",
+      rule_kind: "design_integrity",
+      source: makeSource("design"),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(true);
+  });
+
+  it("rejects design_integrity with wrong source kind", () => {
+    const violation = makeViolation({
+      rule_id: "design_integrity.violation",
+      rule_kind: "design_integrity",
+      source: makeSource("rule"),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(false);
+  });
+
+  it("rejects design source kind with wrong rule_kind", () => {
+    const violation = makeViolation({
+      rule_id: "design.something",
+      rule_kind: "other_kind",
+      source: makeSource("design"),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(false);
+  });
+
+  it("rejects design_integrity violations with stele.check.* prefix", () => {
+    const violation = makeViolation({
+      rule_id: "stele.check.design",
+      rule_kind: "design_integrity",
+      source: makeSource("design"),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Edge cases
+// ---------------------------------------------------------------------------
+
 describe("isBaselineEligibleViolation — edge cases", () => {
   it("rejects unknown rule_kind", () => {
     const violation = makeViolation({
@@ -111,6 +157,48 @@ describe("isBaselineEligibleViolation — edge cases", () => {
   it("rejects empty source kind", () => {
     const violation = makeViolation({
       source: makeSource(""),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Design integrity violations
+// ---------------------------------------------------------------------------
+
+describe("isBaselineEligibleViolation — design integrity violations", () => {
+  it("accepts design_integrity violations", () => {
+    const violation = makeViolation({
+      rule_id: "design_integrity.violation",
+      rule_kind: "design_integrity",
+      source: makeSource("design"),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(true);
+  });
+
+  it("rejects design_integrity with wrong source kind", () => {
+    const violation = makeViolation({
+      rule_id: "design_integrity.violation",
+      rule_kind: "design_integrity",
+      source: makeSource("rule"),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(false);
+  });
+
+  it("rejects design source with wrong rule_kind", () => {
+    const violation = makeViolation({
+      rule_id: "design.some_rule",
+      rule_kind: "design_other",
+      source: makeSource("design"),
+    });
+    expect(isBaselineEligibleViolation(violation)).toBe(false);
+  });
+
+  it("rejects design_integrity with stele.check.* prefix", () => {
+    const violation = makeViolation({
+      rule_id: "stele.check.design_integrity",
+      rule_kind: "design_integrity",
+      source: makeSource("design"),
     });
     expect(isBaselineEligibleViolation(violation)).toBe(false);
   });

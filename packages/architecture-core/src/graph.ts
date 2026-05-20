@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import type {
   ArchitectureDeclaration,
   ArchitectureGraph,
@@ -5,6 +6,17 @@ import type {
   DependencyEdge,
 } from "./types.js";
 import { createExtractor } from "./typescript-extractor.js";
+
+/**
+ * Normalize an absolute path back to a relative POSIX path from the project directory.
+ */
+function toProjectRelativePath(projectDir: string, absolutePath: string): string {
+  let rel = absolutePath.slice(projectDir.length);
+  if (rel.startsWith("/") || rel.startsWith("\\")) {
+    rel = rel.slice(1);
+  }
+  return rel.replace(/\\/g, "/");
+}
 
 /**
  * Match a file path to a module declaration by checking if any of the module's
@@ -175,16 +187,22 @@ export function buildArchitectureGraph(
       continue;
     }
 
-    const fileEdges = extractor.extractImports(file, content);
+    // TS compiler API needs absolute paths for module resolution.
+    const absoluteFile = resolve(projectDir, file);
+    const fileEdges = extractor.extractImports(absoluteFile, content);
 
     for (const edge of fileEdges) {
-      const targetFile = edge.toFile;
-      const targetModule = targetFile !== undefined ? fileToModule.get(targetFile) : undefined;
+      // resolveModuleName returns absolute paths — normalize back to relative POSIX.
+      const rawTargetFile = edge.toFile;
+      const normalizedTarget = rawTargetFile !== undefined
+        ? toProjectRelativePath(projectDir, rawTargetFile)
+        : undefined;
+      const targetModule = normalizedTarget !== undefined ? fileToModule.get(normalizedTarget) : undefined;
 
       if (targetModule === undefined) {
         // Unresolved or unowned target
         unresolvedSpecifiers.push({
-          fromFile: edge.fromFile,
+          fromFile: file,
           specifier: edge.specifier,
           line: edge.line,
           column: edge.column,
@@ -197,7 +215,8 @@ export function buildArchitectureGraph(
         ...edge,
         fromModule: owningModule,
         toModule: targetModule,
-        toFile: targetFile ?? undefined,
+        fromFile: file,
+        toFile: normalizedTarget,
       });
     }
   }

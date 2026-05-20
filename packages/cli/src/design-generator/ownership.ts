@@ -2,10 +2,12 @@
 // Validates that generated output files are owned by the design profile, not hand-edited.
 
 import { statSync, readdirSync } from "node:fs";
-import { resolve, relative } from "node:path";
+import { minimatch } from "minimatch";
+import { resolve, relative, isAbsolute } from "node:path";
 
 import { hashFile } from "../design-profile/hash.js";
 import { readManifest, type GenerationManifest, type GeneratedFileEntry } from "./manifest.js";
+import { safeGlob } from "../utils/glob.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -20,8 +22,90 @@ export interface OwnershipResult {
   unexpectedEdits: string[]; // Files whose hash doesn't match manifest
 }
 
+export interface SourceOwnershipResult {
+  valid: boolean;
+  unowned: string[];      // files not owned by any context/kernel
+  ambiguous: string[];    // files matching multiple ownership sources
+}
+
 // ---------------------------------------------------------------------------
-// Public API
+// Public API: source-root ownership
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate that every source file under the configured source roots is owned
+ * by exactly one bounded context or shared kernel.
+ *
+ * Files matching ignore patterns (from `project.ignore`) are skipped.
+ * Files not covered by any context root or shared kernel path are reported as
+ * **unowned**. Files matching multiple contexts or kernels are reported as
+ * **ambiguous**.
+ */
+export function validateSourceOwnership(
+  projectDir: string,
+  sourceRoots: string[],
+  contextRoots: string[],
+  sharedKernels: string[],
+  ignorePatterns: string[],
+): SourceOwnershipResult {
+  // Collect all source files across every source root
+  const allFiles = new Set<string>();
+  for (const root of sourceRoots) {
+    const resolved = normalizePath(root);
+    const pattern = resolved.endsWith("/") ? `${resolved}*` : `${resolved}/**/*`;
+    try {
+      const files = safeGlob(pattern, { projectDir });
+      for (const f of files) {
+        allFiles.add(f);
+      }
+    } catch {
+      // Root does not exist or is unreadable — skip
+    }
+  }
+
+  const unowned: string[] = [];
+  const ambiguous: string[] = [];
+
+  for (const file of allFiles) {
+    // Skip ignored files
+    if (isIgnored(file, ignorePatterns)) {
+      continue;
+    }
+
+    // Count matching contexts
+    let matchCount = 0;
+    for (const root of contextRoots) {
+      if (isUnderRoot(file, root)) {
+        matchCount++;
+      }
+    }
+
+    // Count matching shared kernels
+    for (const kernel of sharedKernels) {
+      if (minimatch(file, kernel, { dot: true })) {
+        matchCount++;
+      }
+    }
+
+    if (matchCount === 0) {
+      unowned.push(file);
+    } else if (matchCount > 1) {
+      ambiguous.push(file);
+    }
+  }
+
+  unowned.sort();
+  ambiguous.sort();
+
+  return {
+    valid: unowned.length === 0 && ambiguous.length === 0,
+    unowned,
+    ambiguous,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Public API: generated-file ownership
 // ---------------------------------------------------------------------------
 
 /**
@@ -160,4 +244,36 @@ function walkDir(dir: string, baseDir: string, result: string[]): void {
   } catch {
     // Ignore unreadable directories
   }
+}
+
+// ---------------------------------------------------------------------------
+// Source-root ownership helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a path to POSIX-style (forward slashes), stripping leading slash.
+ */
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\//, "");
+}
+
+/**
+ * Check if a file path is under a given directory root.
+ */
+function isUnderRoot(file: string, root: string): boolean {
+  const normalizedRoot = normalizePath(root);
+  const prefix = normalizedRoot.endsWith("/") ? normalizedRoot : `${normalizedRoot}/`;
+  return file.startsWith(prefix);
+}
+
+/**
+ * Check if a file matches any of the ignore patterns.
+ */
+function isIgnored(file: string, patterns: string[]): boolean {
+  for (const pattern of patterns) {
+    if (minimatch(file, normalizePath(pattern), { dot: true })) {
+      return true;
+    }
+  }
+  return false;
 }
