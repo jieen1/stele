@@ -2,6 +2,7 @@
 // Uses the TypeScript compiler API (ts.readConfigFile) to properly parse
 // tsconfig files, including extended configs.
 
+import { lstatSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import type { ToolchainConfigOptions, ToolchainViolation } from "./types.js";
 import * as ts from "typescript";
@@ -87,16 +88,21 @@ function resolveExtendsPath(basePath: string, extendsPath: string): string | und
     return resolve(dirname(basePath), extendsPath);
   }
 
-  // For node_modules resolution, use TypeScript's resolution
-  const result = ts.resolveCompilerOptions(
-    { extends: extendsPath },
-    (name, _compilerOptions, containingFile, _redirectCont, extension, _resolutionStack) => {
-      if (!extension) extension = ".json";
-      return resolve(dirname(containingFile), name + extension);
-    },
-  );
-
-  return result?.extendsPath;
+  // For node_modules packages, try resolving relative to the base directory
+  const nodeModulesPath = resolve(dirname(basePath), "node_modules", extendsPath);
+  try {
+    lstatSync(nodeModulesPath + ".json");
+    return nodeModulesPath + ".json";
+  } catch {
+    // ignore
+  }
+  try {
+    lstatSync(nodeModulesPath);
+    return nodeModulesPath;
+  } catch {
+    // ignore
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------

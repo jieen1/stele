@@ -162,15 +162,15 @@ describe("toMinimalArchitecture strips structural fields", () => {
       ].join("\n"),
     });
 
-    const arch = contract.architectures[0];
+    const arch = contract.architectures[0]!;
     const minimal = toMinimalArchitecture(arch);
 
-    expect(minimal.modules[0]).toEqual({
+    expect(minimal.modules[0]!).toEqual({
       id: "m",
       paths: ["src/m/**"],
     });
     // Verify no extra fields
-    expect(Object.keys(minimal.modules[0])).toEqual(["id", "paths"]);
+    expect(Object.keys(minimal.modules[0]!)).toEqual(["id", "paths"]);
   });
 
   it("removes span from allowDependencies", async () => {
@@ -185,14 +185,14 @@ describe("toMinimalArchitecture strips structural fields", () => {
       ].join("\n"),
     });
 
-    const arch = contract.architectures[0];
+    const arch = contract.architectures[0]!;
     const minimal = toMinimalArchitecture(arch);
 
-    expect(minimal.allowDependencies[0]).toEqual({
+    expect(minimal.allowDependencies[0]!).toEqual({
       from: "a",
       to: ["b"],
     });
-    expect(Object.keys(minimal.allowDependencies[0])).toEqual(["from", "to"]);
+    expect(Object.keys(minimal.allowDependencies[0]!)).toEqual(["from", "to"]);
   });
 });
 

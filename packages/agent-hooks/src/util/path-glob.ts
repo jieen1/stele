@@ -216,13 +216,13 @@ function normalizeWindowsNamespacedPath(value: string): string {
   const uncMatch = value.match(/^[\\/]{2}[?.][\\/]+UNC[\\/]+(.+)$/iu);
 
   if (uncMatch) {
-    return `\\\\${uncMatch[1].replaceAll("/", "\\")}`;
+    return `\\\\${uncMatch[1]!.replaceAll("/", "\\")}`;
   }
 
   const namespacedMatch = value.match(/^[\\/]{2}[?.][\\/]+(.+)$/u);
 
   if (namespacedMatch) {
-    return namespacedMatch[1];
+    return namespacedMatch[1]!;
   }
 
   return value;

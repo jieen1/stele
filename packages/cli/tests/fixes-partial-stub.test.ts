@@ -203,43 +203,53 @@ export function someFunction() {
 `, "utf8");
 
     const declaration: CoreNodeDeclaration = {
+      kind: "core-node",
       id: "test-core-node",
-      role: "aggregator",
+      role: "business-core-service",
       target: "src/MissingClass.ts::NonExistentClass",
       metrics: [
         { name: "sloc", ideal: 100, max: 200 },
         { name: "public-method-count", ideal: 5, max: 10 },
         { name: "max-cyclomatic", ideal: 10, max: 20 },
       ],
+      filePath: "test.stele",
+      node: null!,
+      span: { file: "test.stele", line: 1, column: 0 },
+      lang: "typescript",
     };
 
     const result = await evaluateCoreNode(dir, declaration);
 
     expect(result.violations).toHaveLength(1);
-    expect(result.violations[0].isConfigurationViolation).toBe(true);
-    expect(result.violations[0].metric).toBe("missing-target");
-    expect(result.violations[0].nodeId).toBe("test-core-node");
+    expect(result.violations[0]!.isConfigurationViolation).toBe(true);
+    expect(result.violations[0]!.metric).toBe("missing-target");
+    expect(result.violations[0]!.nodeId).toBe("test-core-node");
   });
 
   it("returns configuration violation when target file doesn't exist", async () => {
     const dir = createTempDir();
 
     const declaration: CoreNodeDeclaration = {
+      kind: "core-node",
       id: "test-core-node",
-      role: "aggregator",
+      role: "business-core-service",
       target: "src/NonExistent.ts::SomeClass",
       metrics: [
         { name: "sloc", ideal: 100, max: 200 },
         { name: "public-method-count", ideal: 5, max: 10 },
         { name: "max-cyclomatic", ideal: 10, max: 20 },
       ],
+      filePath: "test.stele",
+      node: null!,
+      span: { file: "test.stele", line: 1, column: 0 },
+      lang: "typescript",
     };
 
     const result = await evaluateCoreNode(dir, declaration);
 
     expect(result.violations).toHaveLength(1);
-    expect(result.violations[0].isConfigurationViolation).toBe(true);
-    expect(result.violations[0].metric).toBe("missing-target");
+    expect(result.violations[0]!.isConfigurationViolation).toBe(true);
+    expect(result.violations[0]!.metric).toBe("missing-target");
   });
 
   it("returns no violation when file and class both exist", async () => {
@@ -258,14 +268,19 @@ export class ExistingClass {
 `, "utf8");
 
     const declaration: CoreNodeDeclaration = {
+      kind: "core-node",
       id: "test-core-node",
-      role: "aggregator",
+      role: "business-core-service",
       target: "src/ExistingClass.ts::ExistingClass",
       metrics: [
         { name: "sloc", ideal: 100, max: 200 },
         { name: "public-method-count", ideal: 5, max: 10 },
         { name: "max-cyclomatic", ideal: 10, max: 20 },
       ],
+      filePath: "test.stele",
+      node: null!,
+      span: { file: "test.stele", line: 1, column: 0 },
+      lang: "typescript",
     };
 
     const result = await evaluateCoreNode(dir, declaration);

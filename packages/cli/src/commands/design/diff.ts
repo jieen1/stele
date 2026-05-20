@@ -67,14 +67,14 @@ export function computeDesignDiff(
   compareProject(oldProfile, newProfile, changes);
 
   const overallClass = changes.length > 0
-    ? changes.reduce((acc, c) => maxClass(acc, c.changeClass), "additive")
+    ? changes.reduce((acc, c) => maxClass(acc, c.changeClass), "additive" as ChangeClass)
     : "additive";
 
   const hasWeakening = changes.some((c) => c.changeClass === "weakening");
   const hasRestructuring = changes.some((c) => c.changeClass === "restructuring");
   const requiresApproval = changes.some((c) => c.requiresApproval);
 
-  return { changes, overallClass, hasWeakening, hasRestructuring, requiresApproval };
+  return { changes, overallClass: overallClass as ChangeClass, hasWeakening, hasRestructuring, requiresApproval };
 }
 
 // ---------------------------------------------------------------------------

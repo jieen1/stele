@@ -38,7 +38,7 @@ const FORBIDDEN_ARG_CHARS = /\0|\r|\n/u;
  */
 function validateArgs(args: string[]): void {
   for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
+    const arg = args[i]!;
     if (FORBIDDEN_ARG_CHARS.test(arg)) {
       throw new Error(`Invalid character in argument ${i}: newlines and null bytes are not allowed`);
     }

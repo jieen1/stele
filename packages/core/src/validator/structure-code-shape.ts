@@ -147,7 +147,7 @@ function readFieldRequirements(node: ListNode, label: string): ClassShapeFieldRe
   // Extract the declaration id from the full label "Class shape "service_class" must-have-field"
   // Format: "Label "id" field" → extract just "id"
   const match = label.match(/"([^"]+)"/);
-  const id = match ? match[1] : label;
+  const id = match?.[1] ?? label;
   return [parseClassShapeFieldRequirement(node, id)];
 }
 

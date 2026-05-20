@@ -33,7 +33,7 @@ function evictCache(): void {
   if (projectCache.size > MAX_CACHE_ENTRIES) {
     const sorted = [...projectCache.entries()].sort((a, b) => a[1].lastLoadTime - b[1].lastLoadTime);
     for (let i = 0; i < sorted.length - MAX_CACHE_ENTRIES; i += 1) {
-      projectCache.delete(sorted[i][0]);
+      projectCache.delete(sorted[i]![0]);
     }
   }
 }

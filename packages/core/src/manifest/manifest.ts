@@ -276,7 +276,7 @@ function sameProtectedFiles(
   return leftKeys.every((key) => {
     const leftEntry = left[key];
     const rightEntry = right[key];
-    return rightEntry !== undefined && leftEntry.sha256 === rightEntry.sha256 && leftEntry.size === rightEntry.size;
+    return leftEntry !== undefined && rightEntry !== undefined && leftEntry.sha256 === rightEntry.sha256 && leftEntry.size === rightEntry.size;
   });
 }
 

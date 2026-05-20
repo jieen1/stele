@@ -23,7 +23,7 @@ export class CliCommandError extends Error {
   constructor(
     message: string,
     readonly exitCode: ExitCode,
-    readonly cause?: unknown,
+    override readonly cause?: unknown,
   ) {
     super(message);
     this.name = "CliCommandError";

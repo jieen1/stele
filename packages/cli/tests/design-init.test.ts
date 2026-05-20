@@ -33,7 +33,7 @@ async function createTempDir(): Promise<string> {
 
 function captureStdout(): { read: () => string } {
   const chunks: string[] = [];
-  vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Buffer) => {
+  vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
     chunks.push(typeof chunk === "string" ? chunk : chunk.toString());
     return true;
   });
@@ -42,7 +42,7 @@ function captureStdout(): { read: () => string } {
 
 function captureStderr(): { read: () => string } {
   const chunks: string[] = [];
-  vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Buffer) => {
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
     chunks.push(typeof chunk === "string" ? chunk : chunk.toString());
     return true;
   });

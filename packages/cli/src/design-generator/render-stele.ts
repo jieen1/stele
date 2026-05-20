@@ -130,12 +130,28 @@ function mapLayerToRole(layerName: string): string {
 
 /**
   * Build allow-dependency rules from the context's layer ordering.
-  * Standard DDD: outer layers depend on inner layers.
+  * If layer_dependencies is defined in the profile, use those explicitly.
+  * Otherwise, fall back to standard DDD: outer layers depend on inner layers.
   */
 function buildDependencyRules(ctx: Context): string[] {
   const layerNames = Object.keys(ctx.layers);
-  const layerRoles = layerNames.map(mapLayerToRole);
+  const moduleIds = layerNames.map((name) => layerModuleId(ctx.id, name));
 
+  // Use explicit layer_dependencies from profile if provided
+  if (ctx.layer_dependencies) {
+    const rules: string[] = [];
+    for (const [fromLayer, deps] of Object.entries(ctx.layer_dependencies)) {
+      const fromMod = layerModuleId(ctx.id, fromLayer);
+      const targetMods = deps.map((dep) => layerModuleId(ctx.id, dep));
+      if (targetMods.length > 0) {
+        rules.push(`${fromMod} ${targetMods.join(" ")}`);
+      }
+    }
+    return rules;
+  }
+
+  // Fallback: standard DDD layer ordering
+  const layerRoles = layerNames.map(mapLayerToRole);
   const layerOrder: Record<string, number> = {
     presentation: 0,
     api: 0,
@@ -153,7 +169,6 @@ function buildDependencyRules(ctx: Context): string[] {
   };
 
   const rules: string[] = [];
-  const moduleIds = layerNames.map((name) => layerModuleId(ctx.id, name));
 
   for (let i = 0; i < layerNames.length; i++) {
     const fromRole = layerRoles[i];

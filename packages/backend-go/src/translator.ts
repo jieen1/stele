@@ -222,7 +222,7 @@ function serializeScenarioStep(step: ScenarioOperation): string {
  */
 function toGoExported(name: string): string {
   if (name.length === 0) return name;
-  return name[0].toUpperCase() + name.slice(1);
+  return name[0]!.toUpperCase() + name.slice(1);
 }
 
 /**

@@ -275,3 +275,4 @@
   (severity error)
   (description "Generated file paths must not escape the output directory via traversal.")
   (uses-checker path-no-traversal))
+(import "generated/ddd-typedriven.stele")

@@ -67,7 +67,7 @@ export async function runDesignPropose(
     const files = readdirSync(proposalsDir).filter((f) => f.endsWith(".yaml"));
     for (const file of files) {
       const raw = readFileSync(resolve(proposalsDir, file), "utf8");
-      const parsed = yaml.parse(raw) as Record<string, unknown>;
+      const parsed = yaml.load(raw) as Record<string, unknown>;
       if (String(parsed.id) === opts.id && String(parsed.kind) === proposalType) {
         process.stderr.write(`[design] Proposal "${opts.id}" (kind: ${proposalType}) already exists in proposals/\n`);
         process.exitCode = 1;
@@ -100,7 +100,7 @@ export async function runDesignPropose(
     content.target = opts.target ?? "";
   }
 
-  writeFileSync(filePath, yaml.stringify(content), "utf8");
+  writeFileSync(filePath, yaml.dump(content), "utf8");
 
   // Validate: run diff to prove the proposal is additive (no weakening or restructuring)
   const currentProfile = await loadProfile(projectDir);

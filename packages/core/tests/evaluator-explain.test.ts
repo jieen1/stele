@@ -55,8 +55,8 @@ describe("buildInvariantTrace", () => {
     const trace = buildInvariantTrace(invariant, null);
 
     expect(trace.children).toBeDefined();
-    expect(trace.children![0].expression).toContain("eq");
-    expect(trace.children![0].evaluated).toBeNull();
+    expect(trace.children![0]!.expression).toContain("eq");
+    expect(trace.children![0]!.evaluated).toBeNull();
   });
 
   it("handles invariant with when expression", () => {

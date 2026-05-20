@@ -101,7 +101,7 @@ describe("manifest", () => {
       expected: manifest.protected_files["protected/alpha.bin"],
     });
     expect(changedEntry?.actual?.sha256).toBe(sha256(Buffer.from([0x00, 0x10, 0x21, 0xff])));
-    expect(changedEntry?.actual?.sha256).not.toBe(manifest.protected_files["protected/alpha.bin"].sha256);
+    expect(changedEntry?.actual?.sha256).not.toBe(manifest.protected_files["protected/alpha.bin"]!.sha256);
     expect(missingEntry).toMatchObject({
       status: "missing",
       expected: manifest.protected_files["protected/beta.bin"],
@@ -142,7 +142,7 @@ describe("manifest", () => {
 
     const updatedManifest = await readManifest(manifestPath);
     expect(updatedManifest.generated_at).not.toBe(pinnedGeneratedAt);
-    expect(updatedManifest.protected_files["protected/check.py"].sha256).toBe(sha256("print('beta')\n"));
+    expect(updatedManifest.protected_files["protected/check.py"]!.sha256).toBe(sha256("print('beta')\n"));
   });
 
   it("writes a new manifest when the target file is missing", async () => {

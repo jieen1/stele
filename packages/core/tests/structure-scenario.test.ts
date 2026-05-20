@@ -61,7 +61,7 @@ describe("parseScenarioDeclaration", () => {
     expect(result.sandbox).toBe("transactional");
     expect(result.executor).toBe("python-import");
     expect(result.steps).toHaveLength(1);
-    expect(result.steps[0].kind).toBe("step");
+    expect(result.steps[0]!.kind).toBe("step");
     expect(result.filePath).toBe(FILE);
     expect(result.span).toBe(node.span);
   });
@@ -83,8 +83,8 @@ describe("parseScenarioDeclaration", () => {
     const result = parseScenarioDeclaration(FILE, node);
 
     expect(result.steps).toHaveLength(2);
-    expect(result.steps[0].kind).toBe("step");
-    expect(result.steps[1].kind).toBe("capture-state");
+    expect(result.steps[0]!.kind).toBe("step");
+    expect(result.steps[1]!.kind).toBe("capture-state");
   });
 
   it("rejects when first item is not an identifier", () => {

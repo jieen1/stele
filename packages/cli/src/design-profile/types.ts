@@ -50,6 +50,7 @@ export type Context = {
   architecture_style?: "domain_model" | "transaction_script" | "hexagonal";
   architecture_style_decision_ref?: string;
   layers: Record<string, string | string[]>;
+  layer_dependencies?: Record<string, string[]>;
   aggregate_roots?: AggregateRoot[];
 };
 

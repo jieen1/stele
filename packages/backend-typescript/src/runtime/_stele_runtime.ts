@@ -944,7 +944,7 @@ function _steleEvalJsonPath(data: unknown, path: string): unknown[] {
   if (!path) return [data];
   const tokens = _steleTokenizePath(path);
   if (!tokens.length) return [data];
-  const [kind, value] = tokens[0];
+  const [kind, value] = tokens[0]!;
   const rest = _steleDetokenize(tokens.slice(1));
   if (kind === "field") {
     if (typeof data === "object" && data !== null && !Array.isArray(data) && value in data) {

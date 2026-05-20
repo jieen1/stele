@@ -1,0 +1,552 @@
+{
+  "schemaVersion": "1",
+  "profileHash": "f6d9634c7a808dab6c7c6eff1c8d20515ece0bee0b0e94004298fb5eb447f298",
+  "profilePath": "contract/design/profile.yaml",
+  "preset": "ddd-typedriven",
+  "generator": {
+    "package": "@stele/cli",
+    "version": "0.1.0",
+    "git_sha": "922243ec4ada13811327808f77e0e95b91a1738c"
+  },
+  "templates": [
+    "ddd-typedriven"
+  ],
+  "generatedRules": [
+    {
+      "ruleId": "architecture.ddd-core",
+      "ruleKind": "architecture",
+      "origin": "context:core",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "core",
+          "context_name": "Core"
+        }
+      ],
+      "fileHash": "336a2c268e1c8a4f92def318d44cbedd0d8bdbae32e1b73140b118f7e7f3fbdb",
+      "cdl": "(architecture \"ddd-core\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: core context must preserve DDD layer direction.\")\n\n  (module core-domain-primitives\n    (path \"packages/core/src/{ast,errors,config,util}/**\"))\n  (module core-domain-services\n    (path \"packages/core/src/{validator,registry,evaluator}/**\"))\n  (module core-application\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module core-parsing\n    (path \"packages/core/src/{lexer,parser}/**\"))\n  (module core-generation\n    (path \"packages/core/src/generator/**\"))\n  (module core-report\n    (path \"packages/core/src/report/**\"))\n\n  (layer domain-primitives core-domain-primitives)\n  (layer domain-services core-domain-services)\n  (layer application core-application)\n  (layer parsing core-parsing)\n  (layer generation core-generation)\n  (layer report core-report)\n\n  (allow-dependency core-domain-services core-domain-primitives core-report)\n  (allow-dependency core-application core-domain-primitives core-domain-services core-parsing core-generation core-report)\n  (allow-dependency core-generation core-domain-services core-domain-primitives core-parsing core-report)\n  (allow-dependency core-parsing core-domain-primitives)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-cli",
+      "ruleKind": "architecture",
+      "origin": "context:cli",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "cli",
+          "context_name": "Cli"
+        }
+      ],
+      "fileHash": "fbb80b54a2f4799a0c3248b5e7dda9b5694ab44fe0a11c664b9bac2d0a5b5ff9",
+      "cdl": "(architecture \"ddd-cli\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.\")\n\n  (module cli-presentation\n    (path \"packages/cli/src/{commands,index}/**\"))\n  (module cli-application\n    (path \"packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**\"))\n  (module cli-design-domain\n    (path \"packages/cli/src/{design-profile,design-generator}/**\"))\n  (module cli-type-domain\n    (path \"packages/cli/src/typescript-shape/**\"))\n  (module cli-toolchain\n    (path \"packages/cli/src/toolchain/**\"))\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n\n  (layer presentation cli-presentation)\n  (layer application cli-application)\n  (layer design-domain cli-design-domain)\n  (layer type-domain cli-type-domain)\n  (layer toolchain cli-toolchain)\n  (layer infrastructure cli-infrastructure)\n\n  (allow-dependency cli-presentation cli-application cli-design-domain cli-type-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-application cli-design-domain cli-type-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-design-domain cli-type-domain cli-infrastructure)\n  (allow-dependency cli-type-domain cli-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-architecture",
+      "ruleKind": "architecture",
+      "origin": "context:architecture",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "architecture",
+          "context_name": "Architecture"
+        }
+      ],
+      "fileHash": "611c124a97e49ac6a5eb34063f639f8830608562bace38e82e53eab104ae4200",
+      "cdl": "(architecture \"ddd-architecture\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: architecture context must preserve DDD layer direction.\")\n\n  (module architecture-domain\n    (path \"packages/architecture-core/src/**\"))\n\n  (layer domain architecture-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-backends-ts",
+      "ruleKind": "architecture",
+      "origin": "context:backends-ts",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "backends-ts",
+          "context_name": "Backends-ts"
+        }
+      ],
+      "fileHash": "bedbd1b5632f0622c47646e9606a072259c9f60eba847d8ecb101d0ed3b97bdc",
+      "cdl": "(architecture \"ddd-backends-ts\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.\")\n\n  (module backends-ts-domain\n    (path \"packages/backend-typescript/src\"))\n\n  (layer domain backends-ts-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-backends-py",
+      "ruleKind": "architecture",
+      "origin": "context:backends-py",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "backends-py",
+          "context_name": "Backends-py"
+        }
+      ],
+      "fileHash": "e4abc9173b0a65151a2e035a0626a6f0a686a04d9ce4c57e9108581ce41460cc",
+      "cdl": "(architecture \"ddd-backends-py\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.\")\n\n  (module backends-py-domain\n    (path \"packages/backend-python/src\"))\n\n  (layer domain backends-py-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-hooks",
+      "ruleKind": "architecture",
+      "origin": "context:hooks",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "hooks",
+          "context_name": "Hooks"
+        }
+      ],
+      "fileHash": "1f3a4a61c6096b6b74d52995cbd4cf579bb241f792d39ce16d030c9b7ea40c14",
+      "cdl": "(architecture \"ddd-hooks\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: hooks context must preserve DDD layer direction.\")\n\n  (module hooks-protocol\n    (path \"packages/agent-hooks/src/{protocol}/**\"))\n  (module hooks-domain\n    (path \"packages/agent-hooks/src/handlers/**\"))\n  (module hooks-application\n    (path \"packages/agent-hooks/src/adapters/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n\n  (layer protocol hooks-protocol)\n  (layer domain hooks-domain)\n  (layer application hooks-application)\n  (layer infrastructure hooks-infrastructure)\n\n  (allow-dependency hooks-domain hooks-protocol hooks-infrastructure)\n  (allow-dependency hooks-application hooks-protocol hooks-domain hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-protocol)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-mcp",
+      "ruleKind": "architecture",
+      "origin": "context:mcp",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "mcp",
+          "context_name": "Mcp"
+        }
+      ],
+      "fileHash": "274982a8653232f88951594f8fee96bb7debf278707782c8e7231dd21070101b",
+      "cdl": "(architecture \"ddd-mcp\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: mcp context must preserve DDD layer direction.\")\n\n  (module mcp-application\n    (path \"packages/mcp-server/src/{server,sessions,types}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin,tools}/**\"))\n\n  (layer application mcp-application)\n  (layer infrastructure mcp-infrastructure)\n\n  (allow-dependency mcp-application mcp-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-plugin",
+      "ruleKind": "architecture",
+      "origin": "context:plugin",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "plugin",
+          "context_name": "Plugin"
+        }
+      ],
+      "fileHash": "d68c2127e890c87ee003e748ad245dc4a1222ed1abd510124b214103ff9a3872",
+      "cdl": "(architecture \"ddd-plugin\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: plugin context must preserve DDD layer direction.\")\n\n  (module plugin-domain\n    (path \"packages/claude-code-plugin/src/**\"))\n\n  (layer domain plugin-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-context-map",
+      "ruleKind": "architecture",
+      "origin": "integration:all",
+      "origins": [
+        {
+          "type": "decision",
+          "decision_id": "q1-bounded-contexts"
+        }
+      ],
+      "fileHash": "5f4f803cb0a70f08d08c2434e39d58380087b22516e74a1a62bee327cdd07ba4",
+      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n    (path \"packages/agent-hooks/src/{install,util}/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{server,sessions,types}/**\")\n    (path \"packages/mcp-server/src/{bin,tools}/**\")\n  )\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin,tools}/**\"))\n\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
+    },
+    {
+      "ruleId": "core-node.core-operator-registry-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:registry",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "registry"
+        }
+      ],
+      "fileHash": "eb3114f76e7b170df1fb5af7879513ed71e218c933d6d4b30ae50bd2411612b4",
+      "cdl": "(core-node \"core-operator-registry-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/registry/operators.ts::OperatorRegistry\")\n  (description \"Generated from design profile: OperatorRegistry aggregate must remain reviewable.\")\n  (rationale \"OperatorRegistry protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 400) (max 800))\n  (metric public-method-count (ideal 8) (max 20))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
+    },
+    {
+      "ruleId": "core-node.core-invariant-validator-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:validator",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "validator"
+        }
+      ],
+      "fileHash": "4d8f20c3613d09e9b5459818e4903e51bcffa23869296e8cc0f3deecc077b8c3",
+      "cdl": "(core-node \"core-invariant-validator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/validator/structure-invariant.ts::validateInvariant\")\n  (description \"Generated from design profile: InvariantValidator aggregate must remain reviewable.\")\n  (rationale \"InvariantValidator protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 150) (max 350))\n  (metric public-method-count (ideal 4) (max 10))\n)"
+    },
+    {
+      "ruleId": "core-node.core-contract-loader-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:loader",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "loader"
+        }
+      ],
+      "fileHash": "dfd861fccd2acd994203e02372f0edfc7946f06ab3fb794405c80ad4b01cbb83",
+      "cdl": "(core-node \"core-contract-loader-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/loader/load-contract.ts::loadContract\")\n  (description \"Generated from design profile: ContractLoader aggregate must remain reviewable.\")\n  (rationale \"ContractLoader protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 100) (max 250))\n  (metric public-method-count (ideal 3) (max 8))\n)"
+    },
+    {
+      "ruleId": "core-node.core-manifest-engine-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:engine",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "engine"
+        }
+      ],
+      "fileHash": "d8fd0170fb822945cb779698a0ea51d97db74f3b8bff7aec112455dd58be27c8",
+      "cdl": "(core-node \"core-manifest-engine-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/manifest/hash-manifest.ts::hashManifest\")\n  (description \"Generated from design profile: ManifestEngine aggregate must remain reviewable.\")\n  (rationale \"ManifestEngine protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 100) (max 250))\n  (metric max-cyclomatic (ideal 8) (max 20))\n)"
+    },
+    {
+      "ruleId": "core-node.cli-check-orchestrator-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:orchestrator",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "orchestrator"
+        }
+      ],
+      "fileHash": "95ed94d1fd65c5de0b6ec1f81acf44e35ff651a4fdf3b32de0ebd001eac58f15",
+      "cdl": "(core-node \"cli-check-orchestrator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/commands/check.ts::runCheck\")\n  (description \"Generated from design profile: CheckOrchestrator aggregate must remain reviewable.\")\n  (rationale \"CheckOrchestrator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 400) (max 700))\n  (metric public-method-count (ideal 6) (max 15))\n  (metric max-cyclomatic (ideal 15) (max 30))\n)"
+    },
+    {
+      "ruleId": "core-node.cli-code-shape-evaluator-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:evaluator",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "evaluator"
+        }
+      ],
+      "fileHash": "4eceb18dd7027d4d157f7da63a609c67dc94f574453d72f944622b104056d10c",
+      "cdl": "(core-node \"cli-code-shape-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes\")\n  (description \"Generated from design profile: CodeShapeEvaluator aggregate must remain reviewable.\")\n  (rationale \"CodeShapeEvaluator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 400) (max 800))\n  (metric public-method-count (ideal 8) (max 20))\n  (metric max-cyclomatic (ideal 15) (max 35))\n)"
+    },
+    {
+      "ruleId": "core-node.cli-design-diff-engine-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:engine",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "engine"
+        }
+      ],
+      "fileHash": "4d615bfa13a4e70860df32601c5336b57ac7bfc0773c5a037c92476692783780",
+      "cdl": "(core-node \"cli-design-diff-engine-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/commands/design/diff.ts::computeDesignDiff\")\n  (description \"Generated from design profile: DesignDiffEngine aggregate must remain reviewable.\")\n  (rationale \"DesignDiffEngine protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 300) (max 600))\n  (metric max-cyclomatic (ideal 12) (max 25))\n)"
+    },
+    {
+      "ruleId": "core-node.cli-cli-program-factory-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:factory",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "factory"
+        }
+      ],
+      "fileHash": "701dae5a72732436231d7de7e7386ce94bd369159d5d9bd2282a2e2412f2e912",
+      "cdl": "(core-node \"cli-cli-program-factory-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/index.ts::createSteleProgram\")\n  (description \"Generated from design profile: CliProgramFactory aggregate must remain reviewable.\")\n  (rationale \"CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric public-method-count (ideal 4) (max 10))\n)"
+    },
+    {
+      "ruleId": "core-node.cli-design-profile-validator-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:validator",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "validator"
+        }
+      ],
+      "fileHash": "8dba4ea6a609e05050e485067f8733c1815684451b139685fbc99100b697e987",
+      "cdl": "(core-node \"cli-design-profile-validator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/design-profile/validate.ts::validateProfile\")\n  (description \"Generated from design profile: DesignProfileValidator aggregate must remain reviewable.\")\n  (rationale \"DesignProfileValidator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
+    },
+    {
+      "ruleId": "core-node.architecture-architecture-evaluator-aggregate",
+      "ruleKind": "core-node",
+      "origin": "aggregate:evaluator",
+      "origins": [
+        {
+          "type": "aggregate",
+          "aggregate_id": "evaluator"
+        }
+      ],
+      "fileHash": "2cec395eccfb622b6e53aeebeb261deb5ad5faaaff83d9ac43b5f29455bb0ee6",
+      "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
+    }
+  ],
+  "generatedAt": "2026-05-20T12:41:33.001Z",
+  "generatedFiles": [
+    {
+      "path": "contract/generated/ddd-typedriven.stele",
+      "hash": "21b25d036e5905e47b631ac7a553327dfc26c07f7da3f2e0cc38f30e52df5e13"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "contract/generated/ddd-typedriven.stele",
+      "sha256": "21b25d036e5905e47b631ac7a553327dfc26c07f7da3f2e0cc38f30e52df5e13",
+      "rules": [
+        {
+          "id": "architecture.ddd-core",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-core",
+              "profile_anchor": "ddd.contexts.core",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-cli",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-cli",
+              "profile_anchor": "ddd.contexts.cli",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-architecture",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-architecture",
+              "profile_anchor": "ddd.contexts.architecture",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-backends-ts",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-backends-ts",
+              "profile_anchor": "ddd.contexts.backends-ts",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-backends-py",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-backends-py",
+              "profile_anchor": "ddd.contexts.backends-py",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-hooks",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-hooks",
+              "profile_anchor": "ddd.contexts.hooks",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-mcp",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-mcp",
+              "profile_anchor": "ddd.contexts.mcp",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-plugin",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-plugin",
+              "profile_anchor": "ddd.contexts.plugin",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-context-map",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "q1-bounded-contexts",
+              "profile_anchor": "ddd.integrations",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.core-operator-registry-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-core-operator-registry",
+              "profile_anchor": "ddd.contexts.core.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "operator-registry"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.core-invariant-validator-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-core-invariant-validator",
+              "profile_anchor": "ddd.contexts.core.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "invariant-validator"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.core-contract-loader-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-core-contract-loader",
+              "profile_anchor": "ddd.contexts.core.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "contract-loader"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.core-manifest-engine-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-core-manifest-engine",
+              "profile_anchor": "ddd.contexts.core.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "manifest-engine"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.cli-check-orchestrator-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-cli-check-orchestrator",
+              "profile_anchor": "ddd.contexts.cli.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "check-orchestrator"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.cli-code-shape-evaluator-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-cli-code-shape-evaluator",
+              "profile_anchor": "ddd.contexts.cli.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "code-shape-evaluator"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.cli-design-diff-engine-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-cli-design-diff-engine",
+              "profile_anchor": "ddd.contexts.cli.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "design-diff-engine"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.cli-cli-program-factory-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-cli-cli-program-factory",
+              "profile_anchor": "ddd.contexts.cli.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "cli-program-factory"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.cli-design-profile-validator-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-cli-design-profile-validator",
+              "profile_anchor": "ddd.contexts.cli.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "design-profile-validator"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        },
+        {
+          "id": "core-node.architecture-architecture-evaluator-aggregate",
+          "kind": "core-node",
+          "origins": [
+            {
+              "decision_id": "aggregate-architecture-architecture-evaluator",
+              "profile_anchor": "ddd.contexts.architecture.aggregate_roots",
+              "question_id": "Q2",
+              "selected_option": "architecture-evaluator"
+            }
+          ],
+          "enforcement_level": "partial",
+          "source": "generated"
+        }
+      ]
+    }
+  ]
+}

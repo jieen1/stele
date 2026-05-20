@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-17T10:30:07.113Z",
+  "generated_at": "2026-05-20T12:42:14.036Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/.gitkeep": {
@@ -15,9 +15,13 @@
       "sha256": "967ff1bc48dd333637dd181067710ffea855e553c76c04cc2696a0c86bae8898",
       "size": 21860
     },
+    "contract/generated/ddd-typedriven.stele": {
+      "sha256": "21b25d036e5905e47b631ac7a553327dfc26c07f7da3f2e0cc38f30e52df5e13",
+      "size": 12551
+    },
     "contract/main.stele": {
-      "sha256": "4b649fd2094a0c0420c60235608445f61457ce5cfeb7320edbbd262a33be191f",
-      "size": 10498
+      "sha256": "e104fb97f585c3aa50118bea9742f23a8e9a0da363e12885542fb8c7fcad12c2",
+      "size": 10263
     },
     "tests/contract/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -36,5 +40,5 @@
       "size": 6086
     }
   },
-  "contract_hash": "de9bdcd78f040ac65fe2aaf619de0bd41b73b971a66040c37785091948bfde4c"
+  "contract_hash": "1816e6aa3ce0ef8d487d4194b0f9e1923b8f75ae3e971ad9ebceb84d247b0613"
 }

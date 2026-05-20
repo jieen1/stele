@@ -313,7 +313,7 @@ function checkDeclaration(
 
   // Find files in scope
   const allFiles = program.getSourceFiles();
-  const scopeFiles = getScopeFiles(declaration.entityScope, allFiles, projectDir);
+  const scopeFiles = getScopeFiles(declaration.entityScope, Array.from(allFiles), projectDir);
 
   if (scopeFiles.length === 0) {
     return violations;

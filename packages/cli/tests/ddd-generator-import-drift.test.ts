@@ -111,7 +111,7 @@ describe("runDesignGenerate — ensures import in main.stele", () => {
 
     // Verify the import was added
     const mainContent = readFileSync(join(projectDir, "contract/main.stele"), "utf8");
-    expect(mainContent).toContain('(import "contract/generated/ddd-typedriven.stele")');
+    expect(mainContent).toContain('(import "generated/ddd-typedriven.stele")');
 
     // The original invariant should still be there (import is appended, not replacing)
     expect(mainContent).toContain("(invariant \"no-mutation\"");
@@ -133,7 +133,7 @@ describe("runDesignGenerate — ensures import in main.stele", () => {
 
     const mainPath = join(projectDir, "contract/main.stele");
     const mainContent = readFileSync(mainPath, "utf8");
-    expect(mainContent).toContain('(import "contract/generated/ddd-typedriven.stele")');
+    expect(mainContent).toContain('(import "generated/ddd-typedriven.stele")');
   });
 
   it("does not duplicate the import if it already exists", async () => {
@@ -141,7 +141,7 @@ describe("runDesignGenerate — ensures import in main.stele", () => {
     writeConfig(projectDir);
 
     // Contract already has the import
-    writeContract(projectDir, `(import "contract/generated/ddd-typedriven.stele")
+    writeContract(projectDir, `(import "generated/ddd-typedriven.stele")
 
 (invariant "existing"
   (description "existing invariant")
@@ -159,7 +159,7 @@ describe("runDesignGenerate — ensures import in main.stele", () => {
     process.stdout.write = originalStdoutWrite;
 
     const mainContent = readFileSync(join(projectDir, "contract/main.stele"), "utf8");
-    const importCount = (mainContent.match(/\(import "contract\/generated\/ddd-typedriven\.stele"\)/g) || []).length;
+    const importCount = (mainContent.match(/\(import "generated\/ddd-typedriven\.stele"\)/g) || []).length;
     expect(importCount).toBe(1);
   });
 });

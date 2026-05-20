@@ -161,9 +161,9 @@ describe("parseInterAgentContractDeclaration", () => {
     expect(result.id).toBe("review-before-merge");
     expect(result.agents).toEqual(["code-reviewer", "feature-writer"]);
     expect(result.requires).toHaveLength(1);
-    expect(result.requires[0].agentId).toBe("feature-writer");
-    expect(result.requires[0].pathPattern).toBe("src/**");
-    expect(result.requires[0].approvedBy).toBe("code-reviewer");
+    expect(result.requires[0]!.agentId).toBe("feature-writer");
+    expect(result.requires[0]!.pathPattern).toBe("src/**");
+    expect(result.requires[0]!.approvedBy).toBe("code-reviewer");
   });
 
   it("parses contract with description", () => {

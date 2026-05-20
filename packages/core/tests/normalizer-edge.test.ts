@@ -95,7 +95,7 @@ describe("normalizer edge cases", () => {
     const contract = await loadContract(project.rootPath);
     const normalized = normalizeContract(contract);
 
-    expect(contract.invariants[0].id).toBe("RULE_CAFE");
+    expect(contract.invariants[0]!.id).toBe("RULE_CAFE");
     expect(normalized).toContain("RULE_CAFE");
   });
 
@@ -113,7 +113,7 @@ describe("normalizer edge cases", () => {
     const normalized = normalizeContract(contract);
 
     expect(normalized).toContain("\u4e2d\u6587\u63cf\u8ff0\u8bed\u6d4b\u8bd5");
-    expect(contract.invariants[0].description).toBe("\u4e2d\u6587\u63cf\u8ff0\u8bed\u6d4b\u8bd5.");
+    expect(contract.invariants[0]!.description).toBe("\u4e2d\u6587\u63cf\u8ff0\u8bed\u6d4b\u8bd5.");
   });
 
   it("normalizes invariant with uses-checker reference", async () => {
@@ -229,8 +229,8 @@ describe("normalizer edge cases", () => {
     const contract = await loadContract(project.rootPath);
 
     expect(contract.scenarios).toHaveLength(1);
-    expect(contract.scenarios[0].id).toBe("my-scenario");
-    expect(contract.invariants[0].usesScenario?.scenarioId).toBe("my-scenario");
+    expect(contract.scenarios[0]!.id).toBe("my-scenario");
+    expect(contract.invariants[0]!.usesScenario?.scenarioId).toBe("my-scenario");
   });
 
   it("normalizes group declarations", async () => {
@@ -248,9 +248,9 @@ describe("normalizer edge cases", () => {
     const normalized = normalizeContract(contract);
 
     expect(contract.groups).toHaveLength(1);
-    expect(contract.groups[0].id).toBe("account-rules");
+    expect(contract.groups[0]!.id).toBe("account-rules");
     expect(contract.invariants).toHaveLength(1);
-    expect(contract.invariants[0].groupId).toBe("account-rules");
+    expect(contract.invariants[0]!.groupId).toBe("account-rules");
     expect(normalized).toContain("(group account-rules");
   });
 

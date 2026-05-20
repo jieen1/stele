@@ -45,7 +45,7 @@ export function extractBashWriteTarget(command: string | undefined): string | nu
         break;
       }
 
-      if (value.startsWith("-")) {
+      if (value?.startsWith("-")) {
         continue;
       }
 
@@ -59,14 +59,14 @@ export function extractBashWriteTarget(command: string | undefined): string | nu
   // cp / mv / install: last positional is destination
   const fileOps = new Set(["cp", "mv", "install"]);
   for (let index = 0; index < tokens.length; index += 1) {
-    if (!fileOps.has(tokens[index])) {
+    if (!fileOps.has(tokens[index]!)) {
       continue;
     }
 
     const positional: string[] = [];
     let sawDoubleDash = false;
     for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-      const value = tokens[cursor];
+      const value = tokens[cursor]!;
       if (!sawDoubleDash && value === "--") {
         sawDoubleDash = true;
         continue;
@@ -116,7 +116,7 @@ function tokenize(command: string): string[] {
         continue;
       }
 
-      if (/\s/u.test(char)) {
+      if (/\s/u.test(char!)) {
         pushIfNonEmpty(tokens, current);
         current = "";
         continue;

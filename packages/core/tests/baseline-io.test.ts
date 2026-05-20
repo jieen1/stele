@@ -181,7 +181,7 @@ describe("fingerprint validation", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("rejects short fingerprints", async () => {
+  it("accepts short fingerprints (architecture violations use descriptive IDs)", async () => {
     const path = join(tmpDir, "short-fp.json");
     const content = {
       version: "1",
@@ -200,29 +200,28 @@ describe("fingerprint validation", () => {
     };
     await writeFile(path, JSON.stringify(content), "utf8");
 
-    await expect(readViolationBaseline(path)).rejects.toThrow("invalid shape");
+    // Short fingerprints are accepted for architecture violations
+    const result = await readViolationBaseline(path);
+    expect(result.violations["aaaaaaaaaaa"]).toBeDefined();
   });
 
-  it("rejects non-hex fingerprints", async () => {
+  it("accepts non-hex fingerprints (architecture violations use descriptive IDs)", async () => {
     const path = join(tmpDir, "non-hex-fp.json");
-    const content = {
-      version: "1",
-      generated_at: "2026-05-07T00:00:00.000Z",
-      reason: "test",
+    const validBaseline = makeValidBaseline();
+    const [originalFp] = Object.keys(validBaseline.violations);
+    const validViolation = validBaseline.violations[originalFp];
+
+    const nonHexFp = "core-domain-services->core-domain-primitives:src/path.ts:123";
+    const nonHexBaseline = {
+      ...validBaseline,
       violations: {
-        zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz: {
-          rule_id: "ledger.balance_mismatch",
-          rule_kind: "rule_violation",
-          first_seen: "2026-05-07T00:00:00.000Z",
-          source: { tool: "ledger-checker", command: "check", kind: "rule" },
-          location: { path: "src/payments.ts" },
-          scope_paths: ["src/payments.ts"],
-        },
+        [nonHexFp]: validViolation,
       },
     };
-    await writeFile(path, JSON.stringify(content), "utf8");
+    await writeViolationBaseline(path, nonHexBaseline);
 
-    await expect(readViolationBaseline(path)).rejects.toThrow("invalid shape");
+    const result = await readViolationBaseline(path);
+    expect(result.violations[nonHexFp]).toBeDefined();
   });
 
   it("accepts valid 64-char hex fingerprints", async () => {

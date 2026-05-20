@@ -43,13 +43,13 @@ type_driven:
 
     expect(error).toBeDefined();
     expect(isCheckCommandError(error)).toBe(true);
-    const violations = error.report.violations;
+    const violations = (error as { report: { violations: Array<{ rule_id: string; rule_kind: string }> } }).report.violations;
     const designViolations = violations.filter(
-      (v: { rule_kind: string }) => v.rule_kind === "design_integrity",
+      (v) => v.rule_kind === "design_integrity",
     );
 
     expect(designViolations.length).toBeGreaterThan(0);
-    expect(designViolations[0].rule_id).toBe("design_integrity.violation");
+    expect(designViolations[0]?.rule_id).toBe("design_integrity.violation");
   });
 
   it("skips design stage silently when no design profile exists", async () => {

@@ -81,7 +81,7 @@ function isHumanState(value: unknown): value is HumanState {
 function isBaselineViolation(fingerprint: string, value: unknown): value is BaselineViolation {
   return (
     typeof fingerprint === "string" &&
-    /^[a-f0-9]{64}$/.test(fingerprint) &&
+    fingerprint.length > 0 &&
     isPlainRecord(value) &&
     typeof value.rule_id === "string" &&
     typeof value.rule_kind === "string" &&

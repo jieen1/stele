@@ -49,11 +49,11 @@ describe("buildContract", () => {
     expect(contract.rootPath).toBe(ROOT_PATH);
     expect(contract.files).toHaveLength(1);
     expect(contract.metadata).toHaveLength(1);
-    expect(contract.metadata[0].filePath).toBe(ROOT_PATH);
+    expect(contract.metadata[0]!.filePath).toBe(ROOT_PATH);
     expect(contract.operators.map((o) => o.id)).toEqual(["my-op"]);
     expect(contract.checkers.map((c) => c.id)).toEqual(["my-checker"]);
     expect(contract.invariants.map((i) => i.id)).toEqual(["INV_1"]);
-    expect(contract.invariants[0].filePath).toBe(ROOT_PATH);
+    expect(contract.invariants[0]!.filePath).toBe(ROOT_PATH);
   });
 
   it("flattens declarations from multiple files into one contract", () => {
@@ -104,9 +104,9 @@ describe("buildContract", () => {
     const contract = buildContract(ROOT_PATH, [loaded(ROOT_PATH, source)]);
 
     expect(contract.groups).toHaveLength(1);
-    expect(contract.groups[0].id).toBe("account-rules");
-    expect(contract.groups[0].description).toBe("Rules for accounts.");
-    expect(contract.groups[0].invariants).toHaveLength(2);
+    expect(contract.groups[0]!.id).toBe("account-rules");
+    expect(contract.groups[0]!.description).toBe("Rules for accounts.");
+    expect(contract.groups[0]!.invariants).toHaveLength(2);
     expect(contract.invariants).toHaveLength(2);
     for (const inv of contract.invariants) {
       expect(inv.groupId).toBe("account-rules");
@@ -124,7 +124,7 @@ describe("buildContract", () => {
 
     const contract = buildContract(ROOT_PATH, [loaded(ROOT_PATH, source)]);
     expect(contract.imports).toHaveLength(1);
-    const declaration = contract.imports[0];
+    const declaration = contract.imports[0]!;
     expect(declaration.kind).toBe("import");
     expect(declaration.value).toBe("module.stele");
     expect(declaration.resolvedPath).toBe(path.join(ROOT_DIR, "module.stele"));
@@ -373,7 +373,7 @@ describe("collectImportDeclarations", () => {
     const declarations = collectImportDeclarations(ROOT_PATH, parsed);
     expect(declarations).toHaveLength(1);
 
-    const declaration = declarations[0];
+    const declaration = declarations[0]!;
     expect(declaration.kind).toBe("import");
     expect(declaration.value).toBe("module.stele");
     expect(declaration.resolvedPath).toBe(path.join(ROOT_DIR, "module.stele"));

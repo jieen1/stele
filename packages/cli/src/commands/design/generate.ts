@@ -169,7 +169,9 @@ function buildProvenanceOutputs(
  */
 function ensureImportInMain(projectDir: string): void {
   const mainPath = resolve(projectDir, "contract/main.stele");
-  const targetPath = "contract/generated/ddd-typedriven.stele";
+  // Import path is resolved relative to dirname(main.stele) = contract/
+  // So use path relative to contract/, not the project root.
+  const targetPath = "generated/ddd-typedriven.stele";
   const importLine = `(import "${targetPath}")`;
 
   if (!existsSync(mainPath)) {
