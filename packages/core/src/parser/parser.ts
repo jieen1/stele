@@ -1,15 +1,9 @@
-import type { AstNode, AtomNode, SourceSpan } from "../ast/types.js";
+import type { AstNode, AtomNode, SourceSpan, ParsedFile } from "../ast/types.js";
 import { SteleError } from "../errors/SteleError.js";
-import { lex } from "../lexer/lexer.js";
+import { lex, DEFAULT_FILE } from "../lexer/lexer.js";
 import type { Token } from "../lexer/token.js";
 
-const DEFAULT_FILE = "<input>";
-
-export type ParsedFile = {
-  kind: "file";
-  body: AstNode[];
-  file: string;
-};
+export type { ParsedFile };
 
 export function parseFile(input: string, file = DEFAULT_FILE): ParsedFile {
   const parser = new Parser(lex(input, file), file);

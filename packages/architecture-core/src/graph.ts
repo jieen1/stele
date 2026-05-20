@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { resolve, isAbsolute } from "node:path";
 import type {
   ArchitectureDeclaration,
   ArchitectureGraph,
@@ -176,6 +176,12 @@ export function buildArchitectureGraph(
     column: number;
   }> = [];
 
+  // Normalize projectDir once, to POSIX, for reliable prefix matching.
+  // On Windows, resolve() returns backslashes but TS resolveModuleName may
+  // return paths with different casing or separators. Normalizing both sides
+  // ensures the startsWith check is cross-platform robust.
+  const projectDirPosix = projectDir.replace(/\\/g, "/");
+
   for (const file of allFiles) {
     const owningModule = fileToModule.get(file);
     if (owningModule === undefined) {
@@ -194,13 +200,28 @@ export function buildArchitectureGraph(
     for (const edge of fileEdges) {
       // resolveModuleName returns absolute paths — normalize back to relative POSIX.
       const rawTargetFile = edge.toFile;
-      const normalizedTarget = rawTargetFile !== undefined
-        ? toProjectRelativePath(projectDir, rawTargetFile)
-        : undefined;
-      const targetModule = normalizedTarget !== undefined ? fileToModule.get(normalizedTarget) : undefined;
+
+      // Skip external packages (node_modules) and unresolved imports silently.
+      // Only internal project imports participate in architecture evaluation.
+      if (rawTargetFile === undefined || rawTargetFile.includes("node_modules")) {
+        continue;
+      }
+
+      // Check the target is inside the project directory.
+      // Normalize both sides to POSIX for reliable comparison on Windows.
+      const targetPosix = rawTargetFile.replace(/\\/g, "/");
+      if (!targetPosix.startsWith(projectDirPosix)) {
+        continue;
+      }
+
+      // Convert to relative POSIX path. Use the POSIX-normalized versions
+      // to avoid path-separator mismatches on Windows.
+      const normalizedTarget = toProjectRelativePath(projectDirPosix, targetPosix);
+
+      const targetModule = fileToModule.get(normalizedTarget);
 
       if (targetModule === undefined) {
-        // Unresolved or unowned target
+        // File resolved but not owned by any module — record as unresolved
         unresolvedSpecifiers.push({
           fromFile: file,
           specifier: edge.specifier,

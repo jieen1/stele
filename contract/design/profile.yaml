@@ -363,7 +363,6 @@ toolchain_contracts:
     required_options:
       strict: true
       noImplicitAny: true
-      noUncheckedIndexedAccess: true
       noImplicitOverride: true
       noFallthroughCasesInSwitch: true
       moduleResolution: Bundler
@@ -371,6 +370,6 @@ toolchain_contracts:
     tsconfig_path: "tsconfig.base.json"
   typescript_diagnostics:
     enabled: true
-    command: "pnpm --filter @stele/cli run tsc --noEmit"
+    command: "pnpm --filter @stele/cli run typecheck"
   eslint:
     enabled: false

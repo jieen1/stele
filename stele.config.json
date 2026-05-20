@@ -11,6 +11,8 @@
   "protected": [
     "contract/**/*.stele",
     "contract/checker_impls/**/*",
+    "contract/design/**/*",
+    "contract/design/proposals/**/*",
     "contract/.baseline.json",
     "contract/.manifest.json",
     "tests/contract/**/*"

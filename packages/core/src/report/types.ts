@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { uniqueSortedStrings } from "../util/array.js";
+
+function uniqueSortedStrings(values: string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
 
 export type ViolationSeverity = "error" | "warning" | "info";
 export type ViolationStatus = "active" | "suppressed" | "out_of_scope";

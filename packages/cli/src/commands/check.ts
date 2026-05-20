@@ -20,7 +20,10 @@ import {
   type ViolationReport,
 } from "@stele/core";
 import { loadBackend } from "../backend-registry.js";
-import { STELE_BASELINE_FILE, type SteleConfig } from "../config/defaults.js";
+import { STELE_BASELINE_FILE } from "../config/defaults.js";
+import type { SteleConfig } from "../config/defaults.js";
+import type { CheckSummary, PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
+export type { CheckSummary, PreparedCheckContext, ProtectedCheckState };
 import { loadConfig } from "../config/loadConfig.js";
 import { evaluateCodeShapes } from "../code-shape/evaluate.js";
 import { buildArchitectureStageReport } from "../architecture/stage.js";
@@ -68,11 +71,7 @@ const execFileAsync = promisify(execFile);
 // Types
 // ----------------------------------------------------------------
 
-export type CheckSummary = {
-  invariantCount: number;
-  generatedFileCount: number;
-  protectedFileCount: number;
-};
+// CheckSummary - see architecture/types.ts
 
 export type CheckCommandOptions = {
   diff?: string | true;
@@ -98,19 +97,7 @@ export type CheckCommandResult = {
   report: ViolationReport;
 };
 
-export type PreparedCheckContext = {
-  projectDir: string;
-  config: SteleConfig;
-  contract: Contract;
-  generated: GeneratedVerificationResult;
-  invariantCount: number;
-};
-
-export type ProtectedCheckState = {
-  protectedPaths: string[];
-  contractHash: string;
-  summary: CheckSummary;
-};
+// PreparedCheckContext, ProtectedCheckState - see architecture/types.ts
 
 type CheckFilters = {
   baseline?: ViolationBaseline;
@@ -812,16 +799,25 @@ async function buildToolchainStage(
 
   // Sub-stage 1: TypeScript config policy
   if (toolchain.typescript_config?.required_options) {
+    const _tsconfigPath = toolchain.typescript_config.tsconfig_path ?? "tsconfig.json";
     try {
-      const tsconfigPath = toolchain.typescript_config.tsconfig_path ?? "tsconfig.json";
       const policyViolations = validateTsconfigPolicy(
         context.projectDir,
-        tsconfigPath,
+        _tsconfigPath,
         toolchain.typescript_config.required_options,
       );
       violations.push(...policyViolations.map(toolchainViolationToViolation(context.projectDir, command)));
-    } catch {
-      // tsconfig not found or unreadable — skip silently
+    } catch (e) {
+      // tsconfig missing or unreadable — report as violation
+      const msg = e instanceof Error ? e.message : String(e);
+      violations.push(toolchainViolationToViolation(context.projectDir, command)({
+        ruleId: "typedriven.typescript.config.read_error",
+        ruleKind: "typescript-config-policy",
+        file: _tsconfigPath,
+        message: `tsconfig policy check failed: ${msg}`,
+        severity: "error",
+        fix: "Ensure tsconfig.json exists and is valid JSON at the configured path.",
+      }));
     }
   }
 
@@ -833,8 +829,17 @@ async function buildToolchainStage(
       const raw = stdout + stderr;
       const tscViolations = parseTscOutputToViolations(raw, context.projectDir);
       violations.push(...tscViolations.map(toolchainViolationToViolation(context.projectDir, command)));
-    } catch {
-      // tsc not available or failed to run — skip silently
+    } catch (e) {
+      // tsc command failed — report as violation, not silent skip
+      const msg = e instanceof Error ? e.message : String(e);
+      violations.push(toolchainViolationToViolation(context.projectDir, command)({
+        ruleId: "typedriven.typescript.diagnostics.command_failed",
+        ruleKind: "typescript-diagnostic",
+        file: "tsconfig.json",
+        message: `TypeScript diagnostics command failed: ${msg}. Command: ${tscCommand}`,
+        severity: "error",
+        fix: "Ensure the diagnostics command in profile.yaml is correct and the script exists in package.json.",
+      }));
     }
   }
 
@@ -848,8 +853,17 @@ async function buildToolchainStage(
       const report = JSON.parse(stdout);
       const eslintViolations = parseEslintReport(report, eslintConfig.rules ?? []);
       violations.push(...eslintViolations.map(toolchainViolationToViolation(context.projectDir, command)));
-    } catch {
-      // ESLint not available or failed to run — skip silently
+    } catch (e) {
+      // ESLint failed — report as violation, not silent skip
+      const msg = e instanceof Error ? e.message : String(e);
+      violations.push(toolchainViolationToViolation(context.projectDir, command)({
+        ruleId: "typedriven.eslint.command_failed",
+        ruleKind: "eslint",
+        file: "eslint.config.js",
+        message: `ESLint command failed: ${msg}. Command: ${eslintCommand}`,
+        severity: "error",
+        fix: "Ensure the ESLint command in profile.yaml is correct and ESLint is installed.",
+      }));
     }
   }
 

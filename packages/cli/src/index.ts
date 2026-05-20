@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { posix } from "node:path";
 import { Command, Option } from "commander";
 
 export { DEFAULT_CONFIG, type SteleConfig } from "./config/defaults.js";
@@ -534,6 +536,23 @@ async function loadAgentHooksInstaller(): Promise<{
   return mod;
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await runCli();
+{
+  const argvScript = process.argv[1];
+  let isDirect = false;
+  if (argvScript !== undefined) {
+    try {
+      const realArgv = realpathSync(argvScript);
+      const realMeta = fileURLToPath(import.meta.url);
+      // Normalize to POSIX for cross-platform comparison
+      const argvPosix = posix.normalize(realArgv);
+      const metaPosix = posix.normalize(realMeta);
+      isDirect = argvPosix === metaPosix;
+    } catch {
+      // realpath or path conversion failed — fall back to URL comparison
+      isDirect = import.meta.url === pathToFileURL(argvScript).href;
+    }
+  }
+  if (isDirect) {
+    await runCli();
+  }
 }

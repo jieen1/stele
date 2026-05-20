@@ -1,5 +1,4 @@
-import type { AstNode, ListNode, SourceSpan } from "../ast/types.js";
-import type { ParsedFile } from "../parser/parser.js";
+import type { AstNode, ListNode, SourceSpan, ParsedFile } from "../ast/types.js";
 
 export const TOP_LEVEL_DECLARATIONS = new Set([
   "metadata",

@@ -2,7 +2,7 @@ import type { SourceSpan } from "../ast/types.js";
 import { SteleError } from "../errors/SteleError.js";
 import type { Token } from "./token.js";
 
-const DEFAULT_FILE = "<input>";
+export const DEFAULT_FILE = "<input>";
 const NUMBER_PATTERN = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/;
 
 export function lex(input: string, file = DEFAULT_FILE): Token[] {

@@ -29,3 +29,14 @@ export type ListNode = {
 };
 
 export type AstNode = AtomNode | ListNode;
+
+/**
+ * Output of the parser — a list of top-level AST nodes for a single file.
+ * Lives here (primitives) so it can be referenced without crossing
+ * the core-parsing ↔ core-domain-primitives boundary.
+ */
+export type ParsedFile = {
+  kind: "file";
+  body: AstNode[];
+  file: string;
+};

@@ -7,7 +7,7 @@ import {
 } from "../src/generator/layout.js";
 import type { Contract, ContractFile } from "../src/validator/structure.js";
 import type { ListNode } from "../src/ast/types.js";
-import type { ParsedFile } from "../src/parser/parser.js";
+import type { ParsedFile } from "../src/ast/types.js";
 import type { LanguageBackend, GeneratedFile } from "../src/generator/types.js";
 
 function makeContract(overrides: Partial<Contract> = {}): Contract {

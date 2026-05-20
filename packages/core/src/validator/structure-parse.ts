@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { AstNode, ListNode, SourceSpan } from "../ast/types.js";
 import { SteleError } from "../errors/SteleError.js";
-import type { ParsedFile } from "../parser/parser.js";
+import type { ParsedFile } from "../ast/types.js";
 import { describeNode, validationError } from "./structure-error.js";
 import { parseInvariantDeclaration } from "./structure-invariant.js";
 import { parseScenarioDeclaration } from "./structure-scenario.js";

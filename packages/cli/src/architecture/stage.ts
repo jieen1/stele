@@ -5,7 +5,7 @@ import { createViolationReport } from "@stele/core";
 import type { Violation, ViolationReport } from "@stele/core";
 import { evaluateArchitectureContract, type ArchitectureContractOptions } from "../architecture-runtime.js";
 import { safeGlob } from "../utils/glob.js";
-import type { PreparedCheckContext, ProtectedCheckState } from "../commands/check.js";
+import type { PreparedCheckContext, ProtectedCheckState } from "./types.js";
 
 /**
  * Build the architecture stage report for the check pipeline.
@@ -144,6 +144,11 @@ async function evaluateCycleViolations(
 
   const graph = buildArchitectureGraph(declaration, projectRoot, fileContents);
   const result = evaluateArchitecture(declaration, graph);
+
+  process.stderr.write(`[STAGE DEBUG] cycle detection: edges=${graph.edges.length} cycleViolations=${result.cycleViolations.length}\n`);
+  for (const e of graph.edges) {
+    process.stderr.write(`  [STAGE DEBUG] edge: ${e.fromModule}(${e.fromFile}) -> ${e.toModule}(${e.toFile})\n`);
+  }
 
   const violations: Violation[] = [];
   for (const cycle of result.cycleViolations) {

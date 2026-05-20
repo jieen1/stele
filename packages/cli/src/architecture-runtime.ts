@@ -123,12 +123,18 @@ export async function evaluateArchitectureContract(
         const rawTo = edge.toFile;
         if (rawTo === undefined) continue;
 
+        // Skip external packages (node_modules) silently — they are not part of DDD evaluation
+        if (rawTo.includes("node_modules")) {
+          continue;
+        }
+
         const normalizedTo = isAbsoluteLikePath(rawTo)
           ? toProjectRelativePath(projectRoot, rawTo)
           : rawTo;
 
         const targetModule = moduleMap.fileToModule.get(normalizedTo);
         if (targetModule === undefined) {
+          // Resolved to a file not owned by any module — record as unresolved
           unresolvedSpecifiers.push({
             fromFile: file,
             specifier: edge.specifier,
