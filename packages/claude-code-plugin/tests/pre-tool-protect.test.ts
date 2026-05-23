@@ -378,7 +378,13 @@ describe("pre-tool-protect hook", () => {
     expectDenied(result);
   });
 
-  it("allows protected targets when config explicitly sets protected to an empty array", async () => {
+  it("default-protected files stay protected even when config sets protected to an empty array", async () => {
+    // Round 3 Reviewer G P0-3: protected config UNIONS with DEFAULT_PROTECTED;
+    // it never replaces. An adopter that ships `protected: []` (or simply omits
+    // a path from their array) can no longer accidentally drop security-critical
+    // paths like contract/main.stele, hook scripts, or stele.config.json from
+    // the glob. Replacing semantics was the single biggest kill-switch path
+    // discovered during the Round 3 implementation review.
     const projectDir = await createProject({
       protected: [],
     });
@@ -389,7 +395,7 @@ describe("pre-tool-protect hook", () => {
       },
     });
 
-    expectAllowed(result);
+    expectDenied(result);
   });
 
   it("allows unprotected files", async () => {

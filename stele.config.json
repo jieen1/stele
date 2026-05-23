@@ -15,6 +15,10 @@
     "contract/generated/**/*",
     "contract/.baseline.json",
     "contract/.manifest.json",
-    "tests/contract/**/*"
+    "tests/contract/**/*",
+    "packages/claude-code-plugin/scripts/*.js",
+    "packages/claude-code-plugin/hooks/hooks.json",
+    "stele.config.json",
+    ".stele/stop-state.json"
   ]
 }

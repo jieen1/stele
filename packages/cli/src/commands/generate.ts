@@ -498,11 +498,42 @@ export async function assertProtectedContractFilesReachable(
 }
 
 async function expandProtectedPattern(projectDir: string, pattern: string): Promise<string[]> {
+  // Fast path: literal file paths (no glob metachars) — don't walk an entire
+  // directory tree just to find one named file. Without this, a pattern like
+  // `stele.config.json` triggers a full project-root walk via globParent()=='.',
+  // which then crashes on any symlink under node_modules (Round 3 Reviewer G
+  // P0 follow-up). For literal paths, just stat the candidate and return it
+  // if the file exists and is a regular file.
+  if (!containsGlobMetachars(pattern)) {
+    const absolutePath = resolve(projectDir, pattern);
+    try {
+      const entryStat = await lstat(absolutePath);
+      if (entryStat.isSymbolicLink()) {
+        throw new Error(
+          `Protected file scanning does not allow symbolic links or other non-regular entries: ${pattern}.`,
+        );
+      }
+      if (!entryStat.isFile()) {
+        return [];
+      }
+      return [pattern];
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
   const rootPattern = normalizeProtectedPattern(globParent(pattern));
   const rootDirectory = rootPattern === "." ? projectDir : resolve(projectDir, rootPattern);
   const files = await walkProtectedRoot(rootDirectory, projectDir);
 
   return files.filter((file) => minimatch(file, pattern, { dot: true }));
+}
+
+function containsGlobMetachars(pattern: string): boolean {
+  return /[*?[\]{}]/.test(pattern);
 }
 
 async function walkProtectedRoot(directory: string, projectDir: string): Promise<string[]> {

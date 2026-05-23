@@ -147,6 +147,6 @@ export function defaultUnresolvedCallFixHint(
     ``,
     proposeExitText(policyId),
     ``,
-    `Choose [A] or [B] before acting. The default code suggestion in [A] is ONLY valid if you have confirmed it is a code issue, not a contract issue. Round 2 D-CG-5: unresolved calls fail closed by default — opt out with \`--no-strict-effects\` if you accept the analysis gap.`,
+    `Choose [A] or [B] before acting. The default code suggestion in [A] is ONLY valid if you have confirmed it is a code issue, not a contract issue. Round 2 D-CG-5: unresolved calls fail closed by default. If you genuinely accept the analysis gap, do it through the propose flow above — there is no CLI flag to silently opt out.`,
   ].join("\n");
 }

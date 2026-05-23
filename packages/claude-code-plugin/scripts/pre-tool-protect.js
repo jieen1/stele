@@ -44,6 +44,12 @@ const DEFAULT_PROTECTED = [
   "packages/claude-code-plugin/hooks/hooks.json",
   // Config files - protect against tampering
   "stele.config.json",
+  // Stele runtime state — Stop hook loop-guard fingerprint store.
+  // (Round 3 Reviewer G P0-1: without this, an agent can pre-fill
+  // .stele/stop-state.json to bypass the two-attempt human floor.)
+  // Note: `.stele/events/**` is intentionally NOT protected — those are
+  // append-only observation logs the Stop hook writes on every run.
+  ".stele/stop-state.json",
 ];
 
 try {
@@ -94,12 +100,19 @@ async function loadConfig(projectDir) {
   try {
     const raw = await readFile(path.join(projectDir, "stele.config.json"), "utf8");
     const parsed = JSON.parse(stripBom(raw));
-    const protectedPatterns = Object.prototype.hasOwnProperty.call(parsed ?? {}, "protected")
+    // Round 3 Reviewer G P0-3: UNION default + user patterns, never replace.
+    // Replacing on `protected` let adopters silently drop hook scripts, the
+    // stele.config.json itself, and other security-critical paths from the
+    // glob — a complete kill switch. User config can only ADD patterns now,
+    // never narrow the default set.
+    const userPatterns = Object.prototype.hasOwnProperty.call(parsed ?? {}, "protected")
       ? readProtectedConfig(parsed?.protected)
-      : [...DEFAULT_PROTECTED];
+      : [];
+
+    const merged = new Set([...DEFAULT_PROTECTED, ...userPatterns]);
 
     return {
-      protected: protectedPatterns,
+      protected: [...merged],
     };
   } catch (error) {
     if (isMissingFileError(error)) {

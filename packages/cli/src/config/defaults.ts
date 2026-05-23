@@ -39,6 +39,10 @@ export const DEFAULT_CONFIG: SteleConfig = {
     STELE_BASELINE_FILE,
     "contract/.manifest.json",
     "tests/contract/**/*",
+    // Round 3 Reviewer G P0-1: prevent agent from tampering with Stop hook
+    // loop-guard state (`.stele/events/**` is intentionally excluded — those
+    // are append-only observation logs, not security-critical).
+    ".stele/stop-state.json",
     // Design profile files
     "contract/design/**/*",
     "contract/design/proposals/**/*",
