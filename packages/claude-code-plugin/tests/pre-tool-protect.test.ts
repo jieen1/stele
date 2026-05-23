@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -628,6 +628,100 @@ describe("pre-tool-protect hook", () => {
         tool_input: {
           command: "cp -f source_file contract/.manifest.json",
         },
+      }),
+    );
+  });
+
+  it("Round 4 D-06: denies write to a symlink that realpath-resolves to a protected file", async () => {
+    const projectDir = await createProject();
+    // Pre-create the contract file so realpath has something to resolve to.
+    await writeProjectFile(projectDir, "contract/main.stele", "(metadata)\n");
+    const protectedAbsolute = join(projectDir, "contract/main.stele");
+    const decoyAbsolute = join(projectDir, "decoy");
+    await mkdir(dirname(decoyAbsolute), { recursive: true });
+    await symlink(protectedAbsolute, decoyAbsolute);
+    // The agent supplies the decoy path; pre-realpath that path is
+    // "decoy" (not under contract/), so the legacy matchProtectedPath
+    // would let it through. With D-06 the realpath puts it inside
+    // contract/main.stele and matching denies.
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Write",
+        tool_input: { file_path: "decoy", content: "x" },
+      }),
+    );
+  });
+
+  it("Round 4 D-05: denies ln -s pointing at a protected file", async () => {
+    const projectDir = await createProject();
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: { command: "ln -s /tmp/malicious contract/main.stele" },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: { command: "ln -sf /tmp/payload .stele/stop-state.json" },
+      }),
+    );
+  });
+
+  it("Round 4 D-05: denies git checkout / git restore on a protected file", async () => {
+    const projectDir = await createProject();
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: { command: "git checkout HEAD -- contract/main.stele" },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: { command: "git restore contract/checker_impls/self_protection.py" },
+      }),
+    );
+  });
+
+  it("Round 4 D-05: denies interpreter -c / -e invocations that look like a protected-file write", async () => {
+    const projectDir = await createProject();
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "python3 -c \"open('.stele/stop-state.json','w').write('x')\"",
+        },
+      }),
+    );
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "node -e \"require('node:fs').writeFileSync('contract/main.stele','x')\"",
+        },
+      }),
+    );
+  });
+
+  it("Round 4 D-05: allows interpreter -c reads that mention a protected file but don't write", async () => {
+    const projectDir = await createProject();
+    expectAllowed(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: {
+          command: "python3 -c \"print(open('contract/main.stele').read())\"",
+        },
+      }),
+    );
+  });
+
+  it("Round 4 D-05: denies chmod/chown on a protected file", async () => {
+    const projectDir = await createProject();
+    expectDenied(
+      runHook(projectDir, {
+        tool_name: "Bash",
+        tool_input: { command: "chmod 0 contract/main.stele" },
       }),
     );
   });

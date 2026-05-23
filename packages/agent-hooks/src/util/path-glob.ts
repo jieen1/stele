@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { minimatch } from "minimatch";
 
@@ -34,8 +35,22 @@ export function matchProtectedPath(
   const canonicalTargetPath = canonicalizeTargetPath(targetPath);
   const normalizedInput = normalizeForComparison(normalizeInputPath(canonicalTargetPath));
   const resolvedTarget = path.resolve(projectRoot, canonicalTargetPath);
-  const relativeToProject = normalizeForComparison(toPosixPath(path.relative(projectRoot, resolvedTarget)));
-  const withinProject = isWithinProject(projectRoot, resolvedTarget);
+  // Round 4 D-06: realpath the resolved target before matching. Without
+  // this an agent can create a symlink at /tmp/decoy that points to a
+  // protected file inside the project, then "write to /tmp/decoy" — the
+  // pre-realpath path comparison sees `/tmp/decoy` (outside project,
+  // permitted) but the OS write lands on `<project>/contract/main.stele`.
+  // Errors during realpath (file doesn't exist yet, EACCES) fall back to
+  // the raw resolved path — we never UPGRADE permissions on failure.
+  const realpathedTarget = (() => {
+    try {
+      return fs.realpathSync(resolvedTarget);
+    } catch {
+      return resolvedTarget;
+    }
+  })();
+  const relativeToProject = normalizeForComparison(toPosixPath(path.relative(projectRoot, realpathedTarget)));
+  const withinProject = isWithinProject(projectRoot, realpathedTarget);
 
   if (withinProject && shouldIgnorePythonCache(relativeToProject)) {
     return false;
