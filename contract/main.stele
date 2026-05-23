@@ -312,4 +312,12 @@
   (description "Default fix-hint generators in trace/type-state/effect evaluators MUST contain the keywords 'code issue', 'contract issue', 'propose', '[A]', '[B]'. This prevents agents from auto-fixing stale rules; forces them to first decide whether to fix the code or propose a contract change.")
   (uses-checker fix-hint-requires-analysis-branch))
 
+(checker default-protected-consistent
+  (description "The three default-protected-patterns lists (in core, cli, claude-code-plugin) must agree."))
+
+(invariant DEFAULT_PROTECTED_CONSISTENT
+  (severity error)
+  (description "Round 4 D-13: packages/core/src/config/defaults.ts (DEFAULT_PROTECTED_PATTERNS), packages/cli/src/config/defaults.ts (DEFAULT_CONFIG.protected), and packages/claude-code-plugin/scripts/pre-tool-protect.js (DEFAULT_PROTECTED) must declare byte-equal sets of protected patterns. A future fix that updates one and forgets the others silently drops defense-in-depth for some path category.")
+  (uses-checker default-protected-consistent))
+
 (import "generated/ddd-typedriven.stele")

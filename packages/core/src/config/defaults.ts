@@ -5,6 +5,21 @@
  * This constant is the single source of truth for default protection.
  * All packages (core, cli, mcp-server, agent-hooks) import from here.
  */
+/**
+ * Default protected patterns used by Stele.
+ *
+ * SINGLE SOURCE OF TRUTH (Round 4 D-13): three call sites previously kept
+ * their own copies of this list and drifted freely. Both
+ * `packages/cli/src/config/defaults.ts#DEFAULT_CONFIG.protected` and
+ * `packages/claude-code-plugin/scripts/pre-tool-protect.js#DEFAULT_PROTECTED`
+ * MUST be byte-equal to this array (modulo ordering); the
+ * `default-protected-consistent` self-protection checker enforces it on
+ * every `pytest tests/contract` run.
+ *
+ * When adding an entry: edit this file first, then mirror into the other
+ * two declarations (cli/defaults.ts + plugin/pre-tool-protect.js) verbatim.
+ * The checker will fail loudly if you forget.
+ */
 export const DEFAULT_PROTECTED_PATTERNS: readonly string[] = [
   // Contract surface — agent never edits these
   "contract/**/*.stele",
@@ -12,10 +27,17 @@ export const DEFAULT_PROTECTED_PATTERNS: readonly string[] = [
   "contract/.baseline.json",
   "contract/.manifest.json",
   "contract/design/**/*",
+  "contract/design/proposals/**/*",
+  // Round 4 D-02: approval records gate `stele design generate`. If the
+  // approvals directory is editable by the agent, the gate is a no-op.
+  "contract/design/approvals/**/*",
   "contract/generated/**/*",
   "tests/contract/**/*",
   // Hook scripts — direct edit = complete kill switch (Round 3 Reviewer G P0-3)
-  "packages/claude-code-plugin/scripts/*.js",
+  "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+  "packages/claude-code-plugin/scripts/stop-validate.js",
+  "packages/claude-code-plugin/scripts/observation-hook.js",
+  "packages/claude-code-plugin/scripts/lifecycle-context.js",
   "packages/claude-code-plugin/hooks/hooks.json",
   // Project config — tampering changes which files are protected
   "stele.config.json",
@@ -24,7 +46,7 @@ export const DEFAULT_PROTECTED_PATTERNS: readonly string[] = [
   // two-attempt human floor; see Round 3 Reviewer G P0-1).
   // Note: `.stele/events/**` is intentionally excluded — those are append-only
   // observation logs that change every Stop hook fire. `.stele/maintenance/**`
-  // and `.stele/agent/**` are likewise dynamic marker / summary stores. We only
-  // freeze the security-critical control-plane file here.
+  // and `.stele/agent/**` are likewise dynamic marker / summary stores. We
+  // only freeze the security-critical control-plane file here.
   ".stele/stop-state.json",
 ];

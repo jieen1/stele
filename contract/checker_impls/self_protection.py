@@ -1398,6 +1398,148 @@ def fix_hint_requires_analysis_branch(ctx: dict, **kwargs: Any) -> dict[str, Any
     return {"passed": True, "message": None, "violations": []}
 
 
+_STRING_LITERAL_RE = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
+
+
+def _extract_string_array(source: str, anchor: str) -> set[str] | None:
+    """Find the array literal following `anchor =` in source and return its
+    string literals as a set. Returns None when the anchor is missing.
+
+    Brittle-by-design: it expects an `=` sign between the anchor and the
+    array open-bracket, so TypeScript type annotations like
+    `readonly string[]` don't trip up the scanner.
+    """
+    idx = source.find(anchor)
+    if idx == -1:
+        return None
+    # Find the array literal: scan forward for the first `[` that is
+    # followed by whitespace + newline (i.e. a multi-line array opener,
+    # not the `[]` of a TypeScript type annotation like `readonly string[]`).
+    # All three target files use the multi-line format.
+    pos = idx + len(anchor)
+    lb = -1
+    while pos < len(source):
+        candidate = source.find("[", pos)
+        if candidate == -1:
+            return None
+        # Look at the next non-space character on the same line; if it's
+        # `]`, this is a `string[]`-style type bracket — skip past it.
+        tail = source[candidate + 1:].lstrip(" \t")
+        if tail.startswith("]"):
+            pos = candidate + 1
+            continue
+        lb = candidate
+        break
+    if lb == -1:
+        return None
+    depth = 0
+    end = -1
+    for i in range(lb, len(source)):
+        ch = source[i]
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end == -1:
+        return None
+    body = source[lb + 1:end]
+    return {m.group(1) for m in _STRING_LITERAL_RE.finditer(body)}
+
+
+def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 4 D-13: the three "default protected patterns" lists must
+    agree byte-for-byte (modulo ordering):
+
+      - packages/core/src/config/defaults.ts          DEFAULT_PROTECTED_PATTERNS
+      - packages/cli/src/config/defaults.ts            DEFAULT_CONFIG.protected
+      - packages/claude-code-plugin/scripts/           DEFAULT_PROTECTED
+        pre-tool-protect.js
+
+    A future fix that updates one and forgets the other two would silently
+    drop defense-in-depth for some path category. This checker parses each
+    file, extracts the literal-string set, and asserts equality.
+    """
+    sources = [
+        (
+            "packages/core/src/config/defaults.ts",
+            "DEFAULT_PROTECTED_PATTERNS",
+        ),
+        (
+            "packages/cli/src/config/defaults.ts",
+            "protected:",
+        ),
+        (
+            "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+            "DEFAULT_PROTECTED",
+        ),
+    ]
+    extracted: list[tuple[str, set[str]]] = []
+    violations: list[dict[str, Any]] = []
+    for rel_path, anchor in sources:
+        abs_path = _REPO_ROOT / rel_path
+        if not abs_path.is_file():
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": f"file missing — cannot verify '{anchor}'",
+            })
+            continue
+        content = abs_path.read_text(encoding="utf-8", errors="replace")
+        entries = _extract_string_array(content, anchor)
+        if entries is None:
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": f"could not extract array following '{anchor}'",
+            })
+            continue
+        extracted.append((rel_path, entries))
+
+    if len(extracted) >= 2:
+        base_path, base_set = extracted[0]
+        for other_path, other_set in extracted[1:]:
+            missing_here = base_set - other_set
+            extra_here = other_set - base_set
+            if missing_here:
+                violations.append({
+                    "file": other_path,
+                    "line": None,
+                    "column": None,
+                    "message": (
+                        f"missing {len(missing_here)} pattern(s) vs {base_path}: "
+                        + ", ".join(sorted(missing_here))
+                    ),
+                })
+            if extra_here:
+                violations.append({
+                    "file": base_path,
+                    "line": None,
+                    "column": None,
+                    "message": (
+                        f"missing {len(extra_here)} pattern(s) vs {other_path}: "
+                        + ", ".join(sorted(extra_here))
+                    ),
+                })
+
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"Default protected lists disagree in {len(violations)} place(s): "
+                + "; ".join(
+                    f"{v['file']} — {v['message']}" for v in violations[:5]
+                )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
 def inline_version_sync(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Verify inline version strings match package.json versions."""
     # Get version from packages/cli/package.json

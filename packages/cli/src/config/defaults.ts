@@ -33,27 +33,31 @@ export const DEFAULT_CONFIG: SteleConfig = {
   targetLanguage: "python",
   testFramework: "pytest",
   pathMode: "auto",
+  // Round 4 D-13: this list MUST stay byte-equal (modulo ordering) to
+  // `DEFAULT_PROTECTED_PATTERNS` in `@stele/core/src/config/defaults.ts`
+  // and `DEFAULT_PROTECTED` in `packages/claude-code-plugin/scripts/
+  // pre-tool-protect.js`. The `default-protected-consistent` self-
+  // protection checker parses all three on every pytest run and fails
+  // loudly on any divergence.
   protected: [
     "contract/**/*.stele",
     "contract/checker_impls/**/*",
-    STELE_BASELINE_FILE,
+    // Note: kept as a literal (not STELE_BASELINE_FILE) so the
+    // default-protected-consistent checker can byte-compare the three
+    // independent lists via string-literal extraction.
+    "contract/.baseline.json",
     "contract/.manifest.json",
-    "tests/contract/**/*",
-    // Round 3 Reviewer G P0-1: prevent agent from tampering with Stop hook
-    // loop-guard state (`.stele/events/**` is intentionally excluded — those
-    // are append-only observation logs, not security-critical).
-    ".stele/stop-state.json",
-    // Design profile files
     "contract/design/**/*",
     "contract/design/proposals/**/*",
-    "contract/generated/ddd-typedriven.stele",
-    // Hook scripts - security-critical, must not be editable by agents
+    "contract/design/approvals/**/*",
+    "contract/generated/**/*",
+    "tests/contract/**/*",
     "packages/claude-code-plugin/scripts/pre-tool-protect.js",
     "packages/claude-code-plugin/scripts/stop-validate.js",
     "packages/claude-code-plugin/scripts/observation-hook.js",
     "packages/claude-code-plugin/scripts/lifecycle-context.js",
     "packages/claude-code-plugin/hooks/hooks.json",
-    // Config files - protect against tampering
     "stele.config.json",
+    ".stele/stop-state.json",
   ],
 };

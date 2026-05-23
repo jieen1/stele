@@ -32,6 +32,7 @@ const DEFAULT_PROTECTED = [
   "contract/checker_impls/**/*",
   "contract/design/**/*",
   "contract/design/proposals/**/*",
+  "contract/design/approvals/**/*",
   "contract/generated/**/*",
   "contract/.baseline.json",
   "contract/.manifest.json",
@@ -50,6 +51,26 @@ const DEFAULT_PROTECTED = [
   // Note: `.stele/events/**` is intentionally NOT protected — those are
   // append-only observation logs the Stop hook writes on every run.
   ".stele/stop-state.json",
+];
+
+// Round 4 D-05: hoisted constants used by extractInterpreterScriptTargets.
+// Defined here so the function — which is invoked during the early
+// extractTargetPaths call — sees fully-initialised values rather than a
+// TDZ binding.
+const _INTERPRETER_NAMES = new Set([
+  "python", "python3", "node", "nodejs", "perl", "ruby", "bash", "sh", "zsh",
+]);
+const _INTERPRETER_WRITE_HINTS = [
+  // Python: open(..., 'w') / 'wb' / 'a' / 'ab' / 'x' / 'r+' — the mode
+  // argument is the unambiguous write signal. We deliberately don't
+  // match a bare `open(` since reads use `open('x').read()`.
+  ",'w'", ",\"w\"", ",'wb'", ",\"wb\"", ",'a'", ",\"a\"",
+  ",'ab'", ",\"ab\"", ",'x'", ",\"x\"", ",'r+'", ",\"r+\"",
+  "Path.write_text", "Path.write_bytes",
+  "os.remove(", "os.unlink(", "shutil.move(", "shutil.rmtree(",
+  // Node.js
+  "writeFileSync", "appendFileSync", "unlinkSync", "rmSync",
+  "fs.write", "fs.unlink", "fs.rm", "fs.appendFile",
 ];
 
 try {
@@ -300,7 +321,130 @@ function extractWriteTargetsFromLine(line) {
     ...extractTeeTargets(tokens),
     ...extractFileOperationTargets(tokens),
     ...extractDdTargets(tokens),
+    // Round 4 D-05: additional bash bypass vectors.
+    ...extractGitCheckoutTargets(tokens),
+    ...extractInterpreterScriptTargets(tokens, line),
   ];
+}
+
+/**
+ * Round 4 D-05: `git checkout <file>` and `git restore <file>` overwrite
+ * the working-tree file from history. An agent that wants to undo a
+ * protected change can `git checkout HEAD -- contract/main.stele`.
+ * Tokens look like: word("git") word("checkout"|"restore") word(<file>...)
+ * or with -- separator. We treat every positional arg after the
+ * subcommand as a potential target.
+ */
+function extractGitCheckoutTargets(tokens) {
+  const targets = [];
+  let segmentStart = 0;
+  for (let i = 0; i <= tokens.length; i += 1) {
+    const t = tokens[i];
+    if (i === tokens.length || (t.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(t.value))) {
+      targets.push(...extractGitCheckoutFromSegment(tokens.slice(segmentStart, i)));
+      segmentStart = i + 1;
+    }
+  }
+  return targets;
+}
+
+function extractGitCheckoutFromSegment(tokens) {
+  const wordTokens = tokens.filter((t) => t.type === "word");
+  if (wordTokens.length < 2) return [];
+  if (path.posix.basename(wordTokens[0].value) !== "git") return [];
+  const sub = wordTokens[1].value;
+  if (sub !== "checkout" && sub !== "restore") return [];
+  const targets = [];
+  let sawDoubleDash = false;
+  for (const tok of wordTokens.slice(2)) {
+    if (!sawDoubleDash && tok.value === "--") {
+      sawDoubleDash = true;
+      continue;
+    }
+    if (!sawDoubleDash && tok.value.startsWith("-")) {
+      continue;
+    }
+    // Skip refspecs / branch names (no slash or dot is ambiguous; we
+    // err on the side of including them — false positives only block
+    // an agent's "restore from history" of a clean file).
+    const literalPath = parseLiteralShellPath(tok.value);
+    if (literalPath !== null && (literalPath.includes("/") || literalPath.includes("."))) {
+      targets.push(literalPath);
+    }
+  }
+  return targets;
+}
+
+/**
+ * Round 4 D-05: detect `python -c "<script>"`, `python3 -c …`, `node -e
+ * "<script>"`, `bash -c "<script>"`, `perl -e "<script>"`. The target
+ * embedded inside the script body cannot be reliably parsed without
+ * executing the interpreter, but we can scan the raw `line` for any
+ * substring matching a protected glob's literal prefix; that catches the
+ * pathological `python -c "open('.stele/stop-state.json','w')"` case
+ * without trying to be a shell-aware interpreter.
+ *
+ * To avoid false positives on harmless reads (`python -c "open('
+ * contract/.manifest.json').read()"`), this extractor only fires when
+ * the script body contains BOTH the protected substring AND a
+ * write-shaped token like `'w'`, `"w"`, `'wb'`, `>>>` (Python `truncate`),
+ * `fs.writeFileSync`, `os.remove`, `unlink`, etc.
+ */
+function extractInterpreterScriptTargets(tokens, line) {
+  const wordTokens = tokens.filter((t) => t.type === "word");
+  if (wordTokens.length < 2) return [];
+  const cmd = path.posix.basename(wordTokens[0].value);
+  if (!_INTERPRETER_NAMES.has(cmd)) return [];
+  // Check that `-c` or `-e` is present in the args.
+  const interpreterFlag = wordTokens.slice(1).find((t) => t.value === "-c" || t.value === "-e");
+  if (interpreterFlag === undefined) return [];
+  // Determine whether the script body looks like a write.
+  if (!_INTERPRETER_WRITE_HINTS.some((hint) => line.includes(hint))) {
+    return [];
+  }
+  // Surface the entire line as a "synthetic target" — the caller will
+  // match it against protected globs via matchProtectedPath. To make
+  // glob matching meaningful we use a placeholder filename and rely on
+  // the downstream protected-list matcher knowing about substrings.
+  // Concretely: emit every protected-glob literal we can spot in the
+  // line as a candidate. The match step then deny-lists any actual hit.
+  return _extractProtectedSubstringsFromLine(line);
+}
+
+/**
+ * Pull every quoted string literal out of `line` (any of `"..."`, `'...'`,
+ * or backtick-quoted) that looks like a file path. The caller passes
+ * these to `matchProtectedPath` like any other write target — so when a
+ * literal matches a protected glob the hook denies. Conservative: only
+ * captures values inside quotes, so unquoted identifiers are ignored.
+ */
+function _extractProtectedSubstringsFromLine(line) {
+  const targets = new Set();
+  // Scan each quote type separately so a nested mix of `"..."` containing
+  // `'...'` (the common interpreter -c pattern) doesn't cause the regex
+  // to terminate the inner capture on the wrong quote.
+  const quotePatterns = [
+    /"([^"\n\r]{1,256})"/g,
+    /'([^'\n\r]{1,256})'/g,
+    /`([^`\n\r]{1,256})`/g,
+  ];
+  for (const re of quotePatterns) {
+    let match;
+    while ((match = re.exec(line)) !== null) {
+      const candidate = match[1];
+      // Path-shape filter: must contain a slash or a dot, no shell or
+      // template metachars, and reasonable length.
+      if (
+        candidate.length > 0 &&
+        candidate.length < 256 &&
+        (candidate.includes("/") || candidate.includes(".")) &&
+        !/[\s()$;|&]/.test(candidate)
+      ) {
+        targets.add(candidate);
+      }
+    }
+  }
+  return [...targets];
 }
 
 function extractRedirectTargets(tokens) {
@@ -376,7 +520,18 @@ function extractTeeTargetsFromSegment(tokens) {
 
 function extractFileOperationTargets(tokens) {
   const targets = [];
-  const commands = new Set(["cp", "mv", "install"]);
+  // Round 4 D-05: extend beyond cp/mv/install. Each of these can write or
+  // replace a target file, so when the target falls under a protected
+  // pattern the hook must intercept the Bash invocation just like a
+  // direct Write tool call.
+  const commands = new Set([
+    "cp", "mv", "install",
+    "ln",       // ln / ln -s — symlink swap is the classic protected-file bypass
+    "rsync",    // rsync writes to a destination
+    "truncate", // truncate -s 0 file
+    "chmod",    // metadata mutation on protected files is just as bad as a content edit
+    "chown",
+  ]);
   let segmentStart = 0;
 
   for (let index = 0; index <= tokens.length; index += 1) {
