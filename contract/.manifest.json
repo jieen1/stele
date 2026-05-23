@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-23T13:27:02.465Z",
+  "generated_at": "2026-05-23T14:09:55.038Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/.gitkeep": {
@@ -8,12 +8,12 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "aa5a57054c31a63ea71b0776a78c6f5177bee2053d60c9d9cd9e62e038852f37",
-      "size": 48106
+      "sha256": "976fb854eb6fbded4e8049275555787e66657ae2d59da6f1d821509a64bb66fa",
+      "size": 55971
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "11993531b1e9fe4bb1c38b1db5c279620281bfef911618aa6fe9d99b3caac4a2",
-      "size": 25274
+      "sha256": "e206de90faf8c8bf708edddee213d3528e06407450ac789346007f551e971932",
+      "size": 29293
     },
     "contract/design/manifest.json": {
       "sha256": "58ccf50a8ec98fd5afc68f3bdd74d73f7aee90a8e63d50574a3ff63d09cec427",

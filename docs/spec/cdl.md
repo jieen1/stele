@@ -1132,7 +1132,9 @@ New self-protection invariants in `contract/main.stele` (also visible to `stele 
 
 - `ALL_EVALUATORS_COMPILE` — every Phase B evaluator package (`@stele/call-graph-core`, `@stele/trace-evaluator`, `@stele/type-state-evaluator`, `@stele/effect-evaluator`, `@stele/type-driven-evaluator`) must build to `dist/index.js` + `dist/index.d.ts`.
 - `STRICT_MODE_DEFAULT_IN_CI` — `.github/workflows/` may not pass `--lenient-effects`, `--lenient-typestate`, `--lenient-callgraph`, or `--lenient-trace`.
-- `FIX_HINT_REQUIRES_ANALYSIS_BRANCH` — every default fix-hint emitted by a trace, type-state, or effect evaluator must contain the substrings `code issue`, `contract issue`, `propose`, `[A]`, `[B]`.
+- `FIX_HINT_REQUIRES_ANALYSIS_BRANCH` — every default fix-hint emitted by a trace, type-state, or effect evaluator must contain the substrings `code issue`, `contract issue`, `propose`, `[A]`, `[B]`. Round 3 P1-2 strengthened this from a pure keyword check to a structural check that asserts the canonical `[A] Code issue` and `[B] Contract issue` anchors appear in order, the `[B]` branch references the propose flow + `contract/design/proposals/<id>.yaml`, and the trailing `Choose [A] or [B] before acting` decision prompt is present.
+
+  *Naming history.* This invariant is the renamed-and-promoted successor of the pre-0.3 `FIX_HINT_NOT_VAGUE` invariant. The earlier name and its `warning` severity made the check trivially ignorable; v0.3 ships under the explicit `FIX_HINT_REQUIRES_ANALYSIS_BRANCH` name and at `error` severity to communicate that an evaluator without an analysis-branch hint is a self-protection failure, not a style nit.
 
 CLI surface added in Phase B:
 
