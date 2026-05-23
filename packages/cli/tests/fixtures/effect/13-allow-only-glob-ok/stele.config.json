@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "1",
+  "contractRoot": "contract/main.stele",
+  "language": "typescript"
+}

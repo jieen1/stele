@@ -1,0 +1,27 @@
+(metadata
+  (stele-version "0.1")
+  (project "effect-fixture-07-effect-glob-match-forbid"))
+
+(effect-declarations
+  (effect "payment.charge" (description "Calling payment provider for charge"))
+  (effect "payment.refund" (description "Calling payment provider for refund"))
+  (effect "log.audit" (description "Writing audit log")))
+
+(effect-annotation
+  (target "src/payment.ts::charge(*)")
+  (annotates "payment.charge"))
+
+(effect-annotation
+  (target "src/payment.ts::refund(*)")
+  (annotates "payment.refund"))
+
+(effect-annotation
+  (target "src/audit.ts::*")
+  (annotates "log.audit"))
+
+(effect-policy NO_PAYMENT_IN_UI
+  (description "UI components must not perform any payment effect.")
+  (target-scope "src/components/**")
+  (forbid "payment.*")
+  (severity "error")
+  (fix-hint "Move the `charge` call out of `CheckoutButton` into a server-side action. If the rule is wrong, propose a design update via `stele design propose --effect-policy NO_PAYMENT_IN_UI`. Do NOT edit the contract directly."))

@@ -1,0 +1,22 @@
+(metadata
+  (stele-version "0.1")
+  (project "effect-fixture-08-suppression-removes-effect"))
+
+(effect-declarations
+  (effect "db.read" (description "Reading from database")))
+
+(effect-annotation
+  (target "src/db.ts::findUser(*)")
+  (annotates "db.read"))
+
+(effect-policy NO_IO_IN_UI
+  (description "UI components must be pure render functions.")
+  (target-scope "src/components/**")
+  (forbid "db.read")
+  (severity "error")
+  (fix-hint "Move the `findUser` call out of `UserCard`. If the rule is wrong, propose a design update via `stele design propose --effect-policy NO_IO_IN_UI`. Do NOT edit the contract directly."))
+
+(effect-suppression
+  (target "src/cache/cached-get.ts::cachedGet(1)")
+  (suppresses "db.read")
+  (reason "Caching wrapper around `findUser`. The db.read leakage through cachedGet is intentional — the cache invalidation path is reviewed separately under MC-13."))

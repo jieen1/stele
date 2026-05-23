@@ -1,0 +1,18 @@
+(metadata
+  (stele-version "0.1")
+  (project "effect-fixture-10-unresolved-fail-closed-error"))
+
+(effect-declarations
+  (effect "db.read" (description "Reading from database"))
+  (effect "db.write" (description "Writing to database")))
+
+(effect-annotation
+  (target "src/db.ts::*")
+  (annotates "db.read" "db.write"))
+
+(effect-policy NO_IO_IN_UI
+  (description "UI components must be pure render functions.")
+  (target-scope "src/components/**")
+  (forbid "db.read" "db.write")
+  (severity "error")
+  (fix-hint "Replace the dynamic dispatch in `UserCard` with a typed call so the evaluator can resolve effects. If the rule is wrong, propose a design update via `stele design propose --effect-policy NO_IO_IN_UI`. Do NOT edit the contract directly."))

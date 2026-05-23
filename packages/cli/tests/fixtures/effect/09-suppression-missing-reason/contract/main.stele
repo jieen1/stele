@@ -1,0 +1,16 @@
+(metadata
+  (stele-version "0.1")
+  (project "effect-fixture-09-suppression-missing-reason"))
+
+(effect-declarations
+  (effect "db.read" (description "Reading from database")))
+
+(effect-annotation
+  (target "src/db.ts::*")
+  (annotates "db.read"))
+
+;; INTENTIONAL E0357: (reason "...") is mandatory per Round 2 D-CG-1.
+;; This fixture verifies the parser refuses contracts that omit `reason`.
+(effect-suppression
+  (target "src/cache/cached-get.ts::cachedGet(1)")
+  (suppresses "db.read"))

@@ -1,0 +1,10 @@
+[
+  {
+    "rule_id": "effect.unresolved_call_blocks_evaluation",
+    "rule_kind_pattern": "trace_violation|effect_violation|type_state_violation",
+    "severity": "warning",
+    "location": { "path": "src/components/UserCard.ts" },
+    "group_id_pattern": "::UserCard\\(1\\)$",
+    "cause": { "summary_contains": "unresolved" }
+  }
+]

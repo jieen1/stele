@@ -1,0 +1,10 @@
+[
+  {
+    "rule_id": "effect.NO_IO_IN_UI.forbidden_effect",
+    "rule_kind_pattern": "trace_violation|effect_violation|type_state_violation",
+    "severity": "error",
+    "location": { "path": "src/components/UserCard.ts" },
+    "group_id_pattern": "::UserCard\\(1\\)$",
+    "cause": { "summary_contains": "db.read" }
+  }
+]

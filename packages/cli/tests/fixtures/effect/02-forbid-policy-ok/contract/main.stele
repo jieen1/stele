@@ -1,0 +1,23 @@
+(metadata
+  (stele-version "0.1")
+  (project "effect-fixture-02-forbid-policy-ok"))
+
+(effect-declarations
+  (effect "db.read" (description "Reading from database"))
+  (effect "db.write" (description "Writing to database"))
+  (effect "http.outgoing" (description "Outgoing HTTP request")))
+
+(effect-annotation
+  (target "src/db.ts::*")
+  (annotates "db.read" "db.write"))
+
+(effect-annotation
+  (target "src/http.ts::*")
+  (annotates "http.outgoing"))
+
+(effect-policy NO_IO_IN_UI
+  (description "UI components must be pure render functions.")
+  (target-scope "src/components/**")
+  (forbid "db.read" "db.write" "http.outgoing")
+  (severity "error")
+  (fix-hint "Move IO out of `UserCard`. UI should receive pre-fetched data via props. If the rule is wrong, propose a design update via `stele design propose --effect-policy NO_IO_IN_UI`. Do NOT edit the contract directly."))

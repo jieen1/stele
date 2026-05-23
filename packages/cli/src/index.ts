@@ -27,7 +27,12 @@ import {
 import { runCheckRecursive } from "./commands/check-recursive.js";
 import { formatCheckReport } from "./report/formatter.js";
 import { runAgentContext, type AgentContextOptions } from "./commands/agentContext.js";
-import { runExplain, type ExplainOptions } from "./commands/explain.js";
+import {
+  runExplain,
+  runExplainEffect,
+  type ExplainEffectOptions,
+  type ExplainOptions,
+} from "./commands/explain.js";
 import { runGenerate, runGenerateRecursive, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
 import { runList } from "./commands/list.js";
@@ -266,11 +271,42 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .description("Display the contract rule inventory with severity and category details.")
     .option("--json", "emit machine-readable rule inventory")
     .action((options: RulesOptions) => rules(cwd(), options));
-  program
-    .command("explain <id>")
-    .description("Explain a specific contract invariant by its ID.")
+  const explainCommand = program
+    .command("explain")
+    .description("Explain a contract rule or effect propagation chain.");
+  explainCommand
+    .argument("[id]", "invariant id (or use a subcommand)")
     .option("--json", "emit machine-readable rule explanation")
-    .action((id, options: ExplainOptions) => explain(cwd(), id, options));
+    .action(async (id: string | undefined, options: ExplainOptions) => {
+      if (id === undefined) {
+        explainCommand.help();
+        return;
+      }
+      await explain(cwd(), id, options);
+    });
+  const effectSubcommand = explainCommand
+    .command("effect <node-id>")
+    .description("Show effect propagation chain and applicable policies for a node.")
+    .option("--no-cache", "force re-extraction of the call graph (skip on-disk cache).")
+    .action(async (nodeId: string) => {
+      // `--json` is declared on the parent `explain` command so the existing
+      // `stele explain <id> --json` syntax keeps working. Commander does not
+      // duplicate-detect across parent and child, so we read the merged
+      // options here via `optsWithGlobals()`.
+      const merged = effectSubcommand.optsWithGlobals() as {
+        json?: boolean;
+        cache?: boolean;
+      };
+      const explainEffectOptions: ExplainEffectOptions = {
+        json: merged.json,
+        noCache: merged.cache === false,
+      };
+      const result = await runExplainEffect(cwd(), nodeId, explainEffectOptions);
+      process.stdout.write(result.output);
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
+    });
   program
     .command("agent-context")
     .description("Generate context for AI agents about the current contract state.")

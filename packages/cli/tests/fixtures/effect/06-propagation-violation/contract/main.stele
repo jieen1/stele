@@ -1,0 +1,19 @@
+(metadata
+  (stele-version "0.1")
+  (project "effect-fixture-06-propagation-violation"))
+
+(effect-declarations
+  (effect "db.read" (description "Reading from database"))
+  (effect "db.write" (description "Writing to database"))
+  (effect "http.outgoing" (description "Outgoing HTTP request")))
+
+(effect-annotation
+  (target "src/db.ts::findUser(*)")
+  (annotates "db.read"))
+
+(effect-policy NO_IO_IN_UI
+  (description "UI components must be pure render functions.")
+  (target-scope "src/components/**")
+  (forbid "db.read" "db.write" "http.outgoing")
+  (severity "error")
+  (fix-hint "Move the indirect db access in `UserPanel` to a service or route loader. If the rule is wrong, propose a design update via `stele design propose --effect-policy NO_IO_IN_UI`. Do NOT edit the contract directly."))

@@ -1,0 +1,22 @@
+(metadata
+  (stele-version "0.1")
+  (project "effect-fixture-05-allow-only-policy-violation"))
+
+(effect-declarations
+  (effect "db.read" (description "Reading from database"))
+  (effect "time.now" (description "Reading current time")))
+
+(effect-annotation
+  (target "src/db.ts::*")
+  (annotates "db.read"))
+
+(effect-annotation
+  (target "src/clock.ts::*")
+  (annotates "time.now"))
+
+(effect-policy PURE_LIB_ONLY
+  (description "Pure library functions may read time but nothing else.")
+  (target-scope "src/lib/pure/**")
+  (allow-only "time.now")
+  (severity "error")
+  (fix-hint "Remove the `findUser` call from `formatRecord`. If the rule is wrong, propose a design update via `stele design propose --effect-policy PURE_LIB_ONLY`. Do NOT edit the contract directly."))

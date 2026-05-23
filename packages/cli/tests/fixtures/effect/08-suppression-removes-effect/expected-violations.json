@@ -1,0 +1,16 @@
+[
+  {
+    "rule_id": "effect.NO_IO_IN_UI.forbidden_effect",
+    "rule_kind_pattern": "effect_violation",
+    "severity": "error",
+    "location": { "path": "src/components/UserCard.ts" },
+    "group_id_pattern": "::UserCard\\(1\\)$",
+    "cause": { "summary_contains": "db.read" }
+  },
+  {
+    "rule_id": "effect.suppression_active",
+    "rule_kind_pattern": "effect_suppression_notice|effect_notice|notice",
+    "severity": "warning",
+    "cause": { "summary_contains": "db.read" }
+  }
+]
