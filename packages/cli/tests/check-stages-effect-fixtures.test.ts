@@ -73,16 +73,21 @@ describe("effect-policy end-to-end fixtures", () => {
   for (const fixture of fixtures) {
     it(fixture, async () => {
       if (!(await isEffectInfrastructureAvailable())) {
-        // T5.2 (@stele/effect-evaluator) or T5.3
-        // (tsEffectAnnotationExtractor) not yet built — skip gracefully so
-        // this fixture suite can land independently. The maintainer will
-        // re-run after both ship.
-        // eslint-disable-next-line no-console
-        console.log(
-          `[effect-fixture] skipping ${fixture}: infrastructure not yet built ` +
-            "(T5.2 or T5.3 incomplete). Build both packages to enable.",
+        // Round 3 P1-7: pre-Phase-B grace period for missing dist is over —
+        // missing infra is a regression. Fail-fast unless the maintainer
+        // opts in via STELE_FIXTURE_ALLOW_SKIP=1.
+        if (process.env.STELE_FIXTURE_ALLOW_SKIP === "1") {
+          // eslint-disable-next-line no-console
+          console.log(
+            `[effect-fixture] STELE_FIXTURE_ALLOW_SKIP=1 set; skipping ${fixture}.`,
+          );
+          return;
+        }
+        throw new Error(
+          `[effect-fixture] effect-evaluator + tsEffectAnnotationExtractor not built ` +
+            `for fixture "${fixture}". Build both packages, or set ` +
+            `STELE_FIXTURE_ALLOW_SKIP=1 to skip during local development.`,
         );
-        return;
       }
 
       const fixturePath = resolve(FIXTURES_DIR, fixture);

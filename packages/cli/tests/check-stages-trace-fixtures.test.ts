@@ -68,15 +68,24 @@ describe("trace-policy end-to-end fixtures", () => {
     it(fixture, async () => {
       const evaluator = await loadTraceEvaluator();
       if (evaluator === null) {
-        // T3.2 (@stele/trace-evaluator) not yet built — skip gracefully so
-        // this fixture suite can land independently. The maintainer will
-        // re-run after T3.2 lands.
-        // eslint-disable-next-line no-console
-        console.log(
-          `[trace-fixture] skipping ${fixture}: @stele/trace-evaluator not yet built ` +
-            `(T3.2 in progress). Run \`pnpm --filter @stele/trace-evaluator build\` to enable.`,
+        // Round 3 P1-7: previously this fell through with a console.log so the
+        // fixture suite could land before @stele/trace-evaluator built. That
+        // pre-Phase-B grace period has now passed — Phase B has shipped and a
+        // missing dist is a regression, not a transitional state. Fail-fast
+        // unless the maintainer opts back into the old behaviour for
+        // genuinely-local-dev situations.
+        if (process.env.STELE_FIXTURE_ALLOW_SKIP === "1") {
+          // eslint-disable-next-line no-console
+          console.log(
+            `[trace-fixture] STELE_FIXTURE_ALLOW_SKIP=1 set; skipping ${fixture}.`,
+          );
+          return;
+        }
+        throw new Error(
+          `[trace-fixture] @stele/trace-evaluator not importable for fixture "${fixture}". ` +
+            "Build the package first with `pnpm --filter @stele/trace-evaluator build`, " +
+            "or set STELE_FIXTURE_ALLOW_SKIP=1 to skip during local development.",
         );
-        return;
       }
 
       const fixturePath = resolve(FIXTURES_DIR, fixture);

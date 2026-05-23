@@ -78,16 +78,21 @@ describe("type-state end-to-end fixtures", () => {
   for (const fixture of fixtures) {
     it(fixture, async () => {
       if (!(await isTypeStateInfrastructureAvailable())) {
-        // T4.2 (@stele/type-state-evaluator) or T4.3
-        // (tsTypeStateInferenceExtractor) not yet built — skip gracefully so
-        // this fixture suite can land independently. The maintainer will
-        // re-run after both ship.
-        // eslint-disable-next-line no-console
-        console.log(
-          `[type-state-fixture] skipping ${fixture}: infrastructure not yet built ` +
-            "(T4.2 or T4.3 incomplete). Build both packages to enable.",
+        // Round 3 P1-7: pre-Phase-B grace period for missing dist is over —
+        // missing infra is a regression. Fail-fast unless the maintainer
+        // opts in via STELE_FIXTURE_ALLOW_SKIP=1.
+        if (process.env.STELE_FIXTURE_ALLOW_SKIP === "1") {
+          // eslint-disable-next-line no-console
+          console.log(
+            `[type-state-fixture] STELE_FIXTURE_ALLOW_SKIP=1 set; skipping ${fixture}.`,
+          );
+          return;
+        }
+        throw new Error(
+          `[type-state-fixture] type-state-evaluator + tsTypeStateInferenceExtractor not built ` +
+            `for fixture "${fixture}". Build both packages, or set ` +
+            `STELE_FIXTURE_ALLOW_SKIP=1 to skip during local development.`,
         );
-        return;
       }
 
       const fixturePath = resolve(FIXTURES_DIR, fixture);
