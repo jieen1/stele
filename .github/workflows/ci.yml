@@ -30,6 +30,13 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test:packed-adoption
+      # Round 3 P0-2: Stele's own self-protection invariants (ALL_EVALUATORS_COMPILE,
+      # STRICT_MODE_DEFAULT_IN_CI, FIX_HINT_REQUIRES_ANALYSIS_BRANCH, and the other
+      # path/import safety checks) live in this repo's own contract. Run them here.
+      - run: node packages/cli/dist/index.js check
+      - run: python -m pytest tests/contract -q
+      # Adoption smoke: a clean checkout of fixtures/python-app must generate,
+      # pytest, and check successfully.
       - run: node ../../packages/cli/dist/index.js generate
         working-directory: fixtures/python-app
       - run: python -m pytest tests/contract -q

@@ -67,6 +67,8 @@ local-packages/*.tgz
 .stele/events/
 .stele/maintenance/
 .stele/tmp-*
+examples/**/.stele/events/
+examples/**/.stele/maintenance/
 
 # CodeGraph local index
 .codegraph/
