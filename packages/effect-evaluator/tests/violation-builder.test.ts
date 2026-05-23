@@ -116,6 +116,85 @@ describe("buildForbiddenEffectViolation", () => {
     expect(v2.fingerprint).toBe(v.fingerprint);
   });
 
+  // Round 3 P1-6: typed effect_evidence field is populated alongside the
+  // free-text cause.detail rendering.
+  it("populates the first-class typed effect_evidence field", () => {
+    expect(v.effect_evidence).toBeDefined();
+    expect(v.effect_evidence!.offending_effect).toBe("db.read");
+    expect(v.effect_evidence!.inherited_effects).toEqual(["db.read"]);
+    expect(v.effect_evidence!.direct_effects_on_node).toEqual([]);
+    expect(v.effect_evidence!.propagation_chain).toEqual([
+      NODE.id,
+      "src/db/users.ts::getUserFromDb(1)",
+    ]);
+    expect(v.effect_evidence!.propagation_root_nodes).toEqual([
+      "src/db/users.ts::getUserFromDb(1)",
+    ]);
+  });
+
+  // Round 3 P1-5 (Round 2 E-P2-3): propagation_chain rendering caps at 5 hops.
+  it("collapses propagation_chain when it exceeds the render cap", () => {
+    const longChain = [
+      "src/a.ts::A(0)",
+      "src/b.ts::B(0)",
+      "src/c.ts::C(0)",
+      "src/d.ts::D(0)",
+      "src/e.ts::E(0)",
+      "src/f.ts::F(0)",
+      "src/g.ts::G(0)",
+      "src/h.ts::H(0)", // 8 hops total → caps at 5 rendered (4 head + 1 root)
+    ];
+    const longEvidence = basicEvidence("db.read", false, longChain);
+    const cgLong = mkCallGraph({ nodes: [NODE], edges: [] });
+    const v = buildForbiddenEffectViolation({
+      policy: POLICY,
+      node: NODE,
+      evidence: longEvidence,
+      callGraph: cgLong,
+      directOnNode: false,
+    });
+    expect(v.cause.detail).toContain("propagation_chain:");
+    // Head — first 4 hops (cap - 1) preserved verbatim.
+    expect(v.cause.detail).toContain("→ src/a.ts::A(0)");
+    expect(v.cause.detail).toContain("→ src/b.ts::B(0)");
+    expect(v.cause.detail).toContain("→ src/c.ts::C(0)");
+    expect(v.cause.detail).toContain("→ src/d.ts::D(0)");
+    // The 3 middle hops are collapsed (8 total − 4 head − 1 root = 3).
+    expect(v.cause.detail).toContain("[... 3 more callees");
+    expect(v.cause.detail).toContain(
+      "stele explain effect src/h.ts::H(0)",
+    );
+    // Root preserved with the declares-marker.
+    expect(v.cause.detail).toContain("→ src/h.ts::H(0) [declares: db.read]");
+    // None of the middle ids should appear in the rendered chain.
+    expect(v.cause.detail).not.toContain("src/e.ts::E(0)");
+    expect(v.cause.detail).not.toContain("src/f.ts::F(0)");
+    expect(v.cause.detail).not.toContain("src/g.ts::G(0)");
+  });
+
+  it("renders chains at or under cap verbatim with no collapse marker", () => {
+    const fiveChain = [
+      "src/a.ts::A(0)",
+      "src/b.ts::B(0)",
+      "src/c.ts::C(0)",
+      "src/d.ts::D(0)",
+      "src/e.ts::E(0)",
+    ];
+    const ev = basicEvidence("db.read", false, fiveChain);
+    const cgShort = mkCallGraph({ nodes: [NODE], edges: [] });
+    const v = buildForbiddenEffectViolation({
+      policy: POLICY,
+      node: NODE,
+      evidence: ev,
+      callGraph: cgShort,
+      directOnNode: false,
+    });
+    expect(v.cause.detail).not.toContain("more callees");
+    for (const id of fiveChain) {
+      expect(v.cause.detail).toContain(`→ ${id}`);
+    }
+  });
+
   it("policy.fixHint overrides the default fix-hint", () => {
     const custom = mkEffectPolicy({
       id: POLICY.id,

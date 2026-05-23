@@ -62,6 +62,14 @@ function findNode(callGraph: CallGraph, id: string): CallGraphNode | undefined {
   return undefined;
 }
 
+/**
+ * Round 3 P1-5 (Round 2 E-P2-3): cap the rendered propagation_chain at this
+ * many hops. Deeper chains collapse the middle into a `[... N more callees]`
+ * marker that points the agent at `stele explain effect <node>` for the
+ * full chain. Chains shorter than the cap render verbatim.
+ */
+const PROPAGATION_CHAIN_RENDER_CAP = 5;
+
 function renderEvidence(evidence: PropagationEvidence): string {
   const lines: string[] = [];
   lines.push(`offending_effect: ${evidence.offendingEffect}`);
@@ -70,15 +78,47 @@ function renderEvidence(evidence: PropagationEvidence): string {
   lines.push(`propagation_root_nodes: [${[...evidence.propagationRootNodes].sort().join(", ")}]`);
   if (evidence.propagationChain.length > 0) {
     lines.push(`propagation_chain:`);
+    const chain = evidence.propagationChain;
+    const fullLen = chain.length;
+    // Truncate the middle for chains longer than the cap: show the caller
+    // (first entry), the declarer (last entry), and a marker for what was
+    // collapsed. Preserves the most agent-actionable endpoints.
+    const renderIndices: number[] = [];
+    let collapsedCount = 0;
+    if (fullLen <= PROPAGATION_CHAIN_RENDER_CAP) {
+      for (let i = 0; i < fullLen; i += 1) {
+        renderIndices.push(i);
+      }
+    } else {
+      // Keep the first (cap - 1) entries + the last entry; collapse the rest.
+      const headLen = PROPAGATION_CHAIN_RENDER_CAP - 1;
+      for (let i = 0; i < headLen; i += 1) {
+        renderIndices.push(i);
+      }
+      collapsedCount = fullLen - headLen - 1;
+      renderIndices.push(fullLen - 1);
+    }
     let indent = "  ";
-    for (let i = 0; i < evidence.propagationChain.length; i += 1) {
-      const id = evidence.propagationChain[i];
-      const suffix =
-        i === evidence.propagationChain.length - 1
-          ? ` [declares: ${evidence.offendingEffect}]`
-          : "";
+    for (let pos = 0; pos < renderIndices.length; pos += 1) {
+      const i = renderIndices[pos];
+      const id = chain[i];
+      const isLast = i === fullLen - 1;
+      const suffix = isLast ? ` [declares: ${evidence.offendingEffect}]` : "";
       lines.push(`${indent}→ ${id}${suffix}`);
       indent += "  ";
+      // After printing the last "head" entry, insert the collapse marker.
+      if (
+        collapsedCount > 0 &&
+        pos === PROPAGATION_CHAIN_RENDER_CAP - 2 &&
+        renderIndices.length === PROPAGATION_CHAIN_RENDER_CAP
+      ) {
+        const root = chain[fullLen - 1];
+        lines.push(
+          `${indent}→ [... ${collapsedCount} more callees, run ` +
+            `\`stele explain effect ${root}\` to see the full chain]`,
+        );
+        indent += "  ";
+      }
     }
   }
   return lines.join("\n");
@@ -170,6 +210,9 @@ export function buildForbiddenEffectViolation(
     },
     priority: defaultPriority("forbidden_effect"),
     group_id: node.id,
+    // Round 3 P1-6: promote propagation evidence to a first-class typed
+    // field so tooling consumers don't have to regex cause.detail.
+    effect_evidence: toReportEvidence(evidence),
   });
 }
 
@@ -251,7 +294,30 @@ export function buildDisallowedEffectViolation(
     },
     priority: defaultPriority("disallowed_effect"),
     group_id: node.id,
+    // Round 3 P1-6 — see forbidden_effect builder for rationale.
+    effect_evidence: toReportEvidence(evidence),
   });
+}
+
+/**
+ * Round 3 P1-6: convert the internal `PropagationEvidence` shape into the
+ * public `EffectViolationEvidence` shape (snake-case field names) for the
+ * report schema.
+ */
+function toReportEvidence(evidence: PropagationEvidence): {
+  offending_effect: string;
+  direct_effects_on_node: readonly string[];
+  inherited_effects: readonly string[];
+  propagation_root_nodes: readonly string[];
+  propagation_chain: readonly string[];
+} {
+  return {
+    offending_effect: evidence.offendingEffect,
+    direct_effects_on_node: [...evidence.directEffectsOnNode],
+    inherited_effects: [...evidence.inheritedEffects],
+    propagation_root_nodes: [...evidence.propagationRootNodes],
+    propagation_chain: [...evidence.propagationChain],
+  };
 }
 
 export interface BuildUnresolvedCallOptions {
