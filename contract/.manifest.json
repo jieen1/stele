@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-23T09:38:30.395Z",
+  "generated_at": "2026-05-23T13:02:21.634Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/.gitkeep": {
@@ -30,6 +30,38 @@
     "contract/main.stele": {
       "sha256": "2ac1dde810a089cc5355ccb2162ade91e33d624151360356184977cb7879a566",
       "size": 12429
+    },
+    "packages/claude-code-plugin/hooks/hooks.json": {
+      "sha256": "893e91f1cbd1cde84b0967c3811081405eda8e28a565b7eddcd28e609b358c4f",
+      "size": 1604
+    },
+    "packages/claude-code-plugin/scripts/lifecycle-context.js": {
+      "sha256": "671955c70843eeb62c3cfe3e04cff5fb6e34ca1aac92610db0c2ba726b2176c3",
+      "size": 6317
+    },
+    "packages/claude-code-plugin/scripts/observation-hook.js": {
+      "sha256": "77f5149f086c2d09e8fad3ebe279b63e990432ede018945381e96aa4e0a1b906",
+      "size": 13990
+    },
+    "packages/claude-code-plugin/scripts/path-utils.js": {
+      "sha256": "92b294611fe9424b07d1ebfb0c5a782be4d07463fbc41253d7f3808127d7a687",
+      "size": 1124
+    },
+    "packages/claude-code-plugin/scripts/pre-tool-protect.js": {
+      "sha256": "166670f5b42d80897d493da5455fb5afc6863075da8f2fd9bf060157601213ee",
+      "size": 16233
+    },
+    "packages/claude-code-plugin/scripts/shell-utils.js": {
+      "sha256": "f306212dae5fb55427a0db34f949368f3687f6236467cfd5e648230c83f50768",
+      "size": 3941
+    },
+    "packages/claude-code-plugin/scripts/stop-validate.js": {
+      "sha256": "597ee7d95ab943fcc0393dc029bbc6c8f698e18add5a695bf10db71a01a41248",
+      "size": 20787
+    },
+    "stele.config.json": {
+      "sha256": "fa311c324f2e92fa31de66ffda4cb3e0af512b98e2cebc8c4c1704148ba9d60b",
+      "size": 680
     },
     "tests/contract/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
