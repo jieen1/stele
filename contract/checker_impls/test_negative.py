@@ -544,6 +544,83 @@ def test_fix_hint_requires_analysis_branch_missing_keyword():
     return _pass_if_false(result, "fix_hint_requires_analysis_branch_missing_keyword")
 
 
+def test_strict_mode_default_in_ci_env_injection():
+    """Round 3 P1-3: place the lenient flag inside a workflow `env:` value
+    (e.g. STELE_ARGS: "--lenient-effects") and verify the checker catches
+    it. The pre-P1-3 substring scan would only find argv-line occurrences."""
+    _reset_caches()
+    ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    if not ci_yml.is_file():
+        print("  SKIP: .github/workflows/ci.yml not present")
+        return True
+    original = ci_yml.read_text(encoding="utf-8")
+    # Inject an env block whose value carries the lenient flag.
+    tampered = original.replace(
+        "    steps:\n",
+        "    env:\n      STELE_ARGS: \"--lenient-effects\"\n    steps:\n",
+        1,
+    )
+    ci_yml.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.strict_mode_default_in_ci({})
+    finally:
+        ci_yml.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "strict_mode_default_in_ci_env_injection")
+
+
+def test_strict_mode_default_in_ci_via_referenced_script():
+    """Round 3 P1-3: hide the lenient flag in a referenced shell script
+    instead of in the workflow itself; the checker must follow the
+    `bash X.sh` reference and scan the script too."""
+    _reset_caches()
+    ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    scripts_dir = sp._REPO_ROOT / "scripts"
+    if not ci_yml.is_file() or not scripts_dir.is_dir():
+        print("  SKIP: .github/workflows/ci.yml or scripts/ missing")
+        return True
+    original_ci = ci_yml.read_text(encoding="utf-8")
+    new_script = scripts_dir / "negtest-strict-mode.sh"
+    try:
+        # 1) Drop a script whose content carries the lenient flag.
+        new_script.write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\nstele check --lenient-effects\n",
+            encoding="utf-8",
+        )
+        # 2) Wire the CI workflow to invoke that script.
+        tampered_ci = original_ci.replace(
+            "      - run: pnpm install --frozen-lockfile",
+            "      - run: bash scripts/negtest-strict-mode.sh\n      - run: pnpm install --frozen-lockfile",
+            1,
+        )
+        ci_yml.write_text(tampered_ci, encoding="utf-8")
+        result = sp.strict_mode_default_in_ci({})
+    finally:
+        ci_yml.write_text(original_ci, encoding="utf-8")
+        new_script.unlink(missing_ok=True)
+    return _pass_if_false(result, "strict_mode_default_in_ci_via_referenced_script")
+
+
+def test_fix_hint_requires_analysis_branch_semantic_inversion():
+    """Round 3 P1-2: rewrite the [A] anchor in trace-evaluator to claim it
+    is the Contract branch. Every required substring (`code issue`, `contract
+    issue`, `propose`, `[A]`, `[B]`) is still present in the file, so the
+    legacy keyword check would PASS. The structural check must catch this
+    via the missing canonical `[A] Code issue` anchor."""
+    _reset_caches()
+    fix_hint_ts = sp._PACKAGES_DIR / "trace-evaluator" / "src" / "fix-hint-substitution.ts"
+    if not fix_hint_ts.is_file():
+        print("  SKIP: trace-evaluator/src/fix-hint-substitution.ts not present")
+        return True
+    original = fix_hint_ts.read_text(encoding="utf-8")
+    tampered = original.replace("[A] Code issue", "[A] Contract issue")
+    fix_hint_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.fix_hint_requires_analysis_branch({})
+    finally:
+        fix_hint_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "fix_hint_requires_analysis_branch_semantic_inversion")
+
+
 def test_cdl_utf8_valid_invalid_bytes():
     """Write invalid UTF-8 bytes to a .stele file, verify checker catches it."""
     _reset_caches()
@@ -592,6 +669,11 @@ def main() -> int:
         ("all_evaluators_compile_missing_dist", test_all_evaluators_compile_missing_dist),
         ("strict_mode_default_in_ci_lenient_flag", test_strict_mode_default_in_ci_lenient_flag),
         ("fix_hint_requires_analysis_branch_missing_keyword", test_fix_hint_requires_analysis_branch_missing_keyword),
+        # Round 3 P1-2: semantic inversion negative test
+        ("fix_hint_requires_analysis_branch_semantic_inversion", test_fix_hint_requires_analysis_branch_semantic_inversion),
+        # Round 3 P1-3: env-injection + referenced-script bypass negatives
+        ("strict_mode_default_in_ci_env_injection", test_strict_mode_default_in_ci_env_injection),
+        ("strict_mode_default_in_ci_via_referenced_script", test_strict_mode_default_in_ci_via_referenced_script),
     ]
 
     print("=" * 60)

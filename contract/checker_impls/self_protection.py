@@ -1054,12 +1054,66 @@ def all_evaluators_compile(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     return {"passed": True, "message": None, "violations": []}
 
 
+_LENIENT_FLAG_RE = re.compile(r"--lenient-")
+# Match references to shell scripts that the workflow may delegate to:
+#   `bash scripts/x.sh`, `sh ./x.sh`, `./scripts/x.sh args...`
+_SCRIPT_REF_RE = re.compile(
+    r"(?:\b(?:bash|sh|zsh)\s+)?(?P<path>[\w./\-]+\.(?:sh|bash|zsh))\b",
+)
+# An env: assignment whose value text contains the literal lenient flag —
+# pre-P1-3 the checker only scanned argv lines and missed this.
+_ENV_LENIENT_RE = re.compile(
+    r"^\s*[A-Z_][A-Z0-9_]*\s*:\s*[\"']?[^\n]*--lenient-",
+    re.MULTILINE,
+)
+
+
+def _scan_text_for_lenient(
+    rel_path: str,
+    content: str,
+    violations: list[dict[str, Any]],
+) -> None:
+    """Round 3 P1-3: surface every `--lenient-` token in a workflow or
+    referenced shell script. Caller controls de-duplication."""
+    for lineno, line in enumerate(content.splitlines(), 1):
+        for m in _LENIENT_FLAG_RE.finditer(line):
+            violations.append({
+                "file": rel_path,
+                "line": lineno,
+                "column": m.start() + 1,
+                "message": (
+                    f"CI uses lenient flag: {line.strip()[:140]}"
+                ),
+            })
+    for m in _ENV_LENIENT_RE.finditer(content):
+        lineno = content.count("\n", 0, m.start()) + 1
+        # Skip if the same line was already captured by the direct scan above.
+        line_text = content.splitlines()[lineno - 1] if lineno - 1 < len(content.splitlines()) else ""
+        if any(v["file"] == rel_path and v["line"] == lineno for v in violations):
+            continue
+        violations.append({
+            "file": rel_path,
+            "line": lineno,
+            "column": 1,
+            "message": (
+                f"CI env assigns lenient flag (will expand via $VAR in a step): {line_text.strip()[:140]}"
+            ),
+        })
+
+
 def strict_mode_default_in_ci(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Verify no CI workflow passes --lenient-* flags to stele check.
 
     Scans .github/workflows/*.yml and .github/workflows/*.yaml for any
-    occurrence of "--lenient-". Absence of the directory is treated as
-    passing — the repo simply has no CI config yet.
+    occurrence of "--lenient-", plus:
+      - any `env:` value containing `--lenient-` (Round 3 P1-3 — shell-var
+        injection like `STELE_ARGS: "--lenient-effects"` followed later by
+        `stele check $STELE_ARGS`)
+      - any shell script referenced from a `run:` line (Round 3 P1-3 — the
+        flag may live in a referenced script rather than the workflow itself)
+
+    Absence of the directory is treated as passing — the repo has no CI
+    config yet.
     """
     workflows_dir = _REPO_ROOT / ".github" / "workflows"
     if not workflows_dir.is_dir():
@@ -1070,6 +1124,7 @@ def strict_mode_default_in_ci(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         }
 
     violations: list[dict[str, Any]] = []
+    referenced_scripts: set[pathlib.Path] = set()
     workflow_files = sorted(
         list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
     )
@@ -1078,17 +1133,22 @@ def strict_mode_default_in_ci(ctx: dict, **kwargs: Any) -> dict[str, Any]:
             content = wf.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        for lineno, line in enumerate(content.splitlines(), 1):
-            idx = line.find("--lenient-")
-            if idx != -1:
-                violations.append({
-                    "file": str(wf.relative_to(_REPO_ROOT)),
-                    "line": lineno,
-                    "column": idx + 1,
-                    "message": (
-                        f"CI workflow uses lenient flag: {line.strip()[:120]}"
-                    ),
-                })
+        rel_wf = str(wf.relative_to(_REPO_ROOT))
+        _scan_text_for_lenient(rel_wf, content, violations)
+        # Discover referenced scripts so we can scan them too.
+        for m in _SCRIPT_REF_RE.finditer(content):
+            script_rel = m.group("path").lstrip("./")
+            script_path = _REPO_ROOT / script_rel
+            if script_path.is_file():
+                referenced_scripts.add(script_path)
+
+    for script in sorted(referenced_scripts):
+        try:
+            script_content = script.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        rel_script = str(script.relative_to(_REPO_ROOT))
+        _scan_text_for_lenient(rel_script, script_content, violations)
 
     if violations:
         return {
@@ -1110,7 +1170,104 @@ _FIX_HINT_SOURCES = [
     "packages/effect-evaluator/src/fix-hint.ts",
 ]
 
+# Substrings that must appear at all (loose check, kept for backwards-compat
+# with negative test fixtures).
 _FIX_HINT_REQUIRED_KEYWORDS = ["code issue", "contract issue", "propose", "[A]", "[B]"]
+
+
+def _inline_propose_exit_text(body: str, source: str) -> str:
+    """Round 3 P1-2: defaultForbiddenEffectFixHint and friends emit their
+    `[B]` block by calling `proposeExitText(...)` — a separate function in
+    the same file. The structural check needs to see that text, so before
+    we analyse a body we replace every `proposeExitText(...)` call with the
+    *literal return value* of the function defined in the same file.
+
+    If `proposeExitText` is not exported in this file the body is returned
+    unchanged (the structural check will then complain about a missing
+    `[B]` branch, which is the right thing).
+    """
+    if "proposeExitText(" not in body:
+        return body
+    functions = _extract_exported_function_bodies(source)
+    propose = next(
+        (b for (name, _line, b) in functions if name == "proposeExitText"),
+        None,
+    )
+    if propose is None:
+        return body
+    # Strip out the `return [ ... ].join("\n");` template-string scaffolding;
+    # what's left between the array's [ ... ] is the actual canonical text.
+    return body + "\n" + propose
+
+
+_RE_A_CODE = re.compile(r"\[A\]\s+Code issue", re.IGNORECASE)
+_RE_B_CONTRACT = re.compile(r"\[B\]\s+Contract issue", re.IGNORECASE)
+_RE_CHOOSE = re.compile(r"Choose\s+\[A\]\s+or\s+\[B\]\s+before\s+acting", re.IGNORECASE)
+
+
+def _analyze_fix_hint_structure(body: str) -> list[str]:
+    """Round 3 P1-2: enforce *semantic* A/B-branch shape, not just keyword
+    presence. The canonical structure is:
+
+        ...head...
+        ... "code issue or contract issue?" ...        (lead-in question)
+        [A] Code issue — ... <code suggestion> ...
+        [B] Contract issue — ... propose ... contract/design/proposals/ ...
+        Choose [A] or [B] before acting...
+
+    The pure-keyword check passes pathological inputs like
+    `[A] propose this code change to the contract issue` because every
+    required substring is present. This function anchors on the canonical
+    phrase pairs `[A] Code issue` and `[B] Contract issue` (case-insensitive)
+    so a semantically inverted hint is caught even when every individual
+    keyword exists somewhere in the body.
+
+    Returns a list of structural failures. Empty list = pass.
+    """
+    failures: list[str] = []
+    match_a = _RE_A_CODE.search(body)
+    match_b = _RE_B_CONTRACT.search(body)
+
+    if match_a is None:
+        failures.append("missing `[A] Code issue` anchor (with that exact phrasing)")
+    if match_b is None:
+        failures.append("missing `[B] Contract issue` anchor (with that exact phrasing)")
+    if failures:
+        return failures
+
+    if match_a.start() > match_b.start():
+        failures.append("`[A] Code issue` must appear before `[B] Contract issue`")
+        return failures
+
+    # Region between [A] Code issue and [B] Contract issue must contain a
+    # concrete code suggestion, not just abstract framing. We do not enforce
+    # syntactic backtick-snippet here (that's E0339); we enforce that the
+    # text is not silent — at least one full line of advice between A and B.
+    a_region = body[match_a.end():match_b.start()]
+    if len(a_region.strip()) < 20:
+        failures.append(
+            "`[A]` branch is empty or too short — must describe a concrete code repair",
+        )
+
+    # The [B] region is everything from `[B] Contract issue` onward; it must
+    # carry the propose flow + a pointer at the YAML proposal store.
+    b_region = body[match_b.start():]
+    lower_b = b_region.lower()
+    if "propose" not in lower_b:
+        failures.append("`[B]` branch must reference the propose flow")
+    if "contract/design/proposals" not in lower_b:
+        failures.append(
+            "`[B]` branch must point at `contract/design/proposals/<id>.yaml` (the YAML proposal store)",
+        )
+
+    # The trailing decision prompt is the agent's call-to-action; without it
+    # the hint reads as a default suggestion rather than an analysis branch.
+    if _RE_CHOOSE.search(body) is None:
+        failures.append(
+            "missing the trailing `Choose [A] or [B] before acting` decision prompt",
+        )
+
+    return failures
 
 
 def _extract_exported_function_bodies(source: str) -> list[tuple[str, int, str]]:
@@ -1185,6 +1342,7 @@ def fix_hint_requires_analysis_branch(ctx: dict, **kwargs: Any) -> dict[str, Any
             })
             continue
         for name, line_no, body in candidates:
+            # Layer 1 — loose keyword presence (back-compat with old negative tests).
             missing: list[str] = []
             for keyword in _FIX_HINT_REQUIRED_KEYWORDS:
                 if keyword in ("[A]", "[B]"):
@@ -1201,6 +1359,27 @@ def fix_hint_requires_analysis_branch(ctx: dict, **kwargs: Any) -> dict[str, Any
                     "message": (
                         f"{name} missing analysis-branch keywords: "
                         + ", ".join(missing)
+                    ),
+                })
+                # When the keyword-level check fails the structural check would
+                # mostly repeat the same complaint; skip the deeper pass to
+                # keep the violation list focused.
+                continue
+
+            # Layer 2 — Round 3 P1-2 structural check: keywords present but in
+            # the wrong branch / wrong order are caught here. Inline
+            # `proposeExitText(...)` first so the [B] branch text reaches the
+            # analyser (effect/type-state delegate [B] to that helper).
+            resolved = _inline_propose_exit_text(body, source)
+            structural_failures = _analyze_fix_hint_structure(resolved)
+            if structural_failures:
+                violations.append({
+                    "file": rel_path,
+                    "line": line_no,
+                    "column": None,
+                    "message": (
+                        f"{name} structural fix-hint check failed: "
+                        + "; ".join(structural_failures)
                     ),
                 })
 
