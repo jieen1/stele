@@ -659,6 +659,8 @@ describe("generateRustSource", () => {
             effectAnnotations: [],
             effectPolicies: [],
             effectSuppressions: [],
+          externAliases: [],
+
         };
     }
 

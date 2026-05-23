@@ -30,10 +30,69 @@ export type DesignApproveOptions = {
  * the env-var (if present) or defaults to "tty:<USER>" — never from the
  * Claude session id alone.
  */
+/**
+ * Round 5 I-02 + J-01: enforce the docstring's denylist that Round 4
+ * advertised but never implemented. STELE_APPROVED_BY accepted only when
+ * it is non-empty, longer than 2 chars, does NOT equal the agent's
+ * inherited shell defaults (CLAUDE_SESSION_ID, USER, USERNAME), is not
+ * the literal word "agent" / "bot" / "claude" / "tty", and carries a
+ * non-default token shape (contains `@` for an email, OR `:` for a
+ * scoped identifier like `service:ci`). Without this an agent that
+ * exports STELE_APPROVED_BY=anything bypasses the gate trivially.
+ */
+const _APPROVED_BY_FORBIDDEN_LITERALS = new Set([
+  "agent", "bot", "claude", "tty", "human", "user", "service",
+  "test", "ci", "unknown", "anonymous", "stele", "approved",
+]);
+
 function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; reason: string } {
   const explicit = process.env.STELE_APPROVED_BY;
-  if (typeof explicit === "string" && explicit.trim().length > 0) {
-    return { ok: true, approvedBy: explicit.trim() };
+  if (typeof explicit === "string") {
+    const trimmed = explicit.trim();
+    if (trimmed.length === 0) {
+      return {
+        ok: false,
+        reason:
+          "STELE_APPROVED_BY is set but empty. Set it to a human-identifying token containing `@` (email) or `:` (scoped service id).",
+      };
+    }
+    if (trimmed.length < 3) {
+      return {
+        ok: false,
+        reason: `STELE_APPROVED_BY value too short (${trimmed.length} chars). Use a real human-identifying token.`,
+      };
+    }
+    const lower = trimmed.toLowerCase();
+    const inheritedDefaults = new Set(
+      [process.env.CLAUDE_SESSION_ID, process.env.USER, process.env.USERNAME, process.env.LOGNAME]
+        .filter((v): v is string => typeof v === "string" && v.length > 0)
+        .map((v) => v.toLowerCase()),
+    );
+    if (inheritedDefaults.has(lower)) {
+      return {
+        ok: false,
+        reason:
+          `STELE_APPROVED_BY=${trimmed} matches a shell-inherited default (CLAUDE_SESSION_ID/USER/USERNAME/LOGNAME). ` +
+          "An agent's inherited env is not an attribution source. Set it to a real human-identifying token.",
+      };
+    }
+    if (_APPROVED_BY_FORBIDDEN_LITERALS.has(lower)) {
+      return {
+        ok: false,
+        reason:
+          `STELE_APPROVED_BY=${trimmed} is too generic. Use a token containing \`@\` (email) or \`:\` (scoped service id like service:ci).`,
+      };
+    }
+    const hasShape = trimmed.includes("@") || trimmed.includes(":");
+    if (!hasShape) {
+      return {
+        ok: false,
+        reason:
+          `STELE_APPROVED_BY=${trimmed} must contain \`@\` (email) or \`:\` (scoped id like service:ci). ` +
+          "Pure bare strings are not attributable.",
+      };
+    }
+    return { ok: true, approvedBy: trimmed };
   }
   if (process.stdin.isTTY) {
     const user = process.env.USER ?? process.env.USERNAME ?? "unknown";
@@ -42,7 +101,7 @@ function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; re
   return {
     ok: false,
     reason:
-      "stele design approve requires either an interactive TTY OR the STELE_APPROVED_BY env var set to a non-empty human-identifying value. " +
+      "stele design approve requires either an interactive TTY OR the STELE_APPROVED_BY env var set to a non-empty human-identifying token (containing `@` or `:`). " +
       "An agent invocation via Bash without one of these is refused; the approval would be unattributable.",
   };
 }

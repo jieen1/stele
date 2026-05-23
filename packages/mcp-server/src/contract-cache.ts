@@ -184,12 +184,22 @@ export function getProtectedPatterns(projectDir: string): string[] {
     return [...DEFAULT_PROTECTED_PATTERNS];
   }
 
+  // Round 5 I-01: UNION user `protected` with `DEFAULT_PROTECTED_PATTERNS`,
+  // never replace. Earlier code returned `config.protected` verbatim when
+  // present — that meant a user/agent config that omitted a default
+  // entry could shrink the protection surface seen by the MCP server's
+  // exposed tools (which the agent reads for its `protectedPatterns`
+  // view). UNION matches the CLI loadConfig + plugin pre-tool-protect
+  // semantics.
   try {
     const raw = readFileSync(configFile, "utf8");
     const config = JSON.parse(raw);
 
     if (config?.protected && Array.isArray(config.protected)) {
-      return config.protected;
+      const userPatterns = config.protected.filter(
+        (p: unknown): p is string => typeof p === "string" && p.length > 0,
+      );
+      return [...new Set<string>([...DEFAULT_PROTECTED_PATTERNS, ...userPatterns])];
     }
   } catch {
     // Config parse failure — fall back to defaults

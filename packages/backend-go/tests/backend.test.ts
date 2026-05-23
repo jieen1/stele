@@ -178,6 +178,8 @@ function createTestContract(): Contract {
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
+
   };
 }
 
@@ -235,6 +237,8 @@ function createContractWithGroup(groupId: string, invariants: any[]): Contract {
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
+
   };
 }
 

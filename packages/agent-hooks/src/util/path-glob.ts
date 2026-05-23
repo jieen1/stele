@@ -35,18 +35,60 @@ export function matchProtectedPath(
   const canonicalTargetPath = canonicalizeTargetPath(targetPath);
   const normalizedInput = normalizeForComparison(normalizeInputPath(canonicalTargetPath));
   const resolvedTarget = path.resolve(projectRoot, canonicalTargetPath);
-  // Round 4 D-06: realpath the resolved target before matching. Without
-  // this an agent can create a symlink at /tmp/decoy that points to a
-  // protected file inside the project, then "write to /tmp/decoy" — the
-  // pre-realpath path comparison sees `/tmp/decoy` (outside project,
-  // permitted) but the OS write lands on `<project>/contract/main.stele`.
-  // Errors during realpath (file doesn't exist yet, EACCES) fall back to
-  // the raw resolved path — we never UPGRADE permissions on failure.
+  // Round 4 D-06 + Round 5 I-05: realpath the resolved target before
+  // matching. Without this an agent can create a symlink at /tmp/decoy
+  // that points to a protected file and "write" to /tmp/decoy — the
+  // pre-realpath path comparison would see /tmp/decoy (outside project,
+  // permitted) but the OS write lands on the protected target.
+  //
+  // I-05 follow-up: a write to a non-existent leaf INSIDE a symlinked
+  // parent dir is the harder case — `realpathSync(<leaf>)` raises ENOENT
+  // and the legacy fallback returned the raw resolved path, missing the
+  // symlink hop. Walk dirname upward until realpath succeeds, then
+  // re-attach the tail. We refuse to walk PAST the projectRoot (and
+  // require the projectRoot itself to be a real directory) — otherwise
+  // a fictional projectRoot under test would walk all the way to "/"
+  // and synthesize wrong paths.
   const realpathedTarget = (() => {
     try {
       return fs.realpathSync(resolvedTarget);
     } catch {
-      return resolvedTarget;
+      // Confirm the projectRoot is a real directory; otherwise leave the
+      // raw path alone (preserves test expectations on fictional roots).
+      let projectRootReal: string;
+      try {
+        projectRootReal = fs.realpathSync(projectRoot);
+      } catch {
+        return resolvedTarget;
+      }
+      let current = resolvedTarget;
+      const tail: string[] = [];
+      while (true) {
+        const parent = path.dirname(current);
+        if (parent === current) return resolvedTarget; // reached fs root without finding
+        // Don't walk past the projectRoot: a write whose nearest existing
+        // ancestor is outside the project couldn't be inside a protected
+        // subdir by definition.
+        const parentReal = (() => {
+          try {
+            return fs.realpathSync(parent);
+          } catch {
+            return null;
+          }
+        })();
+        if (parentReal !== null) {
+          // Require the resolved parent to actually be at or below the
+          // project root; otherwise the symlink hop took us outside.
+          const rel = path.relative(projectRootReal, parentReal);
+          if (rel.startsWith("..") || path.isAbsolute(rel)) {
+            return resolvedTarget;
+          }
+          tail.unshift(path.basename(current));
+          return path.join(parentReal, ...tail);
+        }
+        tail.unshift(path.basename(current));
+        current = parent;
+      }
     }
   })();
   const relativeToProject = normalizeForComparison(toPosixPath(path.relative(projectRoot, realpathedTarget)));

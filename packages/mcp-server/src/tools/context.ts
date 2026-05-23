@@ -141,8 +141,18 @@ async function buildContext(projectDir: string, _focusPaths: string[]): Promise<
     if (context.hasConfig) {
       try {
         const config = JSON.parse(readFileSync(configFile, "utf8"));
+        // Round 5 I-01: UNION semantics — match CLI loadConfig + plugin
+        // pre-tool-protect. User config can only ADD patterns, never
+        // narrow the default set; the agent's view of "what is
+        // protected" must not be a subset of what the hook actually
+        // protects.
         if (config?.protected && Array.isArray(config.protected)) {
-          context.protectedPatterns = config.protected;
+          const userPatterns = config.protected.filter(
+            (p: unknown): p is string => typeof p === "string" && p.length > 0,
+          );
+          context.protectedPatterns = [
+            ...new Set<string>([...DEFAULT_PROTECTED_PATTERNS, ...userPatterns]),
+          ];
         } else {
           context.protectedPatterns = [...DEFAULT_PROTECTED_PATTERNS];
         }

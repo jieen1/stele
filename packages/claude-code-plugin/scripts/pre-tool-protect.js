@@ -68,6 +68,12 @@ const DEFAULT_PROTECTED = [
 const _INTERPRETER_NAMES = new Set([
   "python", "python3", "node", "nodejs", "perl", "ruby", "bash", "sh", "zsh",
 ]);
+// Round 5 I-04: wrapper-command names to peel before the real command.
+const _SHELL_WRAPPER_NAMES = new Set([
+  "env", "command", "exec", "nice", "nohup", "time", "sudo", "doas",
+  "busybox", "stdbuf", "ionice", "chronic",
+]);
+
 const _INTERPRETER_WRITE_HINTS = [
   // Python: open(..., 'w') / 'wb' / 'a' / 'ab' / 'x' / 'r+' — the mode
   // argument is the unambiguous write signal. We deliberately don't
@@ -359,12 +365,17 @@ function extractGitCheckoutTargets(tokens) {
 function extractGitCheckoutFromSegment(tokens) {
   const wordTokens = tokens.filter((t) => t.type === "word");
   if (wordTokens.length < 2) return [];
-  if (path.posix.basename(wordTokens[0].value) !== "git") return [];
-  const sub = wordTokens[1].value;
+  // Round 5 I-04: peel env-prefix and wrappers (env/command/exec/nice/
+  // nohup/time/sudo/doas/busybox/stdbuf) before checking for `git`.
+  const realCmdIdx = _firstRealCommandIndex(wordTokens);
+  if (realCmdIdx < 0) return [];
+  if (path.posix.basename(wordTokens[realCmdIdx].value) !== "git") return [];
+  if (wordTokens.length <= realCmdIdx + 1) return [];
+  const sub = wordTokens[realCmdIdx + 1].value;
   if (sub !== "checkout" && sub !== "restore") return [];
   const targets = [];
   let sawDoubleDash = false;
-  for (const tok of wordTokens.slice(2)) {
+  for (const tok of wordTokens.slice(realCmdIdx + 2)) {
     if (!sawDoubleDash && tok.value === "--") {
       sawDoubleDash = true;
       continue;
@@ -401,10 +412,16 @@ function extractGitCheckoutFromSegment(tokens) {
 function extractInterpreterScriptTargets(tokens, line) {
   const wordTokens = tokens.filter((t) => t.type === "word");
   if (wordTokens.length < 2) return [];
-  const cmd = path.posix.basename(wordTokens[0].value);
+  // Round 5 I-04: an agent can hide the interpreter behind env-prefix
+  // assignments (`FOO=bar python3 -c …`) or wrappers (`env`/`command`/
+  // `exec`/`nice`/`nohup`/`time`/`sudo`/`doas`/`busybox`/`stdbuf`).
+  // Skip those before we look up the command.
+  const realCmdIdx = _firstRealCommandIndex(wordTokens);
+  if (realCmdIdx < 0) return [];
+  const cmd = path.posix.basename(wordTokens[realCmdIdx].value);
   if (!_INTERPRETER_NAMES.has(cmd)) return [];
   // Check that `-c` or `-e` is present in the args.
-  const interpreterFlag = wordTokens.slice(1).find((t) => t.value === "-c" || t.value === "-e");
+  const interpreterFlag = wordTokens.slice(realCmdIdx + 1).find((t) => t.value === "-c" || t.value === "-e");
   if (interpreterFlag === undefined) return [];
   // Determine whether the script body looks like a write.
   if (!_INTERPRETER_WRITE_HINTS.some((hint) => line.includes(hint))) {
@@ -526,6 +543,33 @@ function extractTeeTargetsFromSegment(tokens) {
   return targets;
 }
 
+/**
+ * Round 5 I-04: peel leading env-prefix assignments (`FOO=bar`) and
+ * wrapper commands (`env`, `command`, `exec`, `nice`, `nohup`, `time`,
+ * `sudo`, `doas`, `busybox`, `stdbuf`) before identifying the real
+ * command. Returns the index of the first "real" word-token, or -1
+ * when no candidate exists.
+ *
+ * `_SHELL_WRAPPER_NAMES` is defined near the top of the file alongside
+ * `_INTERPRETER_NAMES` to avoid the TDZ pitfall — the helper below is
+ * invoked from extractor functions that run early in the hook lifecycle.
+ */
+function _firstRealCommandIndex(wordTokens) {
+  for (let i = 0; i < wordTokens.length; i += 1) {
+    const v = wordTokens[i].value;
+    // env-prefix assignment: NAME=value (NAME starts with letter or _).
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(v)) continue;
+    // Wrapper command: skip and look at the next word.
+    if (_SHELL_WRAPPER_NAMES.has(path.posix.basename(v))) {
+      // `env` may carry its own `KEY=val` pairs after itself; the next
+      // iteration's env-prefix check handles those.
+      continue;
+    }
+    return i;
+  }
+  return -1;
+}
+
 function extractFileOperationTargets(tokens) {
   const targets = [];
   // Round 4 D-05: extend beyond cp/mv/install. Each of these can write or
@@ -555,14 +599,21 @@ function extractFileOperationTargets(tokens) {
 }
 
 function extractFileOperationTargetsFromSegment(tokens, commands) {
-  const commandToken = tokens.find((token) => token.type === "word");
+  // Round 5 I-04: peel env-prefix + wrappers before identifying the
+  // first real command (`FOO=bar cp ... contract/main.stele` was
+  // previously invisible because basename("FOO=bar") is not in
+  // `commands`).
+  const wordTokens = tokens.filter((t) => t.type === "word");
+  const realCmdIdx = _firstRealCommandIndex(wordTokens);
+  if (realCmdIdx < 0) return [];
+  const commandToken = wordTokens[realCmdIdx];
 
   if (!commandToken || !commands.has(path.posix.basename(commandToken.value))) {
     return [];
   }
 
   const targets = [];
-  const wordTokens = [];
+  const positionalArgs = [];
   let sawDoubleDash = false;
 
   for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
@@ -579,11 +630,24 @@ function extractFileOperationTargetsFromSegment(tokens, commands) {
       continue;
     }
 
-    wordTokens.push(token);
+    positionalArgs.push(token);
   }
 
-  if (wordTokens.length > 0) {
-    const lastToken = wordTokens[wordTokens.length - 1];
+  // Round 5 J-03: for `ln`, both source AND destination matter — a
+  // hardlink from a protected source to a non-protected destination
+  // still creates a shared-inode alias that lets the agent mutate
+  // the protected file via the alias. Treat all positional args as
+  // candidate targets for `ln`; for the other commands keep the
+  // legacy "last positional is the destination" rule.
+  if (path.posix.basename(commandToken.value) === "ln") {
+    for (const tok of positionalArgs) {
+      const literalPath = parseLiteralShellPath(tok.value);
+      if (literalPath !== null) {
+        targets.push(literalPath);
+      }
+    }
+  } else if (positionalArgs.length > 0) {
+    const lastToken = positionalArgs[positionalArgs.length - 1];
     const literalPath = parseLiteralShellPath(lastToken.value);
 
     if (literalPath !== null) {

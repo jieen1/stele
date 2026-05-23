@@ -374,7 +374,7 @@ describe("design init --generate", () => {
     const stdout = captureStdout();
 
     const previousApprover = process.env.STELE_APPROVED_BY;
-    process.env.STELE_APPROVED_BY = "test-fixture";
+    process.env.STELE_APPROVED_BY = "test:fixture@round-5";
     try {
       await runDesignInit({ preset: "ddd-typedriven", generate: true }, dir);
     } finally {

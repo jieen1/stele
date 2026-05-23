@@ -62,6 +62,8 @@ function makeContract(invariants: InvariantDeclaration[], groups?: import("@stel
         effectAnnotations: [],
         effectPolicies: [],
         effectSuppressions: [],
+      externAliases: [],
+
     };
 }
 

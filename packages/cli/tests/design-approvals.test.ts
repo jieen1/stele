@@ -12,7 +12,7 @@ const tempDirs: string[] = [];
 // interactive TTY or STELE_APPROVED_BY env. Set the env for the entire
 // suite so every test exercises the post-gate code paths.
 const _previousApprovedBy = process.env.STELE_APPROVED_BY;
-process.env.STELE_APPROVED_BY = "test-fixture";
+process.env.STELE_APPROVED_BY = "test:fixture@round-5";
 
 afterEach(() => {
   // Cleanup temp directories

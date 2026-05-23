@@ -52,6 +52,8 @@ function makeContract(invariants: InvariantDeclaration[]): Contract {
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
+
   };
 }
 

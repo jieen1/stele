@@ -74,7 +74,16 @@ async function loadSteleConfig(projectRoot: string): Promise<SteleConfig> {
     targetLanguage: String(parsed.targetLanguage ?? defaults.targetLanguage),
     testFramework: String(parsed.testFramework ?? defaults.testFramework),
     pathMode: String(parsed.pathMode ?? defaults.pathMode),
-    protected: Array.isArray(parsed.protected) ? parsed.protected : defaults.protected,
+    // Round 5 I-01: UNION user `protected` with defaults so the Cursor
+    // installer's view of the protection surface cannot shrink.
+    protected: Array.isArray(parsed.protected)
+      ? [
+          ...new Set<string>([
+            ...defaults.protected,
+            ...parsed.protected.filter((p): p is string => typeof p === "string" && p.length > 0),
+          ]),
+        ]
+      : defaults.protected,
   };
 }
 

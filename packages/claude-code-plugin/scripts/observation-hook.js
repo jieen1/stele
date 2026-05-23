@@ -14,14 +14,34 @@ const BASH_COMMAND_KEYS = ["command"];
 const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
 const MAX_PATTERN_LENGTH = 4096;
 const MAX_BRACKET_DEPTH = 5;
+// Round 5 J-02: keep byte-equal with packages/core/src/config/defaults.ts,
+// packages/cli/src/config/defaults.ts, and packages/claude-code-plugin/
+// scripts/pre-tool-protect.js. The default-protected-consistent
+// self-protection checker enforces the four-way equality.
 const DEFAULT_PROTECTED = [
   "contract/**/*.stele",
   "contract/checker_impls/**/*",
-  "contract/design/**/*",
-  "contract/generated/**/*",
   "contract/.baseline.json",
   "contract/.manifest.json",
+  "contract/design/**/*",
+  "contract/design/proposals/**/*",
+  "contract/design/approvals/**/*",
+  "contract/generated/**/*",
   "tests/contract/**/*",
+  "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+  "packages/claude-code-plugin/scripts/stop-validate.js",
+  "packages/claude-code-plugin/scripts/observation-hook.js",
+  "packages/claude-code-plugin/scripts/lifecycle-context.js",
+  "packages/claude-code-plugin/hooks/hooks.json",
+  "stele.config.json",
+  ".stele/stop-state.json",
+  "pnpm-lock.yaml",
+  "package.json",
+  "packages/*/package.json",
+  "packages/*/tsup.config.ts",
+  ".github/workflows/**",
+  "scripts/publish-npm.mjs",
+  "scripts/verify-packed-adoption.mjs",
 ];
 
 try {
@@ -92,10 +112,16 @@ async function loadConfig(projectDir) {
   try {
     const raw = await readFile(path.join(projectDir, "stele.config.json"), "utf8");
     const parsed = JSON.parse(stripBom(raw));
-    const protectedPatterns = Array.isArray(parsed?.protected) ? parsed.protected : DEFAULT_PROTECTED;
+    // Round 5 I-01: UNION user `protected` with DEFAULT_PROTECTED so the
+    // observation log's "material change" detector cannot shrink its
+    // tracked surface. Matches CLI loadConfig + plugin pre-tool-protect.
+    const userPatterns = Array.isArray(parsed?.protected)
+      ? parsed.protected.filter((p) => typeof p === "string" && p.trim().length > 0)
+      : [];
+    const merged = [...new Set([...DEFAULT_PROTECTED, ...userPatterns])];
 
     return {
-      protected: protectedPatterns
+      protected: merged
         .filter((pattern) => typeof pattern === "string" && pattern.trim().length > 0)
         .filter(isSafeGlobPattern),
     };

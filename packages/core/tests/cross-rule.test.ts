@@ -3,16 +3,17 @@ import { annotateCrossRuleViolations, createViolation } from "../src/index.js";
 import type { Violation, ViolationInput } from "../src/index.js";
 
 function mk(input: Partial<ViolationInput> & { rule_id: string; group_id?: string }): Violation {
+  const { rule_id, group_id, ...rest } = input;
   return createViolation({
-    rule_id: input.rule_id,
-    rule_kind: input.rule_id.split(".")[0] + "_violation",
+    rule_kind: rule_id.split(".")[0] + "_violation",
     severity: "error",
     source: { tool: "stele", command: "check", kind: "test" },
     location: { path: "src/x.ts" },
     cause: { summary: "x" },
     scope_paths: ["src/x.ts"],
-    group_id: input.group_id,
-    ...input,
+    group_id,
+    ...rest,
+    rule_id,
   });
 }
 

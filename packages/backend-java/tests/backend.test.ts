@@ -44,6 +44,8 @@ function makeMinimalContract(invariantCount = 1): Contract {
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
+
   };
 }
 

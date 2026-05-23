@@ -1479,7 +1479,15 @@ def fix_hint_requires_analysis_branch(ctx: dict, **kwargs: Any) -> dict[str, Any
     return {"passed": True, "message": None, "violations": []}
 
 
-_STRING_LITERAL_RE = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
+# Round 5 I-06 / K-04: accept either double-quoted OR single-quoted string
+# literals. The pre-Round-5 regex only matched `"..."`, so an agent that
+# swapped one of the three lists to single quotes could shrink the
+# extracted set silently and the comparison would still report
+# "all equal".
+_STRING_LITERAL_RE = re.compile(
+    r'"([^"\\]*(?:\\.[^"\\]*)*)"|'
+    r"'([^'\\]*(?:\\.[^'\\]*)*)'"
+)
 
 
 def _extract_string_array(source: str, anchor: str) -> set[str] | None:
@@ -1527,10 +1535,30 @@ def _extract_string_array(source: str, anchor: str) -> set[str] | None:
     if end == -1:
         return None
     body = source[lb + 1:end]
-    # Strip single-line `// …` comments before string-literal extraction so
-    # comment text like `// They are "build code"` doesn't pollute the set.
+    # Strip BOTH single-line `// …` comments AND `/* … */` block comments
+    # before string-literal extraction. Otherwise an agent could hide a
+    # removed pattern in a comment and the checker would still see the
+    # literal in the set. (Round 5 I-06.)
+    #
+    # The block-comment stripper anchors on `\n\s*/*` (start-of-line `/*`)
+    # so glob patterns inside quoted strings like "packages/*/tsup.config.ts"
+    # or "contract/**/*.stele" — whose `/*/` and `/**/` substrings would
+    # otherwise look like comment open/close pairs to a naive regex —
+    # are preserved.
+    body = re.sub(r"(^|\n)\s*/\*[\s\S]*?\*/", lambda m: m.group(1), body)
     body = re.sub(r"//[^\n]*", "", body)
-    return {m.group(1) for m in _STRING_LITERAL_RE.finditer(body)}
+    # Round 5 K-04: refuse if the body contains spread (`...`), template-
+    # literal entries (backticks), or any non-string identifier — the
+    # checker cannot reason about runtime-computed entries, so we treat
+    # their presence as an automatic divergence signal upstream.
+    if re.search(r"\.\.\.[a-zA-Z_]", body) or "`" in body:
+        return None
+    # Capture group 1 (double-quoted) OR group 2 (single-quoted); skip the
+    # one that didn't match.
+    return {
+        (m.group(1) if m.group(1) is not None else m.group(2))
+        for m in _STRING_LITERAL_RE.finditer(body)
+    }
 
 
 def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
@@ -1546,6 +1574,10 @@ def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     drop defense-in-depth for some path category. This checker parses each
     file, extracts the literal-string set, and asserts equality.
     """
+    # Round 5 J-02: four sources, not three. observation-hook.js carries
+    # its own DEFAULT_PROTECTED used by the material-change heuristic for
+    # the maintenance audit log; if it drifts the audit log silently
+    # under-counts edits to hook scripts / supply-chain / approvals.
     sources = [
         (
             "packages/core/src/config/defaults.ts",
@@ -1557,6 +1589,10 @@ def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         ),
         (
             "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+            "DEFAULT_PROTECTED",
+        ),
+        (
+            "packages/claude-code-plugin/scripts/observation-hook.js",
             "DEFAULT_PROTECTED",
         ),
     ]
@@ -1635,8 +1671,29 @@ def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+# Round 5 K-01: match BOTH single-line `import { … } from "./x"` and the
+# multi-line idiom used heavily in this codebase:
+#     import {
+#       foo,
+#       bar,
+#     } from "./x.js";
+# The legacy regex used `[^\n]*?` which stopped at the first newline and
+# missed every multi-line case (~30 files in packages/cli/src alone).
+# Also covers bare side-effect imports `import "./x.js";` (no `from`).
 _ESM_RELATIVE_IMPORT_RE = re.compile(
-    r"^\s*(?:import|export)[^\n]*?\bfrom\s+[\"'](\.[^\"']+)[\"']",
+    r"""
+    (?:import|export)               # import / export keyword
+    \b                              # word boundary
+    [^;]*?                          # arbitrary content (could span newlines)
+    \bfrom\s+                       # "from "
+    ["'](\.[^"']+)["']              # captured relative specifier (group 1)
+    """,
+    re.MULTILINE | re.VERBOSE | re.DOTALL,
+)
+# Side-effect import: `import "./x.js";` (no `from`). Captured separately
+# so the simpler form isn't confused by the [^;]*? consuming too much.
+_ESM_SIDE_EFFECT_IMPORT_RE = re.compile(
+    r'^\s*import\s+["\'](\.[^"\']+)["\']',
     re.MULTILINE,
 )
 
@@ -1668,20 +1725,23 @@ def esm_relative_imports_keep_js(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 content = ts_file.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            for m in _ESM_RELATIVE_IMPORT_RE.finditer(content):
-                specifier = m.group(1)
-                if specifier.endswith((".json", ".css", ".svg", ".png", ".jpg", ".node", ".js")):
-                    continue
-                line_no = content.count("\n", 0, m.start()) + 1
-                violations.append({
-                    "file": str(ts_file.relative_to(_REPO_ROOT)),
-                    "line": line_no,
-                    "column": None,
-                    "message": (
-                        f"relative import \"{specifier}\" must end in `.js` "
-                        f"so the file resolves under native ESM (CLAUDE.md)"
-                    ),
-                })
+            for re_pattern in (_ESM_RELATIVE_IMPORT_RE, _ESM_SIDE_EFFECT_IMPORT_RE):
+                for m in re_pattern.finditer(content):
+                    specifier = m.group(1)
+                    if specifier.endswith(
+                        (".json", ".css", ".svg", ".png", ".jpg", ".node", ".js"),
+                    ):
+                        continue
+                    line_no = content.count("\n", 0, m.start()) + 1
+                    violations.append({
+                        "file": str(ts_file.relative_to(_REPO_ROOT)),
+                        "line": line_no,
+                        "column": None,
+                        "message": (
+                            f"relative import \"{specifier}\" must end in `.js` "
+                            f"so the file resolves under native ESM (CLAUDE.md)"
+                        ),
+                    })
 
     if violations:
         return {
@@ -1708,6 +1768,31 @@ _HOOK_SCRIPTS_DOGFOOD = [
 ]
 
 
+def _extract_catch_bodies(source: str) -> list[str]:
+    """Round 5 K-02: extract every `catch (...) { ... }` block body via
+    brace counting. Returns a list of body strings; ordering matches
+    source order. Used by hook_entrypoints_fail_closed to assert at
+    least one catch handler ends with a fail-closed exit.
+    """
+    bodies: list[str] = []
+    catch_re = re.compile(r"\}\s*catch\s*(?:\([^)]*\))?\s*\{")
+    for match in catch_re.finditer(source):
+        lb = match.end() - 1  # the `{`
+        depth = 1
+        i = lb + 1
+        while i < len(source) and depth > 0:
+            ch = source[i]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    bodies.append(source[lb + 1:i])
+                    break
+            i += 1
+    return bodies
+
+
 def hook_entrypoints_fail_closed(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Round 4 E-04: CLAUDE.md "Hooks fail closed." Generalises the
     legacy `hooks_fail_closed` checker — which only inspected
@@ -1732,40 +1817,57 @@ def hook_entrypoints_fail_closed(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         # the file) by `catch` and a `process.exit(` with a non-zero arg.
         # The legacy `hooks_fail_closed` checker uses the same pattern; we
         # extend it to the other three scripts.
-        if "try {" not in content:
+        # Round 5 K-02: pre-K-02 the check accepted any file-scope
+        # `try {` + `catch (...)` + non-zero exit / failClosed combination,
+        # whether those tokens sat in the same control-flow scope or not.
+        # An adversary could swallow the real catch and have an unrelated
+        # success-path `process.exit(BLOCK_EXIT_CODE)` elsewhere in the
+        # file and still pass.
+        #
+        # The new check extracts each catch-block body via brace-counting
+        # and asserts at least ONE catch body itself ends with a
+        # `process.exit(<non-zero>)` / `process.exit(<NAMED>)` /
+        # `failClosed(...)`. The file-scope OR'd check is replaced by a
+        # body-scoped AND.
+        if "try {" not in content and "try{" not in content:
             violations.append({
                 "file": rel_path,
                 "line": None,
                 "column": None,
-                "message": "no top-level `try {` block — hook will not fail closed on errors",
+                "message": "no top-level `try` block — hook will not fail closed on errors",
             })
             continue
-        if not re.search(r"catch\s*\(", content):
+        catch_bodies = _extract_catch_bodies(content)
+        if not catch_bodies:
             violations.append({
                 "file": rel_path,
                 "line": None,
                 "column": None,
-                "message": "no catch handler",
+                "message": "no catch handler whose body could be extracted",
             })
             continue
-        # The fail-closed exit pattern in this repo is one of:
-        #   - process.exit(<non-zero-literal>) — hard stop, e.g. process.exit(2)
-        #   - process.exit(<NAMED_CONSTANT>)   — e.g. process.exit(STOP_BLOCK_EXIT_CODE)
-        #   - failClosed(...)                  — pre-tool-protect's own helper
-        # Accept any of these forms.
-        has_literal_nonzero = bool(re.search(r"process\.exit\(\s*[1-9]", content))
-        has_named_exit_constant = bool(
-            re.search(r"process\.exit\(\s*[A-Z][A-Z0-9_]*\s*\)", content),
+        # Accept any of:
+        #   - process.exit(<non-zero-literal>)
+        #   - process.exit(<NAMED_CONSTANT>)
+        #   - failClosed(...)           (pre-tool-protect's helper)
+        #   - blockStop(...)            (stop-validate's helper, calls
+        #                                process.exit(STOP_BLOCK_EXIT_CODE))
+        body_pattern_re = re.compile(
+            r"process\.exit\(\s*(?:[1-9][0-9]*|[A-Z][A-Z0-9_]*)\s*\)|"
+            r"failClosed\(|blockStop\(",
         )
-        has_fail_closed = "failClosed(" in content
-        if not (has_literal_nonzero or has_named_exit_constant or has_fail_closed):
+        any_catch_fails_closed = any(
+            body_pattern_re.search(body) is not None
+            for body in catch_bodies
+        )
+        if not any_catch_fails_closed:
             violations.append({
                 "file": rel_path,
                 "line": None,
                 "column": None,
                 "message": (
-                    "no `process.exit(<non-zero>)` and no `failClosed(...)` "
-                    "call — hook may exit silently on a thrown error"
+                    "no catch-block body ends with `process.exit(<non-zero>)` or "
+                    "`failClosed(...)` — hook may exit silently on a thrown error"
                 ),
             })
 
@@ -1783,30 +1885,31 @@ def hook_entrypoints_fail_closed(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     return {"passed": True, "message": None, "violations": []}
 
 
+# Round 5 K-03: also catch dynamic `import("@stele/X")` and bare
+# side-effect `import "@stele/X"` (no `from` keyword).
 _STELE_PACKAGE_PREFIX_RE = re.compile(
-    r"\bfrom\s+[\"']@stele/([a-z][\w\-]*)[\"']",
+    r"""
+    (?:
+      \bfrom\s+ ["'] @stele/ ([a-z][\w\-]*) ["']     # import ... from "@stele/X"
+      |
+      \bimport \s* \( \s* ["'] @stele/ ([a-z][\w\-]*) ["']  # await import("@stele/X")
+      |
+      ^ \s* import \s+ ["'] @stele/ ([a-z][\w\-]*) ["']  # bare side-effect
+    )
+    """,
+    re.VERBOSE | re.MULTILINE,
 )
-# Forbidden inbound deps from inside @stele/core. The validator legitimately
-# references shared types from `@stele/call-graph-core` (NodeId helpers used
-# at parse time for `extern:` patterns) so that dep is allowed. Every other
-# @stele/* package would invert the layering.
-_CORE_FORBIDDEN_DEPS = {
-    "cli",
-    "backend-python",
-    "backend-go",
-    "backend-rust",
-    "backend-java",
-    "backend-typescript",
-    "agent-hooks",
-    "claude-code-plugin",
-    "mcp-server",
-    "github-action",
-    "conformance-tests",
-    "effect-evaluator",
-    "trace-evaluator",
-    "type-state-evaluator",
-    "type-driven-evaluator",
-    "architecture-core",
+# Round 5 K-03: ALLOW-list, not deny-list. The pre-Round-5 deny-list
+# would silently allow imports from a NEW workspace package the
+# implementer hadn't anticipated. Inverting to "only @stele/call-graph-core
+# is allowed" closes that vector: any new dep must be ADDED here
+# explicitly, with a code review, before it can be imported from
+# @stele/core.
+_CORE_ALLOWED_DEPS = {
+    # call-graph-core: the validator uses NodeId helpers from this package
+    # at parse time for `extern:` patterns. It's a leaf-level package with
+    # no further @stele/* deps, so the layering still holds.
+    "call-graph-core",
 }
 
 
@@ -1832,18 +1935,20 @@ def core_has_no_stele_deps(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         except OSError:
             continue
         for m in _STELE_PACKAGE_PREFIX_RE.finditer(content):
-            pkg = m.group(1)
-            if pkg in _CORE_FORBIDDEN_DEPS:
-                line_no = content.count("\n", 0, m.start()) + 1
-                violations.append({
-                    "file": str(ts_file.relative_to(_REPO_ROOT)),
-                    "line": line_no,
-                    "column": None,
-                    "message": (
-                        f"forbidden import `@stele/{pkg}` — @stele/core must be a "
-                        f"leaf package"
-                    ),
-                })
+            # The regex has three alternation groups; exactly one matches.
+            pkg = m.group(1) or m.group(2) or m.group(3)
+            if pkg is None or pkg in _CORE_ALLOWED_DEPS:
+                continue
+            line_no = content.count("\n", 0, m.start()) + 1
+            violations.append({
+                "file": str(ts_file.relative_to(_REPO_ROOT)),
+                "line": line_no,
+                "column": None,
+                "message": (
+                    f"forbidden import `@stele/{pkg}` — @stele/core must be a leaf "
+                    f"package; only @stele/call-graph-core is allow-listed"
+                ),
+            })
 
     if violations:
         return {

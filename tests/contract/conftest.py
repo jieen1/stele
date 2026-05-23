@@ -67,6 +67,10 @@ def _lazy_load_checkers():
             "fix_hint_requires_analysis_branch",
             # Round 4 D-13
             "default_protected_consistent",
+            # Round 4 Phase 3 dogfood
+            "esm_relative_imports_keep_js",
+            "hook_entrypoints_fail_closed",
+            "core_has_no_stele_deps",
         ):
             _checkers[name] = getattr(mod, name, None)
 
@@ -111,6 +115,10 @@ _CHECKER_NAME_MAP = {
     "fix-hint-requires-analysis-branch": "fix_hint_requires_analysis_branch",
     # Round 4 D-13
     "default-protected-consistent": "default_protected_consistent",
+    # Round 4 Phase 3 dogfood
+    "esm-relative-imports-keep-js": "esm_relative_imports_keep_js",
+    "hook-entrypoints-fail-closed": "hook_entrypoints_fail_closed",
+    "core-has-no-stele-deps": "core_has_no_stele_deps",
 }
 
 

@@ -213,5 +213,6 @@ function createSingleFileContract(_contract: Contract, file: Contract["files"][n
     effectAnnotations: [...(file.effectAnnotations ?? [])],
     effectPolicies: [...(file.effectPolicies ?? [])],
     effectSuppressions: [...(file.effectSuppressions ?? [])],
+    externAliases: [...(file.externAliases ?? [])],
   };
 }
