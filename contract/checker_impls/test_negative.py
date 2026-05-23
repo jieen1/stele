@@ -474,6 +474,76 @@ def test_config_schema_valid_missing_field():
 # Test: cdl_utf8_valid — invalid UTF-8
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Test: all_evaluators_compile — temporarily rename one evaluator's dist
+# ---------------------------------------------------------------------------
+
+def test_all_evaluators_compile_missing_dist():
+    """Round 3 P0-8: rename packages/effect-evaluator/dist to a different name
+    so the checker can't find dist/index.js, then verify failure."""
+    _reset_caches()
+    dist_dir = sp._PACKAGES_DIR / "effect-evaluator" / "dist"
+    backup_dir = sp._PACKAGES_DIR / "effect-evaluator" / "dist.bak-negtest"
+    if not dist_dir.is_dir():
+        print("  SKIP: effect-evaluator/dist/ not built; run pnpm build first")
+        return True
+    dist_dir.rename(backup_dir)
+    try:
+        result = sp.all_evaluators_compile({})
+    finally:
+        backup_dir.rename(dist_dir)
+    return _pass_if_false(result, "all_evaluators_compile_missing_dist")
+
+
+# ---------------------------------------------------------------------------
+# Test: strict_mode_default_in_ci — inject a --lenient-effects flag
+# ---------------------------------------------------------------------------
+
+def test_strict_mode_default_in_ci_lenient_flag():
+    """Round 3 P0-8: inject a --lenient-effects flag into ci.yml, verify
+    checker catches it."""
+    _reset_caches()
+    ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    if not ci_yml.is_file():
+        print("  SKIP: .github/workflows/ci.yml not present")
+        return True
+    original = ci_yml.read_text(encoding="utf-8")
+    tampered = original.replace(
+        "pnpm test",
+        "pnpm test --lenient-effects",
+        1,
+    )
+    ci_yml.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.strict_mode_default_in_ci({})
+    finally:
+        ci_yml.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "strict_mode_default_in_ci_lenient_flag")
+
+
+# ---------------------------------------------------------------------------
+# Test: fix_hint_requires_analysis_branch — drop the [A] marker from a hint
+# ---------------------------------------------------------------------------
+
+def test_fix_hint_requires_analysis_branch_missing_keyword():
+    """Round 3 P0-8: rewrite a default fix-hint function body so it no
+    longer contains the literal `[A]`, verify the checker catches it."""
+    _reset_caches()
+    fix_hint_ts = sp._PACKAGES_DIR / "effect-evaluator" / "src" / "fix-hint.ts"
+    if not fix_hint_ts.is_file():
+        print("  SKIP: effect-evaluator/src/fix-hint.ts not present")
+        return True
+    original = fix_hint_ts.read_text(encoding="utf-8")
+    # The default fix-hint uses `[A] Code issue` literals; rip them out.
+    tampered = original.replace("[A]", "(branch-A)")
+    fix_hint_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.fix_hint_requires_analysis_branch({})
+    finally:
+        fix_hint_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "fix_hint_requires_analysis_branch_missing_keyword")
+
+
 def test_cdl_utf8_valid_invalid_bytes():
     """Write invalid UTF-8 bytes to a .stele file, verify checker catches it."""
     _reset_caches()
@@ -518,6 +588,10 @@ def main() -> int:
         ("backend_registries_missing_language", test_backend_registries_missing_language),
         ("backend_contains_go_missing", test_backend_contains_go_missing),
         ("config_schema_valid_missing_field", test_config_schema_valid_missing_field),
+        # Round 3 P0-8: Phase B self-protection negative tests
+        ("all_evaluators_compile_missing_dist", test_all_evaluators_compile_missing_dist),
+        ("strict_mode_default_in_ci_lenient_flag", test_strict_mode_default_in_ci_lenient_flag),
+        ("fix_hint_requires_analysis_branch_missing_keyword", test_fix_hint_requires_analysis_branch_missing_keyword),
     ]
 
     print("=" * 60)
