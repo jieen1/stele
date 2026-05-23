@@ -33,16 +33,26 @@ export {
 } from "./structure-code-shape.js";
 
 export {
-  parseAgentDeclaration,
-  parseScopeDeclaration,
-  parseInterAgentContractDeclaration,
-  parseConflictDeclaration,
-} from "./structure-agent.js";
-
-export {
   parseBrandedIdDeclaration,
   parseSmartCtorDeclaration,
 } from "./structure-type-driven.js";
+
+export {
+  parseTracePolicyDeclaration,
+  isFixHintActionable,
+} from "./structure-trace-policy.js";
+
+export {
+  parseTypeStateDeclaration,
+  parseTypeStateBindingDeclaration,
+} from "./structure-type-state.js";
+
+export {
+  parseEffectAnnotationDeclaration,
+  parseEffectDeclarationsDeclaration,
+  parseEffectPolicyDeclaration,
+  parseEffectSuppressionDeclaration,
+} from "./structure-effect.js";
 
 
 export {
@@ -52,18 +62,11 @@ export {
 
 // -- all types live in structure-types.js --
 export type {
-  AgentDeclaration,
-  AgentSingleValueField,
   ArchitectureDeclaration,
   ArchitectureLang,
   ArchitectureModuleDeclaration,
   ArchitectureLayerDeclaration,
   ArchitectureAllowDependencyDeclaration,
-  ConflictDeclaration,
-  ConflictResolutionStrategy,
-  InterAgentContractDeclaration,
-  RequiresClause,
-  ScopeDeclaration,
   LoadedContractFile,
   MetadataDeclaration,
   ImportDeclaration,
@@ -100,5 +103,17 @@ export type {
   CoreNodeRole,
   BrandedIdDeclaration,
   SmartCtorDeclaration,
+  TracePolicyDeclaration,
+  TracePolicyExempt,
+  TypeStateBindingDeclaration,
+  TypeStateBindingParam,
+  TypeStateDeclaration,
+  TypeStateMapping,
+  TypeStateTransition,
+  EffectAnnotationDeclaration,
+  EffectDeclarationsDeclaration,
+  EffectName,
+  EffectPolicyDeclaration,
+  EffectSuppressionDeclaration,
 } from "./structure-types.js";
 

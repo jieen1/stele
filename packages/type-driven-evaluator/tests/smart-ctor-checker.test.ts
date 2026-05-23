@@ -2,13 +2,13 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   checkSmartConstructors,
-} from "../src/typescript-shape/smart-constructors.js";
+} from "../src/smart-ctor-checker.js";
 import type {
   SmartConstructorCheckOptions,
   SmartConstructorTarget,
-} from "../src/typescript-shape/types.js";
+} from "../src/types.js";
 
-const FIXTURES = resolve(__dirname, "fixtures", "typescript-shape");
+const FIXTURES = resolve(__dirname, "fixtures");
 
 const tsconfigPath = resolve(FIXTURES, "tsconfig.json");
 

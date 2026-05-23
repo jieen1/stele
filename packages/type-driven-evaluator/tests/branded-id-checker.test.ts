@@ -1,9 +1,9 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkBrandedIds } from "../src/typescript-shape/branded-ids.js";
-import type { BrandedIdDeclaration, BrandedIdCheckOptions } from "../src/typescript-shape/types.js";
+import { checkBrandedIds } from "../src/branded-id-checker.js";
+import type { BrandedIdDeclaration, BrandedIdCheckOptions } from "../src/types.js";
 
-const FIXTURES = resolve(__dirname, "fixtures", "typescript-shape");
+const FIXTURES = resolve(__dirname, "fixtures");
 const tsconfigPath = resolve(FIXTURES, "tsconfig.json");
 
 function makeOptions(

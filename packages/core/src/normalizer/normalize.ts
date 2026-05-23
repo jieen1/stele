@@ -1,15 +1,11 @@
 import type { AstNode, ListNode } from "../ast/types.js";
 import type {
-  AgentDeclaration,
-  ConflictDeclaration,
   Contract,
   ContractFile,
   GroupDeclaration,
-  InterAgentContractDeclaration,
   InvariantDeclaration,
   InvariantMultiValueField,
   InvariantSingleValueField,
-  ScopeDeclaration,
 } from "../validator/structure.js";
 
 const INDENT = "  ";
@@ -25,10 +21,6 @@ export function normalizeContract(contract: Contract): string {
 export function normalizeFile(file: ContractFile): string {
   const topLevelInvariants = new Map(file.invariants.filter((invariant) => invariant.groupId === undefined).map((invariant) => [invariant.node, invariant]));
   const groups = new Map(file.groups.map((group) => [group.node, group]));
-  const agents = new Map(file.agents.map((agent) => [agent.node, agent]));
-  const scopes = new Map(file.scopes.map((scope) => [scope.node, scope]));
-  const interAgentContracts = new Map(file.interAgentContracts.map((c) => [c.node, c]));
-  const conflicts = new Map(file.conflicts.map((c) => [c.node, c]));
 
   return file.parsed.body
     .map((node) => {
@@ -46,30 +38,6 @@ export function normalizeFile(file: ContractFile): string {
 
       if (invariant !== undefined) {
         return renderInvariant(invariant);
-      }
-
-      const agent = agents.get(node);
-
-      if (agent !== undefined) {
-        return renderAgent(agent);
-      }
-
-      const scope = scopes.get(node);
-
-      if (scope !== undefined) {
-        return renderScope(scope);
-      }
-
-      const contract = interAgentContracts.get(node);
-
-      if (contract !== undefined) {
-        return renderInterAgentContract(contract);
-      }
-
-      const conflict = conflicts.get(node);
-
-      if (conflict !== undefined) {
-        return renderConflict(conflict);
       }
 
       return renderNode(node);
@@ -209,51 +177,4 @@ function renderString(value: string): string {
 
 function renderText(value: string): string {
   return JSON.stringify(value) === `"${value}"` && !value.includes(" ") ? value : renderString(value);
-}
-
-function renderAgent(agent: AgentDeclaration, indent = 0): string {
-  const items = [
-    agent.description ? renderList("description", [renderNode(agent.description.valueNode)], indent + 1) : undefined,
-    agent.allowedPaths.length > 0 ? renderList("allowed-paths", agent.allowedPaths.map(renderString), indent + 1) : undefined,
-    agent.deniedPaths.length > 0 ? renderList("denied-paths", agent.deniedPaths.map(renderString), indent + 1) : undefined,
-  ].filter((item): item is string => item !== undefined);
-
-  return wrapBlock(`(agent ${renderString(agent.id)}`, items, indent);
-}
-
-function renderScope(scope: ScopeDeclaration, indent = 0): string {
-  const items = scope.paths.map((p) => renderList("path", [renderString(p)], indent + 1));
-
-  return wrapBlock(`(scope ${renderString(scope.agentId)}`, items, indent);
-}
-
-function renderInterAgentContract(contract: InterAgentContractDeclaration, indent = 0): string {
-  const items = [
-    contract.description ? renderList("description", [renderNode(contract.description.valueNode)], indent + 1) : undefined,
-    renderList("agents", contract.agents.map(renderString), indent + 1),
-    ...contract.requires.map((req) =>
-      renderList(
-        "requires",
-        [
-          renderString(req.agentId),
-          renderList("path", [renderString(req.pathPattern)], indent + 1),
-          renderList("approved-by", [renderString(req.approvedBy)]),
-        ],
-        indent + 1,
-      ),
-    ),
-  ].filter((item): item is string => item !== undefined);
-
-  return wrapBlock(`(inter-agent-contract ${renderString(contract.id)}`, items, indent);
-}
-
-function renderConflict(conflict: ConflictDeclaration, indent = 0): string {
-  const items = [
-    renderList("path", [renderString(conflict.path)], indent + 1),
-    conflict.agents.length > 0 ? renderList("agents", conflict.agents.map(renderString), indent + 1) : undefined,
-    renderList("resolution", [conflict.resolution], indent + 1),
-    conflict.fallback ? renderList("fallback", [conflict.fallback], indent + 1) : undefined,
-  ].filter((item): item is string => item !== undefined);
-
-  return wrapBlock(`(conflict`, items, indent);
 }

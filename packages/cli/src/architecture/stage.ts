@@ -1,9 +1,9 @@
 import { createViolationReport } from "@stele/core";
 import type { Violation, ViolationReport } from "@stele/core";
 import {
-  evaluateArchitectureFull,
+  evaluateArchitectureRuntime,
   type ArchitectureContractOptions,
-  type ArchitectureEvaluationResult,
+  type ArchitectureRuntimeResult,
 } from "../architecture-runtime.js";
 import type { PreparedCheckContext, ProtectedCheckState } from "./types.js";
 
@@ -14,7 +14,7 @@ import type { PreparedCheckContext, ProtectedCheckState } from "./types.js";
 /**
  * Build the architecture stage report for the check pipeline.
  *
- * Delegates to evaluateArchitectureFull for a single pass: file discovery,
+ * Delegates to evaluateArchitectureRuntime for a single pass: file discovery,
  * graph building, and evaluation. No duplicate graph building.
  */
 export async function buildArchitectureStageReport(
@@ -42,7 +42,7 @@ export async function buildArchitectureStageReport(
     const runtimeArch = convertToRuntimeArch(arch);
 
     // Single evaluation pass: dependency, cycle, layer, public entry, unowned
-    const result = await evaluateArchitectureFull({
+    const result = await evaluateArchitectureRuntime({
       projectRoot: context.projectDir,
       architecture: runtimeArch,
     });
@@ -72,7 +72,7 @@ export async function buildArchitectureStageReport(
 // ----------------------------------------------------------------
 
 function buildDependencyViolations(
-  result: ArchitectureEvaluationResult,
+  result: ArchitectureRuntimeResult,
   arch: { id: string; description?: string; fix?: string },
   command: string,
 ): Violation[] {
@@ -95,7 +95,7 @@ function buildDependencyViolations(
 }
 
 function buildCycleViolations(
-  result: ArchitectureEvaluationResult,
+  result: ArchitectureRuntimeResult,
   runtimeArch: ArchitectureContractOptions["architecture"],
   arch: { description?: string; fix?: string },
   command: string,
@@ -121,7 +121,7 @@ function buildCycleViolations(
 }
 
 function buildLayerDirectionViolations(
-  result: ArchitectureEvaluationResult,
+  result: ArchitectureRuntimeResult,
   arch: { id: string; description?: string; fix?: string },
   command: string,
 ): Violation[] {
@@ -145,7 +145,7 @@ function buildLayerDirectionViolations(
 }
 
 function buildPublicEntryViolations(
-  result: ArchitectureEvaluationResult,
+  result: ArchitectureRuntimeResult,
   arch: { id: string; description?: string; fix?: string },
   command: string,
 ): Violation[] {
@@ -169,7 +169,7 @@ function buildPublicEntryViolations(
 }
 
 function buildUnownedFileViolations(
-  result: ArchitectureEvaluationResult,
+  result: ArchitectureRuntimeResult,
   arch: { id: string },
   command: string,
 ): Violation[] {

@@ -5,10 +5,10 @@ import {
   clearProgramCache,
   findSourceFile,
   findNamedDeclaration,
-} from "../src/typescript-shape/program.js";
+} from "../src/program.js";
 import * as ts from "typescript";
 
-const FIXTURES = resolve(__dirname, "fixtures", "typescript-shape");
+const FIXTURES = resolve(__dirname, "fixtures");
 const FIXTURE_TS_CONFIG = resolve(FIXTURES, "tsconfig.json");
 
 beforeEach(() => {
@@ -53,7 +53,7 @@ describe("createShapeProgram", () => {
 
     // A different tsconfig path (even if non-existent in cache) produces a new entry
     // We use a relative vs absolute path to the same file to verify the key differs
-    const relativePath = join("fixtures", "typescript-shape", "tsconfig.json");
+    const relativePath = join("fixtures", "tsconfig.json");
     const b = createShapeProgram({
       projectDir: FIXTURES,
       tsconfigPath: relativePath,

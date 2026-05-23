@@ -107,7 +107,8 @@ export async function buildCodeShapeStageReport(
   protectedState: ProtectedCheckState,
   command: string,
 ): Promise<ViolationReport> {
-  const violations = await evaluateCodeShapes(context.projectDir, context.contract, command);
+  const contract = context.codeShapeContract ?? context.contract;
+  const violations = await evaluateCodeShapes(context.projectDir, contract, command);
 
   return createViolationReport({
     tool: "stele",

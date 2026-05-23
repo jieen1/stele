@@ -1,0 +1,830 @@
+{
+  "schema_version": 1,
+  "kind": "ddd-typedriven",
+  "profile_id": "stele-self",
+  "created_at": "2026-05-20T00:00:00Z",
+  "updated_at": "2026-05-20T00:00:00Z",
+  "decisions": [
+    {
+      "id": "d1",
+      "question_id": "Q1",
+      "selected_option": "by_business_function",
+      "rationale": "Core engine is pure domain; CLI is application orchestrator. Clear separation prevents technology bleed into CDL semantics.",
+      "approved_by": "maintainer",
+      "approved_at": "2026-05-20T00:00:00Z"
+    }
+  ],
+  "project": {
+    "language": "typescript",
+    "source_roots": [
+      "packages/core/src",
+      "packages/cli/src",
+      "packages/architecture-core/src",
+      "packages/backend-typescript/src",
+      "packages/backend-python/src",
+      "packages/backend-go/src",
+      "packages/backend-java/src",
+      "packages/backend-rust/src",
+      "packages/agent-hooks/src",
+      "packages/mcp-server/src",
+      "packages/claude-code-plugin/src",
+      "packages/github-action/src"
+    ],
+    "ignore": [
+      "**/tests/**",
+      "**/__tests__/**",
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/__pycache__/**",
+      "**/fixtures/**",
+      "packages/backend-python/src/runtime/**",
+      "packages/cli/src/commands/design/fixtures/**"
+    ],
+    "tsconfig": "packages/cli/tsconfig.json"
+  },
+  "ddd": {
+    "bounded_context_strategy": "by_business_function",
+    "domain_model_style": "anemic_with_guarded_invariants",
+    "entity_mutability": "immutable",
+    "error_handling": "result-types",
+    "aggregate_reference_rule": "by-id-only",
+    "repository_location": "domain-layer",
+    "repository_pattern": "interface-in-domain-impl-in-infrastructure",
+    "query_constraints": {
+      "no_find_all": true,
+      "require_pagination": true,
+      "require_filter": true
+    },
+    "contexts": [
+      {
+        "id": "core",
+        "decision_ref": "d1",
+        "name": "Stele Core Engine",
+        "subdomain_type": "core",
+        "architecture_style": "hexagonal",
+        "root": "packages/core/src",
+        "layers": {
+          "domain-primitives": "packages/core/src/{ast,errors,config,util}/**",
+          "domain-services": "packages/core/src/{validator,registry,evaluator}/**",
+          "application": "packages/core/src/{loader,normalizer,manifest,baseline}/**",
+          "parsing": "packages/core/src/{lexer,parser}/**",
+          "generation": "packages/core/src/generator/**",
+          "report": "packages/core/src/report/**"
+        },
+        "layer_dependencies": {
+          "domain-services": [
+            "domain-primitives",
+            "report"
+          ],
+          "application": [
+            "domain-primitives",
+            "domain-services",
+            "parsing",
+            "generation",
+            "report"
+          ],
+          "generation": [
+            "domain-services",
+            "domain-primitives",
+            "parsing",
+            "report"
+          ],
+          "parsing": [
+            "domain-primitives"
+          ]
+        },
+        "aggregate_roots": [
+          {
+            "id": "operator-registry",
+            "class": "OperatorRegistry",
+            "target": "packages/core/src/registry/operators.ts::OperatorRegistry",
+            "metrics": {
+              "sloc": {
+                "ideal": 400,
+                "max": 800
+              },
+              "public-method-count": {
+                "ideal": 8,
+                "max": 20
+              },
+              "max-cyclomatic": {
+                "ideal": 10,
+                "max": 25
+              }
+            }
+          },
+          {
+            "id": "invariant-validator",
+            "class": "InvariantValidator",
+            "target": "packages/core/src/validator/structure-invariant.ts::validateInvariant",
+            "metrics": {
+              "sloc": {
+                "ideal": 150,
+                "max": 350
+              },
+              "public-method-count": {
+                "ideal": 4,
+                "max": 10
+              }
+            }
+          },
+          {
+            "id": "contract-loader",
+            "class": "ContractLoader",
+            "target": "packages/core/src/loader/load-contract.ts::loadContract",
+            "metrics": {
+              "sloc": {
+                "ideal": 100,
+                "max": 250
+              },
+              "public-method-count": {
+                "ideal": 3,
+                "max": 8
+              }
+            }
+          },
+          {
+            "id": "manifest-engine",
+            "class": "ManifestEngine",
+            "target": "packages/core/src/manifest/hash-manifest.ts::hashManifest",
+            "metrics": {
+              "sloc": {
+                "ideal": 100,
+                "max": 250
+              },
+              "max-cyclomatic": {
+                "ideal": 8,
+                "max": 20
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli",
+        "decision_ref": "d1",
+        "name": "Stele CLI Orchestrator",
+        "subdomain_type": "core",
+        "architecture_style": "hexagonal",
+        "root": "packages/cli/src",
+        "layers": {
+          "presentation": "packages/cli/src/{commands,index}/**",
+          "application": "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**",
+          "design-domain": "packages/cli/src/{design-profile,design-generator}/**",
+          "toolchain": "packages/cli/src/toolchain/**",
+          "infrastructure": "packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**"
+        },
+        "layer_dependencies": {
+          "presentation": [
+            "application",
+            "design-domain",
+            "toolchain",
+            "infrastructure"
+          ],
+          "application": [
+            "design-domain",
+            "toolchain",
+            "infrastructure"
+          ],
+          "design-domain": [
+            "infrastructure"
+          ]
+        },
+        "aggregate_roots": [
+          {
+            "id": "check-orchestrator",
+            "class": "CheckOrchestrator",
+            "target": "packages/cli/src/commands/check.ts::runCheck",
+            "metrics": {
+              "sloc": {
+                "ideal": 400,
+                "max": 700
+              },
+              "public-method-count": {
+                "ideal": 6,
+                "max": 15
+              },
+              "max-cyclomatic": {
+                "ideal": 15,
+                "max": 30
+              }
+            }
+          },
+          {
+            "id": "code-shape-evaluator",
+            "class": "CodeShapeEvaluator",
+            "target": "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes",
+            "metrics": {
+              "sloc": {
+                "ideal": 400,
+                "max": 800
+              },
+              "public-method-count": {
+                "ideal": 8,
+                "max": 20
+              },
+              "max-cyclomatic": {
+                "ideal": 15,
+                "max": 35
+              }
+            }
+          },
+          {
+            "id": "design-diff-engine",
+            "class": "DesignDiffEngine",
+            "target": "packages/cli/src/commands/design/diff.ts::computeDesignDiff",
+            "metrics": {
+              "sloc": {
+                "ideal": 300,
+                "max": 600
+              },
+              "max-cyclomatic": {
+                "ideal": 12,
+                "max": 25
+              }
+            }
+          },
+          {
+            "id": "cli-program-factory",
+            "class": "CliProgramFactory",
+            "target": "packages/cli/src/index.ts::createSteleProgram",
+            "metrics": {
+              "sloc": {
+                "ideal": 200,
+                "max": 400
+              },
+              "public-method-count": {
+                "ideal": 4,
+                "max": 10
+              }
+            }
+          },
+          {
+            "id": "design-profile-validator",
+            "class": "DesignProfileValidator",
+            "target": "packages/cli/src/design-profile/validate.ts::validateProfile",
+            "metrics": {
+              "sloc": {
+                "ideal": 200,
+                "max": 400
+              },
+              "max-cyclomatic": {
+                "ideal": 10,
+                "max": 25
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "architecture",
+        "decision_ref": "d1",
+        "name": "Architecture Evaluation Engine",
+        "subdomain_type": "supporting",
+        "architecture_style": "hexagonal",
+        "root": "packages/architecture-core/src",
+        "layers": {
+          "domain": "packages/architecture-core/src/**"
+        },
+        "aggregate_roots": [
+          {
+            "id": "architecture-evaluator",
+            "class": "ArchitectureEvaluator",
+            "target": "packages/architecture-core/src/evaluate.ts::evaluateArchitecture",
+            "metrics": {
+              "sloc": {
+                "ideal": 200,
+                "max": 400
+              },
+              "max-cyclomatic": {
+                "ideal": 10,
+                "max": 25
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "backends-ts",
+        "decision_ref": "d1",
+        "name": "TypeScript Test Backend",
+        "subdomain_type": "supporting",
+        "architecture_style": "transaction_script",
+        "root": "packages/backend-typescript/src",
+        "layers": {
+          "domain": "packages/backend-typescript/src"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "backends-py",
+        "decision_ref": "d1",
+        "name": "Python Test Backend",
+        "subdomain_type": "supporting",
+        "architecture_style": "transaction_script",
+        "root": "packages/backend-python/src",
+        "layers": {
+          "domain": "packages/backend-python/src"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "hooks",
+        "decision_ref": "d1",
+        "name": "Agent Hooks SDK",
+        "subdomain_type": "supporting",
+        "architecture_style": "hexagonal",
+        "root": "packages/agent-hooks/src",
+        "layers": {
+          "protocol": "packages/agent-hooks/src/{protocol.ts,protocol/**}",
+          "domain": "packages/agent-hooks/src/handlers/**",
+          "application": "packages/agent-hooks/src/adapters/**",
+          "infrastructure": "packages/agent-hooks/src/{install,util}/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "mcp",
+        "decision_ref": "d1",
+        "name": "MCP Server Integration",
+        "subdomain_type": "supporting",
+        "architecture_style": "hexagonal",
+        "root": "packages/mcp-server/src",
+        "layers": {
+          "application": "packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}",
+          "infrastructure": "packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}"
+        },
+        "layer_dependencies": {
+          "infrastructure": [
+            "application"
+          ]
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "backends-go",
+        "decision_ref": "d1",
+        "name": "Go Test Backend",
+        "subdomain_type": "supporting",
+        "architecture_style": "transaction_script",
+        "root": "packages/backend-go/src",
+        "layers": {
+          "domain": "packages/backend-go/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "backends-java",
+        "decision_ref": "d1",
+        "name": "Java Test Backend",
+        "subdomain_type": "supporting",
+        "architecture_style": "transaction_script",
+        "root": "packages/backend-java/src",
+        "layers": {
+          "domain": "packages/backend-java/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "backends-rust",
+        "decision_ref": "d1",
+        "name": "Rust Test Backend",
+        "subdomain_type": "supporting",
+        "architecture_style": "transaction_script",
+        "root": "packages/backend-rust/src",
+        "layers": {
+          "domain": "packages/backend-rust/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "github-action",
+        "decision_ref": "d1",
+        "name": "GitHub Action Integration",
+        "subdomain_type": "supporting",
+        "architecture_style": "hexagonal",
+        "root": "packages/github-action/src",
+        "layers": {
+          "domain": "packages/github-action/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "plugin",
+        "decision_ref": "d1",
+        "name": "Claude Code Plugin",
+        "subdomain_type": "generic",
+        "root": "packages/claude-code-plugin/src",
+        "layers": {
+          "domain": "packages/claude-code-plugin/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "call-graph-core",
+        "decision_ref": "d1",
+        "name": "Call Graph Core",
+        "subdomain_type": "core",
+        "architecture_style": "transaction_script",
+        "root": "packages/call-graph-core/src",
+        "layers": {
+          "domain": "packages/call-graph-core/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "trace-evaluator",
+        "decision_ref": "d1",
+        "name": "Trace-Based Policy Evaluator",
+        "subdomain_type": "core",
+        "architecture_style": "transaction_script",
+        "root": "packages/trace-evaluator/src",
+        "layers": {
+          "domain": "packages/trace-evaluator/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "type-state-evaluator",
+        "decision_ref": "d1",
+        "name": "Type-State Evaluator",
+        "subdomain_type": "core",
+        "architecture_style": "transaction_script",
+        "root": "packages/type-state-evaluator/src",
+        "layers": {
+          "domain": "packages/type-state-evaluator/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "effect-evaluator",
+        "decision_ref": "d1",
+        "name": "Effect System Evaluator",
+        "subdomain_type": "core",
+        "architecture_style": "transaction_script",
+        "root": "packages/effect-evaluator/src",
+        "layers": {
+          "domain": "packages/effect-evaluator/src/**"
+        },
+        "aggregate_roots": []
+      },
+      {
+        "id": "type-driven-evaluator",
+        "decision_ref": "d1",
+        "name": "Type-Driven Evaluator (branded-id + smart-ctor + future)",
+        "subdomain_type": "core",
+        "architecture_style": "transaction_script",
+        "root": "packages/type-driven-evaluator/src",
+        "layers": {
+          "domain": "packages/type-driven-evaluator/src/**"
+        },
+        "aggregate_roots": []
+      }
+    ],
+    "shared_kernels": [
+      {
+        "id": "agent-hooks-shared",
+        "paths": [
+          "packages/agent-hooks/src/protocol/**"
+        ]
+      }
+    ],
+    "integrations": [
+      {
+        "from": "cli",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "architecture",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "backends-ts",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "backends-py",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "hooks",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "mcp",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-go",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-java",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-rust",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "github-action",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-ts",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-py",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "architecture",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "hooks",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "mcp",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "mcp",
+        "to": "hooks",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "plugin",
+        "to": "hooks",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "trace-evaluator",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "type-state-evaluator",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "effect-evaluator",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "cli",
+        "to": "type-driven-evaluator",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "trace-evaluator",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "trace-evaluator",
+        "to": "call-graph-core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "type-state-evaluator",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "type-state-evaluator",
+        "to": "call-graph-core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "effect-evaluator",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "effect-evaluator",
+        "to": "call-graph-core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-ts",
+        "to": "call-graph-core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-ts",
+        "to": "effect-evaluator",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-ts",
+        "to": "type-state-evaluator",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "call-graph-core",
+        "to": "core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      }
+    ],
+    "core_invariants": [
+      {
+        "id": "inv-core-purity",
+        "description": "Core engine must remain pure - no filesystem, network, or clock dependencies outside loader/manifest layers",
+        "evolvability": "never",
+        "status": "enforced",
+        "enforcement": {
+          "kind": "external-tool",
+          "external_tool_ref": "architecture.ddd-core"
+        }
+      },
+      {
+        "id": "inv-no-cli-domain-import",
+        "description": "CLI commands layer must not import from design-domain or core directly - only through application layer",
+        "evolvability": "never",
+        "status": "enforced",
+        "enforcement": {
+          "kind": "external-tool",
+          "external_tool_ref": "architecture.ddd-cli"
+        }
+      },
+      {
+        "id": "inv-no-infra-to-domain",
+        "description": "Infrastructure layer must not import from domain-services or domain-primitives",
+        "evolvability": "with-review",
+        "status": "enforced",
+        "enforcement": {
+          "kind": "external-tool",
+          "external_tool_ref": "architecture.ddd-core"
+        }
+      },
+      {
+        "id": "inv-deterministic-output",
+        "description": "All generator output must be deterministic - same input produces identical output",
+        "evolvability": "never",
+        "status": "pending"
+      },
+      {
+        "id": "inv-no-node-in-domain",
+        "description": "Domain layers (domain-primitives, domain-services) must not import node: modules",
+        "evolvability": "never",
+        "status": "enforced",
+        "enforcement": {
+          "kind": "external-tool",
+          "external_tool_ref": "architecture.ddd-core"
+        }
+      },
+      {
+        "id": "inv-no-direct-backend-import",
+        "description": "CLI application layer must not import backend translators directly - use backend-registry adapter",
+        "evolvability": "with-review",
+        "status": "enforced",
+        "enforcement": {
+          "kind": "external-tool",
+          "external_tool_ref": "architecture.ddd-cli"
+        }
+      },
+      {
+        "id": "inv-path-safety",
+        "description": "All file paths must be resolved through path-safety helpers, never constructed from raw input",
+        "evolvability": "never",
+        "status": "enforced",
+        "enforcement": {
+          "kind": "stele-rule",
+          "rule_ref": "path-safety-checker"
+        }
+      }
+    ]
+  },
+  "type_driven": {
+    "enabled": true,
+    "branded_ids": {
+      "mode": "hard",
+      "declarations": [
+        {
+          "name": "RuleId",
+          "base_type": "string",
+          "invariant": "matches /^[a-z][a-z0-9_.]*$/"
+        },
+        {
+          "name": "ContractPath",
+          "base_type": "string",
+          "invariant": "matches /^[^/]+\\.stele$/"
+        },
+        {
+          "name": "Sha256",
+          "base_type": "string",
+          "invariant": "matches /^[0-9a-f]{64}$/"
+        },
+        {
+          "name": "PackageName",
+          "base_type": "string",
+          "invariant": "matches /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
+        }
+      ]
+    },
+    "smart_constructors": {
+      "mode": "hard",
+      "value_objects": [
+        {
+          "name": "RuleId",
+          "constructor": "parseRuleId(input: string): RuleId",
+          "deny_raw": true
+        },
+        {
+          "name": "ContractPath",
+          "constructor": "parseContractPath(input: string): ContractPath",
+          "deny_raw": true
+        },
+        {
+          "name": "Sha256",
+          "constructor": "parseSha256(input: string): Sha256",
+          "deny_raw": true
+        }
+      ]
+    },
+    "type_state": {
+      "mode": "hard"
+    }
+  },
+  "toolchain_contracts": {
+    "typescript_config": {
+      "required_options": {
+        "strict": true,
+        "noImplicitAny": true,
+        "noImplicitOverride": true,
+        "noFallthroughCasesInSwitch": true,
+        "moduleResolution": "Bundler",
+        "target": "ES2022"
+      },
+      "tsconfig_path": "tsconfig.base.json"
+    },
+    "typescript_diagnostics": {
+      "enabled": true,
+      "command": "pnpm --filter @stele/cli run typecheck"
+    },
+    "eslint": {
+      "enabled": true,
+      "command": "npx eslint --format json .",
+      "format": "json",
+      "rules": [
+        "@typescript-eslint/no-unused-vars",
+        "@typescript-eslint/no-explicit-any"
+      ],
+      "warning_is_error": true
+    }
+  },
+  "self_constraints": {
+    "no_baseline": true
+  }
+}

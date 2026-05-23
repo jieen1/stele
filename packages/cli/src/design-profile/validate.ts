@@ -1,4 +1,5 @@
-import type { DesignProfile, Context, SharedKernel } from "./types.js";
+import { compilePattern } from "@stele/call-graph-core";
+import type { DesignProfile, Context, SharedKernel, TraceSection } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Validation error types
@@ -89,6 +90,9 @@ export function validateProfile(profile: DesignProfile, profilePath: string = "c
   addTypeDrivenErrors(profile, errors, profilePath);
   addCoreInvariantErrors(profile, errors, profilePath);
   addUniquenessErrors(profile, errors, profilePath);
+  if (profile.trace) {
+    addTraceErrors(profile.trace, errors, profilePath);
+  }
 
   return errors;
 }
@@ -300,23 +304,8 @@ function addTypeDrivenErrors(profile: DesignProfile, errors: ValidationErrors, p
     }
   }
 
-  // ADT entity type_target format (skip if not declared)
-  if (td.adt?.entities) {
-    for (const entity of td.adt.entities) {
-      if (!entity.type_target) continue;
-      const err = validateTargetFormat(
-        entity.type_target,
-        `type_driven.adt.entities.${entity.name}.type_target`,
-      );
-      if (err) {
-        errors.push({
-          field: `type_driven.adt.entities.${entity.name}.type_target`,
-          path: profilePath,
-          message: err,
-        });
-      }
-    }
-  }
+  // Note: type_driven.adt is deprecated (Phase B); the field is silently accepted
+  // for back-compat but never validated. Deprecation notice is emitted by loadProfile.
 
   // Smart constructor class_target format (skip if not declared)
   if (td.smart_constructors?.value_objects) {
@@ -448,6 +437,168 @@ function checkUniqueIds(ids: string[], fieldPrefix: string, errors: ValidationEr
       });
     }
     seen.add(id);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trace section (Phase B T3.4)
+// ---------------------------------------------------------------------------
+
+const TRACE_CONSTRAINT_FIELDS = [
+  "must_transit",
+  "must_be_preceded_by",
+  "must_be_followed_by",
+  "deny_direct",
+  "deny_transit",
+] as const;
+
+function addTraceErrors(trace: TraceSection, errors: ValidationErrors, profilePath: string): void {
+  if (!Array.isArray(trace.policies)) {
+    errors.push({
+      field: "trace.policies",
+      path: profilePath,
+      message: "trace.policies must be an array",
+    });
+    return;
+  }
+
+  const seenIds = new Set<string>();
+
+  for (let idx = 0; idx < trace.policies.length; idx++) {
+    const policy = trace.policies[idx]!;
+    const ref = policy && typeof policy.id === "string" && policy.id.length > 0
+      ? policy.id
+      : `#${idx}`;
+    const base = `trace.policies[${ref}]`;
+
+    if (!policy || typeof policy !== "object") {
+      errors.push({ field: base, path: profilePath, message: `trace policy at index ${idx} must be an object` });
+      continue;
+    }
+
+    if (typeof policy.id !== "string" || policy.id.length === 0) {
+      errors.push({ field: `${base}.id`, path: profilePath, message: `trace policy at index ${idx} is missing id (non-empty string)` });
+    } else if (seenIds.has(policy.id)) {
+      errors.push({ field: `${base}.id`, path: profilePath, message: `duplicate trace policy id "${policy.id}"` });
+    } else {
+      seenIds.add(policy.id);
+    }
+
+    if (policy.description !== undefined && typeof policy.description !== "string") {
+      errors.push({ field: `${base}.description`, path: profilePath, message: `${base}.description must be a string when present` });
+    }
+
+    if (policy.severity !== undefined && policy.severity !== "error" && policy.severity !== "warning") {
+      errors.push({
+        field: `${base}.severity`,
+        path: profilePath,
+        message: `${base}.severity must be "error" or "warning" (got ${JSON.stringify(policy.severity)})`,
+      });
+    }
+
+    if (!Array.isArray(policy.target) || policy.target.length === 0) {
+      errors.push({ field: `${base}.target`, path: profilePath, message: `${base}.target must be a non-empty array of pattern strings` });
+    } else {
+      validatePatternArray(policy.target, `${base}.target`, errors, profilePath);
+    }
+
+    let constraintCount = 0;
+    for (const field of TRACE_CONSTRAINT_FIELDS) {
+      const value = policy[field];
+      if (value === undefined) continue;
+      if (!Array.isArray(value)) {
+        errors.push({ field: `${base}.${field}`, path: profilePath, message: `${base}.${field} must be an array of pattern strings when present` });
+        continue;
+      }
+      if (value.length > 0) {
+        constraintCount += value.length;
+        validatePatternArray(value, `${base}.${field}`, errors, profilePath);
+      }
+    }
+
+    if (constraintCount === 0) {
+      errors.push({
+        field: base,
+        path: profilePath,
+        message: `${base} must declare at least one of must_transit, must_be_preceded_by, must_be_followed_by, deny_direct, deny_transit`,
+      });
+    }
+
+    if (policy.scope !== undefined) {
+      if (!Array.isArray(policy.scope)) {
+        errors.push({ field: `${base}.scope`, path: profilePath, message: `${base}.scope must be an array of pattern strings when present` });
+      } else {
+        validatePatternArray(policy.scope, `${base}.scope`, errors, profilePath);
+      }
+    }
+
+    if (policy.exempt !== undefined) {
+      if (!Array.isArray(policy.exempt)) {
+        errors.push({ field: `${base}.exempt`, path: profilePath, message: `${base}.exempt must be an array when present` });
+      } else {
+        for (let exIdx = 0; exIdx < policy.exempt.length; exIdx++) {
+          const ex = policy.exempt[exIdx]!;
+          const exBase = `${base}.exempt[${exIdx}]`;
+          if (!ex || typeof ex !== "object") {
+            errors.push({ field: exBase, path: profilePath, message: `${exBase} must be an object with pattern and reason` });
+            continue;
+          }
+          if (typeof ex.pattern !== "string" || ex.pattern.length === 0) {
+            errors.push({ field: `${exBase}.pattern`, path: profilePath, message: `${exBase}.pattern is required (non-empty string)` });
+          } else {
+            validatePatternString(ex.pattern, `${exBase}.pattern`, errors, profilePath);
+          }
+          if (typeof ex.reason !== "string" || ex.reason.length === 0) {
+            errors.push({ field: `${exBase}.reason`, path: profilePath, message: `${exBase}.reason is required (non-empty string)` });
+          }
+        }
+      }
+    }
+
+    if (policy.fix_hint !== undefined && typeof policy.fix_hint !== "string") {
+      errors.push({ field: `${base}.fix_hint`, path: profilePath, message: `${base}.fix_hint must be a string when present` });
+    }
+  }
+}
+
+function validatePatternArray(values: readonly string[], fieldPath: string, errors: ValidationErrors, profilePath: string): void {
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (typeof v !== "string") {
+      errors.push({ field: `${fieldPath}[${i}]`, path: profilePath, message: `${fieldPath}[${i}] must be a string` });
+      continue;
+    }
+    validatePatternString(v, `${fieldPath}[${i}]`, errors, profilePath);
+  }
+}
+
+/**
+ * Validate a NodeId pattern string. Mirrors the rejection rules in
+ * `@stele/core` validator/structure-trace-policy.ts so that profile-level
+ * validation produces equivalent errors to the structural parser.
+ */
+function validatePatternString(pattern: string, fieldPath: string, errors: ValidationErrors, profilePath: string): void {
+  if (typeof pattern !== "string" || pattern.trim().length === 0) {
+    errors.push({ field: fieldPath, path: profilePath, message: `${fieldPath} pattern must be a non-empty string` });
+    return;
+  }
+  if (pattern.endsWith("::")) {
+    errors.push({ field: fieldPath, path: profilePath, message: `${fieldPath} pattern "${pattern}" has a trailing "::" separator` });
+    return;
+  }
+  const arityMatch = /\(([^()]*)\)\s*(?:#[0-9a-f]{8})?\s*$/.exec(pattern);
+  if (arityMatch) {
+    const inside = arityMatch[1] ?? "";
+    if (inside !== "" && inside !== "*" && !/^\d+$/.test(inside)) {
+      errors.push({ field: fieldPath, path: profilePath, message: `${fieldPath} pattern "${pattern}" has a malformed arity "(${inside})"` });
+      return;
+    }
+  }
+  try {
+    compilePattern(pattern);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push({ field: fieldPath, path: profilePath, message: `${fieldPath} pattern "${pattern}" failed to compile: ${msg}` });
   }
 }
 

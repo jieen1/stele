@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@stele/core": resolve(__dirname, "../core/src/index.ts"),
+      "@stele/call-graph-core": resolve(__dirname, "../call-graph-core/src/index.ts"),
     },
   },
   test: {

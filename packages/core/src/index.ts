@@ -73,6 +73,7 @@ export type {
   ViolationInput,
   ViolationLocation,
   ContractNotice,
+  ViolationPriority,
   ViolationReport,
   ViolationReportSummary,
   ViolationSeverity,
@@ -88,6 +89,12 @@ export {
   safeSerialize,
   stableStringify,
 } from "./report/types.js";
+export {
+  compareViolationsByPriority,
+  priorityRank,
+  severityRank,
+  sortViolations,
+} from "./report/sorting.js";
 export type {
   OperatorParameterOccurrence,
   OperatorParameterSpec,
@@ -120,8 +127,6 @@ export {
   invariantExplanation,
 } from "./evaluator/explain.js";
 export type {
-  AgentDeclaration,
-  AgentSingleValueField,
   ArchitectureDeclaration,
   ArchitectureLang,
   ArchitectureModuleDeclaration,
@@ -135,8 +140,6 @@ export type {
   ClassShapeFieldRequirement,
   CodeShapeDeclaration,
   CodeShapeLang,
-  ConflictDeclaration,
-  ConflictResolutionStrategy,
   Contract,
   ContractFile,
   CoreNodeDeclaration,
@@ -153,11 +156,9 @@ export type {
   InvariantMultiValueField,
   InvariantSingleValueField,
   InvariantSingleValueFieldName,
-  InterAgentContractDeclaration,
   LoadedContractFile,
   MetadataDeclaration,
   OperatorDeclaration,
-  RequiresClause,
   ScenarioCall,
   ScenarioCaptureStateDeclaration,
   ScenarioDeclaration,
@@ -166,7 +167,35 @@ export type {
   ScenarioSandbox,
   ScenarioStepDeclaration,
   ScenarioUse,
-  ScopeDeclaration,
+  TracePolicyDeclaration,
+  TracePolicyExempt,
   TypePolicyDeclaration,
+  TypeStateBindingDeclaration,
+  TypeStateBindingParam,
+  TypeStateDeclaration,
+  TypeStateMapping,
+  TypeStateTransition,
+  EffectAnnotationDeclaration,
+  EffectDeclarationsDeclaration,
+  EffectName,
+  EffectPolicyDeclaration,
+  EffectSuppressionDeclaration,
+} from "./validator/structure.js";
+
+export {
+  parseTracePolicyDeclaration,
+  isFixHintActionable,
+} from "./validator/structure.js";
+
+export {
+  parseTypeStateDeclaration,
+  parseTypeStateBindingDeclaration,
+} from "./validator/structure.js";
+
+export {
+  parseEffectAnnotationDeclaration,
+  parseEffectDeclarationsDeclaration,
+  parseEffectPolicyDeclaration,
+  parseEffectSuppressionDeclaration,
 } from "./validator/structure.js";
 

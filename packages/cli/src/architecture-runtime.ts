@@ -38,6 +38,16 @@ export type ArchitectureContractOptions = {
   };
 };
 
+/**
+ * Options accepted by {@link evaluateArchitectureRuntime}. Currently the
+ * runtime always produces the full structured result; `fullDetails` is
+ * reserved for future detail-toggling without breaking the call signature.
+ */
+export type ArchitectureRuntimeOptions = ArchitectureContractOptions & {
+  /** Reserved: currently the runtime always returns full structured details. */
+  fullDetails?: boolean;
+};
+
 export type ArchitectureViolation = {
   fromModule: string;
   toModule: string;
@@ -67,10 +77,10 @@ function toFullModules(
 }
 
 // ----------------------------------------------------------------
-// Internal: Full result (used by stage.ts and public API)
+// Result shape (used by stage.ts and public API)
 // ----------------------------------------------------------------
 
-export type ArchitectureEvaluationResult = {
+export type ArchitectureRuntimeResult = {
   dependencyViolations: ArchitectureViolation[];
   cycleViolations: import("@stele/architecture-core").CycleViolation[];
   layerDirectionViolations: import("@stele/architecture-core").LayerDirectionViolation[];
@@ -80,12 +90,22 @@ export type ArchitectureEvaluationResult = {
 };
 
 /**
- * Internal: Evaluate architecture and return full structured result.
- * Single source of truth for file discovery, graph building, and evaluation.
+ * @deprecated Renamed to {@link ArchitectureRuntimeResult}. Will be removed in v0.4.
  */
-export async function evaluateArchitectureFull(
-  options: ArchitectureContractOptions,
-): Promise<ArchitectureEvaluationResult> {
+export type ArchitectureEvaluationResult = ArchitectureRuntimeResult;
+
+/**
+ * Evaluate an architecture declaration against the project's TypeScript source
+ * tree. Returns a structured result with every violation kind. Single source of
+ * truth for file discovery, graph building, and evaluation.
+ *
+ * All file paths are handled in POSIX format internally for consistent module
+ * mapping. The TypeScript compiler API resolves absolute paths for imports,
+ * but the module map keys remain relative POSIX paths for determinism.
+ */
+export async function evaluateArchitectureRuntime(
+  options: ArchitectureRuntimeOptions,
+): Promise<ArchitectureRuntimeResult> {
   const { projectRoot, architecture } = options;
 
   // Discover source files across all module paths (relative POSIX paths)
@@ -230,24 +250,25 @@ export async function evaluateArchitectureFull(
 }
 
 // ----------------------------------------------------------------
-// Main entry point
+// Deprecated re-exports (one-version back-compat for external callers)
 // ----------------------------------------------------------------
 
 /**
- * Evaluate an architecture contract against the project's TypeScript source files.
+ * @deprecated Use {@link evaluateArchitectureRuntime} instead. Will be removed in v0.4.
+ */
+export const evaluateArchitectureFull = evaluateArchitectureRuntime;
+
+/**
+ * @deprecated Use {@link evaluateArchitectureRuntime} and flatten the structured
+ *             result at the call site instead. Will be removed in v0.4.
  *
- * This is the public runtime entry point for generated architecture tests.
- * It loads source files, builds a dependency graph, and evaluates it against
- * the declared architecture constraints.
- *
- * All file paths are handled in POSIX format internally for consistent module
- * mapping. The TypeScript compiler API resolves absolute paths for imports,
- * but the module map keys remain relative POSIX paths for determinism.
+ * Flattens every violation kind into a single `ArchitectureViolation[]` list,
+ * preserving the historical wire shape used by older callers.
  */
 export async function evaluateArchitectureContract(
   options: ArchitectureContractOptions,
 ): Promise<ArchitectureViolation[]> {
-  const result = await evaluateArchitectureFull(options);
+  const result = await evaluateArchitectureRuntime(options);
   const violations: ArchitectureViolation[] = [];
 
   // Dependency violations

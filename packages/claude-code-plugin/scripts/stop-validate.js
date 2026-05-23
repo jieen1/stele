@@ -2,9 +2,12 @@
 import { constants, lstatSync } from "node:fs";
 import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 const STOP_BLOCK_EXIT_CODE = 2;
+const STOP_STATE_FILE = ".stele/stop-state.json";
+const MAX_FINGERPRINT_INPUT = 4096;
 const RESEARCH_TEMPLATE = [
   "",
   "=== RESEARCH MODE ===",
@@ -80,7 +83,12 @@ async function main() {
   });
 
   if (steleResult.code !== 0) {
-    blockStopWithContractRecovery(`stele check failed with exit code ${steleResult.code}.\n`);
+    await blockStopWithLoopGuard(
+      "stele check",
+      steleResult.code,
+      `stele check failed with exit code ${steleResult.code}.\n${CONTRACT_RECOVERY_GUIDANCE}`,
+      `${steleResult.stderr}\n${steleResult.stdout}`,
+    );
     return;
   }
 
@@ -120,7 +128,12 @@ async function main() {
       return;
     }
 
-    blockStopWithContractRecovery(`pytest tests/contract failed with exit code ${pytestResult.code}.\n`);
+    await blockStopWithLoopGuard(
+      "pytest tests/contract",
+      pytestResult.code,
+      `pytest tests/contract failed with exit code ${pytestResult.code}.\n${CONTRACT_RECOVERY_GUIDANCE}`,
+      `${pytestResult.stderr}\n${pytestResult.stdout}`,
+    );
     return;
   }
   }
@@ -148,12 +161,22 @@ async function main() {
     });
 
     if (pnpmResult.code !== 0) {
-      blockStopWithContractRecovery(`pnpm test failed with exit code ${pnpmResult.code}.\n`);
+      await blockStopWithLoopGuard(
+        "pnpm test",
+        pnpmResult.code,
+        `pnpm test failed with exit code ${pnpmResult.code}.\n${CONTRACT_RECOVERY_GUIDANCE}`,
+        `${pnpmResult.stderr}\n${pnpmResult.stdout}`,
+      );
       return;
     }
   }
 
   await maybeRequestMaintenanceReview(hookPayload, steleCommandPath);
+
+  // Success path: clear the loop-guard state so the next failure starts fresh
+  // (i.e. is treated as a brand-new failure and gets one cycle of blocking before
+  // being released to the user).
+  await clearStopState();
 
   process.exit(0);
   } catch (error) {
@@ -522,6 +545,124 @@ function blockStop(message) {
 
 function blockStopWithContractRecovery(message) {
   blockStop(`${message}${CONTRACT_RECOVERY_GUIDANCE}`);
+}
+
+/**
+ * Loop guard: when the same Stop-time failure recurs back-to-back, the second
+ * attempt is allowed to stop so the user can intervene. Without this guard the
+ * agent enters an infinite loop where every attempt to stop & ask the user is
+ * blocked by the same failure that prompted the ask.
+ *
+ * Behavior:
+ *   - First time we see a failure with fingerprint F → write state, exit 2 (block)
+ *   - Subsequent attempt with same fingerprint F → write state (attempts++),
+ *     emit a "released to user" message, exit 0 (allow stop)
+ *   - Successful run (or a different fingerprint) → state is reset, so the next
+ *     failure is treated as "first time" again (one cycle of blocking before release)
+ *
+ * State file lives at <project>/.stele/stop-state.json. Read/write failures
+ * are tolerated — they degrade the guard to the legacy always-block behavior
+ * (fail-closed for safety, not fail-open).
+ */
+async function blockStopWithLoopGuard(stage, exitCode, message, evidence) {
+  const fingerprint = computeFailureFingerprint(stage, exitCode, evidence);
+  const stateFilePath = path.join(projectDir, STOP_STATE_FILE);
+  const previousState = await readStopState(stateFilePath);
+  const previousFingerprint = previousState?.lastFingerprint;
+  const previousAttempts =
+    typeof previousState?.consecutiveAttempts === "number" ? previousState.consecutiveAttempts : 0;
+  const sameAsPrevious = previousFingerprint === fingerprint && previousAttempts >= 1;
+
+  if (sameAsPrevious) {
+    await writeStopState(stateFilePath, {
+      lastFingerprint: fingerprint,
+      lastFailureAt: new Date().toISOString(),
+      consecutiveAttempts: previousAttempts + 1,
+      stage,
+      exitCode,
+      releasedToUser: true,
+    });
+    process.stderr.write(message);
+    process.stderr.write(
+      `\n[stele Stop hook] Same failure as the previous stop attempt (attempt #${
+        previousAttempts + 1
+      }, fingerprint ${fingerprint.slice(
+        0,
+        12,
+      )}). Allowing this stop so the user can review and decide. Re-running stele check after a real change will reset this state.\n`,
+    );
+    process.exit(0);
+  }
+
+  await writeStopState(stateFilePath, {
+    lastFingerprint: fingerprint,
+    lastFailureAt: new Date().toISOString(),
+    consecutiveAttempts: 1,
+    stage,
+    exitCode,
+    releasedToUser: false,
+  });
+  blockStop(message);
+}
+
+function computeFailureFingerprint(stage, exitCode, evidence) {
+  const norm = normalizeForFingerprint(evidence ?? "");
+  const payload = `${stage}|${exitCode}|${norm}`;
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+function normalizeForFingerprint(text) {
+  return String(text)
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/g, "<TS>")
+    .replace(/\b[0-9a-f]{40,}\b/g, "<HASH>")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .slice(0, MAX_FINGERPRINT_INPUT);
+}
+
+async function readStopState(stateFilePath) {
+  try {
+    const raw = await readFile(stateFilePath, "utf8");
+    const parsed = JSON.parse(raw);
+    return isObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeStopState(stateFilePath, state) {
+  try {
+    await mkdir(path.dirname(stateFilePath), { recursive: true });
+    await writeFile(stateFilePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  } catch {
+    // Best-effort. If we cannot persist state, future runs degrade to legacy
+    // "always block" — that's safer than failing open.
+  }
+}
+
+async function clearStopState() {
+  try {
+    const stateFilePath = path.join(projectDir, STOP_STATE_FILE);
+    await writeFile(
+      stateFilePath,
+      `${JSON.stringify(
+        {
+          lastFingerprint: null,
+          lastFailureAt: null,
+          consecutiveAttempts: 0,
+          stage: null,
+          exitCode: 0,
+          releasedToUser: false,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+  } catch {
+    // Best-effort.
+  }
 }
 
 function isObject(value) {

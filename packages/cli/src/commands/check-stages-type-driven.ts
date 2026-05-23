@@ -5,14 +5,14 @@ import {
   type ViolationReport,
 } from "@stele/core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
-import { checkBrandedIds } from "../typescript-shape/branded-ids.js";
-import { checkSmartConstructors } from "../typescript-shape/smart-constructors.js";
-import type {
-  BrandedIdDeclaration as TsBrandedIdDeclaration,
-  SmartConstructorTarget,
-  ShapeViolation,
-  BrandedIdViolation,
-} from "../typescript-shape/types.js";
+import {
+  checkBrandedIds,
+  checkSmartConstructors,
+  type BrandedIdDeclaration as TsBrandedIdDeclaration,
+  type SmartConstructorTarget,
+  type ShapeViolation,
+  type BrandedIdViolation,
+} from "@stele/type-driven-evaluator";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
 
 const RULE_KIND_BRANDED = "typescript-branded-id";

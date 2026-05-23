@@ -31,6 +31,9 @@
   "bugs": {
     "url": "https://github.com/stelehq/stele/issues"
   },
+  "dependencies": {
+    "@stele/call-graph-core": "workspace:*"
+  },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.7"
   }

@@ -821,3 +821,267 @@ describe("hash utilities", () => {
     expect(hashFile(filePath)).toBe(hash);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Deprecation: type_driven.adt (Phase B removal)
+// ---------------------------------------------------------------------------
+
+describe("type_driven.adt — deprecated field", () => {
+  it("parses successfully when adt is absent (no notice)", async () => {
+    const dir = await createTempDir();
+    await writeProfile(dir, minimalProfile());
+
+    const writes: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    (process.stderr.write as unknown as (chunk: string) => boolean) = ((chunk: string) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      const profile = loadProfile(dir);
+      expect(profile.type_driven).toBeUndefined();
+    } finally {
+      process.stderr.write = origWrite as typeof process.stderr.write;
+    }
+
+    const combined = writes.join("");
+    expect(combined).not.toContain("adt-deprecated");
+  });
+
+  it("parses successfully with adt: { mode: hard } and emits a deprecation notice (no error)", async () => {
+    const dir = await createTempDir();
+    const profile: DesignProfile = {
+      ...minimalProfile(),
+      type_driven: {
+        enabled: true,
+        adt: { mode: "hard" },
+      },
+    };
+    await writeProfile(dir, profile);
+
+    const writes: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    (process.stderr.write as unknown as (chunk: string) => boolean) = ((chunk: string) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    let loaded: DesignProfile | undefined;
+    try {
+      loaded = loadProfile(dir);
+    } finally {
+      process.stderr.write = origWrite as typeof process.stderr.write;
+    }
+
+    expect(loaded).toBeDefined();
+    expect(loaded!.type_driven?.adt?.mode).toBe("hard");
+
+    const combined = writes.join("");
+    expect(combined).toContain("[notice] design-profile.adt-deprecated");
+    expect(combined).toContain("'type_driven.adt'");
+    expect(combined).toContain("v0.4");
+  });
+
+  it("validateProfile silently accepts adt with malformed entities (back-compat)", () => {
+    const profile: DesignProfile = {
+      ...minimalProfile(),
+      type_driven: {
+        enabled: true,
+        adt: {
+          mode: "hard",
+          entities: [
+            // Malformed type_target previously would have produced a validation error;
+            // it must now be silently ignored.
+            { name: "Bad", type_target: "not-a-valid-format" },
+          ],
+        },
+      },
+    };
+    const errors = validateProfile(profile);
+    const adtErrors = errors.filter((e) => e.field.startsWith("type_driven.adt"));
+    expect(adtErrors).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase B T3.4 — trace section
+// ---------------------------------------------------------------------------
+
+describe("trace section", () => {
+  function withTrace(policies: unknown[]): DesignProfile {
+    return {
+      ...minimalProfile(),
+      // Cast through unknown to allow tests to inject malformed inputs.
+      trace: { policies } as unknown as DesignProfile["trace"],
+    };
+  }
+
+  it("profile without trace section parses cleanly (no notices)", async () => {
+    const dir = await createTempDir();
+    await writeProfile(dir, minimalProfile());
+
+    const writes: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    (process.stderr.write as unknown as (chunk: string) => boolean) = ((chunk: string) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    let loaded: DesignProfile | undefined;
+    try {
+      loaded = loadProfile(dir);
+    } finally {
+      process.stderr.write = origWrite as typeof process.stderr.write;
+    }
+    expect(loaded).toBeDefined();
+    expect(loaded!.trace).toBeUndefined();
+    expect(writes.join("")).not.toContain("trace-fix-hint-vague");
+  });
+
+  it("profile with a valid trace section parses cleanly", () => {
+    const profile = withTrace([
+      {
+        id: "DB_VIA_REPOSITORY",
+        description: "All DB access via repository",
+        severity: "error",
+        target: ["**/db/**::*"],
+        must_transit: ["**/repository/**::*"],
+        fix_hint: "Use `Repository.find` at src/db.ts:42",
+      },
+    ]);
+    const errors = validateProfile(profile);
+    expect(errors).toEqual([]);
+  });
+
+  it("policy missing id → validation error", () => {
+    const profile = withTrace([
+      {
+        target: ["**/db/**::*"],
+        must_transit: ["**/repo/**::*"],
+      },
+    ]);
+    const errors = validateProfile(profile);
+    const idErr = errors.find((e) => e.field.endsWith(".id"));
+    expect(idErr).toBeDefined();
+    expect(idErr!.message).toContain("missing id");
+  });
+
+  it("policy missing target → validation error", () => {
+    const profile = withTrace([
+      {
+        id: "BAD",
+        must_transit: ["**/repo/**::*"],
+      },
+    ]);
+    const errors = validateProfile(profile);
+    const tErr = errors.find((e) => e.field === "trace.policies[BAD].target");
+    expect(tErr).toBeDefined();
+    expect(tErr!.message).toContain("non-empty array");
+  });
+
+  it("policy with no must-* / deny-* constraints → validation error", () => {
+    const profile = withTrace([
+      {
+        id: "NO_RULE",
+        target: ["**/db/**::*"],
+      },
+    ]);
+    const errors = validateProfile(profile);
+    const err = errors.find(
+      (e) => e.field === "trace.policies[NO_RULE]" && e.message.includes("must declare at least one"),
+    );
+    expect(err).toBeDefined();
+  });
+
+  it("policy with bad pattern (trailing ::) → validation error (E0335-equivalent)", () => {
+    const profile = withTrace([
+      {
+        id: "BAD_PAT",
+        target: ["**/db/**::"],
+        must_transit: ["**/repo/**::*"],
+      },
+    ]);
+    const errors = validateProfile(profile);
+    const err = errors.find((e) => e.field.startsWith("trace.policies[BAD_PAT].target"));
+    expect(err).toBeDefined();
+    expect(err!.message).toContain('trailing "::"');
+  });
+
+  it("policy with vague fix-hint → notice (not error)", async () => {
+    const dir = await createTempDir();
+    const profile: DesignProfile = {
+      ...minimalProfile(),
+      trace: {
+        policies: [
+          {
+            id: "DEMO",
+            target: ["**/db/**::*"],
+            must_transit: ["**/repo/**::*"],
+            fix_hint: "be careful", // no backticks, no file:line
+          },
+        ],
+      },
+    };
+    await writeProfile(dir, profile);
+
+    const writes: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    (process.stderr.write as unknown as (chunk: string) => boolean) = ((chunk: string) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    let loaded: DesignProfile | undefined;
+    try {
+      loaded = loadProfile(dir);
+    } finally {
+      process.stderr.write = origWrite as typeof process.stderr.write;
+    }
+
+    expect(loaded).toBeDefined();
+    const combined = writes.join("");
+    expect(combined).toContain("[notice] design-profile.trace-fix-hint-vague");
+    expect(combined).toContain("trace.policies[DEMO].fix_hint");
+    // and not an error — load succeeded
+    expect(loaded!.trace?.policies[0]?.id).toBe("DEMO");
+  });
+
+  it("exempt entry missing reason → validation error", () => {
+    const profile = withTrace([
+      {
+        id: "BAD_EX",
+        target: ["**/db/**::*"],
+        must_transit: ["**/repo/**::*"],
+        exempt: [{ pattern: "**/legacy/**::*" }],
+      },
+    ]);
+    const errors = validateProfile(profile);
+    const err = errors.find(
+      (e) => e.field === "trace.policies[BAD_EX].exempt[0].reason",
+    );
+    expect(err).toBeDefined();
+  });
+
+  it('severity "info" → validation error', () => {
+    const profile = withTrace([
+      {
+        id: "BAD_SEV",
+        severity: "info",
+        target: ["**/db/**::*"],
+        must_transit: ["**/repo/**::*"],
+      },
+    ]);
+    const errors = validateProfile(profile);
+    const err = errors.find((e) => e.field === "trace.policies[BAD_SEV].severity");
+    expect(err).toBeDefined();
+    expect(err!.message).toContain('"error" or "warning"');
+  });
+
+  it("duplicate policy ids → validation error", () => {
+    const profile = withTrace([
+      { id: "DUP", target: ["**/a/**::*"], must_transit: ["**/r/**::*"] },
+      { id: "DUP", target: ["**/b/**::*"], deny_direct: ["**/c/**::*"] },
+    ]);
+    const errors = validateProfile(profile);
+    expect(errors.some((e) => e.message.includes("duplicate trace policy id"))).toBe(true);
+  });
+});

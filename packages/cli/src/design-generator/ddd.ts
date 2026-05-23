@@ -7,6 +7,7 @@ import {
   renderAclIntegration,
   renderAggregateCoreNode,
   renderAllDeclarations,
+  renderTraceSection,
   renderTypeDrivenDeclarations,
 } from "./render-stele.js";
 import type { ProvenanceOutput, ProvenanceRule } from "./manifest.js";
@@ -115,13 +116,29 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
     });
   }
 
-  const allDeclarations = renderAllDeclarations(
+  let allDeclarations = renderAllDeclarations(
     architectures.filter((a) => a !== aclArch),
     aclArch,
     coreNodes,
     typeDriven.brandedIds,
     typeDriven.smartCtors,
   );
+
+  // Append trace-policy declarations at the end. Done as a conditional
+  // suffix so profiles without a `trace:` section keep byte-identical
+  // output (see tests/render-stele-snapshot.test.ts).
+  //
+  // Provenance entries for trace-policies are intentionally NOT added
+  // here: the ProvenanceRule.kind union (see manifest.ts) does not yet
+  // accept "trace-policy". A later task (T3.x / manifest extension)
+  // wires that in once the kind is widened.
+  const traceBlock = renderTraceSection(profile.trace);
+  if (traceBlock.length > 0) {
+    allDeclarations = allDeclarations.length > 0
+      ? `${allDeclarations}\n\n${traceBlock}`
+      : traceBlock;
+  }
+  const tracePolicyCount = profile.trace?.policies?.length ?? 0;
 
   const provenanceOutputs: ProvenanceOutput[] = [
     {
@@ -144,7 +161,7 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
         {
           path: "contract/generated/ddd-typedriven.stele",
           sha256: "", // Computed by caller
-          rule_count: architectures.length + coreNodes.length + typeDriven.brandedIds.length + typeDriven.smartCtors.length,
+          rule_count: architectures.length + coreNodes.length + typeDriven.brandedIds.length + typeDriven.smartCtors.length + tracePolicyCount,
         },
       ],
     },

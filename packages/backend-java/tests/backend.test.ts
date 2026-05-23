@@ -33,15 +33,17 @@ function makeMinimalContract(invariantCount = 1): Contract {
       dependsOn: [],
     })),
     codeShapes: [],
-    agents: [],
-    scopes: [],
-    interAgentContracts: [],
     architectures: [],
     coreNodes: [],
     brandedIds: [],
     smartCtors: [],
-    conflicts: [],
-    warnings: [],
+    tracePolicies: [],
+    typeStates: [],
+    typeStateBindings: [],
+    effectDeclarations: [],
+    effectAnnotations: [],
+    effectPolicies: [],
+    effectSuppressions: [],
   };
 }
 

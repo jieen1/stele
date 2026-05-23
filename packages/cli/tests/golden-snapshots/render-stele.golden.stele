@@ -1,0 +1,499 @@
+(architecture "ddd-core"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: core context must preserve DDD layer direction.")
+
+  (module core-domain-primitives
+    (path "packages/core/src/{ast,errors,config,util}/**"))
+  (module core-domain-services
+    (path "packages/core/src/{validator,registry,evaluator}/**"))
+  (module core-application
+    (path "packages/core/src/{loader,normalizer,manifest,baseline}/**"))
+  (module core-parsing
+    (path "packages/core/src/{lexer,parser}/**"))
+  (module core-generation
+    (path "packages/core/src/generator/**"))
+  (module core-report
+    (path "packages/core/src/report/**"))
+
+  (layer domain-primitives core-domain-primitives)
+  (layer domain-services core-domain-services)
+  (layer application core-application)
+  (layer parsing core-parsing)
+  (layer generation core-generation)
+  (layer report core-report)
+
+  (allow-dependency core-domain-services core-domain-primitives core-report)
+  (allow-dependency core-application core-domain-primitives core-domain-services core-parsing core-generation core-report)
+  (allow-dependency core-generation core-domain-services core-domain-primitives core-parsing core-report)
+  (allow-dependency core-parsing core-domain-primitives)
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-cli"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.")
+
+  (module cli-presentation
+    (path "packages/cli/src/{commands,index}/**"))
+  (module cli-application
+    (path "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**"))
+  (module cli-design-domain
+    (path "packages/cli/src/{design-profile,design-generator}/**"))
+  (module cli-toolchain
+    (path "packages/cli/src/toolchain/**"))
+  (module cli-infrastructure
+    (path "packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**"))
+
+  (layer presentation cli-presentation)
+  (layer application cli-application)
+  (layer design-domain cli-design-domain)
+  (layer toolchain cli-toolchain)
+  (layer infrastructure cli-infrastructure)
+
+  (allow-dependency cli-presentation cli-application cli-design-domain cli-toolchain cli-infrastructure)
+  (allow-dependency cli-application cli-design-domain cli-toolchain cli-infrastructure)
+  (allow-dependency cli-design-domain cli-infrastructure)
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-architecture"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: architecture context must preserve DDD layer direction.")
+
+  (module architecture-domain
+    (path "packages/architecture-core/src/**"))
+
+  (layer domain architecture-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-backends-ts"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.")
+
+  (module backends-ts-domain
+    (path "packages/backend-typescript/src/**"))
+
+  (layer domain backends-ts-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-backends-py"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.")
+
+  (module backends-py-domain
+    (path "packages/backend-python/src/**"))
+
+  (layer domain backends-py-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-hooks"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: hooks context must preserve DDD layer direction.")
+
+  (module hooks-protocol
+    (path "packages/agent-hooks/src/{protocol.ts,protocol/**}"))
+  (module hooks-domain
+    (path "packages/agent-hooks/src/handlers/**"))
+  (module hooks-application
+    (path "packages/agent-hooks/src/adapters/**"))
+  (module hooks-infrastructure
+    (path "packages/agent-hooks/src/{install,util}/**"))
+
+  (layer protocol hooks-protocol)
+  (layer domain hooks-domain)
+  (layer application hooks-application)
+  (layer infrastructure hooks-infrastructure)
+
+  (allow-dependency hooks-domain hooks-protocol hooks-infrastructure)
+  (allow-dependency hooks-application hooks-protocol hooks-domain hooks-infrastructure)
+  (allow-dependency hooks-infrastructure hooks-protocol)
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-mcp"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: mcp context must preserve DDD layer direction.")
+
+  (module mcp-application
+    (path "packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}"))
+  (module mcp-infrastructure
+    (path "packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}"))
+
+  (layer application mcp-application)
+  (layer infrastructure mcp-infrastructure)
+
+  (allow-dependency mcp-infrastructure mcp-application)
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-backends-go"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: backends-go context must preserve DDD layer direction.")
+
+  (module backends-go-domain
+    (path "packages/backend-go/src/**"))
+
+  (layer domain backends-go-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-backends-java"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: backends-java context must preserve DDD layer direction.")
+
+  (module backends-java-domain
+    (path "packages/backend-java/src/**"))
+
+  (layer domain backends-java-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-backends-rust"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: backends-rust context must preserve DDD layer direction.")
+
+  (module backends-rust-domain
+    (path "packages/backend-rust/src/**"))
+
+  (layer domain backends-rust-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-github-action"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: github-action context must preserve DDD layer direction.")
+
+  (module github-action-domain
+    (path "packages/github-action/src/**"))
+
+  (layer domain github-action-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-plugin"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: plugin context must preserve DDD layer direction.")
+
+  (module plugin-domain
+    (path "packages/claude-code-plugin/src/**"))
+
+  (layer domain plugin-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-call-graph-core"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: call-graph-core context must preserve DDD layer direction.")
+
+  (module call-graph-core-domain
+    (path "packages/call-graph-core/src/**"))
+
+  (layer domain call-graph-core-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-trace-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: trace-evaluator context must preserve DDD layer direction.")
+
+  (module trace-evaluator-domain
+    (path "packages/trace-evaluator/src/**"))
+
+  (layer domain trace-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-type-state-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: type-state-evaluator context must preserve DDD layer direction.")
+
+  (module type-state-evaluator-domain
+    (path "packages/type-state-evaluator/src/**"))
+
+  (layer domain type-state-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-effect-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: effect-evaluator context must preserve DDD layer direction.")
+
+  (module effect-evaluator-domain
+    (path "packages/effect-evaluator/src/**"))
+
+  (layer domain effect-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-type-driven-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: type-driven-evaluator context must preserve DDD layer direction.")
+
+  (module type-driven-evaluator-domain
+    (path "packages/type-driven-evaluator/src/**"))
+
+  (layer domain type-driven-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-context-map"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated context map: cross-context dependencies must follow declared integration patterns.")
+
+  (module cli-infrastructure
+    (path "packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**"))
+  (module core-internal
+    (path "packages/core/src/{loader,normalizer,manifest,baseline}/**"))
+  (module architecture-internal
+    (path "packages/architecture-core/src/**"))
+  (module backends-ts-internal
+    (path "packages/backend-typescript/src/**"))
+  (module backends-py-internal
+    (path "packages/backend-python/src/**"))
+  (module hooks-internal
+    (path "packages/agent-hooks/src/handlers/**")
+    (path "packages/agent-hooks/src/adapters/**")
+  )
+  (module mcp-internal
+    (path "packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}"))
+  (module hooks-infrastructure
+    (path "packages/agent-hooks/src/{install,util}/**"))
+  (module mcp-infrastructure
+    (path "packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}"))
+  (module trace-evaluator-internal
+    (path "packages/trace-evaluator/src/**"))
+  (module type-state-evaluator-internal
+    (path "packages/type-state-evaluator/src/**"))
+  (module effect-evaluator-internal
+    (path "packages/effect-evaluator/src/**"))
+  (module type-driven-evaluator-internal
+    (path "packages/type-driven-evaluator/src/**"))
+  (module call-graph-core-internal
+    (path "packages/call-graph-core/src/**"))
+
+  (allow-dependency hooks-internal hooks-infrastructure)
+  (allow-dependency hooks-infrastructure hooks-internal)
+  (allow-dependency mcp-internal mcp-infrastructure)
+  (allow-dependency mcp-infrastructure mcp-internal)
+  (allow-dependency cli-infrastructure core-internal)
+  (allow-dependency cli-infrastructure architecture-internal)
+  (allow-dependency cli-infrastructure backends-ts-internal)
+  (allow-dependency cli-infrastructure backends-py-internal)
+  (allow-dependency cli-infrastructure hooks-internal)
+  (allow-dependency cli-infrastructure mcp-internal)
+  (allow-dependency backends-ts-internal core-internal)
+  (allow-dependency backends-py-internal core-internal)
+  (allow-dependency architecture-internal core-internal)
+  (allow-dependency hooks-infrastructure core-internal)
+  (allow-dependency mcp-infrastructure core-internal)
+  (allow-dependency mcp-infrastructure hooks-internal)
+  (allow-dependency cli-infrastructure trace-evaluator-internal)
+  (allow-dependency cli-infrastructure type-state-evaluator-internal)
+  (allow-dependency cli-infrastructure effect-evaluator-internal)
+  (allow-dependency cli-infrastructure type-driven-evaluator-internal)
+  (allow-dependency trace-evaluator-internal core-internal)
+  (allow-dependency trace-evaluator-internal call-graph-core-internal)
+  (allow-dependency type-state-evaluator-internal core-internal)
+  (allow-dependency type-state-evaluator-internal call-graph-core-internal)
+  (allow-dependency effect-evaluator-internal core-internal)
+  (allow-dependency effect-evaluator-internal call-graph-core-internal)
+  (allow-dependency backends-ts-internal call-graph-core-internal)
+  (allow-dependency backends-ts-internal effect-evaluator-internal)
+  (allow-dependency backends-ts-internal type-state-evaluator-internal)
+  (allow-dependency call-graph-core-internal core-internal)
+
+  (deny-cycles)
+  (fix "Use the declared ACL module instead of importing the target context directly."))
+
+(core-node "core-operator-registry-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/core/src/registry/operators.ts::OperatorRegistry")
+  (description "Generated from design profile: OperatorRegistry aggregate must remain reviewable.")
+  (rationale "OperatorRegistry protects core core invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 400) (max 800))
+  (metric public-method-count (ideal 8) (max 20))
+  (metric max-cyclomatic (ideal 10) (max 25))
+)
+
+(core-node "core-invariant-validator-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/core/src/validator/structure-invariant.ts::validateInvariant")
+  (description "Generated from design profile: InvariantValidator aggregate must remain reviewable.")
+  (rationale "InvariantValidator protects core core invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 150) (max 350))
+  (metric public-method-count (ideal 4) (max 10))
+)
+
+(core-node "core-contract-loader-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/core/src/loader/load-contract.ts::loadContract")
+  (description "Generated from design profile: ContractLoader aggregate must remain reviewable.")
+  (rationale "ContractLoader protects core core invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 100) (max 250))
+  (metric public-method-count (ideal 3) (max 8))
+)
+
+(core-node "core-manifest-engine-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/core/src/manifest/hash-manifest.ts::hashManifest")
+  (description "Generated from design profile: ManifestEngine aggregate must remain reviewable.")
+  (rationale "ManifestEngine protects core core invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 100) (max 250))
+  (metric max-cyclomatic (ideal 8) (max 20))
+)
+
+(core-node "cli-check-orchestrator-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/cli/src/commands/check.ts::runCheck")
+  (description "Generated from design profile: CheckOrchestrator aggregate must remain reviewable.")
+  (rationale "CheckOrchestrator protects core cli invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 400) (max 700))
+  (metric public-method-count (ideal 6) (max 15))
+  (metric max-cyclomatic (ideal 15) (max 30))
+)
+
+(core-node "cli-code-shape-evaluator-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes")
+  (description "Generated from design profile: CodeShapeEvaluator aggregate must remain reviewable.")
+  (rationale "CodeShapeEvaluator protects core cli invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 400) (max 800))
+  (metric public-method-count (ideal 8) (max 20))
+  (metric max-cyclomatic (ideal 15) (max 35))
+)
+
+(core-node "cli-design-diff-engine-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/cli/src/commands/design/diff.ts::computeDesignDiff")
+  (description "Generated from design profile: DesignDiffEngine aggregate must remain reviewable.")
+  (rationale "DesignDiffEngine protects core cli invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 300) (max 600))
+  (metric max-cyclomatic (ideal 12) (max 25))
+)
+
+(core-node "cli-cli-program-factory-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/cli/src/index.ts::createSteleProgram")
+  (description "Generated from design profile: CliProgramFactory aggregate must remain reviewable.")
+  (rationale "CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 200) (max 400))
+  (metric public-method-count (ideal 4) (max 10))
+)
+
+(core-node "cli-design-profile-validator-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/cli/src/design-profile/validate.ts::validateProfile")
+  (description "Generated from design profile: DesignProfileValidator aggregate must remain reviewable.")
+  (rationale "DesignProfileValidator protects core cli invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 200) (max 400))
+  (metric max-cyclomatic (ideal 10) (max 25))
+)
+
+(core-node "architecture-architecture-evaluator-aggregate"
+  (lang typescript)
+  (role business-core-service)
+  (target "packages/architecture-core/src/evaluate.ts::evaluateArchitecture")
+  (description "Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.")
+  (rationale "ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.")
+  (metric sloc (ideal 200) (max 400))
+  (metric max-cyclomatic (ideal 10) (max 25))
+)
+
+(branded-id "RuleId"
+  (target "packages/core/src/util/branded-types.ts::RuleId")
+  (base-type "string")
+  (pattern "/^[a-z][a-z0-9_.]*$/")
+)
+
+(branded-id "ContractPath"
+  (target "packages/core/src/util/branded-types.ts::ContractPath")
+  (base-type "string")
+  (pattern "/^[^/]+\\.stele$/")
+)
+
+(branded-id "Sha256"
+  (target "packages/core/src/util/branded-types.ts::Sha256")
+  (base-type "string")
+  (pattern "/^[0-9a-f]{64}$/")
+)
+
+(branded-id "PackageName"
+  (target "packages/core/src/util/branded-types.ts::PackageName")
+  (base-type "string")
+  (pattern "/^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/")
+)
+
+(smart-ctor "RuleId"
+  (constructor "parseRuleId")
+  (deny-raw "true")
+)
+
+(smart-ctor "ContractPath"
+  (constructor "parseContractPath")
+  (deny-raw "true")
+)
+
+(smart-ctor "Sha256"
+  (constructor "parseSha256")
+  (deny-raw "true")
+)

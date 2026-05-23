@@ -41,15 +41,17 @@ function makeContract(invariants: InvariantDeclaration[]): Contract {
     groups: [],
     invariants,
     codeShapes: [],
-    agents: [],
-    scopes: [],
-    interAgentContracts: [],
     architectures: [],
     coreNodes: [],
     brandedIds: [],
     smartCtors: [],
-    conflicts: [],
-    warnings: [],
+    tracePolicies: [],
+    typeStates: [],
+    typeStateBindings: [],
+    effectDeclarations: [],
+    effectAnnotations: [],
+    effectPolicies: [],
+    effectSuppressions: [],
   };
 }
 

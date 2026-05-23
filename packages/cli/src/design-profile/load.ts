@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import * as yaml from "js-yaml";
+import { isFixHintActionable } from "@stele/core";
 import type { DesignProfile } from "./types.js";
 import { validateProfile } from "./validate.js";
 
@@ -39,7 +40,41 @@ export function loadProfile(
     throw new Error(`[profile] Schema validation failed for ${profilePath}:\n${messages}`);
   }
 
+  emitDeprecationNotices(profile);
+
   return profile;
+}
+
+/**
+ * Emit human-readable notices for deprecated profile fields. Notices are
+ * informational only — they do not affect parse success or validation. Notice
+ * output goes to stderr so it does not contaminate stdout pipelines.
+ */
+function emitDeprecationNotices(profile: DesignProfile): void {
+  if (profile.type_driven?.adt !== undefined) {
+    process.stderr.write(
+      "[notice] design-profile.adt-deprecated\n" +
+        "  Your design profile contains 'type_driven.adt' — this field is deprecated and silently ignored. " +
+        "Remove it in your next contract update. Will be removed in v0.4.\n",
+    );
+  }
+
+  // Phase B T3.4: emit a notice (NOT a validation error) for trace policies
+  // whose fix_hint is missing or too vague to be agent-actionable. The
+  // structural parser rejects vague hints with E0339, but at the profile
+  // layer we treat this as a soft warning so users can iterate on their
+  // hints without breaking generation.
+  for (const policy of profile.trace?.policies ?? []) {
+    if (typeof policy.id !== "string") continue;
+    const hint = policy.fix_hint;
+    if (hint === undefined || hint.length === 0 || !isFixHintActionable(hint)) {
+      process.stderr.write(
+        "[notice] design-profile.trace-fix-hint-vague\n" +
+          `  trace.policies[${policy.id}].fix_hint should contain a code snippet (backticks) or file:line ref. ` +
+          "Vague hints reduce agent auto-fix rate.\n",
+      );
+    }
+  }
 }
 
 /**

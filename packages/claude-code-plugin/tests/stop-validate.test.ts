@@ -122,6 +122,89 @@ describe("stop-validate hook", () => {
     expectContractRecoveryGuidance(result.stderr);
   });
 
+  it("loop guard: second consecutive identical failure releases Stop (exit 0) so user can intervene", async () => {
+    const projectDir = await createTempDir();
+    const binDir = await createFakeSteleCli({
+      stdout: "violation summary X",
+      stderr: "deterministic failing stele stderr",
+      exitCode: 3,
+    });
+
+    // First attempt: same as legacy behavior — block (exit 2).
+    const first = runStopHook(projectDir, binDir);
+    expect(first.status).toBe(2);
+    expect(first.stderr).toContain("stele check failed");
+
+    // State file should now record fingerprint + consecutiveAttempts=1.
+    const stateRaw = await readFile(join(projectDir, ".stele", "stop-state.json"), "utf8");
+    const state = JSON.parse(stateRaw) as Record<string, unknown>;
+    expect(state.consecutiveAttempts).toBe(1);
+    expect(state.releasedToUser).toBe(false);
+    expect(state.stage).toBe("stele check");
+    expect(typeof state.lastFingerprint).toBe("string");
+    expect((state.lastFingerprint as string).length).toBeGreaterThanOrEqual(40);
+
+    // Second attempt with the same failure: loop guard releases — exit 0 with explanation.
+    const second = runStopHook(projectDir, binDir);
+    expect(second.status).toBe(0);
+    expect(second.stderr).toContain("Same failure as the previous stop attempt");
+    expect(second.stderr).toContain("Allowing this stop");
+
+    const releasedRaw = await readFile(join(projectDir, ".stele", "stop-state.json"), "utf8");
+    const released = JSON.parse(releasedRaw) as Record<string, unknown>;
+    expect(released.consecutiveAttempts).toBe(2);
+    expect(released.releasedToUser).toBe(true);
+  });
+
+  it("loop guard: a different failure after first one re-blocks (no false release)", async () => {
+    const projectDir = await createTempDir();
+    const binDir1 = await createFakeSteleCli({
+      stdout: "first failure stdout",
+      stderr: "first failure stderr",
+      exitCode: 3,
+    });
+    const first = runStopHook(projectDir, binDir1);
+    expect(first.status).toBe(2);
+
+    // Swap in a different failure (different exit code + content) — this is a NEW failure,
+    // not a repeat of the first, so loop guard must NOT release.
+    const binDir2 = await createFakeSteleCli({
+      stdout: "second different failure",
+      stderr: "second different failure stderr",
+      exitCode: 5,
+    });
+    const second = runStopHook(projectDir, binDir2);
+    expect(second.status).toBe(2);
+    expect(second.stderr).not.toContain("Same failure as the previous stop attempt");
+  });
+
+  it("loop guard: state cleared after a successful Stop so next failure gets one block cycle", async () => {
+    const projectDir = await createTempDir();
+    const binDirFailing = await createFakeSteleCli({
+      stdout: "",
+      stderr: "stele fail A",
+      exitCode: 3,
+    });
+    expect(runStopHook(projectDir, binDirFailing).status).toBe(2);
+    expect(runStopHook(projectDir, binDirFailing).status).toBe(0); // released
+
+    // Now make stele check pass — this should clear the state.
+    const binDirOk = await createFakeToolchain({
+      stele: { stdout: "ok", stderr: "", exitCode: 0 },
+      python: { stdout: "ok", stderr: "", exitCode: 0 },
+    });
+    const ok = runStopHook(projectDir, binDirOk);
+    expect(ok.status).toBe(0);
+
+    const clearedRaw = await readFile(join(projectDir, ".stele", "stop-state.json"), "utf8");
+    const cleared = JSON.parse(clearedRaw) as Record<string, unknown>;
+    expect(cleared.consecutiveAttempts).toBe(0);
+    expect(cleared.lastFingerprint).toBeNull();
+
+    // A subsequent failure must once again get one cycle of blocking (no false release).
+    expect(runStopHook(projectDir, binDirFailing).status).toBe(2);
+  });
+
   it("blocks Stop with a clear reason when stele cannot be started", async () => {
     const projectDir = await createTempDir();
     const emptyBinDir = await createTempDir();

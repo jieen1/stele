@@ -190,9 +190,9 @@ function normalizeContract(contract: Contract): string {
   return (normalizeContractValue as (value: Contract) => string)(contract);
 }
 
-function createSingleFileContract(contract: Contract, file: Contract["files"][number]): Contract {
+function createSingleFileContract(_contract: Contract, file: Contract["files"][number]): Contract {
   return {
-    rootPath: contract.rootPath,
+    rootPath: _contract.rootPath,
     files: [file],
     metadata: file.metadata === undefined ? [] : [file.metadata],
     imports: [...file.imports],
@@ -202,14 +202,16 @@ function createSingleFileContract(contract: Contract, file: Contract["files"][nu
     groups: [...file.groups],
     invariants: [...file.invariants],
     codeShapes: [...file.codeShapes],
-    agents: [...(file.agents ?? [])],
-    scopes: [...(file.scopes ?? [])],
-    interAgentContracts: [...(file.interAgentContracts ?? [])],
-    conflicts: [...(file.conflicts ?? [])],
     coreNodes: [...(file.coreNodes ?? [])],
     architectures: [...(file.architectures ?? [])],
     brandedIds: [...(file.brandedIds ?? [])],
     smartCtors: [...(file.smartCtors ?? [])],
-    warnings: [...(contract.warnings ?? [])],
+    tracePolicies: [...(file.tracePolicies ?? [])],
+    typeStates: [...(file.typeStates ?? [])],
+    typeStateBindings: [...(file.typeStateBindings ?? [])],
+    effectDeclarations: [...(file.effectDeclarations ?? [])],
+    effectAnnotations: [...(file.effectAnnotations ?? [])],
+    effectPolicies: [...(file.effectPolicies ?? [])],
+    effectSuppressions: [...(file.effectSuppressions ?? [])],
   };
 }

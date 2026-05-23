@@ -7,7 +7,7 @@ import { STELE_CONFIG_FILE, DEFAULT_CONFIG } from "../src/config/defaults.js";
 import { loadConfig } from "../src/config/loadConfig.js";
 import { loadContract } from "@stele/core";
 import {
-  evaluateArchitectureContract,
+  evaluateArchitectureRuntime,
 } from "../src/architecture-runtime.js";
 import { buildArchitectureStageReport } from "../src/architecture/stage.js";
 import type { PreparedCheckContext, ProtectedCheckState } from "../src/commands/check.js";
@@ -43,11 +43,11 @@ function writeContract(projectDir: string, content: string): void {
   writeFileSync(path, content, "utf8");
 }
 
-async function loadAndEvaluate(projectDir: string): Promise<Awaited<ReturnType<typeof evaluateArchitectureContract>>> {
+async function loadAndEvaluate(projectDir: string): Promise<Awaited<ReturnType<typeof evaluateArchitectureRuntime>>> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(join(projectDir, config.entry));
   const arch = contract.architectures[0];
-  return evaluateArchitectureContract({
+  return evaluateArchitectureRuntime({
     projectRoot: projectDir,
     architecture: {
       id: arch.id,
@@ -63,7 +63,7 @@ async function loadAndEvaluate(projectDir: string): Promise<Awaited<ReturnType<t
 // Test 1: Unresolved internal import is visible
 // ---------------------------------------------------------------------------
 
-describe("evaluateArchitectureContract — unresolved import visibility", () => {
+describe("evaluateArchitectureRuntime — unresolved import visibility", () => {
   it("treats imports to unowned files as external dependencies (silently skipped)", async () => {
     const projectDir = await createTempDir();
     writeConfig(projectDir);
@@ -96,15 +96,16 @@ describe("evaluateArchitectureContract — unresolved import visibility", () => 
     mkdirSync(join(projectDir, "src/core"), { recursive: true });
     writeFileSync(corePath, 'export function process() { return "ok"; }\n', "utf8");
 
-    const violations = await loadAndEvaluate(projectDir);
+    const result = await loadAndEvaluate(projectDir);
 
     // Imports to files outside any declared module are silently skipped
-    // (treated as cross-architecture / external dependencies)
-    const unresolved = violations.filter((v) => v.specifier.startsWith("unresolved:"));
-    expect(unresolved.length).toBe(0);
-
-    // No violations because the external import is outside the architecture's scope
-    expect(violations.length).toBe(0);
+    // (treated as cross-architecture / external dependencies). The structured
+    // runtime result exposes them via unownedFiles / ambiguousFiles, neither
+    // of which should fire here.
+    expect(result.dependencyViolations).toHaveLength(0);
+    expect(result.cycleViolations).toHaveLength(0);
+    expect(result.unownedFiles).toHaveLength(0);
+    expect(result.ambiguousFiles).toHaveLength(0);
   });
 });
 
@@ -112,7 +113,7 @@ describe("evaluateArchitectureContract — unresolved import visibility", () => 
 // Test 2: Ambiguous module ownership produces violations
 // ---------------------------------------------------------------------------
 
-describe("evaluateArchitectureContract — ambiguous module ownership", () => {
+describe("evaluateArchitectureRuntime — ambiguous module ownership", () => {
   it("reports files matching multiple module paths as violations", async () => {
     const projectDir = await createTempDir();
     writeConfig(projectDir);
@@ -130,17 +131,16 @@ describe("evaluateArchitectureContract — ambiguous module ownership", () => {
     mkdirSync(join(projectDir, "src/shared"), { recursive: true });
     writeFileSync(sharedPath, 'export function util() { return 42; }\n', "utf8");
 
-    const violations = await loadAndEvaluate(projectDir);
+    const result = await loadAndEvaluate(projectDir);
 
-    // Should have ambiguous ownership violations
-    const ambiguousViolations = violations.filter((v) => v.specifier.startsWith("ambiguous:"));
-    expect(ambiguousViolations.length).toBeGreaterThanOrEqual(1);
+    // Should have ambiguous ownership entries in the structured result
+    expect(result.ambiguousFiles.length).toBeGreaterThanOrEqual(1);
 
-    // The ambiguous violation should reference the overlapping file
-    const amb = ambiguousViolations[0];
-    expect(amb.fromFile).toContain("shared/utils");
-    expect(amb.specifier).toContain("api");
-    expect(amb.specifier).toContain("core");
+    // The ambiguous entry should reference the overlapping file
+    const amb = result.ambiguousFiles[0];
+    expect(amb.file).toContain("shared/utils");
+    expect(amb.modules).toContain("api");
+    expect(amb.modules).toContain("core");
   });
 });
 
@@ -148,8 +148,8 @@ describe("evaluateArchitectureContract — ambiguous module ownership", () => {
 // Test 3: Cycle violation has correct rule_kind "architecture_cycle"
 // ---------------------------------------------------------------------------
 
-describe("evaluateArchitectureContract — cycle detection", () => {
-  it("reports cycle violations with cycle: prefix when deny-cycles is true", async () => {
+describe("evaluateArchitectureRuntime — cycle detection", () => {
+  it("reports cycle violations when deny-cycles is true", async () => {
     const projectDir = await createTempDir();
     writeConfig(projectDir);
 
@@ -170,21 +170,15 @@ describe("evaluateArchitectureContract — cycle detection", () => {
     mkdirSync(join(projectDir, "src/b"), { recursive: true });
     writeFileSync(bPath, 'import { alphaFn } from "../a/mod.js";\nexport function betaFn() { return alphaFn(); }\n', "utf8");
 
-    const violations = await loadAndEvaluate(projectDir);
+    const result = await loadAndEvaluate(projectDir);
 
-    // Cycle violations have specifier starting with "cycle:"
-    const cycleViolations = violations.filter((v) => v.specifier.startsWith("cycle:"));
-    expect(cycleViolations.length).toBeGreaterThanOrEqual(2);
+    // The structured result reports cycles as cycleViolations entries with
+    // the full module list, not as flattened pseudo-edges.
+    expect(result.cycleViolations.length).toBeGreaterThanOrEqual(1);
 
-    // At least one cycle violation involves module "a" depending on "b"
-    const aToB = cycleViolations.find((v) => v.fromModule === "a" && v.toModule === "b");
-    expect(aToB).toBeDefined();
-    expect(aToB!.specifier).toContain("a");
-    expect(aToB!.specifier).toContain("b");
-
-    // At least one cycle violation involves module "b" depending on "a"
-    const bToA = cycleViolations.find((v) => v.fromModule === "b" && v.toModule === "a");
-    expect(bToA).toBeDefined();
+    const cycle = result.cycleViolations[0];
+    expect(cycle.modules).toContain("a");
+    expect(cycle.modules).toContain("b");
   });
 });
 

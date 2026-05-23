@@ -5,34 +5,42 @@ import { describeNode, validationError } from "./structure-error.js";
 import { parseInvariantDeclaration } from "./structure-invariant.js";
 import { parseScenarioDeclaration } from "./structure-scenario.js";
 import { parseCodeShapeDeclaration } from "./structure-code-shape.js";
-import {
-  parseAgentDeclaration,
-  parseScopeDeclaration,
-  parseInterAgentContractDeclaration,
-  parseConflictDeclaration,
-} from "./structure-agent.js";
 import { parseArchitectureDeclaration } from "./structure-architecture.js";
 import { parseCoreNodeDeclaration } from "./structure-core-node.js";
 import { parseBrandedIdDeclaration, parseSmartCtorDeclaration } from "./structure-type-driven.js";
+import { parseTracePolicyDeclaration } from "./structure-trace-policy.js";
+import {
+  parseTypeStateBindingDeclaration,
+  parseTypeStateDeclaration,
+} from "./structure-type-state.js";
+import {
+  parseEffectAnnotationDeclaration,
+  parseEffectDeclarationsDeclaration,
+  parseEffectPolicyDeclaration,
+  parseEffectSuppressionDeclaration,
+} from "./structure-effect.js";
 import { TOP_LEVEL_DECLARATIONS } from "./structure-types.js";
 import { readSingleExpression } from "./structure-shared.js";
 import type {
-  AgentDeclaration,
   ArchitectureDeclaration,
   BrandedIdDeclaration,
-  ConflictDeclaration,
   Contract,
   ContractFile,
   CoreNodeDeclaration,
+  EffectAnnotationDeclaration,
+  EffectDeclarationsDeclaration,
+  EffectPolicyDeclaration,
+  EffectSuppressionDeclaration,
   GroupDeclaration,
   ImportDeclaration,
-  InterAgentContractDeclaration,
   LoadedContractFile,
   MetadataDeclaration,
   OperatorDeclaration,
-  ScopeDeclaration,
   SmartCtorDeclaration,
   CheckerDeclaration,
+  TracePolicyDeclaration,
+  TypeStateBindingDeclaration,
+  TypeStateDeclaration,
 } from "./structure-types.js";
 
 export function buildContract(rootPath: string, files: LoadedContractFile[]): Contract {
@@ -49,15 +57,17 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     groups: contractFiles.flatMap((file) => file.groups),
     invariants: contractFiles.flatMap((file) => file.invariants),
     codeShapes: contractFiles.flatMap((file) => file.codeShapes),
-    agents: contractFiles.flatMap((file) => file.agents),
-    scopes: contractFiles.flatMap((file) => file.scopes),
-    interAgentContracts: contractFiles.flatMap((file) => file.interAgentContracts),
-    conflicts: contractFiles.flatMap((file) => file.conflicts),
     architectures: contractFiles.flatMap((file) => file.architectures),
     coreNodes: contractFiles.flatMap((file) => file.coreNodes),
     brandedIds: contractFiles.flatMap((file) => file.brandedIds),
     smartCtors: contractFiles.flatMap((file) => file.smartCtors),
-    warnings: [],
+    tracePolicies: contractFiles.flatMap((file) => [...file.tracePolicies]),
+    typeStates: contractFiles.flatMap((file) => [...file.typeStates]),
+    typeStateBindings: contractFiles.flatMap((file) => [...file.typeStateBindings]),
+    effectDeclarations: contractFiles.flatMap((file) => [...file.effectDeclarations]),
+    effectAnnotations: contractFiles.flatMap((file) => [...file.effectAnnotations]),
+    effectPolicies: contractFiles.flatMap((file) => [...file.effectPolicies]),
+    effectSuppressions: contractFiles.flatMap((file) => [...file.effectSuppressions]),
   };
 }
 
@@ -80,14 +90,17 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   const groups: GroupDeclaration[] = [];
   const invariants: Array<ReturnType<typeof parseInvariantDeclaration>> = [];
   const codeShapes: Array<ReturnType<typeof parseCodeShapeDeclaration>> = [];
-  const agents: AgentDeclaration[] = [];
-  const scopes: ScopeDeclaration[] = [];
-  const interAgentContracts: InterAgentContractDeclaration[] = [];
-  const conflicts: ConflictDeclaration[] = [];
   const architectures: ArchitectureDeclaration[] = [];
   const coreNodes: CoreNodeDeclaration[] = [];
   const brandedIds: BrandedIdDeclaration[] = [];
   const smartCtors: SmartCtorDeclaration[] = [];
+  const tracePolicies: TracePolicyDeclaration[] = [];
+  const typeStates: TypeStateDeclaration[] = [];
+  const typeStateBindings: TypeStateBindingDeclaration[] = [];
+  const effectDeclarations: EffectDeclarationsDeclaration[] = [];
+  const effectAnnotations: EffectAnnotationDeclaration[] = [];
+  const effectPolicies: EffectPolicyDeclaration[] = [];
+  const effectSuppressions: EffectSuppressionDeclaration[] = [];
 
   for (const node of file.parsed.body) {
     if (node.kind !== "list") {
@@ -159,18 +172,6 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
       case "file-policy":
         codeShapes.push(parseCodeShapeDeclaration(file.path, node));
         break;
-      case "agent":
-        agents.push(parseAgentDeclaration(file.path, node));
-        break;
-      case "scope":
-        scopes.push(parseScopeDeclaration(file.path, node));
-        break;
-      case "inter-agent-contract":
-        interAgentContracts.push(parseInterAgentContractDeclaration(file.path, node));
-        break;
-      case "conflict":
-        conflicts.push(parseConflictDeclaration(file.path, node));
-        break;
       case "architecture":
         architectures.push(parseArchitectureDeclaration(file.path, node));
         break;
@@ -182,6 +183,27 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
         break;
       case "smart-ctor":
         smartCtors.push(parseSmartCtorDeclaration(file.path, node));
+        break;
+      case "trace-policy":
+        tracePolicies.push(parseTracePolicyDeclaration(file.path, node));
+        break;
+      case "type-state":
+        typeStates.push(parseTypeStateDeclaration(file.path, node));
+        break;
+      case "type-state-binding":
+        typeStateBindings.push(parseTypeStateBindingDeclaration(file.path, node));
+        break;
+      case "effect-declarations":
+        effectDeclarations.push(parseEffectDeclarationsDeclaration(file.path, node));
+        break;
+      case "effect-annotation":
+        effectAnnotations.push(parseEffectAnnotationDeclaration(file.path, node));
+        break;
+      case "effect-policy":
+        effectPolicies.push(parseEffectPolicyDeclaration(file.path, node));
+        break;
+      case "effect-suppression":
+        effectSuppressions.push(parseEffectSuppressionDeclaration(file.path, node));
         break;
     }
   }
@@ -197,14 +219,17 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
     groups,
     invariants,
     codeShapes,
-    agents,
-    scopes,
-    interAgentContracts,
-    conflicts,
     architectures,
     coreNodes,
     brandedIds,
     smartCtors,
+    tracePolicies,
+    typeStates,
+    typeStateBindings,
+    effectDeclarations,
+    effectAnnotations,
+    effectPolicies,
+    effectSuppressions,
   };
 }
 

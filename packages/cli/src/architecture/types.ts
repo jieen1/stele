@@ -13,6 +13,13 @@ export type PreparedCheckContext = {
   contract: Contract;
   generated: GeneratedVerificationResult;
   invariantCount: number;
+  /**
+   * Optional override for the contract used by the code-shape stage. Set by
+   * `checkProject` when `--diff` is active so code-shape only re-evaluates
+   * changed files while other stages still see the full contract. When
+   * undefined, code-shape uses `contract`.
+   */
+  codeShapeContract?: Contract;
 };
 
 export type ProtectedCheckState = {

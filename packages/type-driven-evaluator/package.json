@@ -1,0 +1,39 @@
+{
+  "name": "@stele/type-driven-evaluator",
+  "version": "0.1.0",
+  "description": "Type-driven evaluators (branded IDs, smart constructors, type-state, effects) for Stele contracts.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "prepack": "npm run build",
+    "test": "vitest run --dir tests",
+    "typecheck": "tsc --project tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@stele/core": "workspace:*",
+    "minimatch": "^10.0.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "license": "MIT",
+  "repository": "github:stelehq/stele",
+  "homepage": "https://github.com/stelehq/stele",
+  "bugs": {
+    "url": "https://github.com/stelehq/stele/issues"
+  }
+}

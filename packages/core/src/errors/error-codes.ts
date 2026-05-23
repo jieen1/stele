@@ -3,10 +3,10 @@
  *
  * Error code ranges by family:
  *   E0001-E0003  — Lexical errors (lexer)
- *   E0101-E0102  — Parser errors (parser)
- *   E0201-E0203  — Loader errors (loadContract)
- *   E0301-E0322  — Validation errors (validator)
- *   E0401-E0404  — Manifest errors (manifest)
+ *   E0101-E0103  — Parser errors (parser)
+ *   E0201-E0204  — Loader errors (loadContract)
+ *   E0301-E0359  — Validation errors (validator; E0320-E0322 removed with multi-agent forms; E0330-E0339 trace-policy; E0340-E0349 type-state; E0350-E0359 effect system)
+ *   E0401-E0405  — Manifest errors (manifest)
  *   E0501-E0505  — Generator errors (coordinator)
  *   E0601-E0606  — Python backend errors (translator)
  *
@@ -61,6 +61,12 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     category: 1,
     source: "parser/parser.ts",
   },
+  E0103: {
+    name: "Parser Error",
+    message: "Unbalanced parentheses or unterminated list",
+    category: 1,
+    source: "parser/parser.ts",
+  },
 
   // --- Loader errors (E0201-E0204) ---
 
@@ -89,7 +95,7 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     source: "validator/structure-parse.ts",
   },
 
-  // --- Validation errors (E0301-E0322) ---
+  // --- Validation errors (E0301-E0319) ---
 
   E0301: {
     name: "Validation Error",
@@ -189,9 +195,9 @@ export const ErrorCodes: Record<string, ErrorCode> = {
   },
   E0317: {
     name: "Validation Error",
-    message: "Agent / Scope / Inter-Agent Contract / Conflict declaration error",
+    message: "Scenario declaration error (unknown/repeated fields, format, missing required clauses)",
     category: 3,
-    source: "validator/structure-agent.ts",
+    source: "validator/structure-scenario.ts",
   },
   E0318: {
     name: "Validation Error",
@@ -205,26 +211,233 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     category: 3,
     source: "validator/structure-invariant.ts",
   },
-  E0320: {
+  E0323: {
     name: "Validation Error",
-    message: "Unknown agent cross-reference or self-approval",
+    message: "Architecture declaration error (modules, layers, allow-dependency, deny-cycles)",
     category: 3,
-    source: "validator/references.ts",
+    source: "validator/structure-architecture.ts",
   },
-  E0321: {
+  E0324: {
     name: "Validation Error",
-    message: "Duplicate agent id",
+    message: "Core-node declaration error (target, role, metrics)",
+    category: 3,
+    source: "validator/structure-core-node.ts",
+  },
+  E0325: {
+    name: "Validation Error",
+    message: "Duplicate architecture id",
     category: 3,
     source: "validator/uniqueness.ts",
   },
-  E0322: {
+  E0326: {
     name: "Validation Error",
-    message: "Agent path injection (absolute path, traversal, empty path)",
+    message: "Duplicate core-node id",
     category: 3,
-    source: "validator/references.ts",
+    source: "validator/uniqueness.ts",
+  },
+  E0327: {
+    name: "Validation Error",
+    message: "Branded-id declaration error (id, target, base-type, pattern, entity-scope)",
+    category: 3,
+    source: "validator/structure-type-driven.ts",
+  },
+  E0328: {
+    name: "Validation Error",
+    message: "Smart-ctor declaration error (id, constructor, deny-raw, target)",
+    category: 3,
+    source: "validator/structure-type-driven.ts",
   },
 
-  // --- Manifest errors (E0401-E0404) ---
+  // --- Trace-policy validation errors (E0330-E0339) ---
+
+  E0330: {
+    name: "Validation Error",
+    message: "Trace-policy declaration is missing its id",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0331: {
+    name: "Validation Error",
+    message: "Duplicate trace-policy id",
+    category: 3,
+    source: "validator/uniqueness.ts",
+  },
+  E0332: {
+    name: "Validation Error",
+    message: "Trace-policy is missing the required (target ...) field",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0333: {
+    name: "Validation Error",
+    message: "Trace-policy must declare at least one must-*/deny-* constraint",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0334: {
+    name: "Validation Error",
+    message: "Trace-policy exempt entry is missing (reason \"...\")",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0335: {
+    name: "Validation Error",
+    message: "Trace-policy pattern has invalid syntax",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0336: {
+    name: "Validation Error",
+    message: "Trace-policy severity must be \"error\" or \"warning\"",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0337: {
+    name: "Validation Error",
+    message: "Trace-policy declares the same field twice",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0338: {
+    name: "Validation Error",
+    message: "Trace-policy contains an unknown field",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+  E0339: {
+    name: "Validation Error",
+    message: "Trace-policy fix-hint must reference code (`...`) or a file:line location",
+    category: 3,
+    source: "validator/structure-trace-policy.ts",
+  },
+
+  // --- Type-state validation errors (E0340-E0349) ---
+
+  E0340: {
+    name: "Validation Error",
+    message: "Type-state declaration is missing its id",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0341: {
+    name: "Validation Error",
+    message: "Duplicate type-state id or target (one type can only have one state machine)",
+    category: 3,
+    source: "validator/uniqueness.ts",
+  },
+  E0342: {
+    name: "Validation Error",
+    message: "Type-state missing or malformed target (expected path::TypeName or NodeId glob)",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0343: {
+    name: "Validation Error",
+    message: "Type-state declares an empty (states ...) field",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0344: {
+    name: "Validation Error",
+    message: "Type-state initial state is not in (states ...)",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0345: {
+    name: "Validation Error",
+    message: "Type-state terminal contains a non-state",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0346: {
+    name: "Validation Error",
+    message: "Type-state transition.from or transition.to references a non-state",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0347: {
+    name: "Validation Error",
+    message: "Type-state (allowed-ops <state> ...) references a non-state",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0348: {
+    name: "Validation Error",
+    message: "Type-state terminal state appears in (transition (from ...) ...)",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+  E0349: {
+    name: "Validation Error",
+    message: "Type-state or type-state-binding has an unknown/malformed field",
+    category: 3,
+    source: "validator/structure-type-state.ts",
+  },
+
+  // --- Effect system validation errors (E0350-E0359) ---
+
+  E0350: {
+    name: "Validation Error",
+    message: "Effect name violates lowercase dot-notation pattern",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0351: {
+    name: "Validation Error",
+    message: "Multiple (effect-declarations ...) blocks in the same file",
+    category: 3,
+    source: "validator/uniqueness.ts",
+  },
+  E0352: {
+    name: "Validation Error",
+    message: "Effect name declared in multiple effect-declarations blocks",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0353: {
+    name: "Validation Error",
+    message: "Effect-declarations entry is missing the effect name",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0354: {
+    name: "Validation Error",
+    message: "Effect-declarations contains an unknown field",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0355: {
+    name: "Validation Error",
+    message: "Effect-annotation is missing the required (target ...) field",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0356: {
+    name: "Validation Error",
+    message: "Effect-annotation is missing the required (annotates ...) field",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0357: {
+    name: "Validation Error",
+    message: "Effect-suppression is missing or has an empty (reason \"...\") field",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0358: {
+    name: "Validation Error",
+    message: "Effect-policy declares both (forbid ...) and (allow-only ...)",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+  E0359: {
+    name: "Validation Error",
+    message: "Effect-policy/annotation/suppression has an unknown field or missing both forbid/allow-only",
+    category: 3,
+    source: "validator/structure-effect.ts",
+  },
+
+  // --- Manifest errors (E0401-E0405) ---
 
   E0401: {
     name: "Manifest Error",
@@ -247,6 +460,12 @@ export const ErrorCodes: Record<string, ErrorCode> = {
   E0404: {
     name: "Manifest Error",
     message: "Invalid protected path in manifest",
+    category: 4,
+    source: "manifest/manifest.ts",
+  },
+  E0405: {
+    name: "Manifest Error",
+    message: "Manifest path contains dot/dot-dot segments",
     category: 4,
     source: "manifest/manifest.ts",
   },

@@ -152,6 +152,10 @@ export type TypeDrivenSection = {
     declarations?: BrandedId[];
     entity_id_map?: Array<{ aggregate: string; id_type: string }>;
   };
+  /**
+   * @deprecated Phase B removes ADT exhaustiveness. This field is parsed but ignored; will be removed in v0.4.
+   *             If your profile uses it, no action is needed — Stele 0.3 silently ignores the field.
+   */
   adt?: {
     mode: string;
     entities?: Array<{ name: string; type_target: string }>;
@@ -194,6 +198,38 @@ export type ToolchainContracts = {
 };
 
 // ---------------------------------------------------------------------------
+// Trace Policy (Phase B T3.4 — call-graph trace-policy declarations)
+// ---------------------------------------------------------------------------
+
+/**
+ * Single trace-policy entry as captured in the design profile YAML.
+ *
+ * Field names use snake_case to match the surrounding YAML convention; the
+ * design-generator renders them out as kebab-case CDL forms
+ * (must_transit → must-transit, deny_direct → deny-direct, fix_hint →
+ * fix-hint, …). The structural parser in `@stele/core` consumes the
+ * kebab-case form.
+ */
+export interface TracePolicySpec {
+  id: string;
+  description?: string;
+  severity?: "error" | "warning";
+  target: readonly string[];
+  must_transit?: readonly string[];
+  must_be_preceded_by?: readonly string[];
+  must_be_followed_by?: readonly string[];
+  deny_direct?: readonly string[];
+  deny_transit?: readonly string[];
+  scope?: readonly string[];
+  exempt?: readonly { pattern: string; reason: string }[];
+  fix_hint?: string;
+}
+
+export interface TraceSection {
+  policies: readonly TracePolicySpec[];
+}
+
+// ---------------------------------------------------------------------------
 // Self Constraints (for Stele's own strict self-check)
 // ---------------------------------------------------------------------------
 
@@ -215,6 +251,7 @@ export type DesignProfile = {
   project: Project;
   ddd?: DddSection;
   type_driven?: TypeDrivenSection;
+  trace?: TraceSection;
   toolchain_contracts?: ToolchainContracts;
   self_constraints?: SelfConstraints;
 };

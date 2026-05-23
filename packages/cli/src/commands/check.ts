@@ -2,7 +2,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
   createViolationReport,
-  filterViolationReport,
   formatViolationReportHuman,
   formatViolationReportJson,
   loadContract,
@@ -11,7 +10,6 @@ import {
   type Contract,
   type GeneratedVerificationResult,
   type Violation,
-  type ViolationBaseline,
   type ViolationReport,
 } from "@stele/core";
 import { loadBackend } from "../backend-registry.js";
@@ -39,16 +37,10 @@ import { createExecutionViolation } from "./check-violations.js";
 import { profilePathExists } from "../design-profile/load.js";
 import { createEvent, writeEvent } from "../events/write-event.js";
 import { loadProfile } from "../design-profile/load.js";
-import { buildToolchainStage } from "./check-stages-toolchain.js";
-import { buildProtectedStageReport } from "./check-stages-protected.js";
-import {
-  buildGeneratedStageReport,
-  buildDesignStage,
-  buildCodeShapeStageReport,
-  buildArchitectureStage,
-  buildComplexityStage,
-} from "./check-stages-other.js";
-import { buildTypeDrivenStage } from "./check-stages-type-driven.js";
+import { runAllStages } from "./check-stages-registry.js";
+import { isBaselineEligibleViolation, type ReportFilters } from "../report/filters.js";
+
+export { isBaselineEligibleViolation };
 
 // ----------------------------------------------------------------
 // Types
@@ -75,11 +67,6 @@ export type CheckCommandResult = {
 
 // PreparedCheckContext, ProtectedCheckState - see architecture/types.ts
 
-type CheckFilters = {
-  baseline?: ViolationBaseline;
-  diffScopePaths?: string[];
-};
-
 // ----------------------------------------------------------------
 // Entry points
 // ----------------------------------------------------------------
@@ -99,7 +86,10 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   }
 
   // Always verify generated + protected files against the FULL contract.
-  const context = await prepareCheckContext(projectDir);
+  // When --diff is active, the code-shape stage uses a narrowed contract
+  // (only changed files) via `codeShapeContract`; all other stages keep
+  // the full contract.
+  const context = await prepareCheckContext(projectDir, changedFileSet);
 
   // Self no-baseline check: if profile declares no_baseline: true and a baseline
   // file exists, fail immediately. This is a hard rule—cannot be bypassed by
@@ -121,51 +111,22 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   }
 
   const filters = await prepareCheckFilters(context, options);
-  const generatedReport = applyFiltersToReport(buildGeneratedStageReport(context, "check"), filters);
 
-  if (!generatedReport.ok) {
-    await recordViolationEvent(projectDir, generatedReport);
-    await persistLastReport(projectDir, generatedReport);
-    throw new CheckCommandError(getCheckExitCode(generatedReport), generatedReport);
+  // Generated-drift short-circuit: preserves v0.1 semantics where downstream
+  // stages and the protected-state collector never run against a project
+  // whose generated files have drifted from the contract. `runAllStages` will
+  // also halt after the generated stage, but doing the guard here avoids the
+  // side effects in `collectProtectedCheckState`.
+  if (!context.generated.ok) {
+    const reports = await runAllStages(context, makeEmptyProtectedState(context), "check", options, filters);
+    const report = mergeCheckReports(reports);
+    await recordViolationEvent(projectDir, report);
+    await persistLastReport(projectDir, report);
+    throw new CheckCommandError(getCheckExitCode(report), report);
   }
 
   const protectedState = await collectProtectedCheckState(projectDir, context.config, context.contract, context.generated);
-  const reports: ViolationReport[] = [
-    generatedReport,
-    applyFiltersToReport(await buildProtectedStageReport(context, protectedState, "check"), filters),
-  ];
-
-  // Stage selection:
-  // --architecture-only: run only architecture stage
-  // --complexity-only: run only complexity stage
-  // normal: run all stages (unless --lenient skips code-shape)
-  const architectureOnly = options.architectureOnly ?? false;
-  const complexityOnly = options.complexityOnly ?? false;
-
-  if (!architectureOnly && !complexityOnly) {
-    // In lenient mode, skip code-shape checks
-    if (!options.lenient) {
-      const codeShapeContext = changedFileSet !== undefined
-        ? { ...context, contract: filterContractByFiles(context.contract, changedFileSet) }
-        : context;
-      reports.push(applyFiltersToReport(await buildCodeShapeStageReport(codeShapeContext, protectedState, "check"), filters));
-    }
-    reports.push(applyFiltersToReport(await buildDesignStage(context, protectedState, "check"), filters));
-    reports.push(applyFiltersToReport(await buildToolchainStage(context, protectedState, "check"), filters));
-    reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
-    reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
-    reports.push(applyFiltersToReport(await buildTypeDrivenStage(context, protectedState, "check"), filters));
-  }
-
-  if (architectureOnly) {
-    reports.push(applyFiltersToReport(await buildDesignStage(context, protectedState, "check"), filters));
-    reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
-  }
-
-  if (complexityOnly) {
-    reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
-  }
-
+  const reports = await runAllStages(context, protectedState, "check", options, filters);
   const report = mergeCheckReports(reports);
 
   if (!report.ok) {
@@ -193,13 +154,13 @@ export { runCheckRecursive, type RecursiveCheckResult } from "./check-recursive.
 // Context preparation
 // ----------------------------------------------------------------
 
-export async function prepareCheckContext(projectDir: string): Promise<PreparedCheckContext> {
+export async function prepareCheckContext(projectDir: string, changedFileSet?: Set<string>): Promise<PreparedCheckContext> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));
-  return prepareCheckContextWithContract(projectDir, contract);
+  return prepareCheckContextWithContract(projectDir, contract, changedFileSet);
 }
 
-export async function prepareCheckContextWithContract(projectDir: string, contract: Contract): Promise<PreparedCheckContext> {
+export async function prepareCheckContextWithContract(projectDir: string, contract: Contract, changedFileSet?: Set<string>): Promise<PreparedCheckContext> {
   const config = await loadConfig(projectDir);
   const backend = await loadBackend(config.targetLanguage, config.testFramework);
   const generated = await verifyManagedGeneratedFiles(projectDir, config.generatedDir, contract, backend);
@@ -210,6 +171,7 @@ export async function prepareCheckContextWithContract(projectDir: string, contra
     contract,
     generated,
     invariantCount: contract.invariants.length,
+    codeShapeContract: changedFileSet === undefined ? undefined : filterContractByFiles(contract, changedFileSet),
   };
 }
 
@@ -233,29 +195,43 @@ export async function collectProtectedCheckState(
   };
 }
 
+/**
+ * Build a ProtectedCheckState placeholder for the generated-drift short-circuit
+ * path. `runAllStages` halts after the generated stage when it fails, so this
+ * placeholder is never inspected by downstream stages — but `runAllStages`'
+ * signature still requires a typed argument.
+ */
+function makeEmptyProtectedState(context: PreparedCheckContext): ProtectedCheckState {
+  return {
+    protectedPaths: [],
+    contractHash: "",
+    summary: {
+      invariantCount: context.invariantCount,
+      generatedFileCount: context.generated.files.length,
+      protectedFileCount: 0,
+    },
+  };
+}
+
 // ----------------------------------------------------------------
 // Raw check (programmatic API)
 // ----------------------------------------------------------------
 
 export async function buildRawCheckReport(context: PreparedCheckContext, command = "check"): Promise<ViolationReport> {
-  const generatedReport = buildGeneratedStageReport(context, command);
-
-  if (!context.generated.ok) {
-    return generatedReport;
-  }
+  // Raw report omits baseline/diff filters — programmatic callers (baseline
+  // init/update, maintenance summaries) need to see every violation, suppressed
+  // or not.
+  const noopFilters: ReportFilters = {};
 
   try {
+    if (!context.generated.ok) {
+      const reports = await runAllStages(context, makeEmptyProtectedState(context), command, {}, noopFilters);
+      return mergeCheckReports(reports);
+    }
+
     const protectedState = await collectProtectedCheckState(context.projectDir, context.config, context.contract, context.generated);
-    return mergeCheckReports([
-      generatedReport,
-      await buildProtectedStageReport(context, protectedState, command),
-      await buildDesignStage(context, protectedState, command),
-      await buildCodeShapeStageReport(context, protectedState, command),
-      await buildToolchainStage(context, protectedState, command),
-      await buildArchitectureStage(context, protectedState, command),
-      await buildComplexityStage(context, protectedState, command),
-      await buildTypeDrivenStage(context, protectedState, command),
-    ]);
+    const reports = await runAllStages(context, protectedState, command, {}, noopFilters);
+    return mergeCheckReports(reports);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -279,41 +255,11 @@ export function isCheckCommandError(error: unknown): error is CheckCommandError 
   return error instanceof CheckCommandError;
 }
 
-export function isBaselineEligibleViolation(violation: Violation): boolean {
-  if (violation.rule_id.startsWith("stele.check.")) {
-    return false;
-  }
-  if (violation.source.kind === "rule" && violation.rule_kind === "rule_violation") {
-    return true;
-  }
-  if (violation.source.kind === "architecture" &&
-      (violation.rule_kind === "architecture_dependency" ||
-       violation.rule_kind === "architecture_cycle")) {
-    return true;
-  }
-  if (violation.source.kind === "design" && violation.rule_kind === "design_integrity") {
-    return true;
-  }
-  return false;
-}
-
-function isCheckSuppressibleViolation(violation: Violation): boolean {
-  return isBaselineEligibleViolation(violation) && violation.scope_paths.length > 0;
-}
-
-async function prepareCheckFilters(context: PreparedCheckContext, options: CheckCommandOptions): Promise<CheckFilters> {
+async function prepareCheckFilters(context: PreparedCheckContext, options: CheckCommandOptions): Promise<ReportFilters> {
   return {
     baseline: await tryReadViolationBaseline(resolve(context.projectDir, STELE_BASELINE_FILE)),
     diffScopePaths: options.diffFrom === undefined ? undefined : await collectGitDiffScope(context.projectDir, options.diffFrom),
   };
-}
-
-function applyFiltersToReport(report: ViolationReport, filters: CheckFilters): ViolationReport {
-  return filterViolationReport(report, {
-    baseline: report.violations.some((violation) => violation.scope_paths.includes(STELE_BASELINE_FILE)) ? undefined : filters.baseline,
-    diffScopePaths: filters.diffScopePaths,
-    isSuppressible: isCheckSuppressibleViolation,
-  });
 }
 
 // ----------------------------------------------------------------

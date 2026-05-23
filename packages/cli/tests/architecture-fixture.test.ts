@@ -6,10 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { STELE_CONFIG_FILE, DEFAULT_CONFIG } from "../src/config/defaults.js";
 import { loadConfig } from "../src/config/loadConfig.js";
 import { loadContract } from "@stele/core";
-import {
-  evaluateArchitectureContract,
-  type ArchitectureContractOptions,
-} from "../src/architecture-runtime.js";
+import { evaluateArchitectureRuntime } from "../src/architecture-runtime.js";
 
 // ----------------------------------------------------------------
 // Fixture paths
@@ -89,16 +86,16 @@ function toMinimalArchitecture(
 async function loadAndEvaluate(projectDir: string): Promise<{
   contract: Awaited<ReturnType<typeof loadContract>>;
   arch: MinimalArch;
-  violations: Awaited<ReturnType<typeof evaluateArchitectureContract>>;
+  result: Awaited<ReturnType<typeof evaluateArchitectureRuntime>>;
 }> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(join(projectDir, config.entry));
   const arch = toMinimalArchitecture(contract.architectures[0]);
-  const violations = await evaluateArchitectureContract({
+  const result = await evaluateArchitectureRuntime({
     projectRoot: projectDir,
     architecture: arch,
   });
-  return { contract, arch, violations };
+  return { contract, arch, result };
 }
 
 // ----------------------------------------------------------------
@@ -108,9 +105,12 @@ async function loadAndEvaluate(projectDir: string): Promise<{
 describe("architecture fixture: typescript-architecture-valid", () => {
   it("passes architecture check — no violations", async () => {
     const projectDir = await setupFixture(VALID_DIR);
-    const { violations } = await loadAndEvaluate(projectDir);
+    const { result } = await loadAndEvaluate(projectDir);
 
-    expect(violations).toHaveLength(0);
+    expect(result.dependencyViolations).toHaveLength(0);
+    expect(result.cycleViolations).toHaveLength(0);
+    expect(result.layerDirectionViolations).toHaveLength(0);
+    expect(result.publicEntryViolations).toHaveLength(0);
   });
 });
 
@@ -121,11 +121,11 @@ describe("architecture fixture: typescript-architecture-valid", () => {
 describe("architecture fixture: typescript-architecture-invalid-edge", () => {
   it("detects unauthorized dependency edge", async () => {
     const projectDir = await setupFixture(INVALID_EDGE_DIR);
-    const { violations } = await loadAndEvaluate(projectDir);
+    const { result } = await loadAndEvaluate(projectDir);
 
-    expect(violations).toHaveLength(1);
+    expect(result.dependencyViolations).toHaveLength(1);
 
-    const v = violations[0];
+    const v = result.dependencyViolations[0];
     expect(v.fromModule).toBe("api");
     expect(v.toModule).toBe("infra");
     expect(v.fromFile).toContain("api");
@@ -142,27 +142,22 @@ describe("architecture fixture: typescript-architecture-invalid-edge", () => {
 describe("architecture fixture: typescript-architecture-cycle", () => {
   it("detects circular dependency when deny-cycles is true", async () => {
     const projectDir = await setupFixture(CYCLE_DIR);
-    const { contract, violations } = await loadAndEvaluate(projectDir);
+    const { contract, result } = await loadAndEvaluate(projectDir);
 
     expect(contract.architectures).toHaveLength(1);
     expect(contract.architectures[0].denyCycles).toBe(true);
 
-    // Filter for cycle violations (specifier contains "cycle:")
-    const cycleViolations = violations.filter((v) => v.specifier.startsWith("cycle:"));
-    expect(cycleViolations.length).toBeGreaterThanOrEqual(2);
+    // The structured runtime result reports cycles as cycleViolations entries
+    // with the full module list, not as flattened pseudo-edges.
+    expect(result.cycleViolations.length).toBeGreaterThanOrEqual(1);
 
-    // At least one cycle violation involves module "a" depending on "b"
-    const aToB = cycleViolations.find((v) => v.fromModule === "a" && v.toModule === "b");
-    expect(aToB).toBeDefined();
-    expect(aToB!.specifier).toContain("a");
-    expect(aToB!.specifier).toContain("b");
-
-    // At least one cycle violation involves module "b" depending on "a"
-    const bToA = cycleViolations.find((v) => v.fromModule === "b" && v.toModule === "a");
-    expect(bToA).toBeDefined();
+    const cycle = result.cycleViolations[0];
+    expect(cycle.modules).toContain("a");
+    expect(cycle.modules).toContain("b");
 
     // Cycle violations reference actual source files
-    expect(aToB!.fromFile).toBeTruthy();
+    expect(cycle.edgeFiles.length).toBeGreaterThan(0);
+    expect(cycle.edgeFiles[0]).toBeTruthy();
   });
 });
 
@@ -174,18 +169,19 @@ describe("architecture fixture: end-to-end contract pipeline", () => {
   it("loads contract, extracts architecture, and evaluates all three fixtures correctly", async () => {
     // Valid: zero violations
     const validDir = await setupFixture(VALID_DIR);
-    const validResult = await loadAndEvaluate(validDir);
-    expect(validResult.violations).toHaveLength(0);
+    const validRun = await loadAndEvaluate(validDir);
+    expect(validRun.result.dependencyViolations).toHaveLength(0);
+    expect(validRun.result.cycleViolations).toHaveLength(0);
 
     // Invalid-edge: has violations
     const invalidDir = await setupFixture(INVALID_EDGE_DIR);
-    const invalidResult = await loadAndEvaluate(invalidDir);
-    expect(invalidResult.violations).not.toHaveLength(0);
+    const invalidRun = await loadAndEvaluate(invalidDir);
+    expect(invalidRun.result.dependencyViolations.length).toBeGreaterThan(0);
 
     // Cycle: detected when deny-cycles enabled
     const cycleDir = await setupFixture(CYCLE_DIR);
-    const cycleResult = await loadAndEvaluate(cycleDir);
-    expect(cycleResult.contract.architectures[0].denyCycles).toBe(true);
-    expect(cycleResult.violations.length).toBeGreaterThanOrEqual(2);
+    const cycleRun = await loadAndEvaluate(cycleDir);
+    expect(cycleRun.contract.architectures[0].denyCycles).toBe(true);
+    expect(cycleRun.result.cycleViolations.length).toBeGreaterThanOrEqual(1);
   });
 });
