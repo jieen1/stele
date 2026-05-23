@@ -67,7 +67,51 @@ describe("loadConfig", () => {
     expect(config.targetLanguage).toBe("typescript");
     expect(config.testFramework).toBe("jest");
     expect(config.pathMode).toBe("posix");
-    expect(config.protected).toEqual(["src/**/*", "lib/**/*"]);
+    // Round 4 D-01: user-supplied `protected` UNIONs with defaults, not
+    // replaces. Assert that user entries are present AND defaults remain.
+    expect(config.protected).toContain("src/**/*");
+    expect(config.protected).toContain("lib/**/*");
+    expect(config.protected).toContain("contract/**/*.stele");
+    expect(config.protected).toContain("packages/claude-code-plugin/scripts/pre-tool-protect.js");
+  });
+
+  it("Round 4 D-01: empty `protected: []` keeps defaults via UNION semantics", async () => {
+    const projectDir = await createTempDir();
+    await writeFile(
+      join(projectDir, STELE_CONFIG_FILE),
+      JSON.stringify({ protected: [] }),
+      "utf8",
+    );
+    const config = await loadConfig(projectDir);
+    // User contributed nothing; defaults remain.
+    expect(config.protected).toContain("contract/**/*.stele");
+    expect(config.protected).toContain("packages/claude-code-plugin/scripts/pre-tool-protect.js");
+    expect(config.protected).toContain(".stele/stop-state.json");
+    expect(config.protected.length).toBeGreaterThan(5);
+  });
+
+  it("Round 4 D-01: omitting `protected` key keeps defaults", async () => {
+    const projectDir = await createTempDir();
+    await writeFile(
+      join(projectDir, STELE_CONFIG_FILE),
+      JSON.stringify({}),
+      "utf8",
+    );
+    const config = await loadConfig(projectDir);
+    expect(config.protected).toContain("contract/**/*.stele");
+  });
+
+  it("Round 4 D-01: deduplicates when user re-lists a default pattern", async () => {
+    const projectDir = await createTempDir();
+    await writeFile(
+      join(projectDir, STELE_CONFIG_FILE),
+      JSON.stringify({ protected: ["contract/**/*.stele", "extra/**"] }),
+      "utf8",
+    );
+    const config = await loadConfig(projectDir);
+    const occurrences = config.protected.filter((p) => p === "contract/**/*.stele");
+    expect(occurrences).toHaveLength(1);
+    expect(config.protected).toContain("extra/**");
   });
 
   it("merges explicit fields with defaults for missing fields", async () => {

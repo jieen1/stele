@@ -37,10 +37,23 @@ export async function loadConfig(projectDir: string): Promise<SteleConfig> {
     targetLanguage: readString(parsed.targetLanguage, DEFAULT_CONFIG.targetLanguage),
     testFramework: readString(parsed.testFramework, DEFAULT_CONFIG.testFramework),
     pathMode: readString(parsed.pathMode, DEFAULT_CONFIG.pathMode),
-    protected: Object.prototype.hasOwnProperty.call(parsed, "protected")
-      ? readProtectedConfig(parsed.protected)
-      : [...DEFAULT_CONFIG.protected],
+    // Round 4 D-01 (Round 3 P0-3 follow-up): UNION default + user patterns
+    // instead of REPLACE. The hook-side `pre-tool-protect.js` was already
+    // changed in P0-3, but the CLI side still trusted a narrowed user
+    // config — meaning manifest verification / generation could silently
+    // skip hook scripts if the user's `stele.config.json` happened to
+    // forget them. Defense-in-depth requires that the CLI honours the
+    // same UNION semantics so the protected glob can only grow, never
+    // shrink, via user config.
+    protected: mergeProtected(parsed),
   };
+}
+
+function mergeProtected(parsed: PartialConfig): string[] {
+  const userPatterns = Object.prototype.hasOwnProperty.call(parsed, "protected")
+    ? readProtectedConfig(parsed.protected)
+    : [];
+  return [...new Set([...DEFAULT_CONFIG.protected, ...userPatterns])];
 }
 
 function readProtectedConfig(value: unknown): string[] {

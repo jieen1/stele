@@ -322,7 +322,11 @@ describe("stele CLI", () => {
     expect(Object.keys(manifest.protected_files)).toContain("docs/other/readme.txt");
   });
 
-  it("explicit empty protected config intentionally allows generate, lock, and check with no protected file entries", async () => {
+  it("default-protected patterns stay protected when the user config sets protected to an empty array (Round 4 D-01)", async () => {
+    // Pre-Round-4 the semantic was: user's `protected: []` REPLACES default.
+    // Round 3 P0-3 fixed the plugin hook to UNION; Round 4 D-01 brings the
+    // CLI's loadConfig in line. With UNION semantics, `protected: []` is
+    // equivalent to "no user additions" — the default set still applies.
     const projectDir = await createFixtureProject({
       protected: [],
     });
@@ -333,7 +337,10 @@ describe("stele CLI", () => {
     await expect(runCheck(projectDir)).resolves.toBeUndefined();
 
     const manifest = await readJson(join(projectDir, "contract", ".manifest.json"));
-    expect(Object.keys(manifest.protected_files)).toEqual([]);
+    // The defaults still protect the CDL surface + tests/contract; assert
+    // that at least one of those default entries is locked in the manifest.
+    const lockedPaths = Object.keys(manifest.protected_files);
+    expect(lockedPaths.some((p) => p.startsWith("contract/"))).toBe(true);
   });
 
   it("check fails after generate until the manifest is explicitly locked", async () => {
