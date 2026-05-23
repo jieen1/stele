@@ -49,4 +49,16 @@ export const DEFAULT_PROTECTED_PATTERNS: readonly string[] = [
   // and `.stele/agent/**` are likewise dynamic marker / summary stores. We
   // only freeze the security-critical control-plane file here.
   ".stele/stop-state.json",
+  // Round 4 E-09: supply-chain shape. Tampering with any of these can
+  // ship a typeless package, skip the workspace-protocol guard, alter
+  // CI gates, or swap deps. They are not source code but they ARE the
+  // build contract; pre-tool-protect blocks edits and the manifest
+  // hashes them.
+  "pnpm-lock.yaml",
+  "package.json",
+  "packages/*/package.json",
+  "packages/*/tsup.config.ts",
+  ".github/workflows/**",
+  "scripts/publish-npm.mjs",
+  "scripts/verify-packed-adoption.mjs",
 ];

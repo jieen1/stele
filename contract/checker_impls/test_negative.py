@@ -568,6 +568,59 @@ def test_strict_mode_default_in_ci_env_injection():
     return _pass_if_false(result, "strict_mode_default_in_ci_env_injection")
 
 
+def test_strict_mode_default_in_ci_via_package_json_script():
+    """Round 4 E-11: hide the lenient flag inside a `scripts.x` block in
+    package.json. A workflow that invokes `pnpm run x` would otherwise
+    pass — the script body is where the flag actually lives."""
+    _reset_caches()
+    pkg = sp._REPO_ROOT / "package.json"
+    if not pkg.is_file():
+        print("  SKIP: package.json missing")
+        return True
+    original = pkg.read_text(encoding="utf-8")
+    import json as _json
+    data = _json.loads(original)
+    scripts = data.setdefault("scripts", {})
+    scripts["__negtest_lenient"] = "stele check --lenient-effects"
+    tampered = _json.dumps(data, indent=2) + "\n"
+    pkg.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.strict_mode_default_in_ci({})
+    finally:
+        pkg.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "strict_mode_default_in_ci_via_package_json_script")
+
+
+def test_strict_mode_default_in_ci_via_python_script_delegation():
+    """Round 4 D-10 / E-11: workflow delegates to `python scripts/x.py`
+    whose body carries the lenient flag. The legacy scanner only chased
+    `.sh` files; the strengthened scanner must follow `.py` too."""
+    _reset_caches()
+    ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    scripts_dir = sp._REPO_ROOT / "scripts"
+    if not ci_yml.is_file() or not scripts_dir.is_dir():
+        print("  SKIP: .github/workflows/ci.yml or scripts/ missing")
+        return True
+    original_ci = ci_yml.read_text(encoding="utf-8")
+    py_script = scripts_dir / "negtest-py-lenient.py"
+    try:
+        py_script.write_text(
+            "import os\nos.system('stele check --lenient-effects')\n",
+            encoding="utf-8",
+        )
+        tampered_ci = original_ci.replace(
+            "      - run: pnpm install --frozen-lockfile",
+            "      - run: python scripts/negtest-py-lenient.py\n      - run: pnpm install --frozen-lockfile",
+            1,
+        )
+        ci_yml.write_text(tampered_ci, encoding="utf-8")
+        result = sp.strict_mode_default_in_ci({})
+    finally:
+        ci_yml.write_text(original_ci, encoding="utf-8")
+        py_script.unlink(missing_ok=True)
+    return _pass_if_false(result, "strict_mode_default_in_ci_via_python_script_delegation")
+
+
 def test_strict_mode_default_in_ci_via_referenced_script():
     """Round 3 P1-3: hide the lenient flag in a referenced shell script
     instead of in the workflow itself; the checker must follow the
@@ -674,6 +727,9 @@ def main() -> int:
         # Round 3 P1-3: env-injection + referenced-script bypass negatives
         ("strict_mode_default_in_ci_env_injection", test_strict_mode_default_in_ci_env_injection),
         ("strict_mode_default_in_ci_via_referenced_script", test_strict_mode_default_in_ci_via_referenced_script),
+        # Round 4 E-11 + D-10
+        ("strict_mode_default_in_ci_via_package_json_script", test_strict_mode_default_in_ci_via_package_json_script),
+        ("strict_mode_default_in_ci_via_python_script_delegation", test_strict_mode_default_in_ci_via_python_script_delegation),
     ]
 
     print("=" * 60)

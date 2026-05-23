@@ -1055,11 +1055,19 @@ def all_evaluators_compile(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 
 
 _LENIENT_FLAG_RE = re.compile(r"--lenient-")
-# Match references to shell scripts that the workflow may delegate to:
-#   `bash scripts/x.sh`, `sh ./x.sh`, `./scripts/x.sh args...`
+# Match references to shell + Python + Node scripts that the workflow may
+# delegate to: `bash scripts/x.sh`, `python scripts/y.py`, `node tools/z.mjs`,
+# `./scripts/x.sh args…`.
+# Round 4 E-11 + Reviewer D D-10: extended from shell-only (.sh/.bash/.zsh)
+# to also cover `.py`, `.mjs`, `.cjs`, `.js`, `.rb` — anything an agent
+# could delegate to from a workflow step.
 _SCRIPT_REF_RE = re.compile(
-    r"(?:\b(?:bash|sh|zsh)\s+)?(?P<path>[\w./\-]+\.(?:sh|bash|zsh))\b",
+    r"(?:\b(?:bash|sh|zsh|python|python3|node|nodejs|ruby|perl)\s+)?(?P<path>[\w./\-]+\.(?:sh|bash|zsh|py|mjs|cjs|js|rb|pl))\b",
 )
+# Round 4 E-11 + Reviewer D D-10: workflow steps frequently delegate to
+# `pnpm run <script>` / `npm run <script>` / `yarn <script>`. Those scripts
+# live in package.json#scripts. Match the `run <name>` to find the target.
+_PNPM_RUN_RE = re.compile(r"\b(?:pnpm|npm|yarn)\s+(?:run\s+)?(?P<name>[a-zA-Z][\w:-]*)")
 # An env: assignment whose value text contains the literal lenient flag —
 # pre-P1-3 the checker only scanned argv lines and missed this.
 _ENV_LENIENT_RE = re.compile(
@@ -1125,6 +1133,7 @@ def strict_mode_default_in_ci(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 
     violations: list[dict[str, Any]] = []
     referenced_scripts: set[pathlib.Path] = set()
+    referenced_pkg_scripts: set[str] = set()
     workflow_files = sorted(
         list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
     )
@@ -1135,12 +1144,16 @@ def strict_mode_default_in_ci(ctx: dict, **kwargs: Any) -> dict[str, Any]:
             continue
         rel_wf = str(wf.relative_to(_REPO_ROOT))
         _scan_text_for_lenient(rel_wf, content, violations)
-        # Discover referenced scripts so we can scan them too.
+        # Discover referenced standalone scripts (bash / python / node).
         for m in _SCRIPT_REF_RE.finditer(content):
             script_rel = m.group("path").lstrip("./")
             script_path = _REPO_ROOT / script_rel
             if script_path.is_file():
                 referenced_scripts.add(script_path)
+        # Round 4 E-11: discover `pnpm run <name>` / `npm run <name>` /
+        # `yarn <name>` references whose body lives in package.json#scripts.
+        for m in _PNPM_RUN_RE.finditer(content):
+            referenced_pkg_scripts.add(m.group("name"))
 
     for script in sorted(referenced_scripts):
         try:
@@ -1149,6 +1162,36 @@ def strict_mode_default_in_ci(ctx: dict, **kwargs: Any) -> dict[str, Any]:
             continue
         rel_script = str(script.relative_to(_REPO_ROOT))
         _scan_text_for_lenient(rel_script, script_content, violations)
+
+    # Round 4 E-11: scan every package.json in the workspace for a `scripts`
+    # block whose value contains a lenient flag — workflows that delegate
+    # via `pnpm run X` would otherwise sneak past the workflow-only scanner.
+    package_json_paths = [_REPO_ROOT / "package.json"]
+    package_json_paths.extend(_PACKAGES_DIR.glob("*/package.json"))
+    for pkg in package_json_paths:
+        if not pkg.is_file():
+            continue
+        try:
+            data = json.loads(pkg.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        scripts = data.get("scripts")
+        if not isinstance(scripts, dict):
+            continue
+        for name, body in scripts.items():
+            if not isinstance(body, str):
+                continue
+            if "--lenient-" not in body:
+                continue
+            violations.append({
+                "file": str(pkg.relative_to(_REPO_ROOT)),
+                "line": None,
+                "column": None,
+                "message": (
+                    f"package.json script '{name}' contains a lenient flag: "
+                    + body.strip()[:140]
+                ),
+            })
 
     if violations:
         return {
@@ -1446,6 +1489,9 @@ def _extract_string_array(source: str, anchor: str) -> set[str] | None:
     if end == -1:
         return None
     body = source[lb + 1:end]
+    # Strip single-line `// …` comments before string-literal extraction so
+    # comment text like `// They are "build code"` doesn't pollute the set.
+    body = re.sub(r"//[^\n]*", "", body)
     return {m.group(1) for m in _STRING_LITERAL_RE.finditer(body)}
 
 

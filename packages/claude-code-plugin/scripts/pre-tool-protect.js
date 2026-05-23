@@ -51,6 +51,14 @@ const DEFAULT_PROTECTED = [
   // Note: `.stele/events/**` is intentionally NOT protected — those are
   // append-only observation logs the Stop hook writes on every run.
   ".stele/stop-state.json",
+  // Round 4 E-09: supply-chain shape (kept byte-equal with cli/core).
+  "pnpm-lock.yaml",
+  "package.json",
+  "packages/*/package.json",
+  "packages/*/tsup.config.ts",
+  ".github/workflows/**",
+  "scripts/publish-npm.mjs",
+  "scripts/verify-packed-adoption.mjs",
 ];
 
 // Round 4 D-05: hoisted constants used by extractInterpreterScriptTargets.

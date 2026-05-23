@@ -59,5 +59,12 @@ export const DEFAULT_CONFIG: SteleConfig = {
     "packages/claude-code-plugin/hooks/hooks.json",
     "stele.config.json",
     ".stele/stop-state.json",
+    "pnpm-lock.yaml",
+    "package.json",
+    "packages/*/package.json",
+    "packages/*/tsup.config.ts",
+    ".github/workflows/**",
+    "scripts/publish-npm.mjs",
+    "scripts/verify-packed-adoption.mjs",
   ],
 };

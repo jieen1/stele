@@ -536,6 +536,21 @@ function containsGlobMetachars(pattern: string): boolean {
   return /[*?[\]{}]/.test(pattern);
 }
 
+// Round 4 E-09 follow-up: package-scoped globs like `packages/*/tsup.config.ts`
+// resolve globParent → "packages", which causes the walker to recurse into
+// every package's node_modules (which often contains symlinks → throw).
+// These directories are never source-of-truth for protected patterns and
+// should be skipped wholesale by the walker.
+const _PROTECTED_WALK_SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".pnpm-store",
+  ".pnpm",
+  ".cache",
+  "dist",
+  "coverage",
+]);
+
 async function walkProtectedRoot(directory: string, projectDir: string): Promise<string[]> {
   try {
     const directoryStat = await stat(directory);
@@ -557,6 +572,13 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
       .slice()
       .sort((left, right) => left.name.localeCompare(right.name))
       .map(async (entry) => {
+        // Round 4 E-09: skip build / vendor / cache trees up front. The
+        // glob matcher in the caller already filters against the requested
+        // pattern, so the only thing recursion into these trees adds is
+        // potential symlink-throws.
+        if (_PROTECTED_WALK_SKIP_DIRS.has(entry.name)) {
+          return [];
+        }
         const fullPath = join(directory, entry.name);
         const relativePath = normalizeProjectRelativePath(projectDir, fullPath);
         const entryStats = await lstat(fullPath);
