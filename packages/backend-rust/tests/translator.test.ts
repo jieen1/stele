@@ -653,6 +653,8 @@ describe("generateRustSource", () => {
             interAgentContracts: [],
             architectures: [],
             coreNodes: [],
+            brandedIds: [],
+            smartCtors: [],
             conflicts: [],
             warnings: [],
         };

@@ -208,6 +208,8 @@ function createSingleFileContract(contract: Contract, file: Contract["files"][nu
     conflicts: [...(file.conflicts ?? [])],
     coreNodes: [...(file.coreNodes ?? [])],
     architectures: [...(file.architectures ?? [])],
+    brandedIds: [...(file.brandedIds ?? [])],
+    smartCtors: [...(file.smartCtors ?? [])],
     warnings: [...(contract.warnings ?? [])],
   };
 }

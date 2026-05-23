@@ -226,10 +226,11 @@ function collectStringViolations(
   return violations;
 }
 
-/** Build a ts.Program from the tsconfig. */
+/** Build a ts.Program from the tsconfig, including the branded type targets. */
 function buildProgram(
   projectDir: string,
   tsconfigPath: string,
+  extraRootNames: string[] = [],
 ): ts.Program {
   const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
   if (!configFile.config) {
@@ -243,8 +244,10 @@ function buildProgram(
     configDir,
   ) as ts.ParsedCommandLine & { fileNames: string[] };
 
+  const rootNames = Array.from(new Set([...parsedConfig.fileNames, ...extraRootNames]));
+
   return ts.createProgram({
-    rootNames: parsedConfig.fileNames,
+    rootNames,
     options: parsedConfig.options,
   });
 }
@@ -354,7 +357,20 @@ export function checkBrandedIds(
   }
 
   const tsconfigPath = options.tsconfigPath ?? resolve(options.projectDir, "tsconfig.json");
-  const program = buildProgram(options.projectDir, tsconfigPath);
+
+  // Pre-collect target file paths so the program includes them even if the
+  // tsconfig include patterns don't.
+  const extraFiles: string[] = [];
+  for (const decl of options.declarations) {
+    try {
+      const parsed = parseTypeTarget(decl.typeTarget);
+      extraFiles.push(parsed.filePath);
+    } catch {
+      // skip
+    }
+  }
+
+  const program = buildProgram(options.projectDir, tsconfigPath, extraFiles);
   const checker = program.getTypeChecker();
 
   const allViolations: BrandedIdViolation[] = [];

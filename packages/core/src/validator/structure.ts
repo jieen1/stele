@@ -39,6 +39,11 @@ export {
   parseConflictDeclaration,
 } from "./structure-agent.js";
 
+export {
+  parseBrandedIdDeclaration,
+  parseSmartCtorDeclaration,
+} from "./structure-type-driven.js";
+
 
 export {
   describeNode,
@@ -93,5 +98,7 @@ export type {
   CoreNodeMetricBoundary,
   CoreNodeMetricName,
   CoreNodeRole,
+  BrandedIdDeclaration,
+  SmartCtorDeclaration,
 } from "./structure-types.js";
 

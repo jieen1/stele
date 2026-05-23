@@ -56,6 +56,8 @@ function makeContract(invariants: InvariantDeclaration[], groups?: import("@stel
         interAgentContracts: [],
         architectures: [],
         coreNodes: [],
+        brandedIds: [],
+        smartCtors: [],
         conflicts: [],
         warnings: [],
     };

@@ -48,6 +48,7 @@ import {
   buildArchitectureStage,
   buildComplexityStage,
 } from "./check-stages-other.js";
+import { buildTypeDrivenStage } from "./check-stages-type-driven.js";
 
 // ----------------------------------------------------------------
 // Types
@@ -153,6 +154,7 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
     reports.push(applyFiltersToReport(await buildToolchainStage(context, protectedState, "check"), filters));
     reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
     reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
+    reports.push(applyFiltersToReport(await buildTypeDrivenStage(context, protectedState, "check"), filters));
   }
 
   if (architectureOnly) {
@@ -252,6 +254,7 @@ export async function buildRawCheckReport(context: PreparedCheckContext, command
       await buildToolchainStage(context, protectedState, command),
       await buildArchitectureStage(context, protectedState, command),
       await buildComplexityStage(context, protectedState, command),
+      await buildTypeDrivenStage(context, protectedState, command),
     ]);
   } catch (error) {
     return createViolationReport({

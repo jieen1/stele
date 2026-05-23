@@ -13,11 +13,13 @@ import {
 } from "./structure-agent.js";
 import { parseArchitectureDeclaration } from "./structure-architecture.js";
 import { parseCoreNodeDeclaration } from "./structure-core-node.js";
+import { parseBrandedIdDeclaration, parseSmartCtorDeclaration } from "./structure-type-driven.js";
 import { TOP_LEVEL_DECLARATIONS } from "./structure-types.js";
 import { readSingleExpression } from "./structure-shared.js";
 import type {
   AgentDeclaration,
   ArchitectureDeclaration,
+  BrandedIdDeclaration,
   ConflictDeclaration,
   Contract,
   ContractFile,
@@ -29,6 +31,7 @@ import type {
   MetadataDeclaration,
   OperatorDeclaration,
   ScopeDeclaration,
+  SmartCtorDeclaration,
   CheckerDeclaration,
 } from "./structure-types.js";
 
@@ -52,6 +55,8 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     conflicts: contractFiles.flatMap((file) => file.conflicts),
     architectures: contractFiles.flatMap((file) => file.architectures),
     coreNodes: contractFiles.flatMap((file) => file.coreNodes),
+    brandedIds: contractFiles.flatMap((file) => file.brandedIds),
+    smartCtors: contractFiles.flatMap((file) => file.smartCtors),
     warnings: [],
   };
 }
@@ -81,6 +86,8 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   const conflicts: ConflictDeclaration[] = [];
   const architectures: ArchitectureDeclaration[] = [];
   const coreNodes: CoreNodeDeclaration[] = [];
+  const brandedIds: BrandedIdDeclaration[] = [];
+  const smartCtors: SmartCtorDeclaration[] = [];
 
   for (const node of file.parsed.body) {
     if (node.kind !== "list") {
@@ -170,6 +177,12 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
       case "core-node":
         coreNodes.push(parseCoreNodeDeclaration(file.path, node));
         break;
+      case "branded-id":
+        brandedIds.push(parseBrandedIdDeclaration(file.path, node));
+        break;
+      case "smart-ctor":
+        smartCtors.push(parseSmartCtorDeclaration(file.path, node));
+        break;
     }
   }
 
@@ -190,6 +203,8 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
     conflicts,
     architectures,
     coreNodes,
+    brandedIds,
+    smartCtors,
   };
 }
 

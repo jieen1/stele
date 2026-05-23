@@ -56,6 +56,18 @@ export function validateUniqueness(contract: Contract): Contract {
     "Core-node",
     "Use a globally unique core-node id across all loaded contract files.",
   );
+  validateDuplicateIds(
+    contract.brandedIds,
+    "E0327",
+    "Branded-id",
+    "Use a globally unique branded-id id across all loaded contract files.",
+  );
+  validateDuplicateIds(
+    contract.smartCtors,
+    "E0328",
+    "Smart-ctor",
+    "Use a globally unique smart-ctor id across all loaded contract files.",
+  );
 
   return contract;
 }
@@ -63,7 +75,7 @@ export function validateUniqueness(contract: Contract): Contract {
 function validateDuplicateIds<T extends { id: string; span: { file: string; line: number; column: number }; filePath: string }>(
   items: T[],
   code: string,
-  label: "Invariant" | "Checker" | "Group" | "Scenario" | "Operator" | "Code-shape" | "Agent" | "Architecture" | "Core-node",
+  label: "Invariant" | "Checker" | "Group" | "Scenario" | "Operator" | "Code-shape" | "Agent" | "Architecture" | "Core-node" | "Branded-id" | "Smart-ctor",
   hint: string,
 ): void {
   const seen = new Map<string, { filePath: string }>();

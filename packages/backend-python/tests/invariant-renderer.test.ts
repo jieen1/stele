@@ -46,6 +46,8 @@ function makeContract(invariants: InvariantDeclaration[]): Contract {
     interAgentContracts: [],
     architectures: [],
     coreNodes: [],
+    brandedIds: [],
+    smartCtors: [],
     conflicts: [],
     warnings: [],
   };

@@ -7,6 +7,7 @@ import {
   renderAclIntegration,
   renderAggregateCoreNode,
   renderAllDeclarations,
+  renderTypeDrivenDeclarations,
 } from "./render-stele.js";
 import type { ProvenanceOutput, ProvenanceRule } from "./manifest.js";
 
@@ -17,6 +18,8 @@ import type { ProvenanceOutput, ProvenanceRule } from "./manifest.js";
 export interface GeneratorResult {
   architectures: string[]; // CDL strings for architecture declarations
   coreNodes: string[];     // CDL strings for core-node declarations
+  brandedIds: string[];    // CDL strings for branded-id declarations
+  smartCtors: string[];    // CDL strings for smart-ctor declarations
   combined: string;        // All declarations concatenated
   manifest: {
     generator: string;
@@ -89,10 +92,35 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
     }
   }
 
+  // Generate type-driven declarations (branded-id, smart-ctor)
+  const typeDriven = renderTypeDrivenDeclarations(profile);
+  for (const td of profile.type_driven?.branded_ids?.declarations ?? []) {
+    const name = td.name ?? td.id ?? "";
+    provenanceRules.push({
+      id: `branded-id.${name}`,
+      kind: "branded-id",
+      origins: [],
+      enforcement_level: (profile.type_driven?.branded_ids?.mode === "hard" ? "hard" : "partial"),
+      source: "generated",
+    });
+  }
+  for (const sc of profile.type_driven?.smart_constructors?.value_objects ?? []) {
+    const name = sc.name ?? sc.id ?? "";
+    provenanceRules.push({
+      id: `smart-ctor.${name}`,
+      kind: "smart-ctor",
+      origins: [],
+      enforcement_level: (profile.type_driven?.smart_constructors?.mode === "hard" ? "hard" : "partial"),
+      source: "generated",
+    });
+  }
+
   const allDeclarations = renderAllDeclarations(
     architectures.filter((a) => a !== aclArch),
     aclArch,
     coreNodes,
+    typeDriven.brandedIds,
+    typeDriven.smartCtors,
   );
 
   const provenanceOutputs: ProvenanceOutput[] = [
@@ -106,6 +134,8 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
   return {
     architectures,
     coreNodes,
+    brandedIds: typeDriven.brandedIds,
+    smartCtors: typeDriven.smartCtors,
     combined: allDeclarations,
     manifest: {
       generator: "@stele/cli",
@@ -114,7 +144,7 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
         {
           path: "contract/generated/ddd-typedriven.stele",
           sha256: "", // Computed by caller
-          rule_count: architectures.length + coreNodes.length,
+          rule_count: architectures.length + coreNodes.length + typeDriven.brandedIds.length + typeDriven.smartCtors.length,
         },
       ],
     },

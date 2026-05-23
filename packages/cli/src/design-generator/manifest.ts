@@ -27,7 +27,7 @@ export type ApprovalRecord = {
 
 export type ProvenanceRule = {
   id: string;                // e.g. "ddd-billing"
-  kind: "architecture" | "core-node";
+  kind: "architecture" | "core-node" | "branded-id" | "smart-ctor";
   origins: Array<{
     decision_id: string;
     profile_anchor: string;

@@ -30,6 +30,8 @@ function makeContract(overrides: Partial<Contract> = {}): Contract {
     conflicts: [],
     coreNodes: [],
     architectures: [],
+    brandedIds: [],
+    smartCtors: [],
   };
   return {
     rootPath: ".",
@@ -48,6 +50,8 @@ function makeContract(overrides: Partial<Contract> = {}): Contract {
     conflicts: [],
     coreNodes: [],
     architectures: [],
+    brandedIds: [],
+    smartCtors: [],
     warnings: [],
     ...overrides,
   };

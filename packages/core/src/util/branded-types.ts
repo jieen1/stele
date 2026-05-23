@@ -23,6 +23,8 @@ const CONTRACT_PATH_BRAND = uniqueSymbol("stele.ContractPath");
 const SHA256_BRAND = uniqueSymbol("stele.Sha256");
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const COMMAND_NAME_BRAND = uniqueSymbol("stele.CommandName");
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const PACKAGE_NAME_BRAND = uniqueSymbol("stele.PackageName");
 
 function uniqueSymbol(description: string): symbol {
   return Symbol(description);
@@ -62,6 +64,13 @@ export type Sha256 = string & { readonly __brand: typeof SHA256_BRAND };
  */
 export type CommandName = string & { readonly __brand: typeof COMMAND_NAME_BRAND };
 
+/**
+ * PackageName — npm package name in lowercase-with-dashes format.
+ *
+ * Examples: `"core"`, `"backend-python"`, `"claude-code-plugin"`.
+ */
+export type PackageName = string & { readonly __brand: typeof PACKAGE_NAME_BRAND };
+
 // ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------
@@ -84,6 +93,11 @@ function isValidSha256(value: string): boolean {
 /** Validate a CommandName string format. */
 function isValidCommandName(value: string): boolean {
   return /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(value);
+}
+
+/** Validate a PackageName string format. */
+function isValidPackageName(value: string): boolean {
+  return /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/.test(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +168,22 @@ export function commandName(value: string): CommandName {
   return value as CommandName;
 }
 
+/**
+ * Create a PackageName. Throws on invalid format.
+ *
+ * @example
+ *   const pkg = packageName("backend-python");   // ok
+ *   const bad = packageName("Backend_Python");   // throws TypeError
+ */
+export function packageName(value: string): PackageName {
+  if (!isValidPackageName(value)) {
+    throw new TypeError(
+      `Invalid PackageName: "${value}". Must be lowercase-with-dashes (e.g. "backend-python").`,
+    );
+  }
+  return value as PackageName;
+}
+
 // ---------------------------------------------------------------------------
 // Predicates (for runtime guards / narrowing)
 // ---------------------------------------------------------------------------
@@ -185,4 +215,11 @@ export function isSha256(value: unknown): boolean {
  */
 export function isCommandName(value: unknown): boolean {
   return typeof value === "string" && isValidCommandName(value);
+}
+
+/**
+ * Check if a value would pass PackageName validation.
+ */
+export function isPackageName(value: unknown): boolean {
+  return typeof value === "string" && isValidPackageName(value);
 }

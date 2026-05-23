@@ -19,6 +19,8 @@ export const TOP_LEVEL_DECLARATIONS = new Set([
   "conflict",
   "architecture",
   "core-node",
+  "branded-id",
+  "smart-ctor",
 ]);
 
 export const ALLOWED_INVARIANT_FIELDS = new Set([
@@ -420,6 +422,31 @@ export type CoreNodeDeclaration = {
   metrics: CoreNodeMetricBoundary[];
 };
 
+// -- Branded-id and smart-ctor declarations (type-driven self-protection) --
+
+export type BrandedIdDeclaration = {
+  kind: "branded-id";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  target: string;
+  baseType: string;
+  pattern?: string;
+  entityScope?: string;
+};
+
+export type SmartCtorDeclaration = {
+  kind: "smart-ctor";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  id: string;
+  constructorName: string;
+  denyRaw: boolean;
+  target?: string;
+};
+
 export type ContractFile = {
   path: string;
   parsed: ParsedFile;
@@ -437,6 +464,8 @@ export type ContractFile = {
   conflicts: ConflictDeclaration[];
   architectures: ArchitectureDeclaration[];
   coreNodes: CoreNodeDeclaration[];
+  brandedIds: BrandedIdDeclaration[];
+  smartCtors: SmartCtorDeclaration[];
 };
 
 export type ContractWarning = {
@@ -462,5 +491,7 @@ export type Contract = {
   conflicts: ConflictDeclaration[];
   architectures: ArchitectureDeclaration[];
   coreNodes: CoreNodeDeclaration[];
+  brandedIds: BrandedIdDeclaration[];
+  smartCtors: SmartCtorDeclaration[];
   warnings: ContractWarning[];
 };
