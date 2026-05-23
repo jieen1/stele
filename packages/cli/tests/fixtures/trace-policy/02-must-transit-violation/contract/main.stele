@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-02-must-transit-violation"))
+
+(trace-policy DB_VIA_REPOSITORY
+  (description "All DB access must go through Repository.")
+  (target "**::Database::query(*)")
+  (scope "src/controller.ts::**")
+  (must-transit "**::Repository::*")
+  (fix-hint "Route DB access through `Repository.find` instead of calling `Database.query` directly.")
+  (severity "error"))

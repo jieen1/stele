@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "trace.AUDIT_AFTER_CHARGE.missing_successor",
+    "rule_kind": "trace_violation",
+    "severity": "error",
+    "priority": "major",
+    "group_id_pattern": "::OrderService::pay\\(1\\)$",
+    "location": { "path": "src/order-service.ts" },
+    "cause": { "summary_contains": "without a required follow-up" }
+  }
+]

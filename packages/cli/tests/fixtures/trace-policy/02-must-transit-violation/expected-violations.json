@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "trace.DB_VIA_REPOSITORY.missing_transit",
+    "rule_kind": "trace_violation",
+    "severity": "error",
+    "priority": "major",
+    "group_id_pattern": "::Controller::load\\(1\\)$",
+    "location": { "path": "src/controller.ts" },
+    "cause": { "summary_contains": "without transiting" }
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "trace.NO_TRANSIT_VIA_DEPRECATED.forbidden_transit",
+    "rule_kind": "trace_violation",
+    "severity": "error",
+    "priority": "major",
+    "group_id_pattern": "::Controller::show\\(1\\)$",
+    "location": { "path": "src/controller.ts" },
+    "cause": { "summary_contains": "via forbidden intermediate" }
+  }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "rule_id": "trace.PAYMENT_PRECEDE.missing_predecessor",
+    "rule_kind": "trace_violation",
+    "severity": "error",
+    "priority": "blocking",
+    "group_id_pattern": "::OrderService::pay\\(1\\)$",
+    "location": { "path": "src/order-service.ts" },
+    "cause": { "summary_contains": "without a required predecessor" }
+  },
+  {
+    "rule_id": "trace.PAYMENT_FOLLOW.missing_successor",
+    "rule_kind": "trace_violation",
+    "severity": "error",
+    "priority": "major",
+    "group_id_pattern": "::OrderService::pay\\(1\\)$",
+    "location": { "path": "src/order-service.ts" },
+    "cause": { "summary_contains": "without a required follow-up" }
+  },
+  {
+    "rule_id": "trace.PAYMENT_INDIRECT.direct_call_denied",
+    "rule_kind": "trace_violation",
+    "severity": "error",
+    "priority": "major",
+    "group_id_pattern": "::OrderService::pay\\(1\\)$",
+    "location": { "path": "src/order-service.ts" },
+    "cause": { "summary_contains": "direct calls from this caller are denied" }
+  }
+]

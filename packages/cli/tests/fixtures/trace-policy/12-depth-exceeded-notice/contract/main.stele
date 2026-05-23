@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-12-depth-exceeded-notice"))
+
+(trace-policy DEEP_CHAIN_RULE
+  (description "Database.query reached via 14-hop chain — analyzer depth cap fires.")
+  (target "**::Database::query(*)")
+  (scope "src/chain.ts::F0::*")
+  (must-transit "**::Repository::*")
+  (fix-hint "Either flatten the call chain or rerun `stele check` with `--trace-max-depth 20` if a deep chain is intentional.")
+  (severity "error"))

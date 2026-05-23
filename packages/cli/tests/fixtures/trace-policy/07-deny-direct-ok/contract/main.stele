@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-07-deny-direct-ok"))
+
+(trace-policy NO_DIRECT_DB_FROM_CONTROLLER
+  (description "Controllers may reach Database only via an intermediate service layer.")
+  (target "**::Database::query(*)")
+  (scope "src/controllers/**::**")
+  (deny-direct "src/controllers/**::**")
+  (fix-hint "Insert a `Service.load(...)` indirection between the controller and `Database.query`.")
+  (severity "error"))

@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-08-deny-direct-violation"))
+
+(trace-policy NO_DIRECT_DB_FROM_CONTROLLER
+  (description "Controllers may not call Database.query directly.")
+  (target "**::Database::query(*)")
+  (scope "src/controllers/**::**")
+  (deny-direct "src/controllers/**::**")
+  (fix-hint "Insert a `Service.load(...)` indirection between the controller and `Database.query`.")
+  (severity "error"))

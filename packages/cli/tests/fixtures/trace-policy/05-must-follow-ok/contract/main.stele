@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-05-must-follow-ok"))
+
+(trace-policy AUDIT_AFTER_CHARGE
+  (description "Stripe charges must be followed by AuditLog.write in the same body.")
+  (target "**::Stripe::create(*)")
+  (scope "src/order-service.ts::**")
+  (must-be-followed-by "**::AuditLog::write(*)")
+  (fix-hint "Append `AuditLog.write(...)` after the `Stripe.create(...)` call.")
+  (severity "error"))

@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-09-scope-narrows-ok"))
+
+(trace-policy SERVICES_ONLY_DB_RULE
+  (description "Services may not call Database.query directly. Scripts are out of scope.")
+  (target "**::Database::query(*)")
+  (scope "src/services/**::**")
+  (deny-direct "src/services/**::**")
+  (fix-hint "Wrap `Database.query` in a service-layer helper before calling from a non-script context.")
+  (severity "error"))

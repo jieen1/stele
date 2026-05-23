@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "trace.PAYMENT_GUARD.missing_predecessor",
+    "rule_kind": "trace_violation",
+    "severity": "error",
+    "priority": "blocking",
+    "group_id_pattern": "::OrderService::pay\\(1\\)$",
+    "location": { "path": "src/order-service.ts" },
+    "cause": { "summary_contains": "without a required predecessor" }
+  }
+]

@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-11-deny-transit-violation"))
+
+(trace-policy NO_TRANSIT_VIA_DEPRECATED
+  (description "Database.query must not be reached via the Deprecated module.")
+  (target "**::Database::query(*)")
+  (scope "src/controller.ts::**")
+  (deny-transit "src/deprecated/**::**")
+  (fix-hint "Replace the `Deprecated.legacyLoad(...)` hop with a direct call to `Repository.find(...)`.")
+  (severity "error"))

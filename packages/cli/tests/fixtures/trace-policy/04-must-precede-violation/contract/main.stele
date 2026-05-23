@@ -1,0 +1,11 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-04-must-precede-violation"))
+
+(trace-policy PAYMENT_GUARD
+  (description "Stripe charge must be preceded by a permission check.")
+  (target "**::Stripe::create(*)")
+  (scope "src/order-service.ts::**")
+  (must-be-preceded-by "**::PermissionService::verify(*)")
+  (fix-hint "Insert `await PermissionService.verify(orderId)` before `Stripe.create(...)`.")
+  (severity "error"))

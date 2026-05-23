@@ -1,0 +1,12 @@
+(metadata
+  (stele-version "0.1")
+  (project "trace-fixture-10-exempt-ok"))
+
+(trace-policy NO_DIRECT_DB_FROM_CONTROLLER
+  (description "Controllers may not call Database.query directly, except legacy.")
+  (target "**::Database::query(*)")
+  (scope "src/controllers/**::**" "src/legacy/**::**")
+  (deny-direct "src/controllers/**::**" "src/legacy/**::**")
+  (exempt "src/legacy/**::**" (reason "Legacy controller pinned to direct DB access until migration story is funded."))
+  (fix-hint "Add a `Service.load(...)` indirection between the controller and `Database.query`.")
+  (severity "error"))
