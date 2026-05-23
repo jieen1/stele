@@ -35,6 +35,7 @@ function makeContract(overrides: Partial<Contract> = {}): Contract {
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
   };
   return {
     rootPath: ".",
@@ -58,6 +59,7 @@ function makeContract(overrides: Partial<Contract> = {}): Contract {
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
     ...overrides,
   };
 }

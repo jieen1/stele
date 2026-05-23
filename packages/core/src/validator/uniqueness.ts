@@ -14,7 +14,8 @@ type LabelTag =
   | "Smart-ctor"
   | "Trace-policy"
   | "Type-state"
-  | "Effect-policy";
+  | "Effect-policy"
+  | "Extern-alias";
 
 export function validateUniqueness(contract: Contract): Contract {
   validateDuplicateIds(
@@ -99,6 +100,12 @@ export function validateUniqueness(contract: Contract): Contract {
   );
   validateEffectDeclarationsBlocks([...contract.effectDeclarations]);
   validateEffectNamesUnique([...contract.effectDeclarations]);
+  validateDuplicateIds(
+    [...contract.externAliases],
+    "E0362",
+    "Extern-alias",
+    "Use a globally unique extern-alias logical name across all loaded contract files.",
+  );
 
   return contract;
 }

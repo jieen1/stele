@@ -180,6 +180,7 @@ export type {
   EffectName,
   EffectPolicyDeclaration,
   EffectSuppressionDeclaration,
+  ExternAliasDeclaration,
 } from "./validator/structure.js";
 
 export {
@@ -198,4 +199,6 @@ export {
   parseEffectPolicyDeclaration,
   parseEffectSuppressionDeclaration,
 } from "./validator/structure.js";
+
+export { parseExternAliasDeclaration } from "./validator/structure.js";
 

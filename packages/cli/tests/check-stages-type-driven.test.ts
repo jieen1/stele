@@ -52,6 +52,7 @@ function makeContract(
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
   };
   return {
     rootPath: FIXTURES,
@@ -75,6 +76,7 @@ function makeContract(
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
   };
 }
 

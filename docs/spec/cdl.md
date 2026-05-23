@@ -85,6 +85,7 @@ The shipped CDL grammar (v0.3, Phase B) accepts only the following top-level dec
 - `effect-annotation`
 - `effect-policy`
 - `effect-suppression`
+- `extern-alias`
 
 Any other top-level declaration fails validation with `E0301`.
 
@@ -968,6 +969,32 @@ Agent workflow:
 Agents that "auto-fix" by going straight to `[A]` without considering `[B]` miss contract drift. Stele's hook system blocks direct edits to `contract/` files regardless, but the explicit `[A]`/`[B]` prompt aims to prevent the wrong fix from being applied in the wrong direction.
 
 User-authored fix-hints in `(trace-policy ...)`, `(type-state ...)`, and `(effect-policy ...)` are checked only against the actionability rule (must contain backtick-quoted code or a `file:line` reference; otherwise `E0339`). The A/B-branch requirement applies to the **default** hints emitted by the evaluator source, not to author overrides.
+
+### `extern-alias`
+
+Cross-language symbol bridging. A trace, type-state, or effect pattern of the form `extern:<logical-name>::...` is resolved through the contract's extern-alias registry to the per-language package name before being matched against the call graph.
+
+```lisp
+(extern-alias stripe
+  (description "Stripe SDK — same logical product across all backends")
+  (typescript "stripe")
+  (python     "stripe")
+  (go         "github.com/stripe/stripe-go/v74")
+  (java       "com.stripe:stripe-java")
+  (rust       "stripe-rust"))
+```
+
+Required: the first item is the logical name (identifier or string) and at least one of `(typescript ...)`, `(python ...)`, `(go ...)`, `(java ...)`, `(rust ...)` must be present. Optional: `(description "...")`. Unknown fields fail with `E0361`; missing logical name or malformed shape fails with `E0360`; declaring no language bindings fails with `E0363`. Duplicate logical names across the loaded contract fail with `E0362`.
+
+### Validation errors for extern-alias
+
+| Code | Source | Trigger |
+| --- | --- | --- |
+| `E0360` | `validator/structure-extern-alias.ts` | Malformed form — missing logical name or non-list field entry |
+| `E0361` | `validator/structure-extern-alias.ts` | Unknown field name inside the form |
+| `E0362` | `validator/uniqueness.ts` | Duplicate logical name across the loaded contract |
+| `E0363` | `validator/structure-extern-alias.ts` | No language bindings declared (at least one required) |
+| `E0364` | `validator/structure-extern-alias.ts` | Language field value is not a string literal |
 
 ## CLI commands relevant to Phase B
 

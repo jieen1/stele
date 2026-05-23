@@ -54,6 +54,10 @@ export {
   parseEffectSuppressionDeclaration,
 } from "./structure-effect.js";
 
+export {
+  parseExternAliasDeclaration,
+} from "./structure-extern-alias.js";
+
 
 export {
   describeNode,
@@ -115,5 +119,6 @@ export type {
   EffectName,
   EffectPolicyDeclaration,
   EffectSuppressionDeclaration,
+  ExternAliasDeclaration,
 } from "./structure-types.js";
 

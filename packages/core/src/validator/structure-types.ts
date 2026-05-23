@@ -35,6 +35,7 @@ export const TOP_LEVEL_DECLARATIONS = new Set([
   "effect-annotation",
   "effect-policy",
   "effect-suppression",
+  "extern-alias",
 ]);
 
 export type { TracePolicyDeclaration, TracePolicyExempt } from "./structure-trace-policy.js";
@@ -389,6 +390,31 @@ export type SmartCtorDeclaration = {
   target?: string;
 };
 
+// -- Extern-alias declarations (cross-language symbol bridging, Round 3 P0-6) --
+
+/**
+ * `(extern-alias <logical-name> (typescript "<pkg>") (python "<pkg>") ...)`
+ *
+ * Logical names appear in trace / type-state / effect patterns as
+ * `extern:<logical-name>::...`. The runtime `ExternAliasRegistry` resolves
+ * the logical name to the per-language package id before pattern matching
+ * the call graph.
+ */
+export type ExternAliasDeclaration = {
+  kind: "extern-alias";
+  filePath: string;
+  node: ListNode;
+  span: SourceSpan;
+  /** Logical (cross-language) name — the `id` slot for uniqueness checks. */
+  id: string;
+  description?: string;
+  typescript?: string;
+  python?: string;
+  go?: string;
+  java?: string;
+  rust?: string;
+};
+
 export type ContractFile = {
   path: string;
   parsed: ParsedFile;
@@ -411,6 +437,7 @@ export type ContractFile = {
   effectAnnotations: readonly EffectAnnotationDeclaration[];
   effectPolicies: readonly EffectPolicyDeclaration[];
   effectSuppressions: readonly EffectSuppressionDeclaration[];
+  externAliases: readonly ExternAliasDeclaration[];
 };
 
 export type Contract = {
@@ -435,4 +462,5 @@ export type Contract = {
   effectAnnotations: readonly EffectAnnotationDeclaration[];
   effectPolicies: readonly EffectPolicyDeclaration[];
   effectSuppressions: readonly EffectSuppressionDeclaration[];
+  externAliases: readonly ExternAliasDeclaration[];
 };

@@ -127,6 +127,7 @@ function mkContract(typeStates: readonly TypeStateDeclaration[]): Contract {
     effectAnnotations: [],
     effectPolicies: [],
     effectSuppressions: [],
+    externAliases: [],
   } as unknown as Contract;
 }
 

@@ -19,6 +19,7 @@ import {
   parseEffectPolicyDeclaration,
   parseEffectSuppressionDeclaration,
 } from "./structure-effect.js";
+import { parseExternAliasDeclaration } from "./structure-extern-alias.js";
 import { TOP_LEVEL_DECLARATIONS } from "./structure-types.js";
 import { readSingleExpression } from "./structure-shared.js";
 import type {
@@ -31,6 +32,7 @@ import type {
   EffectDeclarationsDeclaration,
   EffectPolicyDeclaration,
   EffectSuppressionDeclaration,
+  ExternAliasDeclaration,
   GroupDeclaration,
   ImportDeclaration,
   LoadedContractFile,
@@ -68,6 +70,7 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     effectAnnotations: contractFiles.flatMap((file) => [...file.effectAnnotations]),
     effectPolicies: contractFiles.flatMap((file) => [...file.effectPolicies]),
     effectSuppressions: contractFiles.flatMap((file) => [...file.effectSuppressions]),
+    externAliases: contractFiles.flatMap((file) => [...file.externAliases]),
   };
 }
 
@@ -101,6 +104,7 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   const effectAnnotations: EffectAnnotationDeclaration[] = [];
   const effectPolicies: EffectPolicyDeclaration[] = [];
   const effectSuppressions: EffectSuppressionDeclaration[] = [];
+  const externAliases: ExternAliasDeclaration[] = [];
 
   for (const node of file.parsed.body) {
     if (node.kind !== "list") {
@@ -205,6 +209,9 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
       case "effect-suppression":
         effectSuppressions.push(parseEffectSuppressionDeclaration(file.path, node));
         break;
+      case "extern-alias":
+        externAliases.push(parseExternAliasDeclaration(file.path, node));
+        break;
     }
   }
 
@@ -230,6 +237,7 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
     effectAnnotations,
     effectPolicies,
     effectSuppressions,
+    externAliases,
   };
 }
 

@@ -130,6 +130,7 @@ function mkContract(
     effectAnnotations: [],
     effectPolicies,
     effectSuppressions: [],
+    externAliases: [],
   } as unknown as Contract;
 }
 

@@ -3,12 +3,18 @@ import { resolve } from "node:path";
 import {
   createViolation,
   createViolationReport,
+  type ExternAliasDeclaration,
   type Violation,
   type ViolationReport,
 } from "@stele/core";
 import { evaluateTracePolicies } from "@stele/trace-evaluator";
 import { tsCallGraphExtractor } from "@stele/backend-typescript";
-import type { CallGraph, ExternAliasRegistry } from "@stele/call-graph-core";
+import {
+  buildExternAliasRegistry,
+  type CallGraph,
+  type ExternAlias,
+  type ExternAliasRegistry,
+} from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
 import {
@@ -168,10 +174,15 @@ export async function buildTraceStage(
   }
 
   const evaluate = deps.evaluate ?? evaluateTracePolicies;
+  // Round 3 P0-6: build the cross-language alias registry from the contract's
+  // (extern-alias ...) declarations. Caller may inject a pre-built registry
+  // (tests do this); production always derives it from the parsed contract.
+  const externAliases =
+    deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
   const result = evaluate({
     contract: context.contract,
     callGraph,
-    externAliases: deps.externAliases,
+    externAliases,
   });
 
   // Merge violations + notices. Notices (e.g. path_exceeded_max_depth) are
@@ -192,6 +203,25 @@ export async function buildTraceStage(
     },
     violations: allViolations,
   });
+}
+
+function buildContractExternAliasRegistry(
+  declarations: readonly ExternAliasDeclaration[] | undefined,
+): ExternAliasRegistry | undefined {
+  // Tests sometimes pass synthetic Contract values that pre-date the
+  // externAliases field. Treat missing as "no aliases declared".
+  if (declarations === undefined || declarations.length === 0) {
+    return undefined;
+  }
+  const aliases: ExternAlias[] = declarations.map((d) => ({
+    logicalName: d.id,
+    typescript: d.typescript,
+    python: d.python,
+    go: d.go,
+    java: d.java,
+    rust: d.rust,
+  }));
+  return buildExternAliasRegistry(aliases);
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {

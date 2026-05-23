@@ -137,6 +137,7 @@ describe("CHECK_STAGES smoke — shouldRun gating", () => {
         effectAnnotations: [],
         effectPolicies: [],
         effectSuppressions: [],
+    externAliases: [],
         ...overrides,
       } as unknown as PreparedCheckContext["contract"],
       generated: { ok: true, files: [] } as unknown as PreparedCheckContext["generated"],

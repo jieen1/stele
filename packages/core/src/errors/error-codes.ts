@@ -5,7 +5,7 @@
  *   E0001-E0003  — Lexical errors (lexer)
  *   E0101-E0103  — Parser errors (parser)
  *   E0201-E0204  — Loader errors (loadContract)
- *   E0301-E0359  — Validation errors (validator; E0320-E0322 removed with multi-agent forms; E0330-E0339 trace-policy; E0340-E0349 type-state; E0350-E0359 effect system)
+ *   E0301-E0364  — Validation errors (validator; E0320-E0322 removed with multi-agent forms; E0330-E0339 trace-policy; E0340-E0349 type-state; E0350-E0359 effect system; E0360-E0364 extern-alias)
  *   E0401-E0405  — Manifest errors (manifest)
  *   E0501-E0505  — Generator errors (coordinator)
  *   E0601-E0606  — Python backend errors (translator)
@@ -435,6 +435,39 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     message: "Effect-policy/annotation/suppression has an unknown field or missing both forbid/allow-only",
     category: 3,
     source: "validator/structure-effect.ts",
+  },
+
+  // --- Extern-alias validation errors (E0360-E0364) ---
+
+  E0360: {
+    name: "Validation Error",
+    message: "Extern-alias form is malformed (missing logical name or invalid field shape)",
+    category: 3,
+    source: "validator/structure-extern-alias.ts",
+  },
+  E0361: {
+    name: "Validation Error",
+    message: "Extern-alias has an unknown field",
+    category: 3,
+    source: "validator/structure-extern-alias.ts",
+  },
+  E0362: {
+    name: "Validation Error",
+    message: "Duplicate extern-alias logical name across the contract",
+    category: 3,
+    source: "validator/uniqueness.ts",
+  },
+  E0363: {
+    name: "Validation Error",
+    message: "Extern-alias declares no language bindings (at least one of typescript/python/go/java/rust is required)",
+    category: 3,
+    source: "validator/structure-extern-alias.ts",
+  },
+  E0364: {
+    name: "Validation Error",
+    message: "Extern-alias language field has an invalid value",
+    category: 3,
+    source: "validator/structure-extern-alias.ts",
   },
 
   // --- Manifest errors (E0401-E0405) ---
