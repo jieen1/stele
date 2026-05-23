@@ -75,10 +75,12 @@ def _load_backend_registry() -> list[dict[str, Any]]:
         block = block_match.group()
         lang_match = re.search(r"language:\s*\"([^\"]+)\"", block)
         fw_match = re.search(r"framework:\s*\"([^\"]+)\"", block)
+        pkg_match = re.search(r"packageName:\s*\"([^\"]+)\"", block)
         if lang_match:
             entries.append({
                 "language": lang_match.group(1),
                 "framework": fw_match.group(1) if fw_match else "",
+                "packageName": pkg_match.group(1) if pkg_match else "",
             })
 
     _backend_registry_cache = entries
@@ -172,6 +174,41 @@ def _check_backend_present(language: str) -> dict[str, Any]:
     langs = {b["language"] for b in backends}
     if language not in langs:
         return {"passed": False, "message": f"Backend '{language}' not in registry"}
+    return {"passed": True}
+
+
+def all_backends_compile(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Verify every registered backend has a buildable dist/ output.
+
+    For each entry in REGISTERED_BACKENDS, check that the package's
+    dist/index.js and dist/index.d.ts both exist on disk. The package
+    directory is derived from the npm package name
+    (e.g. "@stele/backend-go" -> "packages/backend-go").
+    """
+    backends = _load_backend_registry()
+    if not backends:
+        return {"passed": False, "message": "Backend registry could not be parsed."}
+
+    missing: list[str] = []
+    for entry in backends:
+        package_name = entry.get("packageName", "")
+        if not package_name.startswith("@stele/"):
+            missing.append(f"{entry.get('language', '?')}: unrecognized packageName '{package_name}'")
+            continue
+        package_dir_name = package_name.split("/", 1)[1]
+        pkg_dir = _PACKAGES_DIR / package_dir_name
+        index_js = pkg_dir / "dist" / "index.js"
+        index_dts = pkg_dir / "dist" / "index.d.ts"
+        if not index_js.is_file():
+            missing.append(f"{package_name}: missing dist/index.js")
+        if not index_dts.is_file():
+            missing.append(f"{package_name}: missing dist/index.d.ts")
+
+    if missing:
+        return {
+            "passed": False,
+            "message": "Some backends are not built: " + "; ".join(missing),
+        }
     return {"passed": True}
 
 

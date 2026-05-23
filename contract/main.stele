@@ -24,6 +24,9 @@
 (checker backend-contains-java
   (description "Java backend must be present."))
 
+(checker all-backends-compile
+  (description "Every registered backend's TypeScript source must produce a valid dist/ build (verified via dist/index.js + dist/index.d.ts presence)."))
+
 (checker config-schema-valid
   (description "stele.config.json must contain all required fields."))
 
@@ -122,6 +125,11 @@
   (severity error)
   (description "Java backend must be present.")
   (uses-checker backend-contains-java))
+
+(invariant ALL_BACKENDS_COMPILE
+  (severity error)
+  (description "Every registered backend package must have buildable TypeScript — dist/index.js and dist/index.d.ts must exist after pnpm build.")
+  (uses-checker all-backends-compile))
 
 ; ============================================================================
 ; Manifest / config invariants

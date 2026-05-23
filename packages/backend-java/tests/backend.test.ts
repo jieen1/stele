@@ -38,6 +38,8 @@ function makeMinimalContract(invariantCount = 1): Contract {
     interAgentContracts: [],
     architectures: [],
     coreNodes: [],
+    brandedIds: [],
+    smartCtors: [],
     conflicts: [],
     warnings: [],
   };

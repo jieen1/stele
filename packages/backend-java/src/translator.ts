@@ -104,7 +104,9 @@ export function generateJUnitSource(
   groupName?: string,
 ): string {
   const invariants = contract.invariants.slice().sort(compareInvariants);
-  const scenariosById = new Map(contract.scenarios.map((scenario) => [scenario.id, scenario] as const));
+  const scenariosById = new Map<string, ScenarioDeclaration>(
+    contract.scenarios.map((scenario: ScenarioDeclaration) => [scenario.id, scenario] as const),
+  );
   const usedTestNames = new Set<string>();
   const lines: string[] = [];
 
@@ -296,7 +298,7 @@ function serializeScenarioRef(node: ListNode): string[] {
   const [captureNode, ...fieldNodes] = node.items;
   if (captureNode?.kind !== "identifier") throw new SteleError("E0606", "Backend Error", "Scenario ref must start with a captured identifier.",
     captureNode?.span ?? node.span, `Found ${captureNode === undefined ? "nothing" : captureNode.kind}.`, "Use (ref fund id).");
-  return [captureNode.value, ...fieldNodes.map((n) => n.kind === "identifier" ? n.value : n.kind === "keyword" ? `:${n.value}` : n.kind === "number" ? String(n.value) : n.kind === "string" ? n.value : String(n.head))];
+  return [captureNode.value, ...fieldNodes.map((n: AstNode) => n.kind === "identifier" ? n.value : n.kind === "keyword" ? `:${n.value}` : n.kind === "number" ? String(n.value) : n.kind === "string" ? n.value : String(n.head))];
 }
 
 function serializeScenarioGenerator(node: ListNode): Record<string, unknown> {
@@ -574,7 +576,7 @@ export function astToSource(node: AstNode): string {
   if (node.kind === "string") return JSON.stringify(node.value);
   if (node.kind === "keyword") return `:${node.value}`;
   if (node.kind === "identifier") return node.value;
-  const parts = [node.head, ...node.items.map((item) => astToSource(item))];
+  const parts = [node.head, ...node.items.map((item: AstNode) => astToSource(item))];
   return `(${parts.join(" ")})`;
 }
 

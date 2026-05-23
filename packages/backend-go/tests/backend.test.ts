@@ -172,6 +172,8 @@ function createTestContract(): Contract {
     interAgentContracts: [],
     architectures: [],
     coreNodes: [],
+    brandedIds: [],
+    smartCtors: [],
     conflicts: [],
     warnings: [],
   };
@@ -225,6 +227,8 @@ function createContractWithGroup(groupId: string, invariants: any[]): Contract {
     interAgentContracts: [],
     architectures: [],
     coreNodes: [],
+    brandedIds: [],
+    smartCtors: [],
     conflicts: [],
     warnings: [],
   };
