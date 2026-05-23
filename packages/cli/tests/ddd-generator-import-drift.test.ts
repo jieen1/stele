@@ -104,7 +104,7 @@ describe("runDesignGenerate — ensures import in main.stele", () => {
       return true;
     }) as typeof process.stdout.write;
 
-    await runDesignGenerate({}, projectDir);
+    await runDesignGenerate({ force: true, reason: "test fixture: import behavior" }, projectDir);
 
     // Restore stdout
     process.stdout.write = originalStdoutWrite;
@@ -127,7 +127,7 @@ describe("runDesignGenerate — ensures import in main.stele", () => {
     const originalStdoutWrite = process.stdout.write.bind(process.stdout);
     process.stdout.write = (() => true) as typeof process.stdout.write;
 
-    await runDesignGenerate({}, projectDir);
+    await runDesignGenerate({ force: true, reason: "test fixture: import behavior" }, projectDir);
 
     process.stdout.write = originalStdoutWrite;
 
@@ -154,7 +154,7 @@ describe("runDesignGenerate — ensures import in main.stele", () => {
     const originalStdoutWrite = process.stdout.write.bind(process.stdout);
     process.stdout.write = (() => true) as typeof process.stdout.write;
 
-    await runDesignGenerate({}, projectDir);
+    await runDesignGenerate({ force: true, reason: "test fixture: import behavior" }, projectDir);
 
     process.stdout.write = originalStdoutWrite;
 

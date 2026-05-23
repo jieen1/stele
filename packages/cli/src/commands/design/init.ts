@@ -304,8 +304,21 @@ export async function runDesignInit(
     );
   }
 
-  // 8. Run generate if requested
+  // 8. Run generate if requested. `stele design init --generate` is an
+  // interactive bootstrap path where the user has just answered the design
+  // questionnaire — that authors the profile. We carry that authorship
+  // forward to the generate step via force+reason. The Round 3 P0-4 gate
+  // (which protects routine `stele design generate` against silent
+  // contract overwrites) is intentionally bypassed here because the
+  // human is the one who just declared intent.
   if (opts.generate) {
-    await runDesignGenerate({ dryRun: opts.dryRun }, projectDir);
+    await runDesignGenerate(
+      {
+        dryRun: opts.dryRun,
+        force: true,
+        reason: `stele design init --generate (preset: ${opts.preset ?? "unspecified"})`,
+      },
+      projectDir,
+    );
   }
 }
