@@ -255,6 +255,49 @@ describe("enumeratePaths — basic shapes", () => {
   });
 });
 
+describe("enumeratePaths — self-recursion (Round 4 P2-4)", () => {
+  it("handles A -> A self-recursion without infinite loop", () => {
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: "src/a.ts::A(0)" })],
+      edges: [mkEdge({ from: "src/a.ts::A(0)", to: "src/a.ts::A(0)" })],
+    });
+    const result = enumeratePaths(
+      graph,
+      "src/a.ts::A(0)",
+      new Set(["src/a.ts::A(0)"]),
+      10,
+      100,
+    );
+    // DFS visited-set must prevent the recursion from blowing up.
+    // We accept zero or one path back to A (depending on whether the
+    // implementation reports the trivial self-loop); the important thing
+    // is the call terminates with bounded enumerations.
+    expect(result.stats.pathsEnumerated).toBeLessThan(100);
+    expect(result.stats.truncated).toBe(false);
+  });
+
+  it("handles multiple distinct edges from a node to itself", () => {
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: "src/a.ts::A(0)" })],
+      edges: [
+        mkEdge({ from: "src/a.ts::A(0)", to: "src/a.ts::A(0)", line: 1, column: 1 }),
+        mkEdge({ from: "src/a.ts::A(0)", to: "src/a.ts::A(0)", line: 2, column: 1 }),
+        mkEdge({ from: "src/a.ts::A(0)", to: "src/a.ts::A(0)", line: 3, column: 1 }),
+      ],
+    });
+    const result = enumeratePaths(
+      graph,
+      "src/a.ts::A(0)",
+      new Set(["src/a.ts::A(0)"]),
+      10,
+      100,
+    );
+    // Bounded enumeration — multiple edges to self must not explode.
+    expect(result.stats.pathsEnumerated).toBeLessThan(100);
+    expect(result.stats.truncated).toBe(false);
+  });
+});
+
 describe("getOrderedOutgoingEdges", () => {
   it("returns edges sorted by line then column", () => {
     const graph = mkCallGraph({

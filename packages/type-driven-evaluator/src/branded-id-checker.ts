@@ -3,8 +3,10 @@ import { dirname, resolve } from "node:path";
 import { minimatch } from "minimatch";
 import type { BrandedIdDeclaration, BrandedIdViolation, BrandedIdCheckOptions } from "./types.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _RULE_ID = "typedriven.shape.branded-id";
+// Round 4 F-A-04: removed dead `_RULE_ID = "typedriven.shape.branded-id"`
+// constant. The branded-id violations emitted by this module carry their
+// rule_id at the call site; the constant was never referenced. Reviewer F's
+// audit confirmed the hollow attribute and recommended deletion.
 
 /** Parse "path/to/file.ts::TypeName" into { filePath, typeName }. */
 function parseTypeTarget(

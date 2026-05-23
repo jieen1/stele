@@ -249,6 +249,23 @@ describe("parseEffectPolicyDeclaration", () => {
     expect(policy.allowOnly).toEqual([]);
   });
 
+  // Round 4 P2-5: the canonical empty form is `(allow-only)` (zero args).
+  // The CDL parser deliberately rejects `(allow-only ())` because a bare
+  // `()` is not a valid CDL sub-expression — every list head must be an
+  // identifier. Pin this rejection so a future relaxation of the parser
+  // doesn't silently start accepting `()` literals.
+  it("rejects (allow-only ()) literal empty-parens form (P2-5 — `()` is not a valid CDL list)", () => {
+    expectSteleError(
+      () =>
+        parsePolicy(
+          '(effect-policy REDUCERS_PURE_LITERAL\n' +
+            '  (target-scope "**/reducers/**")\n' +
+            '  (allow-only ()))',
+        ),
+      { code: "E0102", messageIncludes: "head must be an identifier" },
+    );
+  });
+
   it("rejects declaring both forbid and allow-only (E0358)", () => {
     expectSteleError(
       () =>

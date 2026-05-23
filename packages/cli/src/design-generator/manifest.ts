@@ -27,7 +27,19 @@ export type ApprovalRecord = {
 
 export type ProvenanceRule = {
   id: string;                // e.g. "ddd-billing"
-  kind: "architecture" | "core-node" | "branded-id" | "smart-ctor";
+  // Round 4 F-A-06: widened to accept Phase B CDL forms. The ddd
+  // generator may now emit trace-policy / type-state / effect-policy /
+  // effect-suppression provenance entries alongside the legacy Phase A
+  // architecture / core-node / branded-id / smart-ctor kinds.
+  kind:
+    | "architecture"
+    | "core-node"
+    | "branded-id"
+    | "smart-ctor"
+    | "trace-policy"
+    | "type-state"
+    | "effect-policy"
+    | "effect-suppression";
   origins: Array<{
     decision_id: string;
     profile_anchor: string;

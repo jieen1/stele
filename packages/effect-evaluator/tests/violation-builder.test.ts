@@ -172,6 +172,35 @@ describe("buildForbiddenEffectViolation", () => {
     expect(v.cause.detail).not.toContain("src/g.ts::G(0)");
   });
 
+  // Round 4 D-11: with cap=5, head=4, tail=1, a length-6 chain has
+  // collapsedCount=1 and the collapse marker would be longer than the
+  // single hop it replaces. In that case render the hop verbatim.
+  it("renders length-6 chain verbatim instead of [... 1 more callees] marker (D-11)", () => {
+    const sixChain = [
+      "src/a.ts::A(0)",
+      "src/b.ts::B(0)",
+      "src/c.ts::C(0)",
+      "src/d.ts::D(0)",
+      "src/e.ts::E(0)",
+      "src/f.ts::F(0)",
+    ];
+    const ev = basicEvidence("db.read", false, sixChain);
+    const cgSix = mkCallGraph({ nodes: [NODE], edges: [] });
+    const v = buildForbiddenEffectViolation({
+      policy: POLICY,
+      node: NODE,
+      evidence: ev,
+      callGraph: cgSix,
+      directOnNode: false,
+    });
+    // No collapse marker.
+    expect(v.cause.detail).not.toContain("more callees");
+    // Every hop rendered verbatim (no skipped middle).
+    for (const id of sixChain) {
+      expect(v.cause.detail).toContain(`→ ${id}`);
+    }
+  });
+
   it("renders chains at or under cap verbatim with no collapse marker", () => {
     const fiveChain = [
       "src/a.ts::A(0)",

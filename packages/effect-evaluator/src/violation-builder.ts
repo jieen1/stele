@@ -96,6 +96,14 @@ function renderEvidence(evidence: PropagationEvidence): string {
         renderIndices.push(i);
       }
       collapsedCount = fullLen - headLen - 1;
+      // Round 4 D-11: when there's exactly ONE collapsed callee, the
+      // "[... 1 more callees]" marker is longer than the node id it
+      // would replace, which makes the rendered chain less helpful. In
+      // that case, render the node verbatim instead of the marker.
+      if (collapsedCount === 1) {
+        renderIndices.push(fullLen - 2);
+        collapsedCount = 0;
+      }
       renderIndices.push(fullLen - 1);
     }
     let indent = "  ";

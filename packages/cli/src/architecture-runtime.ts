@@ -90,7 +90,7 @@ export type ArchitectureRuntimeResult = {
 };
 
 /**
- * @deprecated Renamed to {@link ArchitectureRuntimeResult}. Will be removed in v0.4.
+ * @deprecated Renamed to {@link ArchitectureRuntimeResult}. Removal scheduled when this repo's package versions cross 0.4.x (no fixed quarter); the alias is harmless until then.
  */
 export type ArchitectureEvaluationResult = ArchitectureRuntimeResult;
 
@@ -254,13 +254,13 @@ export async function evaluateArchitectureRuntime(
 // ----------------------------------------------------------------
 
 /**
- * @deprecated Use {@link evaluateArchitectureRuntime} instead. Will be removed in v0.4.
+ * @deprecated Use {@link evaluateArchitectureRuntime} instead. Removal scheduled when this repo's package versions cross 0.4.x (no fixed quarter); the alias is harmless until then.
  */
 export const evaluateArchitectureFull = evaluateArchitectureRuntime;
 
 /**
  * @deprecated Use {@link evaluateArchitectureRuntime} and flatten the structured
- *             result at the call site instead. Will be removed in v0.4.
+ *             result at the call site instead. Removal scheduled when this repo's package versions cross 0.4.x (no fixed quarter); the alias is harmless until then.
  *
  * Flattens every violation kind into a single `ArchitectureViolation[]` list,
  * preserving the historical wire shape used by older callers.

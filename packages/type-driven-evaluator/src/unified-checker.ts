@@ -20,21 +20,18 @@ export interface TypeDrivenCheckResult {
 /**
  * Run all type-driven checkers configured in the contract.
  *
- * Phase A scope: branded-id + smart-ctor. Phase B will add type-state +
- * effect. This entry point is a forward-looking dispatch helper; the cli
- * currently calls the per-form checkers (`checkBrandedIds`,
- * `checkSmartConstructors`) directly so it can attribute violations to
- * the right `rule_id` per declaration.
+ * Round 4 F-C-06: Phase B type-state + effect evaluators shipped as their
+ * own packages (`@stele/type-state-evaluator`, `@stele/effect-evaluator`)
+ * with the CLI dispatching directly to them at the stage level — so the
+ * "future unified entry" this stub anticipated never materialised. The
+ * function remains here as a thin compatibility shim for any external
+ * consumer that imported it; new code should call the per-form
+ * checkers (`checkBrandedIds`, `checkSmartConstructors`,
+ * `evaluateTypeStates`, `evaluateEffects`) directly.
  */
 export async function runTypeDrivenChecks(
   options: TypeDrivenCheckOptions,
 ): Promise<TypeDrivenCheckResult> {
-  const violations: Violation[] = [];
-  // Phase A scope: per-form dispatch lives in the cli (check-stages-type-driven.ts)
-  // so each declaration can mint its own rule_id. This stub will be filled in
-  // when type-state and effect checkers land — at that point the cli will
-  // migrate to this unified entry. Keep the no-op deterministic so importing
-  // the function never throws.
   void options;
-  return { violations };
+  return { violations: [] };
 }

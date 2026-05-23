@@ -372,6 +372,16 @@ export function evaluateTracePolicies(
 
   // Cross-rule annotation across BOTH violations and notices (notice may
   // share group_id with a real violation; the agent benefits from knowing).
+  //
+  // Round 4 D-15 follow-up: the CLI `mergeCheckReports` ALSO runs
+  // `annotateCrossRuleViolations` on the full cross-evaluator union. This
+  // inner call is intentionally kept because:
+  //   (a) Fixture tests in @stele/trace-evaluator consume the result
+  //       directly (no CLI merge layer), and rely on intra-trace
+  //       violation/notice cross-references being present.
+  //   (b) `annotateCrossRuleViolations` is idempotent — re-annotating an
+  //       already-annotated set produces the same fields, so running it
+  //       twice is correctness-preserving even if mildly redundant.
   const combined = annotateCrossRuleViolations([...violations, ...notices]);
   const annotatedViolations: Violation[] = [];
   const annotatedNotices: Violation[] = [];

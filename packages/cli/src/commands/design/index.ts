@@ -74,7 +74,12 @@ function makeDiffCmd(): Command {
 function makeProposeCmd(): Command {
   const cmd = new Command("propose");
   cmd.description("Propose an add-only design change (agent-safe path)");
-  cmd.argument("<type>", "type of proposal: invariant, branded-id, aggregate");
+  cmd.argument(
+    "<type>",
+    "type of proposal: invariant, branded-id, aggregate, " +
+      "trace-policy, type-state, effect-policy, effect-suppression " +
+      "(Round 4 F-A-07: Phase B kinds added)",
+  );
   cmd.option("--id <id>", "proposal id");
   cmd.option("--description <text>", "description");
   cmd.option("--evolvability <value>", "evolvability (for invariants)");

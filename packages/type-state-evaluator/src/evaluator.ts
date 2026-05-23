@@ -43,16 +43,18 @@ import type {
   CallGraphNode,
   ExternAliasRegistry,
 } from "@stele/call-graph-core";
-import type {
-  Contract,
-  TypeStateBindingDeclaration,
-  TypeStateDeclaration,
-  Violation,
+import {
+  createViolation,
+  type Contract,
+  type TypeStateBindingDeclaration,
+  type TypeStateDeclaration,
+  type Violation,
 } from "@stele/core";
 
 import {
   methodIsAllowedOp,
   methodIsTransition,
+  unreachableStates,
 } from "./state-machine.js";
 import type {
   InferTypeStatesResult,
@@ -498,6 +500,33 @@ export async function evaluateTypeStates(
         }),
       );
     }
+  }
+
+  // Round 4 F-C-08: emit a notice for any state declared in `decl.states`
+  // that cannot be reached from `decl.initial`. Previously this was a
+  // silent acceptance — a contract with an unreachable state would pass
+  // `stele check` even though the declaration is structurally suspect.
+  for (const decl of declarations) {
+    const unreached = unreachableStates(decl);
+    if (unreached.length === 0) continue;
+    notices.push(
+      createViolation({
+        rule_id: `typestate.${decl.id}.unreachable_state`,
+        rule_kind: "typestate_unreachable_state",
+        severity: "warning",
+        source: { tool: "stele", command: "check", kind: "typestate" },
+        location: { path: decl.filePath ?? "contract" },
+        cause: {
+          summary:
+            `Type-state \`${decl.id}\` declares state(s) [${unreached.join(", ")}] ` +
+            `that cannot be reached from initial state \`${decl.initial}\`. ` +
+            `Either remove the unreachable states or add a transition reaching them.`,
+        },
+        scope_paths: [decl.filePath ?? "contract"],
+        priority: "minor",
+        group_id: decl.id,
+      }),
+    );
   }
 
   return {

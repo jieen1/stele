@@ -103,6 +103,25 @@ describe("isTerminal", () => {
     expect(isTerminal(ORDER, "Submitted")).toBe(false);
     expect(isTerminal(ORDER, "Paid")).toBe(false);
   });
+
+  // Round 4 P2-6: terminal-state any-method-call rejection. Previously
+  // this signal was only exercised through extractor-driven fixture
+  // `05-terminal-state-violation`. If the extractor mis-infers, the
+  // invariant is lost. Pin it as a focused unit test that bypasses the
+  // extractor entirely: any method call on a node inferred at a terminal
+  // state must be disallowed by methodIsAllowedOp + methodIsTransition.
+  it("rejects every method call when the inferred state is terminal (P2-6)", () => {
+    for (const terminalState of ["Shipped", "Cancelled", "Refunded"]) {
+      expect(isTerminal(ORDER, terminalState)).toBe(true);
+      // No allowed-ops mapping is declared for terminal states in the
+      // fixture; any method must therefore be disallowed.
+      for (const method of ["ship", "cancel", "addItem", "refund", "pay"]) {
+        expect(methodIsAllowedOp(ORDER, terminalState, method)).toBe(false);
+        // Transitions out of a terminal state are also disallowed by design.
+        expect(methodIsTransition(ORDER, terminalState, method)).toBe(false);
+      }
+    }
+  });
 });
 
 describe("reachableStates", () => {

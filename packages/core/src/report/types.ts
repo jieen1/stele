@@ -123,6 +123,13 @@ export type Violation = {
    * is *expected* to resolve this one. Useful when a structural fix
    * cascades (e.g. moving a function may eliminate a trace violation but
    * preserve an effect violation).
+   *
+   * **Schema-reserved (Round 4 F-A-05)**: the field is declared, serialized,
+   * and round-tripped, but no evaluator populates it as of v0.3. The cross-
+   * stage cascade analysis required to compute it lands in a later milestone.
+   * Until then `resolves_with` will always be `undefined` on emitted
+   * violations. Consumers that read the field must treat its absence as
+   * "unknown", NOT as "no rules cascade".
    */
   resolves_with?: readonly string[];
 

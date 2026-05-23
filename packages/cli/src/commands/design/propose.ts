@@ -100,6 +100,44 @@ export async function runDesignPropose(
     content.target = opts.target ?? "";
   }
 
+  // Round 4 F-A-07: Phase B proposal kinds (trace-policy, type-state,
+  // effect-policy, effect-suppression) carry their declaration in
+  // contract/main.stele rather than in the design profile, so the
+  // diff-against-profile additive check below does not apply.
+  // Validate the kind is in the supported set up front, then write the
+  // YAML and exit — human review of the YAML + the approve flow is the
+  // gate for these kinds.
+  const PHASE_B_KINDS = new Set([
+    "trace-policy",
+    "type-state",
+    "effect-policy",
+    "effect-suppression",
+  ]);
+  const PHASE_A_KINDS = new Set(["invariant", "branded-id", "aggregate"]);
+  if (!PHASE_A_KINDS.has(proposalType) && !PHASE_B_KINDS.has(proposalType)) {
+    process.stderr.write(
+      `[design] Unknown proposal type "${proposalType}". ` +
+      `Allowed: ${[...PHASE_A_KINDS, ...PHASE_B_KINDS].sort().join(", ")}.\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  if (PHASE_B_KINDS.has(proposalType)) {
+    // Phase B forms get a minimal proposal envelope; the agent fills in
+    // the body following the kind-specific shape in docs/spec/cdl.md.
+    content.description = opts.description ?? "";
+    if (opts.target !== undefined) {
+      content.target = opts.target;
+    }
+    writeFileSync(filePath, yaml.dump(content), "utf8");
+    process.stdout.write(
+      `[design] Phase B proposal "${opts.id}" (${proposalType}) written to ${filePath}. ` +
+      `Edit the YAML to add the declaration body, then \`stele design approve --reason "..."\`.\n`,
+    );
+    return;
+  }
+
   writeFileSync(filePath, yaml.dump(content), "utf8");
 
   // Validate: run diff to prove the proposal is additive (no weakening or restructuring)

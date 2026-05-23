@@ -57,15 +57,19 @@ export async function runDesignApprove(
     return;
   }
 
-  const approverResult = resolveApprovedBy();
-  if (!approverResult.ok) {
-    process.stderr.write(`[design] ${approverResult.reason}\n`);
+  // Round 4 D-02 follow-up: structural prerequisites (profile exists) are
+  // checked BEFORE the human-identity gate so the user gets the more
+  // specific error first. The identity gate only runs when the profile
+  // is actually in shape to be approved.
+  if (!profilePathExists(projectDir)) {
+    process.stderr.write("[design] No profile found\n");
     process.exitCode = 1;
     return;
   }
 
-  if (!profilePathExists(projectDir)) {
-    process.stderr.write("[design] No profile found\n");
+  const approverResult = resolveApprovedBy();
+  if (!approverResult.ok) {
+    process.stderr.write(`[design] ${approverResult.reason}\n`);
     process.exitCode = 1;
     return;
   }
