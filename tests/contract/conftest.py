@@ -60,6 +60,13 @@ def _lazy_load_checkers():
             "cli_exit_code_enum_complete",
             "protected_pattern_safe",
             "inline_version_sync",
+            # Round 3 Phase B self-protection checkers
+            "all_evaluators_compile",
+            "all_backends_compile",
+            "strict_mode_default_in_ci",
+            "fix_hint_requires_analysis_branch",
+            # Round 4 D-13
+            "default_protected_consistent",
         ):
             _checkers[name] = getattr(mod, name, None)
 
@@ -95,6 +102,15 @@ _CHECKER_NAME_MAP = {
     "cli-exit-code-enum-complete": "cli_exit_code_enum_complete",
     "protected-pattern-safe": "protected_pattern_safe",
     "inline-version-sync": "inline_version_sync",
+    # Round 3 Phase B self-protection checkers (Round 4 D-04 fix —
+    # without these mappings pytest tests/contract fails with KeyError
+    # on every run, silently neutering the P0-2 CI enforcement claim).
+    "all-evaluators-compile": "all_evaluators_compile",
+    "all-backends-compile": "all_backends_compile",
+    "strict-mode-default-in-ci": "strict_mode_default_in_ci",
+    "fix-hint-requires-analysis-branch": "fix_hint_requires_analysis_branch",
+    # Round 4 D-13
+    "default-protected-consistent": "default_protected_consistent",
 }
 
 
