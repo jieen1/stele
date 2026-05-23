@@ -61,6 +61,16 @@ export type ViolationFix = {
   command?: string;
 };
 
+/**
+ * Agent processing priority. Suggests the order in which agents should
+ * tackle multiple violations from the same check run.
+ *
+ *   "blocking" — must be fixed before continuing (e.g. type-state illegal op)
+ *   "major"    — must be fixed for green CI (default for most violations)
+ *   "minor"    — informational; suppressible without losing correctness
+ */
+export type ViolationPriority = "blocking" | "major" | "minor";
+
 export type Violation = {
   rule_id: string;
   rule_kind: string;
@@ -74,6 +84,54 @@ export type Violation = {
   suppressed_by?: ViolationSuppressionReason;
   fix?: ViolationFix;
   introduced_in?: string;
+
+  // ----- Phase B Round 2 additions (all optional for back-compat) -----
+
+  /**
+   * Agent processing priority. Suggests the order in which agents should
+   * tackle multiple violations from the same check run.
+   *
+   *   "blocking" — must be fixed before continuing (e.g. type-state illegal op)
+   *   "major"    — must be fixed for green CI (default for most violations)
+   *   "minor"    — informational; suppressible without losing correctness
+   *
+   * Default when omitted: "major".
+   */
+  priority?: ViolationPriority;
+
+  /**
+   * Identifier grouping violations that share a root cause. Agents should
+   * consider violations with the same group_id together — fixing one may
+   * require addressing the others.
+   *
+   * Typically: the NodeId of the offending function, or the path of the
+   * offending file. Empty string when the violation is global.
+   *
+   * Default when omitted: "".
+   */
+  group_id?: string;
+
+  /**
+   * Cross-rule reference: other rule_ids that fire on the same root cause.
+   * The agent sees "this is also flagged as trace.X / effect.Y" so it can
+   * plan a unified fix.
+   */
+  also_violates?: readonly string[];
+
+  /**
+   * "Fix rule X and this Y will vanish" — listed rule_ids whose resolution
+   * is *expected* to resolve this one. Useful when a structural fix
+   * cascades (e.g. moving a function may eliminate a trace violation but
+   * preserve an effect violation).
+   */
+  resolves_with?: readonly string[];
+
+  /**
+   * Human-readable note about cross-rule coupling. Surfaces concerns like
+   * "moving this code WILL NOT resolve the trace violations — they follow"
+   * to help agents plan a fix that handles all related rules at once.
+   */
+  cross_rule_note?: string;
 };
 
 export type ViolationInput = Omit<Violation, "fingerprint">;
@@ -152,6 +210,12 @@ export function createViolation(input: ViolationInput): Violation {
     status: input.status ?? "active",
     suppressed_by: input.suppressed_by,
     fix: input.fix === undefined ? undefined : { ...input.fix },
+    // Phase B Round 2 additions — pass through, defensively cloning arrays
+    priority: input.priority,
+    group_id: input.group_id,
+    also_violates: input.also_violates === undefined ? undefined : [...input.also_violates],
+    resolves_with: input.resolves_with === undefined ? undefined : [...input.resolves_with],
+    cross_rule_note: input.cross_rule_note,
   };
 
   return {
@@ -369,6 +433,9 @@ function cloneViolation(violation: Violation): Violation {
     status: violation.status ?? "active",
     suppressed_by: violation.suppressed_by,
     fix: violation.fix === undefined ? undefined : { ...violation.fix },
+    // Phase B Round 2 additions — defensively clone arrays
+    also_violates: violation.also_violates === undefined ? undefined : [...violation.also_violates],
+    resolves_with: violation.resolves_with === undefined ? undefined : [...violation.resolves_with],
   };
 }
 

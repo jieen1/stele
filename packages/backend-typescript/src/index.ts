@@ -25,3 +25,4 @@ export type {
   ArchitectureContractOptions,
   ArchitectureViolation,
 } from "./architecture-runtime.js";
+export * from "./extractors/index.js";

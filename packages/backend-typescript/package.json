@@ -19,14 +19,20 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean && node -e \"import('fs').then(f=>f.default.cpSync('src/runtime','dist/runtime',{recursive:true}))\"",
+    "build": "tsup && node -e \"import('fs').then(f=>f.default.cpSync('src/runtime','dist/runtime',{recursive:true}))\"",
     "prepack": "npm run build",
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
   },
   "dependencies": {
-    "@stele/core": "workspace:*"
+    "@stele/call-graph-core": "workspace:*",
+    "@stele/core": "workspace:*",
+    "@stele/effect-evaluator": "workspace:*",
+    "@stele/type-state-evaluator": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
   },
   "license": "MIT",
   "repository": "github:stelehq/stele",
