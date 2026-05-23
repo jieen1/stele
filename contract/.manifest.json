@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-23T14:09:55.038Z",
+  "generated_at": "2026-05-23T15:06:49.917Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/.gitkeep": {
@@ -8,8 +8,8 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "976fb854eb6fbded4e8049275555787e66657ae2d59da6f1d821509a64bb66fa",
-      "size": 55971
+      "sha256": "e3121ecdb6c2ebf50a27f88e8103b6853d66a13503ce97599ead537cbb3021b4",
+      "size": 61045
     },
     "contract/checker_impls/test_negative.py": {
       "sha256": "e206de90faf8c8bf708edddee213d3528e06407450ac789346007f551e971932",
@@ -28,8 +28,8 @@
       "size": 19809
     },
     "contract/main.stele": {
-      "sha256": "2ac1dde810a089cc5355ccb2162ade91e33d624151360356184977cb7879a566",
-      "size": 12429
+      "sha256": "cc706e3d32dd162ada029bb19bbec593d0e79b416a086bcb088724f290245891",
+      "size": 13088
     },
     "packages/claude-code-plugin/hooks/hooks.json": {
       "sha256": "893e91f1cbd1cde84b0967c3811081405eda8e28a565b7eddcd28e609b358c4f",
@@ -48,8 +48,8 @@
       "size": 1124
     },
     "packages/claude-code-plugin/scripts/pre-tool-protect.js": {
-      "sha256": "166670f5b42d80897d493da5455fb5afc6863075da8f2fd9bf060157601213ee",
-      "size": 16233
+      "sha256": "00ec24cf78a7b112bcd5d9790971fd93ed81b8ed006af01175b91eb91d643ea2",
+      "size": 22896
     },
     "packages/claude-code-plugin/scripts/shell-utils.js": {
       "sha256": "f306212dae5fb55427a0db34f949368f3687f6236467cfd5e648230c83f50768",
@@ -72,13 +72,13 @@
       "size": 30931
     },
     "tests/contract/conftest.py": {
-      "sha256": "180071b48edb5ba48f3184ae9e51033e046345412732773abf5eb4825be8e1b8",
-      "size": 3971
+      "sha256": "370869fc4b10c9176427534bb8b09572e5816192d5806ffa9dacd9441378e39a",
+      "size": 4807
     },
     "tests/contract/test_contract.py": {
-      "sha256": "8acd52352eb27268692beff5a4cae11f8916e07c51856080ad0b60341b57fb37",
-      "size": 7010
+      "sha256": "4b6abe6d5cfb17e751c885565c5fc3665c2dc711649e53a70dd109b07adee515",
+      "size": 7250
     }
   },
-  "contract_hash": "031287349c44d9788847196dc24fdc648c66d809933785be5d9666c1f8f7ecf4"
+  "contract_hash": "045313a26e3cc2aac58cdae3f3a7b1c9cce0892cb6b8ee7f118d04aad87b4e5f"
 }
