@@ -1,19 +1,27 @@
 {
   "version": "1",
-  "generated_at": "2026-05-23T15:06:49.917Z",
+  "generated_at": "2026-05-23T15:49:18.371Z",
   "stele_version": "0.1.0",
   "protected_files": {
+    ".github/workflows/ci.yml": {
+      "sha256": "90efc225315d2a358df5479c1d2663027a6f1b99fef45a5a2adf85dc8a91a00d",
+      "size": 1762
+    },
+    ".github/workflows/publish.yml": {
+      "sha256": "f4bde1e5eb0653685d8669b7bb779b98f4d14a97d6c62e8a07d96b4aab4ca586",
+      "size": 1599
+    },
     "contract/checker_impls/.gitkeep": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "e3121ecdb6c2ebf50a27f88e8103b6853d66a13503ce97599ead537cbb3021b4",
-      "size": 61045
+      "sha256": "0db918a42796c0476b88566b74fecd0a1639a6da88bdee8289f4859d0cdb88a5",
+      "size": 63371
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "e206de90faf8c8bf708edddee213d3528e06407450ac789346007f551e971932",
-      "size": 29293
+      "sha256": "6bd18386d627768f928a59e93dfd1d2b1d34419664d75d26d4af0e5589714fb8",
+      "size": 31883
     },
     "contract/design/manifest.json": {
       "sha256": "58ccf50a8ec98fd5afc68f3bdd74d73f7aee90a8e63d50574a3ff63d09cec427",
@@ -31,9 +39,61 @@
       "sha256": "cc706e3d32dd162ada029bb19bbec593d0e79b416a086bcb088724f290245891",
       "size": 13088
     },
+    "package.json": {
+      "sha256": "4cd157c4a07307f29229c884d4d3c6a1ac08104eaf2f37cc9758ee543eeb46e6",
+      "size": 948
+    },
+    "packages/agent-hooks/package.json": {
+      "sha256": "363ef5da9ee9bbccdf78a5c63194d8a55cabb8c7447038ee49466d9c6fb83ba1",
+      "size": 2468
+    },
+    "packages/architecture-core/package.json": {
+      "sha256": "ce1a7de168989f88eed12029bf49a11b180fa73114a3f1006a9a86b3c5e9e45e",
+      "size": 966
+    },
+    "packages/architecture-core/tsup.config.ts": {
+      "sha256": "cc322c96cb391b993df559bcf18b3155206de28d051542f5c3fda453e487bd68",
+      "size": 233
+    },
+    "packages/backend-go/package.json": {
+      "sha256": "8baabca63da00cb2f772e173ff0ae92f0c49a8986ddf8152bb9a465161629966",
+      "size": 1069
+    },
+    "packages/backend-java/package.json": {
+      "sha256": "563f4ae174855977f3adedd181bc59798f15a76df4d5c1af57388db4d233d8ce",
+      "size": 1073
+    },
+    "packages/backend-python/package.json": {
+      "sha256": "1b6be2aed07b50a00d9295805b7b9b6aa6c4b18981536af6091a175a6c9f211a",
+      "size": 1076
+    },
+    "packages/backend-rust/package.json": {
+      "sha256": "2c83af0b9c4f3621208e5d83aff9692e2e3ed898f0e1ad74635bfd51c4ad7367",
+      "size": 1073
+    },
+    "packages/backend-typescript/package.json": {
+      "sha256": "f53f54bdedea9ec226312aa80e0610714733f202dac2a0a7e3d0587dc8b7a50c",
+      "size": 1225
+    },
+    "packages/backend-typescript/tsup.config.ts": {
+      "sha256": "28dfcc202ec5267e5ca74775153b4bd3c9835c03401b786d945aa55e280a2b0d",
+      "size": 298
+    },
+    "packages/call-graph-core/package.json": {
+      "sha256": "0b7ec008a0cb64e673a928dce8922b72700574883720b02f0f400b13c79eb170",
+      "size": 983
+    },
+    "packages/call-graph-core/tsup.config.ts": {
+      "sha256": "7d88f14072ade759249af9a5e04d929c4b4e07b6ca6a50f9c00e7b851d1d3285",
+      "size": 163
+    },
     "packages/claude-code-plugin/hooks/hooks.json": {
       "sha256": "893e91f1cbd1cde84b0967c3811081405eda8e28a565b7eddcd28e609b358c4f",
       "size": 1604
+    },
+    "packages/claude-code-plugin/package.json": {
+      "sha256": "89cb2e10efe409759dbc1af65ae13b4e9702c804233552681a37fccc37037056",
+      "size": 1113
     },
     "packages/claude-code-plugin/scripts/lifecycle-context.js": {
       "sha256": "671955c70843eeb62c3cfe3e04cff5fb6e34ca1aac92610db0c2ba726b2176c3",
@@ -48,16 +108,80 @@
       "size": 1124
     },
     "packages/claude-code-plugin/scripts/pre-tool-protect.js": {
-      "sha256": "00ec24cf78a7b112bcd5d9790971fd93ed81b8ed006af01175b91eb91d643ea2",
-      "size": 22896
+      "sha256": "57bacf0bed63b17e904266f4ea367fc3797965935da6f24415adb940d0ba7bf0",
+      "size": 23160
     },
     "packages/claude-code-plugin/scripts/shell-utils.js": {
       "sha256": "f306212dae5fb55427a0db34f949368f3687f6236467cfd5e648230c83f50768",
       "size": 3941
     },
     "packages/claude-code-plugin/scripts/stop-validate.js": {
-      "sha256": "597ee7d95ab943fcc0393dc029bbc6c8f698e18add5a695bf10db71a01a41248",
-      "size": 20787
+      "sha256": "edc882000b27afbdbae8fb51c85c4e5e7687a1cbf824fcd0fe9b057661d564ab",
+      "size": 22244
+    },
+    "packages/cli/package.json": {
+      "sha256": "5b0dae678a4ae78e0ea64d7ae8d1aa60209cd049848b5a3184a255e817837788",
+      "size": 2337
+    },
+    "packages/cli/tsup.config.ts": {
+      "sha256": "3c11c53323f211a2f32d9545d185e0fc22b2e90a04957ea1920900471537ce9c",
+      "size": 327
+    },
+    "packages/core/package.json": {
+      "sha256": "942c0af9bf29561012605de7ffe8aaf99c6af2a80eb9040b77f8704849a31649",
+      "size": 1050
+    },
+    "packages/effect-evaluator/package.json": {
+      "sha256": "3c377832a9cef334aacf2616cc33612a7e21a97ebab8a8f0245bd2b9964d41d3",
+      "size": 1117
+    },
+    "packages/effect-evaluator/tsup.config.ts": {
+      "sha256": "f10a04bf77168e095f8e0b624bea0b90c4b10ddc9fa9d4a8fa13d7a15595fe7c",
+      "size": 220
+    },
+    "packages/github-action/package.json": {
+      "sha256": "0ba256cf45763e481c1be5295e210c37cf6f23d53506d7e1d1dc359d165eb384",
+      "size": 1013
+    },
+    "packages/mcp-server/package.json": {
+      "sha256": "08d172ad20db1270dc83221c36e488f2c0baf5ff73260e738adbbeb250089809",
+      "size": 920
+    },
+    "packages/trace-evaluator/package.json": {
+      "sha256": "1dff6b9ef105d94250833303df59e2b0cd67e06fede731f50a602d24ae7e9abc",
+      "size": 1028
+    },
+    "packages/trace-evaluator/tsup.config.ts": {
+      "sha256": "f10a04bf77168e095f8e0b624bea0b90c4b10ddc9fa9d4a8fa13d7a15595fe7c",
+      "size": 220
+    },
+    "packages/type-driven-evaluator/package.json": {
+      "sha256": "350e1cae62b49977d83552018ea81377d8e48ccc00bbe63f84c3cabde827ff20",
+      "size": 997
+    },
+    "packages/type-driven-evaluator/tsup.config.ts": {
+      "sha256": "0c28a5d8d41451ef91fa6bbf8130ba2de294bc962ca9f84dd6e4db641b87b67a",
+      "size": 192
+    },
+    "packages/type-state-evaluator/package.json": {
+      "sha256": "eacafc40681c89926f831a6cc4ccf05de9fa53d48d118a13cb5fa2e5dba51e44",
+      "size": 1091
+    },
+    "packages/type-state-evaluator/tsup.config.ts": {
+      "sha256": "f10a04bf77168e095f8e0b624bea0b90c4b10ddc9fa9d4a8fa13d7a15595fe7c",
+      "size": 220
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "23df7532df4a019956a2d05a9e7da792d37020e92faf7ee34e2dc3d23d9adf03",
+      "size": 112513
+    },
+    "scripts/publish-npm.mjs": {
+      "sha256": "504d955a6f6afdff10699601e808ad2944ebac525afd9d02200675fe2801cf65",
+      "size": 9456
+    },
+    "scripts/verify-packed-adoption.mjs": {
+      "sha256": "1c9925cfa19a508291b73ff314d2ed3a191089e716fe29623e94738ffbf6817c",
+      "size": 13323
     },
     "stele.config.json": {
       "sha256": "fa311c324f2e92fa31de66ffda4cb3e0af512b98e2cebc8c4c1704148ba9d60b",
