@@ -132,6 +132,39 @@ export type Violation = {
    * to help agents plan a fix that handles all related rules at once.
    */
   cross_rule_note?: string;
+
+  /**
+   * Round 3 P1-6: first-class typed propagation evidence for effect
+   * violations. Pre-P1-6 this information was only available as a free-text
+   * rendering inside `cause.detail`. Tooling that wants to walk from a
+   * violation to its root declarer or annotate UIs with the chain should
+   * read these fields directly instead of regexing `cause.detail`.
+   *
+   * Populated only by `@stele/effect-evaluator` violations whose `rule_kind`
+   * is `effect_violation`. Undefined on every other violation kind so the
+   * field stays small in the JSON output.
+   */
+  effect_evidence?: EffectViolationEvidence;
+};
+
+/**
+ * First-class typed evidence for effect violations. Mirrors the
+ * `PropagationEvidence` shape inside `@stele/effect-evaluator` but lives in
+ * the public report schema so non-effect-evaluator consumers (CLI summary
+ * formatter, design tooling, IDE plugins) can read it without depending on
+ * the evaluator package.
+ */
+export type EffectViolationEvidence = {
+  /** The single effect name that triggered the violation. */
+  offending_effect: string;
+  /** Effects declared *on this node* (CDL or source annotation). */
+  direct_effects_on_node: readonly string[];
+  /** Effects inherited from callees only. */
+  inherited_effects: readonly string[];
+  /** Leaf nodes that originally declared `offending_effect`. */
+  propagation_root_nodes: readonly string[];
+  /** Caller → … → declarer, full (uncapped) ordered chain. */
+  propagation_chain: readonly string[];
 };
 
 export type ViolationInput = Omit<Violation, "fingerprint">;
@@ -216,6 +249,17 @@ export function createViolation(input: ViolationInput): Violation {
     also_violates: input.also_violates === undefined ? undefined : [...input.also_violates],
     resolves_with: input.resolves_with === undefined ? undefined : [...input.resolves_with],
     cross_rule_note: input.cross_rule_note,
+    // Round 3 P1-6 — defensively freeze the embedded arrays so consumers
+    // don't accidentally mutate a violation post-creation.
+    effect_evidence: input.effect_evidence === undefined
+      ? undefined
+      : {
+          offending_effect: input.effect_evidence.offending_effect,
+          direct_effects_on_node: [...input.effect_evidence.direct_effects_on_node],
+          inherited_effects: [...input.effect_evidence.inherited_effects],
+          propagation_root_nodes: [...input.effect_evidence.propagation_root_nodes],
+          propagation_chain: [...input.effect_evidence.propagation_chain],
+        },
   };
 
   return {

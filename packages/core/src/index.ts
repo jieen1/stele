@@ -64,6 +64,7 @@ export {
   formatViolationReportJson,
 } from "./report/format.js";
 export type {
+  EffectViolationEvidence,
   ExplainTrace,
   FailureWitness,
   FailureWitnessOperator,
@@ -81,6 +82,10 @@ export type {
   ViolationSuppressionReason,
   ViolationSource,
 } from "./report/types.js";
+export {
+  annotateCrossRuleViolations,
+} from "./report/cross-rule.js";
+
 export {
   buildFailureWitness,
   buildViolationFingerprint,
