@@ -5,6 +5,7 @@ import type { Context, DesignProfile } from "../../design-profile/types.js";
 import { profilePathExists } from "../../design-profile/load.js";
 import { validateProfile } from "../../design-profile/validate.js";
 import { runDesignGenerate } from "./generate.js";
+import { runDesignApprove } from "./approve.js";
 
 const DEFAULT_PROFILE_PATH = "contract/design/profile.yaml";
 
@@ -304,21 +305,52 @@ export async function runDesignInit(
     );
   }
 
-  // 8. Run generate if requested. `stele design init --generate` is an
-  // interactive bootstrap path where the user has just answered the design
-  // questionnaire — that authors the profile. We carry that authorship
-  // forward to the generate step via force+reason. The Round 3 P0-4 gate
-  // (which protects routine `stele design generate` against silent
-  // contract overwrites) is intentionally bypassed here because the
-  // human is the one who just declared intent.
+  // 8. Run generate if requested.
+  //
+  // Round 4 D-03: previously this hard-coded `force: true` so init could
+  // generate without an approval record. That was a second P0-4 bypass —
+  // any agent running `stele design init --generate` via Bash created
+  // contract files unilaterally. The new behaviour:
+  //
+  //   - In a TTY (the real human bootstrap case), mint a real approval
+  //     record via the same code path `stele design approve` uses, then
+  //     run `runDesignGenerate` with NO override. The approval record is
+  //     attributable, lives in `contract/design/approvals/`, and survives
+  //     re-running `stele design generate` later.
+  //   - Outside a TTY (agent / CI), refuse with a clear message pointing
+  //     at the propose-and-approve flow. CI that needs a bootstrap can
+  //     set `STELE_APPROVED_BY=<service-account>` env var, which the
+  //     downstream `runDesignApprove` honours.
   if (opts.generate) {
-    await runDesignGenerate(
+    if (opts.dryRun) {
+      // Dry-run skips the approval flow — no file writes happen anyway.
+      await runDesignGenerate({ dryRun: true }, projectDir);
+      return;
+    }
+    const isHumanContext =
+      process.stdin.isTTY === true ||
+      (typeof process.env.STELE_APPROVED_BY === "string" &&
+        process.env.STELE_APPROVED_BY.trim().length > 0);
+    if (!isHumanContext) {
+      process.stderr.write(
+        "[design:init] --generate requires an interactive TTY or STELE_APPROVED_BY env var.\n" +
+          "[design:init] Run it interactively, or set STELE_APPROVED_BY=<human-or-service-account-id> before invoking.\n" +
+          "[design:init] Without one of these, the approval record gating stele design generate would be unattributable.\n",
+      );
+      process.exitCode = 1;
+      return;
+    }
+    // Mint the bootstrap approval first so generate sees it.
+    await runDesignApprove(
       {
-        dryRun: opts.dryRun,
-        force: true,
         reason: `stele design init --generate (preset: ${opts.preset ?? "unspecified"})`,
       },
       projectDir,
     );
+    if (process.exitCode === 1) {
+      // runDesignApprove already wrote a stderr explanation; do not generate.
+      return;
+    }
+    await runDesignGenerate({ dryRun: opts.dryRun }, projectDir);
   }
 }

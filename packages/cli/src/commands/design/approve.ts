@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import * as yaml from "js-yaml";
 
@@ -13,12 +14,52 @@ export type DesignApproveOptions = {
   reason?: string;
 };
 
+/**
+ * Round 4 D-02: human-identity gate. `stele design approve` writes the
+ * approval record that gates `stele design generate`. If anyone running
+ * the CLI can mint approvals, the entire P0-4 design gate is rubber-
+ * stampable. We require BOTH:
+ *
+ *   - An interactive TTY (`process.stdin.isTTY === true`), OR
+ *   - An explicit `STELE_APPROVED_BY` env var with a non-empty value that
+ *     does NOT match the default values an agent's shell would inherit
+ *     (CLAUDE_SESSION_ID, USER, USERNAME). The env var must be set by a
+ *     human who deliberately authorized this CLI invocation.
+ *
+ * The `approved_by` field on the written approval record is sourced from
+ * the env-var (if present) or defaults to "tty:<USER>" — never from the
+ * Claude session id alone.
+ */
+function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; reason: string } {
+  const explicit = process.env.STELE_APPROVED_BY;
+  if (typeof explicit === "string" && explicit.trim().length > 0) {
+    return { ok: true, approvedBy: explicit.trim() };
+  }
+  if (process.stdin.isTTY) {
+    const user = process.env.USER ?? process.env.USERNAME ?? "unknown";
+    return { ok: true, approvedBy: `tty:${user}` };
+  }
+  return {
+    ok: false,
+    reason:
+      "stele design approve requires either an interactive TTY OR the STELE_APPROVED_BY env var set to a non-empty human-identifying value. " +
+      "An agent invocation via Bash without one of these is refused; the approval would be unattributable.",
+  };
+}
+
 export async function runDesignApprove(
   opts: DesignApproveOptions,
   projectDir: string = process.cwd(),
 ): Promise<void> {
   if (!opts.reason) {
     process.stderr.write("[design] --reason is required\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  const approverResult = resolveApprovedBy();
+  if (!approverResult.ok) {
+    process.stderr.write(`[design] ${approverResult.reason}\n`);
     process.exitCode = 1;
     return;
   }
@@ -84,7 +125,9 @@ export async function runDesignApprove(
     affected_generated_rules: manifest?.generatedRules.map((r) => r.ruleId) ?? [],
     affected_source_scope: affectedSourceScope,
     reason: opts.reason,
-    approved_by: process.env.CLAUDE_SESSION_ID ?? process.env.USER ?? process.env.USERNAME ?? "human",
+    // Round 4 D-02: approved_by comes from the human-identity gate above,
+    // not from CLAUDE_SESSION_ID / USER env defaults an agent inherits.
+    approved_by: approverResult.approvedBy,
     approved_at: new Date().toISOString(),
   };
 
@@ -99,9 +142,12 @@ export async function runDesignApprove(
  * Returns null if no previous profile can be found.
  */
 function loadPreviousApprovedProfile(projectDir: string): DesignProfile | null {
+  // Round 4 D-14: replace require() calls with top-of-file ESM imports
+  // (readdirSync + execFileSync). The legacy code threw at runtime under
+  // strict ESM if this fallback path was taken.
   const approvalsDir = resolve(projectDir, "contract/design/approvals");
   try {
-    const entries = require("node:fs").readdirSync(approvalsDir).filter((f: string) => f.endsWith(".json"));
+    const entries = readdirSync(approvalsDir).filter((f: string) => f.endsWith(".json"));
     if (entries.length === 0) return null;
 
     entries.sort();
@@ -116,7 +162,6 @@ function loadPreviousApprovedProfile(projectDir: string): DesignProfile | null {
     // Try to get old profile from git HEAD
     const profilePath = "contract/design/profile.yaml";
     try {
-      const { execFileSync } = require("node:child_process");
       const oldContent = execFileSync("git", ["show", `HEAD:${profilePath}`], {
         cwd: projectDir,
         encoding: "utf8",

@@ -369,15 +369,62 @@ describe("design init --preset validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("design init --generate", () => {
-  it("runs design generate after init when --generate is set", async () => {
+  it("runs design generate after init when --generate is set + STELE_APPROVED_BY env is set (Round 4 D-03)", async () => {
     const dir = await createTempDir();
     const stdout = captureStdout();
 
-    await runDesignInit({ preset: "ddd-typedriven", generate: true }, dir);
+    const previousApprover = process.env.STELE_APPROVED_BY;
+    process.env.STELE_APPROVED_BY = "test-fixture";
+    try {
+      await runDesignInit({ preset: "ddd-typedriven", generate: true }, dir);
+    } finally {
+      if (previousApprover === undefined) {
+        delete process.env.STELE_APPROVED_BY;
+      } else {
+        process.env.STELE_APPROVED_BY = previousApprover;
+      }
+    }
 
     const output = stdout.read();
     expect(output).toContain("Created");
     expect(output).toContain("Generated");
+  });
+
+  it("refuses --generate when there's no TTY and no STELE_APPROVED_BY (Round 4 D-03)", async () => {
+    const dir = await createTempDir();
+    const previousExit = process.exitCode;
+    process.exitCode = 0;
+    const previousApprover = process.env.STELE_APPROVED_BY;
+    delete process.env.STELE_APPROVED_BY;
+    const stderr = (() => {
+      const original = process.stderr.write.bind(process.stderr);
+      const lines: string[] = [];
+      process.stderr.write = ((chunk: string | Uint8Array) => {
+        lines.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+        return true;
+      }) as typeof process.stderr.write;
+      return {
+        lines,
+        restore: () => {
+          process.stderr.write = original;
+        },
+      };
+    })();
+    captureStdout();
+    try {
+      await runDesignInit({ preset: "ddd-typedriven", generate: true }, dir);
+    } finally {
+      stderr.restore();
+      if (previousApprover !== undefined) {
+        process.env.STELE_APPROVED_BY = previousApprover;
+      }
+    }
+
+    const captured = stderr.lines.join("");
+    const exit = process.exitCode;
+    process.exitCode = previousExit;
+    expect(exit).toBe(1);
+    expect(captured).toContain("STELE_APPROVED_BY");
   });
 });
 
