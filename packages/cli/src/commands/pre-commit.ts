@@ -94,7 +94,7 @@ export async function maybeInstallPreCommit(projectRoot: string): Promise<void> 
 async function loadTemplate(): Promise<PreCommitConfig> {
   const templatePath = await locateTemplate();
   const raw = await fs.readFile(templatePath, "utf-8");
-  const parsed = yaml.load(raw);
+  const parsed = yaml.load(raw, { schema: yaml.JSON_SCHEMA });
   if (parsed == null || typeof parsed !== "object") {
     throw new Error(`Internal error: bundled ${TEMPLATE_FILE} is empty or not an object.`);
   }
@@ -138,7 +138,7 @@ async function readOptionalConfig(configPath: string): Promise<PreCommitConfig |
     return {};
   }
 
-  const parsed = yaml.load(raw);
+  const parsed = yaml.load(raw, { schema: yaml.JSON_SCHEMA });
   if (parsed == null || typeof parsed !== "object") {
     return {};
   }

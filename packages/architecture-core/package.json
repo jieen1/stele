@@ -24,7 +24,8 @@
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false"
   },
   "dependencies": {
-    "@stele/core": "workspace:*"
+    "@stele/core": "workspace:*",
+    "minimatch": "^10.0.0"
   },
   "peerDependencies": {
     "typescript": ">=5.0.0"

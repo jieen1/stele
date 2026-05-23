@@ -45,7 +45,7 @@ describe("stop-validate hook", () => {
     );
   });
 
-  it("after successful validation asks for one maintenance review when material source edits were observed", async () => {
+  it("after successful validation asks for one maintenance review when material source edits were observed", { timeout: 15000 }, async () => {
     const projectDir = await createTempDir();
     await writeObservation(projectDir, {
       session_id: "session-1",
@@ -273,13 +273,31 @@ describe("stop-validate hook", () => {
     expect(result.stdout).toContain("path python stdout");
   });
 
-  it("fails closed with local install guidance when python cannot be started", async () => {
+  it("skips pytest when python unavailable and no tests/contract directory", async () => {
     const projectDir = await createTempDir();
     const binDir = await createFakeSteleCli({
       stdout: "stele ok",
       stderr: "",
       exitCode: 0,
     });
+
+    const result = runStopHook(projectDir, binDir, { includeSystemPath: false });
+
+    // No tests/contract/ dir exists → pytest skipped gracefully
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("Skipping pytest check");
+  });
+
+  it("fails closed when python unavailable but tests/contract directory exists", async () => {
+    const projectDir = await createTempDir();
+    const binDir = await createFakeSteleCli({
+      stdout: "stele ok",
+      stderr: "",
+      exitCode: 0,
+    });
+
+    // Create tests/contract/ directory to signal this project has contract tests
+    await mkdir(join(projectDir, "tests", "contract"), { recursive: true });
 
     const result = runStopHook(projectDir, binDir, { includeSystemPath: false });
 

@@ -3,7 +3,7 @@
 
 import { statSync, readdirSync } from "node:fs";
 import { minimatch } from "minimatch";
-import { resolve, relative, isAbsolute } from "node:path";
+import { resolve, relative } from "node:path";
 
 import { hashFile } from "../design-profile/hash.js";
 import { readManifest, type GenerationManifest, type GeneratedFileEntry } from "./manifest.js";

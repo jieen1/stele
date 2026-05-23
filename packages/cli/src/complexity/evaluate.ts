@@ -7,6 +7,8 @@ import {
   countPublicMethods,
   computeMaxCyclomaticComplexity,
   findClassByName,
+  findFunctionByName,
+  findInterfaceByName,
 } from "./typescript-metrics.js";
 import * as ts from "typescript";
 
@@ -100,10 +102,11 @@ type RawMetricValues = {
 
 /**
  * Collect raw metric values from a TypeScript source file using the compiler API.
+ * Supports class, function, and interface targets.
  */
 async function collectMetrics(
   filePath: string,
-  className: string,
+  symbolName: string,
 ): Promise<RawMetricValues> {
   try {
     const text = readFileSync(filePath, "utf8");
@@ -120,20 +123,117 @@ async function collectMetrics(
       compilerOptions.target ?? ts.ScriptTarget.Latest,
     );
 
-    const classNode = findClassByName(sourceFile, className);
-
-    if (classNode === undefined) {
-      return { sloc: -1, publicMethodCount: -1, maxCyclomatic: -1 };
+    // Try class first (has SLOC/public-method/cyclomatic metrics)
+    const classNode = findClassByName(sourceFile, symbolName);
+    if (classNode !== undefined) {
+      const sloc = countSLOC(text, classNode);
+      const publicMethodCount = countPublicMethods(classNode);
+      const maxCyclomatic = computeMaxCyclomaticComplexity(classNode);
+      return { sloc, publicMethodCount, maxCyclomatic };
     }
 
-    const sloc = countSLOC(text, classNode);
-    const publicMethodCount = countPublicMethods(classNode);
-    const maxCyclomatic = computeMaxCyclomaticComplexity(classNode);
+    // Try function declaration or variable (countSLOC for functions uses the whole function body)
+    const funcNode = findFunctionByName(sourceFile, symbolName);
+    if (funcNode !== undefined) {
+      const sloc = countSLOCForFunction(text, funcNode);
+      const maxCyclomatic = computeMaxCyclomaticForFunction(funcNode);
+      return { sloc, publicMethodCount: 0, maxCyclomatic };
+    }
 
-    return { sloc, publicMethodCount, maxCyclomatic };
+    // Try interface (only SLOC is meaningful for interfaces)
+    const ifaceNode = findInterfaceByName(sourceFile, symbolName);
+    if (ifaceNode !== undefined) {
+      const sloc = countSLOCForInterface(text, ifaceNode);
+      return { sloc, publicMethodCount: 0, maxCyclomatic: 0 };
+    }
+
+    return { sloc: -1, publicMethodCount: -1, maxCyclomatic: -1 };
   } catch {
     return { sloc: 0, publicMethodCount: 0, maxCyclomatic: 0 };
   }
+}
+
+/**
+ * Count SLOC for a function declaration or variable.
+ */
+function countSLOCForFunction(source: string, node: ts.Node): number {
+  const start = (node as any).getStartPosition?.() ?? (node as any).getStart?.() ?? 0;
+  const end = (node as any).getEnd?.() ?? source.length;
+  const fnText = source.slice(start, end);
+  const lines = fnText.split("\n");
+  let count = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) continue;
+    count++;
+  }
+  return count;
+}
+
+/**
+ * Compute cyclomatic complexity for a function.
+ */
+function computeMaxCyclomaticForFunction(node: ts.Node): number {
+  if (ts.isFunctionDeclaration(node) && node.body) {
+    return computeFunctionCyclomatic(node.body);
+  }
+  if (ts.isVariableDeclaration(node) && node.initializer) {
+    const init: ts.Node = node.initializer;
+    if (ts.isArrowFunction(init)) {
+      if (ts.isBlock(init.body)) {
+        return computeFunctionCyclomatic(init.body);
+      }
+      return 2;
+    }
+    if (ts.isFunctionExpression(init)) {
+      if (ts.isBlock(init.body)) {
+        return computeFunctionCyclomatic(init.body);
+      }
+      return 1;
+    }
+  }
+  return 1;
+}
+
+function computeFunctionCyclomatic(node: ts.Node): number {
+  let complexity = 1;
+
+  const visit = (n: ts.Node): void => {
+    if (ts.isIfStatement(n) || ts.isForStatement(n) || ts.isForOfStatement(n) ||
+        ts.isWhileStatement(n) || ts.isCatchClause(n) || ts.isConditionalExpression(n) ||
+        ts.isCaseClause(n)) {
+      complexity++;
+    }
+    if (ts.isBinaryExpression(n)) {
+      const op = n.operatorToken;
+      if (op.kind === ts.SyntaxKind.AmpersandAmpersandToken || op.kind === ts.SyntaxKind.BarBarToken) {
+        complexity++;
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+
+  ts.forEachChild(node, visit);
+  return complexity;
+}
+
+/**
+ * Count SLOC for an interface declaration.
+ */
+function countSLOCForInterface(source: string, node: ts.Node): number {
+  const start = (node as any).getStartPosition?.() ?? (node as any).getStart?.() ?? 0;
+  const end = (node as any).getEnd?.() ?? source.length;
+  const ifaceText = source.slice(start, end);
+  const lines = ifaceText.split("\n");
+  let count = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) continue;
+    count++;
+  }
+  return count;
 }
 
 // ----------------------------------------------------------------

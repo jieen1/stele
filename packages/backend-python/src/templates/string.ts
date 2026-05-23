@@ -1,4 +1,3 @@
-import { type ListNode } from "@stele/core";
 import type { PythonOperatorHandler } from "../translator.js";
 
 export const stringOperatorHandlers: Record<string, PythonOperatorHandler> = {

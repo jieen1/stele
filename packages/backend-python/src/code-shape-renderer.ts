@@ -1,15 +1,11 @@
 import { type CodeShapeDeclaration } from "@stele/core";
 import { CODE_SHAPE_RUNTIME_HELPERS } from "./types.js";
-import { parseCodeShapeTarget, fileToModulePath, codeShapeTestPrefix } from "./code-shape-target.js";
+import { codeShapeTestPrefix } from "./code-shape-target.js";
 import { renderCodeShapeTest } from "./code-shape-renderers.js";
 import { allocateUniquePythonName, sanitizePythonIdentifier } from "./translation-utils.js";
 
 // Re-exported from extracted modules
-export {
-  parseCodeShapeTarget,
-  fileToModulePath,
-  codeShapeTestPrefix,
-} from "./code-shape-target.js";
+export { codeShapeTestPrefix, parseCodeShapeTarget, fileToModulePath } from "./code-shape-target.js";
 export { renderCodeShapeTest } from "./code-shape-renderers.js";
 
 // ---------------------------------------------------------------------------

@@ -121,10 +121,11 @@ export type DddSection = {
 // ---------------------------------------------------------------------------
 
 export type BrandedId = {
-  id: string;
+  id?: string;
+  name?: string;
   decision_ref?: string;
-  type_name: string;
-  type_target: string;
+  type_name?: string;
+  type_target?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -132,10 +133,11 @@ export type BrandedId = {
 // ---------------------------------------------------------------------------
 
 export type SmartConstructor = {
-  id: string;
+  id?: string;
+  name?: string;
   decision_ref?: string;
-  class_target: string;
-  factory_methods: string[];
+  class_target?: string;
+  factory_methods?: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -187,7 +189,16 @@ export type ToolchainContracts = {
     format: string;
     rules: string[];
     command?: string;
+    warning_is_error?: boolean;
   };
+};
+
+// ---------------------------------------------------------------------------
+// Self Constraints (for Stele's own strict self-check)
+// ---------------------------------------------------------------------------
+
+export type SelfConstraints = {
+  no_baseline?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -205,4 +216,5 @@ export type DesignProfile = {
   ddd?: DddSection;
   type_driven?: TypeDrivenSection;
   toolchain_contracts?: ToolchainContracts;
+  self_constraints?: SelfConstraints;
 };

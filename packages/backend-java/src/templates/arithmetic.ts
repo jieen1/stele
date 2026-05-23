@@ -1,4 +1,4 @@
-import type { AstNode, ListNode } from "@stele/core";
+import type { ListNode } from "@stele/core";
 import { SteleError } from "@stele/core";
 import type { JavaExpressionTranslator, JavaOperatorHandler, TranslationContext } from "./comparison.js";
 

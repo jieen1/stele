@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "f6d9634c7a808dab6c7c6eff1c8d20515ece0bee0b0e94004298fb5eb447f298",
+  "profileHash": "d882dc2041aabcfcc95605d69f32858836325577b8938495726d4e4d087a615c",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "922243ec4ada13811327808f77e0e95b91a1738c"
+    "git_sha": "ab006b831b3320c9b95246f5025774e684bbfabf"
   },
   "templates": [
     "ddd-typedriven"
@@ -65,8 +65,8 @@
           "context_name": "Backends-ts"
         }
       ],
-      "fileHash": "bedbd1b5632f0622c47646e9606a072259c9f60eba847d8ecb101d0ed3b97bdc",
-      "cdl": "(architecture \"ddd-backends-ts\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.\")\n\n  (module backends-ts-domain\n    (path \"packages/backend-typescript/src\"))\n\n  (layer domain backends-ts-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "cd7c57d9c8f3834c377ba54bf5d0914f8a9da58e18eb194f403fa11350cffdd1",
+      "cdl": "(architecture \"ddd-backends-ts\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.\")\n\n  (module backends-ts-domain\n    (path \"packages/backend-typescript/src/**\"))\n\n  (layer domain backends-ts-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-backends-py",
@@ -79,8 +79,8 @@
           "context_name": "Backends-py"
         }
       ],
-      "fileHash": "e4abc9173b0a65151a2e035a0626a6f0a686a04d9ce4c57e9108581ce41460cc",
-      "cdl": "(architecture \"ddd-backends-py\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.\")\n\n  (module backends-py-domain\n    (path \"packages/backend-python/src\"))\n\n  (layer domain backends-py-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "d4bc431017d9aafbda10dc2a38a129662756f55d00479dbf3d338584caf022d6",
+      "cdl": "(architecture \"ddd-backends-py\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.\")\n\n  (module backends-py-domain\n    (path \"packages/backend-python/src/**\"))\n\n  (layer domain backends-py-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-hooks",
@@ -134,8 +134,8 @@
           "decision_id": "q1-bounded-contexts"
         }
       ],
-      "fileHash": "5f4f803cb0a70f08d08c2434e39d58380087b22516e74a1a62bee327cdd07ba4",
-      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n    (path \"packages/agent-hooks/src/{install,util}/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{server,sessions,types}/**\")\n    (path \"packages/mcp-server/src/{bin,tools}/**\")\n  )\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin,tools}/**\"))\n\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
+      "fileHash": "d503224e9d74489c0fc8519b477f7862aae5a28b4b1088aa79c649979a00593e",
+      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src/**\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src/**\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{server,sessions,types}/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin,tools}/**\"))\n\n  (allow-dependency hooks-internal hooks-infrastructure)\n  (allow-dependency mcp-internal mcp-infrastructure)\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
     },
     {
       "ruleId": "core-node.core-operator-registry-aggregate",
@@ -268,17 +268,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-20T12:41:33.001Z",
+  "generatedAt": "2026-05-22T05:56:13.143Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "21b25d036e5905e47b631ac7a553327dfc26c07f7da3f2e0cc38f30e52df5e13"
+      "hash": "cf78d84143956193aa4d8be3664d5bed62ca30712bbf46c40d4c0f519863009f"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "21b25d036e5905e47b631ac7a553327dfc26c07f7da3f2e0cc38f30e52df5e13",
+      "sha256": "cf78d84143956193aa4d8be3664d5bed62ca30712bbf46c40d4c0f519863009f",
       "rules": [
         {
           "id": "architecture.ddd-core",

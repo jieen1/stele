@@ -85,6 +85,7 @@ export function readPathPart(node: AstNode): string {
 // Checker args encoding
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function encodeCheckerArgs(args: AstNode[], _context: TranslationContext): string {
   if (args.length === 0) {
     return "{}";

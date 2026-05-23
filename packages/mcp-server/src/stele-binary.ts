@@ -17,10 +17,13 @@ let cachedBinary: string | null = null;
 let cachedCwd: string | null = null;
 let cachedMtime: number | null = null;
 
+/** Maximum size for single file read (1 MB). */
+const MAX_FILE_READ_SIZE = 1024 * 1024;
+
 /** Default options for stele CLI execution. */
 const DEFAULT_EXEC_OPTIONS: { encoding: BufferEncoding; maxBuffer: number } = {
   encoding: "utf8",
-  maxBuffer: 1024 * 1024,
+  maxBuffer: MAX_FILE_READ_SIZE,
 };
 
 /** Default timeout for CLI invocations (30 seconds). */

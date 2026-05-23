@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { join } from "node:path";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as os from "node:os";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const STELE = join(__dirname, "..", "dist", "index.js");
 
 describe("e2e workflow", () => {
@@ -21,7 +21,7 @@ describe("e2e workflow", () => {
 
   async function run(args: string[]): Promise<{ stdout: string; stderr: string; code: number | null }> {
     try {
-      const result = await execAsync(`node ${STELE} ${args.join(" ")}`, { cwd: tmpDir, timeout: 30000 });
+      const result = await execFileAsync(process.execPath, [STELE, ...args], { cwd: tmpDir, timeout: 30000 });
       return { stdout: result.stdout, stderr: result.stderr, code: 0 };
     } catch (error: any) {
       return {

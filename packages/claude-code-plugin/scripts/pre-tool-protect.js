@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { matchProtectedPath } from "@stele/agent-hooks";
 import { TARGET_KEYS } from "./path-utils.js";
@@ -29,8 +30,20 @@ const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
 const DEFAULT_PROTECTED = [
   "contract/**/*.stele",
   "contract/checker_impls/**/*",
+  "contract/design/**/*",
+  "contract/design/proposals/**/*",
+  "contract/generated/**/*",
+  "contract/.baseline.json",
   "contract/.manifest.json",
   "tests/contract/**/*",
+  // Hook scripts - security-critical, must not be editable by agents
+  "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+  "packages/claude-code-plugin/scripts/stop-validate.js",
+  "packages/claude-code-plugin/scripts/observation-hook.js",
+  "packages/claude-code-plugin/scripts/lifecycle-context.js",
+  "packages/claude-code-plugin/hooks/hooks.json",
+  // Config files - protect against tampering
+  "stele.config.json",
 ];
 
 try {
@@ -208,7 +221,7 @@ function extractBashCommand(payload) {
 }
 
 function isBashPayload(payload) {
-  return isObject(payload) && typeof payload.tool_name === "string" && payload.tool_name === "Bash";
+  return isObject(payload) && typeof payload.tool_name === "string" && payload.tool_name.toLowerCase() === "bash";
 }
 
 function extractCommandFromValue(value, seen) {
@@ -530,12 +543,10 @@ function resolveSessionId(payload) {
 }
 
 async function fileExists(filePath) {
-  try {
-    await readFile(filePath, "utf8");
-    return true;
-  } catch {
-    return false;
-  }
+  return await access(filePath, constants.F_OK).then(
+    () => true,
+    () => false,
+  );
 }
 
 function safeFileName(value) {

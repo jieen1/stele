@@ -4,7 +4,7 @@ import {
   type HumanState,
   type VerificationResult,
 } from "@stele/core";
-import { STELE_BASELINE_FILE, STELE_CONFIG_FILE } from "../config/defaults.js";
+import { STELE_CONFIG_FILE } from "../config/defaults.js";
 
 /**
  * Create a violation for generated file drift.

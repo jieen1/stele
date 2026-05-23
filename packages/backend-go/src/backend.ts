@@ -43,6 +43,7 @@ const backend: LanguageBackend = {
 
     return files;
   },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   supportFiles(_contract, _config) {
     return [];
   },

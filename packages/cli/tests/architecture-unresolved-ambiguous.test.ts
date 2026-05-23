@@ -64,11 +64,11 @@ async function loadAndEvaluate(projectDir: string): Promise<Awaited<ReturnType<t
 // ---------------------------------------------------------------------------
 
 describe("evaluateArchitectureContract — unresolved import visibility", () => {
-  it("reports unresolved specifiers as violations (not silently passing)", async () => {
+  it("treats imports to unowned files as external dependencies (silently skipped)", async () => {
     const projectDir = await createTempDir();
     writeConfig(projectDir);
 
-    // Contract: api can depend on core, but NOT on external
+    // Contract: api can depend on core
     writeContract(projectDir, `(architecture "test-arch"
   (lang typescript)
   (module api (path "src/api/**"))
@@ -77,7 +77,7 @@ describe("evaluateArchitectureContract — unresolved import visibility", () => 
 )`);
 
     // api imports from a path outside any declared module
-    // The file exists but is NOT in any module, so it's unresolved
+    // The file exists but is NOT in any module → treated as external dependency
     const srcPath = join(projectDir, "src/api/handler.ts");
     mkdirSync(join(projectDir, "src/api"), { recursive: true });
     writeFileSync(
@@ -98,14 +98,13 @@ describe("evaluateArchitectureContract — unresolved import visibility", () => 
 
     const violations = await loadAndEvaluate(projectDir);
 
-    // Should have unresolved specifier violations
-    // (The import resolves to a file outside any declared module)
+    // Imports to files outside any declared module are silently skipped
+    // (treated as cross-architecture / external dependencies)
     const unresolved = violations.filter((v) => v.specifier.startsWith("unresolved:"));
-    expect(unresolved.length).toBeGreaterThanOrEqual(1);
+    expect(unresolved.length).toBe(0);
 
-    // The unresolved violation should reference the external import
-    expect(unresolved[0].specifier).toContain("external/external");
-    expect(unresolved[0].fromFile).toContain("api/handler");
+    // No violations because the external import is outside the architecture's scope
+    expect(violations.length).toBe(0);
   });
 });
 

@@ -1,16 +1,12 @@
 import { readdir } from "node:fs/promises";
-import { readFileSync, existsSync } from "node:fs";
-import { dirname, join as pathJoin } from "node:path";
-import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
 import {
   ComplexityMeasureOutput,
   ComplexitySuggestOutput,
-  getMetricStatus,
-  parseCoreNodeTarget,
-  type CoreNodeMeasurement,
   type SuggestCandidate,
 } from "../complexity/types.js";
-import { evaluateCoreNodes, evaluateCoreNode } from "../complexity/evaluate.js";
+import { evaluateCoreNodes } from "../complexity/evaluate.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { loadContract } from "@stele/core";
 
@@ -71,6 +67,7 @@ export async function runComplexitySuggest(projectDir: string, options: Complexi
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function discoverCandidates(projectDir: string, _config: { targetLanguage?: string }): Promise<SuggestCandidate[]> {
   const sourceFiles: string[] = [];
   await walkTypeScriptFiles(projectDir, sourceFiles);
@@ -191,13 +188,13 @@ function tryResolveSpecifier(projectDir: string, fromFile: string, specifier: st
     return undefined;
   }
   const dir = dirname(fromFile);
-  const resolved = pathJoin(dir, specifier);
+  const resolved = join(dir, specifier);
   if (existsSync(resolved)) return resolved;
   for (const ext of [".ts", ".tsx", ".js"]) {
     const candidate = resolved + ext;
     if (existsSync(candidate)) return candidate;
   }
-  const indexTs = pathJoin(resolved, "index.ts");
+  const indexTs = join(resolved, "index.ts");
   if (existsSync(indexTs)) return indexTs;
   return undefined;
 }
@@ -205,7 +202,8 @@ function tryResolveSpecifier(projectDir: string, fromFile: string, specifier: st
 /**
  * Extract class declarations from TypeScript source text.
  */
-function extractClassInfo(text: string, filePath: string): Array<{ name: string; sloc: number; publicMethodCount: number }> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function extractClassInfo(text: string, _filePath: string): Array<{ name: string; sloc: number; publicMethodCount: number }> {
   const classes: Array<{ name: string; sloc: number; publicMethodCount: number }> = [];
   const lines = text.split("\n");
 

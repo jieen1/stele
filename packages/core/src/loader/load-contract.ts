@@ -78,7 +78,7 @@ async function loadRecursive(
       // Import containment: reject imports that escape the project directory
       const resolved = resolve(projectDir, declaration.resolvedPath);
       const relPath = relative(projectDir, resolved);
-      if (relPath.startsWith("../") || isAbsolute(relPath)) {
+      if (relPath.startsWith("../") || relPath.startsWith("..\\") || isAbsolute(relPath)) {
         throw new SteleError(
           "E0204",
           "Loader Error",
@@ -128,7 +128,7 @@ async function readContractFile(filePath: string): Promise<string> {
 function safeFilePath(filePath: string): string {
   try {
     const rel = relative(process.cwd(), filePath);
-    if (rel.startsWith("..")) {
+    if (rel.startsWith("..") || rel.startsWith("..\\")) {
       // Outside cwd — return just the basename
       return filePath.split(/[\\/]/).pop() ?? filePath;
     }

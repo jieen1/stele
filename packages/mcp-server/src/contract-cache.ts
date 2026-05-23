@@ -91,7 +91,7 @@ function scanSteleFilesInternal(directory: string, depth: number): string[] {
       }
     }
   } catch {
-    console.error("[stele] Failed to scan contract directory");
+    // Scan failure is non-fatal — return partial results
   }
 
   return results.sort();
@@ -191,8 +191,8 @@ export function getProtectedPatterns(projectDir: string): string[] {
     if (config?.protected && Array.isArray(config.protected)) {
       return config.protected;
     }
-  } catch (err) {
-    console.error("[stele] Failed to parse project config");
+  } catch {
+    // Config parse failure — fall back to defaults
   }
 
   return [...DEFAULT_PROTECTED_PATTERNS];
@@ -231,8 +231,8 @@ export async function parseContractFromFile(filePath: string): Promise<ParsedCon
       } satisfies ParsedInvariant);
     }
     return { invariants, checkers: [] };
-  } catch (err) {
-    console.error("[stele] Failed to parse contract file");
+  } catch {
+    // Parse failure — return empty contract
     return { invariants: [], checkers: [] };
   }
 }

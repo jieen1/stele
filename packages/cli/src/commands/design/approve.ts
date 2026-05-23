@@ -46,7 +46,7 @@ export async function runDesignApprove(
     try {
       const fromPath = resolve(projectDir, opts.from);
       const raw = readFileSync(fromPath, "utf8");
-      oldProfile = yaml.load(raw) as DesignProfile;
+      oldProfile = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as DesignProfile;
     } catch {
       process.stderr.write(`[design] Could not read previous profile at ${opts.from}\n`);
     }
@@ -84,7 +84,7 @@ export async function runDesignApprove(
     affected_generated_rules: manifest?.generatedRules.map((r) => r.ruleId) ?? [],
     affected_source_scope: affectedSourceScope,
     reason: opts.reason,
-    approved_by: "human",
+    approved_by: process.env.CLAUDE_SESSION_ID ?? process.env.USER ?? process.env.USERNAME ?? "human",
     approved_at: new Date().toISOString(),
   };
 
@@ -116,12 +116,12 @@ function loadPreviousApprovedProfile(projectDir: string): DesignProfile | null {
     // Try to get old profile from git HEAD
     const profilePath = "contract/design/profile.yaml";
     try {
-      const { execSync } = require("node:child_process");
-      const oldContent = execSync(`git show HEAD:${profilePath}`, {
+      const { execFileSync } = require("node:child_process");
+      const oldContent = execFileSync("git", ["show", `HEAD:${profilePath}`], {
         cwd: projectDir,
         encoding: "utf8",
       });
-      return yaml.load(oldContent) as DesignProfile;
+      return yaml.load(String(oldContent), { schema: yaml.JSON_SCHEMA }) as DesignProfile;
     } catch {
       return null;
     }

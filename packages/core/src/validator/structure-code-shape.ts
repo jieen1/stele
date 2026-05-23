@@ -323,6 +323,7 @@ function collectFields(
   config: DeclarationConfig,
   id: string,
   fields: AstNode[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _filePath: string,
 ): Map<string, unknown> {
   const collected = new Map<string, unknown>();

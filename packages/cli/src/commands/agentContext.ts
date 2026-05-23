@@ -228,19 +228,6 @@ function formatGeneratedRuleSources(sources: GeneratedRuleSource[]): string[] {
   return lines;
 }
 
-function findMatchingModule(filePath: string, architectures: Contract["architectures"]): string | null {
-  for (const arch of architectures) {
-    for (const mod of arch.modules) {
-      for (const path of mod.paths) {
-        if (filePath.includes(path.replace(/\*\*/g, ""))) {
-          return `${mod.id} (arch: ${arch.id})`;
-        }
-      }
-    }
-  }
-  return null;
-}
-
 function selectArchitectureContext(
   architectures: ArchitectureDeclaration[],
   focus: string[],
@@ -346,7 +333,10 @@ function loadGeneratedRuleSources(projectDir: string): GeneratedRuleSource[] {
   if (sources.length === 0 && manifest.generatedRules.length > 0) {
     for (const entry of manifest.generatedRules) {
       const origin = entry.origin ?? "unknown";
-      const enforcementLevel = entry.ruleKind === "architecture" ? "hard" : "advisory";
+      // Core-nodes are complexity measurements (SLOC, cyclomatic, method-count),
+      // not behavioral pass/fail contracts. "partial" is the correct enforcement
+      // level — it tracks boundary drift without hard-enforcing a rule.
+      const enforcementLevel = entry.ruleKind === "architecture" ? "hard" : "partial";
       const decisionId = extractDecisionIdFromOrigins(entry.origins);
       sources.push({
         rule_id: entry.ruleId,

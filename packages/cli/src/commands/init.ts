@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { listRegisteredBackends } from "../backend-registry.js";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE, SteleConfig } from "../config/defaults.js";
@@ -412,8 +412,8 @@ const DEFAULT_CONTRACT_SOURCE = [
 function buildGitignoreContent(): string {
   return [
     "# Stele",
-    "contract/manifest.json",
-    "contract/baseline.json",
+    "contract/.manifest.json",
+    "contract/.baseline.json",
     "contract/.unlock-log.jsonl",
     "contract/.last-check-report.json",
     "contract/proposals/",

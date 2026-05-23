@@ -9,6 +9,8 @@ import {
   evaluateArchitecture,
   findDependencyViolations,
   findCycleViolations,
+  findLayerDirectionViolations,
+  findPublicEntryViolations,
   detectCycles,
 } from "../src/evaluate.js";
 
@@ -209,5 +211,288 @@ describe("evaluateArchitecture", () => {
 
     const result = evaluateArchitecture(decl, graph);
     expect(result.cycleViolations).toHaveLength(0);
+  });
+});
+
+function makeDeclarationWithLayers(
+  modules: string[],
+  allowDeps: Record<string, string[]> = {},
+  layers: Array<{ id: string; modules: string[] }> = [],
+  denyCycles = true,
+): ArchitectureDeclaration {
+  return {
+    kind: "architecture",
+    id: "test-arch",
+    lang: "typescript",
+    modules: modules.map((id) => ({
+      id,
+      paths: [`src/${id}/**`],
+      publicEntries: [],
+      span: { file: "test.stele", line: 1, column: 1 },
+    })),
+    layers: layers.map((l) => ({
+      id: l.id,
+      modules: l.modules,
+      span: { file: "test.stele", line: 1, column: 1 },
+    })),
+    allowDependencies: Object.entries(allowDeps).map(([from, to]) => ({
+      from,
+      to,
+      span: { file: "test.stele", line: 1, column: 1 },
+    })),
+    denyCycles,
+  };
+}
+
+describe("findLayerDirectionViolations", () => {
+  it("detects lower-layer importing from higher-layer", () => {
+    // layers: [0]=high, [1]=low. Low module importing high module is violation.
+    const decl = makeDeclarationWithLayers(
+      ["high", "low"],
+      {},
+      [
+        { id: "layer-high", modules: ["high"] },
+        { id: "layer-low", modules: ["low"] },
+      ],
+    );
+    const graph = makeGraph([
+      { fromModule: "low", toModule: "high", fromFile: "src/low/app.ts" },
+    ]);
+
+    const violations = findLayerDirectionViolations(decl, graph);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({
+      fromModule: "low",
+      toModule: "high",
+      fromLayer: "layer-low",
+      toLayer: "layer-high",
+    });
+  });
+
+  it("allows higher-layer importing from lower-layer", () => {
+    const decl = makeDeclarationWithLayers(
+      ["high", "low"],
+      {},
+      [
+        { id: "layer-high", modules: ["high"] },
+        { id: "layer-low", modules: ["low"] },
+      ],
+    );
+    const graph = makeGraph([
+      { fromModule: "high", toModule: "low", fromFile: "src/high/app.ts" },
+    ]);
+
+    const violations = findLayerDirectionViolations(decl, graph);
+    expect(violations).toHaveLength(0);
+  });
+
+  it("allows same-layer imports", () => {
+    const decl = makeDeclarationWithLayers(
+      ["a", "b"],
+      {},
+      [
+        { id: "layer-same", modules: ["a", "b"] },
+      ],
+    );
+    const graph = makeGraph([
+      { fromModule: "a", toModule: "b", fromFile: "src/a/app.ts" },
+    ]);
+
+    const violations = findLayerDirectionViolations(decl, graph);
+    expect(violations).toHaveLength(0);
+  });
+
+  it("skips edges permitted by allowDependencies", () => {
+    const decl = makeDeclarationWithLayers(
+      ["high", "low"],
+      { low: ["high"] }, // explicitly allow low -> high
+      [
+        { id: "layer-high", modules: ["high"] },
+        { id: "layer-low", modules: ["low"] },
+      ],
+    );
+    const graph = makeGraph([
+      { fromModule: "low", toModule: "high", fromFile: "src/low/app.ts" },
+    ]);
+
+    const violations = findLayerDirectionViolations(decl, graph);
+    expect(violations).toHaveLength(0);
+  });
+
+  it("skips modules not in any layer", () => {
+    const decl = makeDeclarationWithLayers(
+      ["a", "b", "c"],
+      {},
+      [
+        { id: "layer-a", modules: ["a"] },
+      ],
+    );
+    const graph = makeGraph([
+      { fromModule: "b", toModule: "c", fromFile: "src/b/app.ts" },
+    ]);
+
+    const violations = findLayerDirectionViolations(decl, graph);
+    expect(violations).toHaveLength(0);
+  });
+
+  it("detects multi-layer violation across three layers", () => {
+    const decl = makeDeclarationWithLayers(
+      ["top", "mid", "bottom"],
+      {},
+      [
+        { id: "layer-top", modules: ["top"] },
+        { id: "layer-mid", modules: ["mid"] },
+        { id: "layer-bottom", modules: ["bottom"] },
+      ],
+    );
+    const graph = makeGraph([
+      { fromModule: "bottom", toModule: "top", fromFile: "src/bottom/app.ts" },
+      { fromModule: "mid", toModule: "top", fromFile: "src/mid/app.ts" },
+      { fromModule: "bottom", toModule: "mid", fromFile: "src/bottom/app2.ts" },
+    ]);
+
+    const violations = findLayerDirectionViolations(decl, graph);
+    expect(violations).toHaveLength(3);
+  });
+});
+
+function makeDeclarationWithPublicEntries(
+  modules: Array<{ id: string; publicEntries: string[] }>,
+  allowDeps: Record<string, string[]> = {},
+): ArchitectureDeclaration {
+  return {
+    kind: "architecture",
+    id: "test-arch",
+    lang: "typescript",
+    modules: modules.map((m) => ({
+      id: m.id,
+      paths: [`src/${m.id}/**`],
+      publicEntries: m.publicEntries,
+      span: { file: "test.stele", line: 1, column: 1 },
+    })),
+    layers: [],
+    allowDependencies: Object.entries(allowDeps).map(([from, to]) => ({
+      from,
+      to,
+      span: { file: "test.stele", line: 1, column: 1 },
+    })),
+    denyCycles: true,
+  };
+}
+
+function makeGraphWithSpecifiers(
+  edges: Array<{
+    fromModule: string;
+    toModule: string;
+    fromFile: string;
+    specifier: string;
+    toFile?: string;
+  }>,
+  moduleFiles: Record<string, string[]> = {},
+): ArchitectureGraph {
+  return {
+    architectureId: "test-arch",
+    modules: moduleFiles,
+    edges: edges.map((e, i) => ({
+      fromModule: e.fromModule,
+      toModule: e.toModule,
+      fromFile: e.fromFile,
+      toFile: e.toFile,
+      specifier: e.specifier,
+      importKind: "static-import",
+      line: i + 1,
+      column: 1,
+    })),
+    unownedFiles: [],
+    ambiguousFiles: [],
+    unresolvedSpecifiers: [],
+  };
+}
+
+describe("findPublicEntryViolations", () => {
+  it("detects import bypassing public entry", () => {
+    const decl = makeDeclarationWithPublicEntries(
+      [
+        { id: "lib", publicEntries: ["./index"] },
+        { id: "app", publicEntries: [] },
+      ],
+      { app: ["lib"] },
+    );
+    const graph = makeGraphWithSpecifiers([
+      { fromModule: "app", toModule: "lib", fromFile: "src/app/main.ts", specifier: "./internal/helper", toFile: "src/lib/internal/helper.ts" },
+    ]);
+
+    const violations = findPublicEntryViolations(decl, graph);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({
+      fromModule: "app",
+      toModule: "lib",
+      specifier: "./internal/helper",
+      publicEntries: ["./index"],
+    });
+  });
+
+  it("allows import through public entry", () => {
+    const decl = makeDeclarationWithPublicEntries(
+      [
+        { id: "lib", publicEntries: ["./index", "./utils"] },
+        { id: "app", publicEntries: [] },
+      ],
+      { app: ["lib"] },
+    );
+    const graph = makeGraphWithSpecifiers([
+      { fromModule: "app", toModule: "lib", fromFile: "src/app/main.ts", specifier: "./index", toFile: "src/lib/index.ts" },
+    ]);
+
+    const violations = findPublicEntryViolations(decl, graph);
+    expect(violations).toHaveLength(0);
+  });
+
+  it("exempts same-module imports", () => {
+    const decl = makeDeclarationWithPublicEntries(
+      [
+        { id: "lib", publicEntries: ["./index"] },
+      ],
+      {},
+    );
+    const graph = makeGraphWithSpecifiers([
+      { fromModule: "lib", toModule: "lib", fromFile: "src/lib/a.ts", specifier: "./b", toFile: "src/lib/b.ts" },
+    ]);
+
+    const violations = findPublicEntryViolations(decl, graph);
+    expect(violations).toHaveLength(0);
+  });
+
+  it("skips modules without public entries declared", () => {
+    const decl = makeDeclarationWithPublicEntries(
+      [
+        { id: "lib", publicEntries: [] },
+        { id: "app", publicEntries: [] },
+      ],
+      { app: ["lib"] },
+    );
+    const graph = makeGraphWithSpecifiers([
+      { fromModule: "app", toModule: "lib", fromFile: "src/app/main.ts", specifier: "./anything", toFile: "src/lib/anything.ts" },
+    ]);
+
+    const violations = findPublicEntryViolations(decl, graph);
+    expect(violations).toHaveLength(0);
+  });
+
+  it("reports multiple violations for different specifiers", () => {
+    const decl = makeDeclarationWithPublicEntries(
+      [
+        { id: "lib", publicEntries: ["./index"] },
+        { id: "app", publicEntries: [] },
+      ],
+      { app: ["lib"] },
+    );
+    const graph = makeGraphWithSpecifiers([
+      { fromModule: "app", toModule: "lib", fromFile: "src/app/a.ts", specifier: "./internal/x", toFile: "src/lib/internal/x.ts" },
+      { fromModule: "app", toModule: "lib", fromFile: "src/app/b.ts", specifier: "./internal/y", toFile: "src/lib/internal/y.ts" },
+    ]);
+
+    const violations = findPublicEntryViolations(decl, graph);
+    expect(violations).toHaveLength(2);
   });
 });

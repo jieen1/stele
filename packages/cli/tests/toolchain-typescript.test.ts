@@ -181,6 +181,76 @@ describe("parseTscOutputToViolations", () => {
     expect(violations[0].column).toBe(5);
     expect(violations[0].code).toBe("TS2322");
   });
+
+  it("resolves package-relative paths to repo-relative paths using tsconfigDir", () => {
+    // Simulates monorepo: tsc runs from packages/cli/ and outputs
+    // "src/complexity/evaluate.ts" which should become "packages/cli/src/complexity/evaluate.ts"
+    const raw = `src/complexity/evaluate.ts(42,17): error TS2322: Type 'string' is not assignable to type 'number'.`;
+    const violations = parseTscOutputToViolations(
+      raw,
+      "/project/stele",
+      "/project/stele/packages/cli",
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].file).toBe("packages/cli/src/complexity/evaluate.ts");
+    expect(violations[0].line).toBe(42);
+    expect(violations[0].column).toBe(17);
+  });
+
+  it("preserves absolute paths when tsconfigDir is provided", () => {
+    const raw = `/project/stele/packages/cli/src/file.ts(10,5): error TS2322: Type mismatch.`;
+    const violations = parseTscOutputToViolations(
+      raw,
+      "/project/stele",
+      "/project/stele/packages/cli",
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].file).toBe("/project/stele/packages/cli/src/file.ts");
+  });
+
+  it("preserves repo-relative paths when tsconfigDir is provided", () => {
+    const raw = `packages/cli/src/file.ts(10,5): error TS2322: Type mismatch.`;
+    const violations = parseTscOutputToViolations(
+      raw,
+      "/project/stele",
+      "/project/stele/packages/cli",
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].file).toBe("packages/cli/src/file.ts");
+  });
+
+  it("preserves projectDir-relative paths when tsconfigDir is provided", () => {
+    const raw = `/project/stele/src/shared/util.ts(5,1): error TS2304: Cannot find name 'x'.`;
+    const violations = parseTscOutputToViolations(
+      raw,
+      "/project/stele",
+      "/project/stele/packages/cli",
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].file).toBe("/project/stele/src/shared/util.ts");
+  });
+
+  it("handles multiple diagnostics with mixed path types", () => {
+    const raw = [
+      `src/index.ts(1,1): error TS2304: Cannot find name 'foo'.`,
+      `packages/core/src/util.ts(5,1): error TS2304: Cannot find name 'bar'.`,
+    ].join("\n");
+    const violations = parseTscOutputToViolations(
+      raw,
+      "/project/stele",
+      "/project/stele/packages/cli",
+    );
+
+    expect(violations).toHaveLength(2);
+    // Package-relative path gets resolved
+    expect(violations[0].file).toBe("packages/cli/src/index.ts");
+    // Repo-relative path is preserved
+    expect(violations[1].file).toBe("packages/core/src/util.ts");
+  });
 });
 
 // ---------------------------------------------------------------------------

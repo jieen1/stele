@@ -1,5 +1,5 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { STELE_BASELINE_FILE } from "../config/defaults.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { isMissingFileError } from "../utils/shared-utils.js";

@@ -31,10 +31,12 @@ export type RecursiveLockResult = {
   jsonOutput?: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function runLock(projectDir: string, _options: LockOptions): Promise<void> {
   await lockProject(projectDir, _options);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function lockProject(projectDir: string, _options: LockOptions): Promise<LockSummary> {
   const config = await loadConfig(projectDir);
   const contract = await loadContract(resolve(projectDir, config.entry));

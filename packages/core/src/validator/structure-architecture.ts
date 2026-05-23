@@ -1,4 +1,4 @@
-import type { AstNode, ListNode, SourceSpan } from "../ast/types.js";
+import type { ListNode } from "../ast/types.js";
 import type {
   ArchitectureDeclaration,
   ArchitectureModuleDeclaration,

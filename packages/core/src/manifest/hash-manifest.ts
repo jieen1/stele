@@ -167,6 +167,9 @@ export function buildTransitiveHash(
   return result;
 }
 
+/** Alias for complexity contract targeting. */
+export { buildTransitiveHash as hashManifest };
+
 export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }

@@ -80,9 +80,33 @@ export type CycleViolation = {
   edgeFiles: string[];
 };
 
+export type LayerDirectionViolation = {
+  fromModule: string;
+  toModule: string;
+  fromLayer: string;
+  toLayer: string;
+  fromFile: string;
+  specifier: string;
+  line: number;
+  column: number;
+};
+
+export type PublicEntryViolation = {
+  fromModule: string;
+  toModule: string;
+  fromFile: string;
+  toFile: string;
+  specifier: string;
+  publicEntries: string[];
+  line: number;
+  column: number;
+};
+
 export type EvaluationResult = {
   violations: DependencyViolation[];
   cycleViolations: CycleViolation[];
+  layerDirectionViolations: LayerDirectionViolation[];
+  publicEntryViolations: PublicEntryViolation[];
   ambiguousFiles: Array<{ file: string; modules: string[] }>;
   unresolvedSpecifiers: ArchitectureGraph["unresolvedSpecifiers"];
 };

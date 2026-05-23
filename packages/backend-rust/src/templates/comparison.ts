@@ -1,4 +1,4 @@
-import type { AstNode, ListNode } from "@stele/core";
+import type { AstNode } from "@stele/core";
 
 /**
  * Wrap an argument for a &SteleValue parameter.

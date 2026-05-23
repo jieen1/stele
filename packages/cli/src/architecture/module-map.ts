@@ -1,4 +1,5 @@
 import type { ArchitectureModuleDeclaration } from "@stele/architecture-core";
+import { expandBraces } from "../utils/glob-utils.js";
 import { minimatch } from "minimatch";
 
 export interface FileToModuleMap {
@@ -6,6 +7,19 @@ export interface FileToModuleMap {
   unownedFiles: string[];
   ambiguousFiles: Array<{ file: string; modules: string[] }>;
   ambiguousModules: Map<string, string[]>;
+}
+
+/**
+ * Match a file against a glob pattern, with brace expansion support.
+ */
+function pathMatchesPattern(file: string, pattern: string): boolean {
+  const expanded = expandBraces(pattern);
+  for (const variant of expanded) {
+    if (minimatch(file, variant)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -29,7 +43,7 @@ export function buildModuleMap(
 
     for (const module of modules) {
       for (const pathPattern of module.paths) {
-        if (minimatch(file, pathPattern)) {
+        if (pathMatchesPattern(file, pathPattern)) {
           matchingModules.push(module.id);
           break;
         }

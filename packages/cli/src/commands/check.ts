@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
-  SteleError,
   createViolationReport,
   filterViolationReport,
   formatViolationReportHuman,
@@ -9,12 +8,8 @@ import {
   loadContract,
   normalizeContract,
   tryReadViolationBaseline,
-  verifyManifest,
   type Contract,
-  type ContractNotice,
   type GeneratedVerificationResult,
-  type HumanState,
-  type VerificationResult,
   type Violation,
   type ViolationBaseline,
   type ViolationReport,
@@ -25,14 +20,9 @@ import type { SteleConfig } from "../config/defaults.js";
 import type { CheckSummary, PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 export type { CheckSummary, PreparedCheckContext, ProtectedCheckState };
 import { loadConfig } from "../config/loadConfig.js";
-import { evaluateCodeShapes } from "../code-shape/evaluate.js";
-import { buildArchitectureStageReport } from "../architecture/stage.js";
-import { evaluateCoreNodes } from "../complexity/evaluate.js";
-import { computeHumanState } from "./baseline.js";
-import { CliCommandError, ExitCode, getExitCode } from "../errors.js";
+import { CliCommandError, ExitCode } from "../errors.js";
 import { validateOutputPath } from "../utils/output-path.js";
 import { writeLastReport } from "../last-report.js";
-import { discoverProjects } from "../recursive-discovery.js";
 import {
   assertProtectedContractFilesReachable,
   collectProtectedPaths,
@@ -40,32 +30,24 @@ import {
   toManifestPaths,
   verifyManagedGeneratedFiles,
 } from "./generate.js";
-import { aggregateExitCode, formatRecursiveHeader, formatRecursiveSummary, type SubReport } from "./recursive.js";
 import {
   collectDiffContractFiles,
   collectGitDiffScope,
   filterContractByFiles,
 } from "./check-diff.js";
-import {
-  createContractHashMismatchViolation,
-  createExecutionViolation,
-  createGeneratedDriftViolation,
-  createHumanFileDriftViolation,
-  createManifestDriftViolation,
-  createProtectedFileDriftViolation,
-} from "./check-violations.js";
-import { checkDesign } from "./design/check.js";
+import { createExecutionViolation } from "./check-violations.js";
 import { profilePathExists } from "../design-profile/load.js";
 import { createEvent, writeEvent } from "../events/write-event.js";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { loadProfile } from "../design-profile/load.js";
-import { validateTsconfigPolicy } from "../toolchain/tsconfig-policy.js";
-import { parseTscOutputToViolations, DEFAULT_TSC_COMMAND } from "../toolchain/typescript.js";
-import { parseEslintReport } from "../toolchain/eslint.js";
-import type { ToolchainViolation } from "../toolchain/types.js";
-
-const execFileAsync = promisify(execFile);
+import { buildToolchainStage } from "./check-stages-toolchain.js";
+import { buildProtectedStageReport } from "./check-stages-protected.js";
+import {
+  buildGeneratedStageReport,
+  buildDesignStage,
+  buildCodeShapeStageReport,
+  buildArchitectureStage,
+  buildComplexityStage,
+} from "./check-stages-other.js";
 
 // ----------------------------------------------------------------
 // Types
@@ -83,13 +65,6 @@ export type CheckCommandOptions = {
   recursive?: boolean;
   architectureOnly?: boolean;
   complexityOnly?: boolean;
-  complexity?: boolean;
-};
-
-export type RecursiveCheckResult = {
-  exitCode: number;
-  subReports: SubReport[];
-  jsonOutput?: string;
 };
 
 export type CheckCommandResult = {
@@ -124,6 +99,26 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
 
   // Always verify generated + protected files against the FULL contract.
   const context = await prepareCheckContext(projectDir);
+
+  // Self no-baseline check: if profile declares no_baseline: true and a baseline
+  // file exists, fail immediately. This is a hard rule—cannot be bypassed by
+  // --diff-from, --lenient, or any other flag.
+  const selfNoBaselineViolations = await checkSelfNoBaseline(projectDir);
+  if (selfNoBaselineViolations.length > 0) {
+    const report = createViolationReport({
+      tool: "stele",
+      command: "check",
+      ok: false,
+      summary: {
+        invariant_count: context.invariantCount,
+        violation_count: selfNoBaselineViolations.length,
+      },
+      violations: selfNoBaselineViolations,
+    });
+    await persistLastReport(projectDir, report);
+    throw new CheckCommandError(getCheckExitCode(report), report);
+  }
+
   const filters = await prepareCheckFilters(context, options);
   const generatedReport = applyFiltersToReport(buildGeneratedStageReport(context, "check"), filters);
 
@@ -157,9 +152,7 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
     reports.push(applyFiltersToReport(await buildDesignStage(context, protectedState, "check"), filters));
     reports.push(applyFiltersToReport(await buildToolchainStage(context, protectedState, "check"), filters));
     reports.push(applyFiltersToReport(await buildArchitectureStage(context, protectedState, "check"), filters));
-    if (options.complexity !== false) {
-      reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
-    }
+    reports.push(applyFiltersToReport(await buildComplexityStage(context, protectedState, "check"), filters));
   }
 
   if (architectureOnly) {
@@ -189,120 +182,10 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
 }
 
 // ----------------------------------------------------------------
-// Recursive check
+// Re-exports (moved to dedicated module)
 // ----------------------------------------------------------------
 
-export async function runCheckRecursive(
-  rootDir: string,
-  options: CheckCommandOptions,
-  output: { stdout: (chunk: string) => void; stderr: (chunk: string) => void },
-): Promise<RecursiveCheckResult> {
-  const projects = await discoverProjects(rootDir);
-
-  if (projects.length === 0) {
-    throw new SteleError(
-      "E_NO_PROJECTS_FOUND",
-      "RecursiveError",
-      `No stele.config.json found under ${rootDir}. Run 'stele init' in a sub-directory first.`,
-      undefined,
-      undefined,
-      "Run 'stele init' in a sub-directory or change to a directory containing Stele projects.",
-    );
-  }
-
-  if (!options.json) {
-    output.stdout(formatRecursiveHeader(projects));
-  }
-
-  const subReports: SubReport[] = [];
-  const subOptions: CheckCommandOptions = { ...options, recursive: false, json: false, reportFile: undefined };
-
-  for (let i = 0; i < projects.length; i++) {
-    const project = projects[i];
-    const indexLabel = `[${i + 1}/${projects.length}]`;
-
-    if (!options.json) {
-      output.stdout(`${indexLabel} checking ${project}\n`);
-    }
-
-    const subReport = await runSingleProjectCheck(project, subOptions);
-    subReports.push(subReport);
-
-    if (!options.json) {
-      const status =
-        subReport.exit_code === 0
-          ? `  passed (${subReport.summary.invariant_count ?? 0} invariants, ${subReport.summary.violation_count ?? 0} violations)`
-          : `  failed (exit ${subReport.exit_code}): ${subReport.summary.violation_count ?? 0} violation${subReport.summary.violation_count === 1 ? "" : "s"}`;
-      output.stdout(`${status}\n\n`);
-    }
-  }
-
-  const exitCode = aggregateExitCode(subReports);
-
-  if (options.json) {
-    const passed = subReports.filter((report) => report.exit_code === 0).length;
-    const failed = subReports.length - passed;
-    const aggregate = {
-      schema_version: "1" as const,
-      tool: "@stele/cli",
-      command: "check",
-      generated_at: new Date().toISOString(),
-      cwd: rootDir,
-      projects: subReports,
-      max_exit_code: exitCode,
-      passed,
-      failed,
-    };
-    const jsonOutput = `${JSON.stringify(aggregate, null, 2)}\n`;
-    output.stdout(jsonOutput);
-    return { exitCode, subReports, jsonOutput };
-  }
-
-  output.stdout(formatRecursiveSummary(subReports));
-  return { exitCode, subReports };
-}
-
-async function runSingleProjectCheck(projectDir: string, options: CheckCommandOptions): Promise<SubReport> {
-  try {
-    const result = await checkProject(projectDir, options);
-    return {
-      project: projectDir,
-      exit_code: 0,
-      summary: {
-        invariant_count: result.summary.invariantCount,
-        generated_file_count: result.summary.generatedFileCount,
-        protected_file_count: result.summary.protectedFileCount,
-        violation_count: result.report.summary.violation_count ?? 0,
-      },
-      violations: result.report.violations,
-    };
-  } catch (error) {
-    if (isCheckCommandError(error)) {
-      return {
-        project: projectDir,
-        exit_code: error.exitCode,
-        summary: {
-          invariant_count: error.report.summary.invariant_count,
-          generated_file_count: error.report.summary.generated_file_count,
-          protected_file_count: error.report.summary.protected_file_count,
-          violation_count: error.report.summary.violation_count ?? 0,
-        },
-        violations: error.report.violations,
-      };
-    }
-
-    const exitCode = getExitCode(error) ?? 1;
-    const message = error instanceof Error ? error.message : String(error);
-    const code = error instanceof SteleError ? error.code : undefined;
-
-    return {
-      project: projectDir,
-      exit_code: exitCode,
-      summary: { violation_count: 0 },
-      error: { message, code },
-    };
-  }
-}
+export { runCheckRecursive, type RecursiveCheckResult } from "./check-recursive.js";
 
 // ----------------------------------------------------------------
 // Context preparation
@@ -462,541 +345,6 @@ function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
   });
 }
 
-function buildGeneratedStageReport(context: PreparedCheckContext, command: string): ViolationReport {
-  if (!context.generated.ok) {
-    return createViolationReport({
-      tool: "stele",
-      command,
-      ok: false,
-      summary: {
-        invariant_count: context.invariantCount,
-        generated_file_count: context.generated.files.length,
-        violation_count: 1,
-      },
-      violations: [createGeneratedDriftViolation(context.config.entry, context.config.generatedDir, context.generated, command)],
-    });
-  }
-
-  return createViolationReport({
-    tool: "stele",
-    command,
-    ok: true,
-    summary: {
-      invariant_count: context.invariantCount,
-      generated_file_count: context.generated.files.length,
-      violation_count: 0,
-    },
-    violations: [],
-  });
-}
-
-async function buildProtectedStageReport(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  command: string,
-): Promise<ViolationReport> {
-  try {
-    const baseline = await tryReadViolationBaseline(resolve(context.projectDir, STELE_BASELINE_FILE));
-    const humanState = baseline?.human_state;
-
-    if (humanState !== undefined) {
-      return buildProtectedReportWithBaseline(context, protectedState, humanState, command);
-    }
-
-    return buildProtectedReportWithManifest(context, protectedState, command);
-  } catch (error) {
-    return createViolationReport({
-      tool: "stele",
-      command,
-      ok: false,
-      summary: {
-        invariant_count: protectedState.summary.invariantCount,
-        generated_file_count: protectedState.summary.generatedFileCount,
-        protected_file_count: protectedState.summary.protectedFileCount,
-        violation_count: 1,
-      },
-      violations: [createExecutionViolation(error, context.config.entry, command)],
-    });
-  }
-}
-
-/**
- * Protected-stage report when baseline has human_state.
- *
- * Compares current human file hashes against the recorded baseline state.
- * If human files match, skips manifest verification entirely (the manifest
- * will naturally drift from human-authored files).
- * If human files drift from baseline, reports human_file_drift violations.
- */
-async function buildProtectedReportWithBaseline(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  humanState: HumanState,
-  command: string,
-): Promise<ViolationReport> {
-  const currentHumanState = await computeHumanState(
-    context.projectDir,
-    context.config,
-    protectedState.contractHash,
-  );
-
-  const driftedFiles: string[] = [];
-  for (const [path, baselineHash] of Object.entries(humanState.files)) {
-    if (currentHumanState.files[path] !== baselineHash) {
-      driftedFiles.push(path);
-    }
-  }
-
-  for (const path of Object.keys(currentHumanState.files)) {
-    if (humanState.files[path] === undefined) {
-      driftedFiles.push(path);
-    }
-  }
-
-  driftedFiles.sort();
-
-  const violations: ReturnType<typeof createHumanFileDriftViolation>[] = [];
-
-  if (driftedFiles.length > 0 || currentHumanState.contract_hash !== humanState.contract_hash) {
-    violations.push(
-      createHumanFileDriftViolation(
-        STELE_BASELINE_FILE,
-        humanState,
-        currentHumanState,
-        command,
-      ),
-    );
-  }
-
-  return createViolationReport({
-    tool: "stele",
-    command,
-    ok: violations.length === 0,
-    summary: {
-      invariant_count: protectedState.summary.invariantCount,
-      generated_file_count: protectedState.summary.generatedFileCount,
-      protected_file_count: protectedState.summary.protectedFileCount,
-      violation_count: violations.length,
-    },
-    violations,
-  });
-}
-
-/**
- * Protected-stage report using manifest verification (no baseline human_state).
- * This is the original behavior when no baseline exists.
- */
-async function buildProtectedReportWithManifest(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  command: string,
-): Promise<ViolationReport> {
-  const manifest = await verifyManifest(resolve(context.projectDir, context.config.manifestPath));
-  const currentProtectedPaths = toManifestPaths(context.projectDir, protectedState.protectedPaths);
-  const manifestProtectedPathSet = new Set(manifest.files.map((file) => file.path));
-  const violations = [
-    ...(!manifest.ok ? [createManifestDriftViolation(context.config.manifestPath, manifest, command)] : []),
-    ...currentProtectedPaths
-      .filter((path) => !manifestProtectedPathSet.has(path))
-      .map((path) => createProtectedFileDriftViolation(context.config.manifestPath, [path], command)),
-  ];
-
-  if (manifest.contractHash !== protectedState.contractHash) {
-    violations.push(
-      createContractHashMismatchViolation(
-        context.config.entry,
-        context.config.manifestPath,
-        manifest.contractHash,
-        protectedState.contractHash,
-        command,
-      ),
-    );
-  }
-
-  return createViolationReport({
-    tool: "stele",
-    command,
-    ok: violations.length === 0,
-    summary: {
-      invariant_count: protectedState.summary.invariantCount,
-      generated_file_count: protectedState.summary.generatedFileCount,
-      protected_file_count: protectedState.summary.protectedFileCount,
-      violation_count: violations.length,
-    },
-    violations,
-  });
-}
-
-async function buildDesignStage(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  command: string,
-): Promise<ViolationReport> {
-  if (!profilePathExists(context.projectDir)) {
-    return createViolationReport({
-      tool: "stele",
-      command,
-      ok: true,
-      summary: {
-        invariant_count: protectedState.summary.invariantCount,
-        violation_count: 0,
-      },
-      violations: [],
-    });
-  }
-
-  const result = await checkDesign(context.projectDir, {});
-
-  const violations: Violation[] = [];
-  for (const error of result.errors) {
-    violations.push({
-      rule_id: "design_integrity.violation",
-      rule_kind: "design_integrity",
-      severity: "error",
-      source: { tool: "stele", command, kind: "design" },
-      location: { path: "contract/design/profile.yaml" },
-      cause: { summary: error },
-      fingerprint: `design_integrity.${result.profileValid ? "profile_fail" : "pass"}.${result.manifestValid ? "manifest_ok" : "manifest_fail"}.${result.ownershipValid ? "ownership_ok" : "ownership_fail"}`,
-      scope_paths: ["contract/design/profile.yaml"],
-      status: "active",
-    });
-  }
-
-  return createViolationReport({
-    tool: "stele",
-    command,
-    ok: violations.length === 0,
-    summary: {
-      invariant_count: protectedState.summary.invariantCount,
-      violation_count: violations.length,
-    },
-    violations,
-  });
-}
-
-async function buildCodeShapeStageReport(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  command: string,
-): Promise<ViolationReport> {
-  const violations = await evaluateCodeShapes(context.projectDir, context.contract, command);
-
-  return createViolationReport({
-    tool: "stele",
-    command,
-    ok: violations.length === 0,
-    summary: {
-      invariant_count: protectedState.summary.invariantCount,
-      generated_file_count: protectedState.summary.generatedFileCount,
-      protected_file_count: protectedState.summary.protectedFileCount,
-      violation_count: violations.length,
-    },
-    violations,
-  });
-}
-
-async function buildArchitectureStage(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  command: string,
-): Promise<ViolationReport> {
-  return buildArchitectureStageReport(context, protectedState, command);
-}
-
-async function buildComplexityStage(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  command: string,
-): Promise<ViolationReport> {
-  const coreNodes = context.contract.coreNodes;
-
-  if (coreNodes.length === 0) {
-    return createViolationReport({
-      tool: "stele",
-      command,
-      ok: true,
-      summary: {
-        invariant_count: protectedState.summary.invariantCount,
-        violation_count: 0,
-      },
-      violations: [],
-      notices: [],
-    });
-  }
-
-  const results = await evaluateCoreNodes(context.projectDir, coreNodes);
-
-  const violations: Violation[] = [];
-  const notices: ContractNotice[] = [];
-
-  for (const result of results) {
-    for (const v of result.violations) {
-      const detail = `Complexity violation: ${v.metric} value ${v.value} exceeds max ${v.max} for core-node "${result.measurement.id}"`;
-      violations.push({
-        rule_id: `complexity.${result.measurement.id}.${v.metric}`,
-        rule_kind: "rule_violation" as const,
-        severity: "error" as const,
-        source: { tool: "stele", command, kind: "rule" },
-        location: { path: result.measurement.filePath },
-        cause: { summary: detail },
-        fingerprint: `complexity.${result.measurement.id}.${v.metric}`,
-        scope_paths: [result.measurement.filePath],
-        status: "active" as const,
-        fix: { summary: `Reduce ${v.metric} of "${result.measurement.className}" below ${v.max}.` },
-      });
-    }
-
-    for (const n of result.notices) {
-      notices.push({
-        id: `notice.${result.measurement.id}.${n.metric}`,
-        kind: "above-ideal",
-        nodeId: n.nodeId,
-        target: n.target,
-        metric: n.metric,
-        value: n.value,
-        ideal: n.ideal,
-        max: n.max,
-        summary: `${n.metric} value ${n.value} exceeds ideal ${n.ideal} for core-node "${result.measurement.id}"`,
-      });
-    }
-  }
-
-  return createViolationReport({
-    tool: "stele",
-    command,
-    ok: violations.length === 0,
-    summary: {
-      invariant_count: protectedState.summary.invariantCount,
-      violation_count: violations.length,
-    },
-    violations,
-    notices,
-  });
-}
-
-async function buildToolchainStage(
-  context: PreparedCheckContext,
-  protectedState: ProtectedCheckState,
-  command: string,
-): Promise<ViolationReport> {
-  if (!profilePathExists(context.projectDir)) {
-    return createEmptyViolationReport(protectedState.summary.invariantCount);
-  }
-
-  let profile: ReturnType<typeof loadProfile>;
-  try {
-    profile = loadProfile(context.projectDir);
-  } catch {
-    return createEmptyViolationReport(protectedState.summary.invariantCount);
-  }
-
-  const toolchain = profile.toolchain_contracts;
-  if (!toolchain) {
-    return createEmptyViolationReport(protectedState.summary.invariantCount);
-  }
-
-  const violations: Violation[] = [];
-
-  // Sub-stage 1: TypeScript config policy
-  if (toolchain.typescript_config?.required_options) {
-    const _tsconfigPath = toolchain.typescript_config.tsconfig_path ?? "tsconfig.json";
-    try {
-      const policyViolations = validateTsconfigPolicy(
-        context.projectDir,
-        _tsconfigPath,
-        toolchain.typescript_config.required_options,
-      );
-      violations.push(...policyViolations.map(toolchainViolationToViolation(context.projectDir, command)));
-    } catch (e) {
-      // tsconfig missing or unreadable — report as violation
-      const msg = e instanceof Error ? e.message : String(e);
-      violations.push(toolchainViolationToViolation(context.projectDir, command)({
-        ruleId: "typedriven.typescript.config.read_error",
-        ruleKind: "typescript-config-policy",
-        file: _tsconfigPath,
-        message: `tsconfig policy check failed: ${msg}`,
-        severity: "error",
-        fix: "Ensure tsconfig.json exists and is valid JSON at the configured path.",
-      }));
-    }
-  }
-
-  // Sub-stage 2: TypeScript diagnostics
-  if (toolchain.typescript_diagnostics?.enabled) {
-    const tscCommand = toolchain.typescript_diagnostics.command ?? DEFAULT_TSC_COMMAND;
-    try {
-      const { stdout, stderr } = await runCommandFromShell(tscCommand, context.projectDir);
-      const raw = stdout + stderr;
-      const tscViolations = parseTscOutputToViolations(raw, context.projectDir);
-      violations.push(...tscViolations.map(toolchainViolationToViolation(context.projectDir, command)));
-    } catch (e) {
-      // tsc command failed — report as violation, not silent skip
-      const msg = e instanceof Error ? e.message : String(e);
-      violations.push(toolchainViolationToViolation(context.projectDir, command)({
-        ruleId: "typedriven.typescript.diagnostics.command_failed",
-        ruleKind: "typescript-diagnostic",
-        file: "tsconfig.json",
-        message: `TypeScript diagnostics command failed: ${msg}. Command: ${tscCommand}`,
-        severity: "error",
-        fix: "Ensure the diagnostics command in profile.yaml is correct and the script exists in package.json.",
-      }));
-    }
-  }
-
-  // Sub-stage 3: ESLint
-  if (toolchain.eslint?.enabled) {
-    const eslintConfig = toolchain.eslint;
-    const eslintCommand = eslintConfig.command ??
-      `npx eslint --format ${eslintConfig.format ?? "json"} --no-eslintrc --no-ignore .`;
-    try {
-      const { stdout } = await runCommandFromShell(eslintCommand, context.projectDir);
-      const report = JSON.parse(stdout);
-      const eslintViolations = parseEslintReport(report, eslintConfig.rules ?? []);
-      violations.push(...eslintViolations.map(toolchainViolationToViolation(context.projectDir, command)));
-    } catch (e) {
-      // ESLint failed — report as violation, not silent skip
-      const msg = e instanceof Error ? e.message : String(e);
-      violations.push(toolchainViolationToViolation(context.projectDir, command)({
-        ruleId: "typedriven.eslint.command_failed",
-        ruleKind: "eslint",
-        file: "eslint.config.js",
-        message: `ESLint command failed: ${msg}. Command: ${eslintCommand}`,
-        severity: "error",
-        fix: "Ensure the ESLint command in profile.yaml is correct and ESLint is installed.",
-      }));
-    }
-  }
-
-  return createViolationReport({
-    tool: "stele",
-    command,
-    ok: violations.length === 0,
-    summary: {
-      invariant_count: protectedState.summary.invariantCount,
-      violation_count: violations.length,
-    },
-    violations,
-  });
-}
-
-function toolchainViolationToViolation(
-  projectDir: string,
-  command: string,
-): (t: ToolchainViolation) => Violation {
-  return (t) => {
-    const path = t.file.includes(projectDir) ? t.file : t.file;
-    return {
-      rule_id: t.ruleId,
-      rule_kind: t.ruleKind,
-      severity: t.severity,
-      source: { tool: "stele", command, kind: "rule" },
-      location: { path, line: t.line, column: t.column },
-      cause: { summary: t.message },
-      fingerprint: t.ruleId,
-      scope_paths: [path],
-      status: "active" as const,
-      fix: { summary: t.fix },
-    };
-  };
-}
-
-/**
- * Parse a shell command into [command, args] for execFile.
- * Handles quoted arguments.
- */
-function parseShellCommand(cmd: string): { command: string; args: string[] } {
-  const tokens: string[] = [];
-  let current = "";
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-  let escaped = false;
-
-  for (let i = 0; i < cmd.length; i++) {
-    const ch = cmd[i];
-
-    if (escaped) {
-      current += ch;
-      escaped = false;
-      continue;
-    }
-
-    if (ch === "\\") {
-      escaped = true;
-      continue;
-    }
-
-    if (ch === "'" && !inDoubleQuote) {
-      inSingleQuote = !inSingleQuote;
-      continue;
-    }
-
-    if (ch === '"' && !inSingleQuote) {
-      inDoubleQuote = !inDoubleQuote;
-      continue;
-    }
-
-    if ((ch === " " || ch === "\t") && !inSingleQuote && !inDoubleQuote) {
-      if (current.length > 0) {
-        tokens.push(current);
-        current = "";
-      }
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (current.length > 0) {
-    tokens.push(current);
-  }
-
-  return {
-    command: tokens[0] ?? "",
-    args: tokens.slice(1),
-  };
-}
-
-function runCommandFromShell(
-  cmd: string,
-  cwd: string,
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const { command, args } = parseShellCommand(cmd);
-    const child = execFile(command, args, {
-      cwd,
-      maxBuffer: 16 * 1024 * 1024,
-      windowsHide: true,
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout?.on("data", (data: Buffer) => { stdout += data.toString(); });
-    child.stderr?.on("data", (data: Buffer) => { stderr += data.toString(); });
-
-    child.on("error", reject);
-    child.on("close", (code) => {
-      // We don't fail on non-zero exit — callers (tsc, eslint) are expected
-      // to return non-zero when violations exist. We capture the output and
-      // parse it ourselves.
-      resolve({ stdout, stderr });
-    });
-  });
-}
-
-function createEmptyViolationReport(invariantCount: number): ViolationReport {
-  return createViolationReport({
-    tool: "stele",
-    command: "check",
-    ok: true,
-    summary: {
-      invariant_count: invariantCount,
-      violation_count: 0,
-    },
-    violations: [],
-  });
-}
-
 // ----------------------------------------------------------------
 // Summary and formatting
 // ----------------------------------------------------------------
@@ -1021,7 +369,7 @@ function getCheckExitCode(report: ViolationReport): ExitCode {
     : ExitCode.TAMPER_DETECTED;
 }
 
-function formatCheckSummary(summary: CheckSummary, report?: ViolationReport): string {
+export function formatCheckSummary(summary: CheckSummary, report?: ViolationReport): string {
   const suffixes: string[] = [];
   const suppressedCount = report?.summary.suppressed_violation_count ?? 0;
   const outOfScopeCount = report?.summary.out_of_scope_violation_count ?? 0;
@@ -1121,9 +469,59 @@ async function recordViolationEvent(projectDir: string, report: ViolationReport)
 async function persistLastReport(projectDir: string, report: ViolationReport): Promise<void> {
   try {
     await writeLastReport(projectDir, report);
-  } catch {
+  } catch (error) {
     // Swallow persistence errors so the check command's primary exit signal is
     // not perturbed by I/O quirks (read-only mount, permission denied). The
     // worst case is a stale `stele why` snapshot.
+    process.stderr.write(
+      "warn: failed to persist last report: " + (error instanceof Error ? error.message : String(error)) + "\n",
+    );
   }
+}
+
+// ----------------------------------------------------------------
+// Self no-baseline check
+// ----------------------------------------------------------------
+
+/**
+ * Check whether the project's design profile declares `self_constraints.no_baseline: true`
+ * and if so, verify that no baseline file exists. Returns violations if baseline found.
+ *
+ * This is a hard rule: cannot be bypassed by --diff-from, --lenient, or any other flag.
+ */
+async function checkSelfNoBaseline(projectDir: string): Promise<Violation[]> {
+  if (!profilePathExists(projectDir)) {
+    return [];
+  }
+
+  let profile: ReturnType<typeof loadProfile>;
+  try {
+    profile = loadProfile(projectDir);
+  } catch {
+    return [];
+  }
+
+  if (!profile.self_constraints?.no_baseline) {
+    return [];
+  }
+
+  // Check for .baseline.json
+  const baselinePath = resolve(projectDir, STELE_BASELINE_FILE);
+  const { existsSync } = await import("node:fs");
+  if (!existsSync(baselinePath)) {
+    return [];
+  }
+
+  return [{
+    rule_id: "stele.self.no_baseline",
+    rule_kind: "rule_violation" as const,
+    severity: "error" as const,
+    source: { tool: "stele", command: "check", kind: "rule" },
+    location: { path: STELE_BASELINE_FILE },
+    cause: { summary: `Self no-baseline rule violated: ${STELE_BASELINE_FILE} exists but project design profile declares baseline files are forbidden. Delete the baseline file or remove self_constraints.no_baseline from the profile.` },
+    fingerprint: "stele.self.no_baseline",
+    scope_paths: [STELE_BASELINE_FILE],
+    status: "active" as const,
+    fix: { summary: `Delete ${STELE_BASELINE_FILE} or set self_constraints.no_baseline: false in contract/design/profile.yaml.` },
+  }];
 }

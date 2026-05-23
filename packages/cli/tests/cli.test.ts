@@ -620,6 +620,7 @@ describe("stele CLI", () => {
     expect(Object.keys(manifest.protected_files)).toEqual([
       "contract/checker_impls/custom_checker.py",
       "contract/main.stele",
+      "stele.config.json",
       "tests/contract/__init__.py",
       "tests/contract/_stele_runtime.py",
       "tests/contract/conftest.py",
@@ -654,6 +655,7 @@ describe("stele CLI", () => {
     expect(Object.keys(manifest.protected_files)).toEqual([
       "contract/checker_impls/custom_checker.py",
       "contract/main.stele",
+      "stele.config.json",
       "tests/contract/__init__.py",
       "tests/contract/_stele_runtime.py",
       "tests/contract/conftest.py",
@@ -689,7 +691,6 @@ describe("stele CLI", () => {
 
     expect(handlers.check).toHaveBeenCalledWith("E:/tmp/project", {
       architectureOnly: false,
-      complexity: false,
       complexityOnly: false,
       diffFrom: "main",
       format: "human",
@@ -717,8 +718,8 @@ describe("stele CLI", () => {
     await runCli(["node", "stele", "check"]);
 
     expect(process.exitCode).toBe(0);
-    expect(stdout.read()).toContain("OK manifest locked: contract/.manifest.json (1 invariant, 6 protected files).");
-    expect(stdout.read()).toContain("OK 1 invariant checked; 3 generated files and 6 protected files verified.");
+    expect(stdout.read()).toContain("OK manifest locked: contract/.manifest.json (1 invariant, 7 protected files).");
+    expect(stdout.read()).toContain("OK 1 invariant checked; 3 generated files and 7 protected files verified.");
     process.exitCode = originalExitCode;
   });
 

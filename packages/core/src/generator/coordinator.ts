@@ -1,6 +1,5 @@
 import type { Contract } from "../validator/structure.js";
 import {
-  DEFAULT_GENERATED_OUTPUT_DIR,
   type GeneratedFile,
   type GenerationConfig,
   type GeneratedVerificationResult,

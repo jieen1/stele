@@ -439,7 +439,7 @@ Because `path` has `Unknown` value type, it is valid in value slots such as `eq`
 
 <!-- BEGIN_CORE_OPERATORS -->
 
-CDL v0.2 ships **70 registered operators** (69 user-facing — `filter` is an alias of `where` and produces byte-identical generated code in both backends).
+CDL v0.2 ships **73 registered operators** (72 user-facing — `filter` is an alias of `where` and produces byte-identical generated code in both backends).
 
 The next subsections are partitioned by category. Each entry uses the format `name(param: Type, ...) -> ReturnType` and notes the introducing version (`since`) for operators added after v0.1.
 
@@ -761,5 +761,9 @@ All core diagnostics carry a category and, when available, file/line/column span
 - `1`: general command failure, unsupported lookup, config failure, or uncategorized CLI error
 - `2`: generated files do not match the canonical managed output
 - `3`: manifest verification failed, protected files drifted, new protected files appeared without a fresh lock, or the current contract hash does not match the manifest
+- `4`: generation failed (backend error)
+- `5`: configuration error
+- `6`: score below threshold (quality gate)
+- `99`: internal error
 
 The Claude Code plugin's `Stop` hook blocks completion on any non-zero `stele check` exit.

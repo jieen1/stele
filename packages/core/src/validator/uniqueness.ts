@@ -1,5 +1,5 @@
 import { SteleError } from "../errors/SteleError.js";
-import type { ArchitectureDeclaration, Contract, CoreNodeDeclaration } from "./structure-types.js";
+import type { Contract } from "./structure-types.js";
 
 export function validateUniqueness(contract: Contract): Contract {
   validateDuplicateIds(

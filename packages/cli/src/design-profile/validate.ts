@@ -1,4 +1,4 @@
-import type { DesignProfile, Context, Integration, SharedKernel, CoreInvariant } from "./types.js";
+import type { DesignProfile, Context, SharedKernel } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Validation error types
@@ -48,12 +48,17 @@ function isPathTraversal(p: string): boolean {
 
 /** Collect all project-relative paths from a context or shared kernel. */
 function collectPaths(context: Context): string[] {
-  const paths: string[] = [context.root];
-  for (const value of Object.values(context.layers)) {
-    if (typeof value === "string") {
-      paths.push(value);
-    } else if (Array.isArray(value)) {
-      paths.push(...value);
+  const paths: string[] = [];
+  if (context.root) {
+    paths.push(context.root);
+  }
+  if (context.layers && typeof context.layers === "object" && !Array.isArray(context.layers)) {
+    for (const value of Object.values(context.layers)) {
+      if (typeof value === "string") {
+        paths.push(value);
+      } else if (Array.isArray(value)) {
+        paths.push(...value);
+      }
     }
   }
   return paths;
@@ -72,6 +77,11 @@ function couldOverlap(a: string, b: string): boolean {
 
 export function validateProfile(profile: DesignProfile, profilePath: string = "contract/design/profile.yaml"): ValidationErrors {
   const errors: ValidationErrors = [];
+
+  // Defensive: check profile is actually an object (not null/undefined from bad YAML).
+  if (!profile || typeof profile !== "object") {
+    return [{ field: "profile", path: profilePath, message: "profile is null or not an object" }];
+  }
 
   addSchemaVersionErrors(profile, errors, profilePath);
   addProjectErrors(profile, errors, profilePath);
@@ -95,6 +105,20 @@ function addSchemaVersionErrors(profile: DesignProfile, errors: ValidationErrors
       message: `schema_version must be 1, got ${profile.schema_version}`,
     });
   }
+
+  // Top-level required fields
+  if (!profile.kind || typeof profile.kind !== "string") {
+    errors.push({ field: "kind", path: profilePath, message: "kind is required and must be a string" });
+  }
+  if (!profile.profile_id || typeof profile.profile_id !== "string") {
+    errors.push({ field: "profile_id", path: profilePath, message: "profile_id is required and must be a string" });
+  }
+  if (!profile.created_at || typeof profile.created_at !== "string") {
+    errors.push({ field: "created_at", path: profilePath, message: "created_at is required and must be a string" });
+  }
+  if (!profile.updated_at || typeof profile.updated_at !== "string") {
+    errors.push({ field: "updated_at", path: profilePath, message: "updated_at is required and must be a string" });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +131,7 @@ function addProjectErrors(profile: DesignProfile, errors: ValidationErrors, prof
     return;
   }
 
-  const { language } = profile.project;
+  const { language, source_roots, ignore } = profile.project;
   if (language !== "typescript") {
     errors.push({
       field: "project.language",
@@ -116,23 +140,29 @@ function addProjectErrors(profile: DesignProfile, errors: ValidationErrors, prof
     });
   }
 
-  // Check source_roots and ignore for path traversal
-  for (const root of profile.project.source_roots ?? []) {
-    if (isPathTraversal(root)) {
-      errors.push({
-        field: "project.source_roots",
-        path: profilePath,
-        message: `source_root must not contain path traversal: "${root}"`,
-      });
+  // Check source_roots for path traversal (guard: must be array of strings)
+  if (source_roots && Array.isArray(source_roots)) {
+    for (const root of source_roots) {
+      if (typeof root === "string" && isPathTraversal(root)) {
+        errors.push({
+          field: "project.source_roots",
+          path: profilePath,
+          message: `source_root must not contain path traversal: "${root}"`,
+        });
+      }
     }
   }
-  for (const pattern of profile.project.ignore ?? []) {
-    if (isPathTraversal(pattern)) {
-      errors.push({
-        field: "project.ignore",
-        path: profilePath,
-        message: `ignore pattern must not contain path traversal: "${pattern}"`,
-      });
+
+  // Check ignore for path traversal (guard: must be array of strings)
+  if (ignore && Array.isArray(ignore)) {
+    for (const pattern of ignore) {
+      if (typeof pattern === "string" && isPathTraversal(pattern)) {
+        errors.push({
+          field: "project.ignore",
+          path: profilePath,
+          message: `ignore pattern must not contain path traversal: "${pattern}"`,
+        });
+      }
     }
   }
 }
@@ -150,8 +180,28 @@ function addDddErrors(profile: DesignProfile, errors: ValidationErrors, profileP
   const sharedKernels = ddd.shared_kernels ?? [];
   const contextIds = new Set(contexts.map((c) => c.id));
 
+  // --- Context schema validation ---
+  for (const ctx of contexts) {
+    if (!ctx.id) {
+      errors.push({ field: "ddd.contexts[*].id", path: profilePath, message: "context is missing id" });
+    }
+    if (!ctx.name) {
+      errors.push({ field: `ddd.contexts.${ctx.id ?? 'unknown'}.name`, path: profilePath, message: "context is missing name" });
+    }
+    if (!ctx.subdomain_type) {
+      errors.push({ field: `ddd.contexts.${ctx.id ?? 'unknown'}.subdomain_type`, path: profilePath, message: "context is missing subdomain_type" });
+    }
+    if (!ctx.root) {
+      errors.push({ field: `ddd.contexts.${ctx.id ?? 'unknown'}.root`, path: profilePath, message: "context is missing root" });
+    }
+    if (!ctx.layers || typeof ctx.layers !== "object" || Array.isArray(ctx.layers)) {
+      errors.push({ field: `ddd.contexts.${ctx.id ?? 'unknown'}.layers`, path: profilePath, message: "context is missing layers (must be a map of layer names to glob patterns)" });
+    }
+  }
+
   // --- Path traversal in context roots and layers ---
   for (const ctx of contexts) {
+    if (!ctx.root) continue; // Skip if root is missing (already reported above).
     for (const p of collectPaths(ctx)) {
       if (isPathTraversal(p)) {
         errors.push({
@@ -165,8 +215,9 @@ function addDddErrors(profile: DesignProfile, errors: ValidationErrors, profileP
 
   // --- Shared kernel path traversal ---
   for (const sk of sharedKernels) {
+    if (!sk.paths || !Array.isArray(sk.paths)) continue;
     for (const p of sk.paths) {
-      if (isPathTraversal(p)) {
+      if (typeof p === "string" && isPathTraversal(p)) {
         errors.push({
           field: `ddd.shared_kernels.${sk.id}`,
           path: profilePath,
@@ -231,16 +282,17 @@ function addTypeDrivenErrors(profile: DesignProfile, errors: ValidationErrors, p
   const td = profile.type_driven;
   if (!td) return;
 
-  // Branded ID type_target format
+  // Branded ID type_target format (skip if not declared)
   if (td.branded_ids?.declarations) {
     for (const bid of td.branded_ids.declarations) {
+      if (!bid.type_target) continue;
       const err = validateTargetFormat(
         bid.type_target,
-        `type_driven.branded_ids.${bid.id}.type_target`,
+        `type_driven.branded_ids.${bid.id ?? bid.name ?? 'unknown'}.type_target`,
       );
       if (err) {
         errors.push({
-          field: `type_driven.branded_ids.${bid.id}.type_target`,
+          field: `type_driven.branded_ids.${bid.id ?? bid.name ?? 'unknown'}.type_target`,
           path: profilePath,
           message: err,
         });
@@ -248,9 +300,10 @@ function addTypeDrivenErrors(profile: DesignProfile, errors: ValidationErrors, p
     }
   }
 
-  // ADT entity type_target format
+  // ADT entity type_target format (skip if not declared)
   if (td.adt?.entities) {
     for (const entity of td.adt.entities) {
+      if (!entity.type_target) continue;
       const err = validateTargetFormat(
         entity.type_target,
         `type_driven.adt.entities.${entity.name}.type_target`,
@@ -265,16 +318,17 @@ function addTypeDrivenErrors(profile: DesignProfile, errors: ValidationErrors, p
     }
   }
 
-  // Smart constructor class_target format
+  // Smart constructor class_target format (skip if not declared)
   if (td.smart_constructors?.value_objects) {
     for (const sc of td.smart_constructors.value_objects) {
+      if (!sc.class_target) continue;
       const err = validateTargetFormat(
         sc.class_target,
-        `type_driven.smart_constructors.${sc.id}.class_target`,
+        `type_driven.smart_constructors.${sc.id ?? sc.name ?? 'unknown'}.class_target`,
       );
       if (err) {
         errors.push({
-          field: `type_driven.smart_constructors.${sc.id}.class_target`,
+          field: `type_driven.smart_constructors.${sc.id ?? sc.name ?? 'unknown'}.class_target`,
           path: profilePath,
           message: err,
         });
@@ -368,11 +422,12 @@ function addUniquenessErrors(profile: DesignProfile, errors: ValidationErrors, p
   }
   checkUniqueIds(allAggregateIds, "ddd.aggregate_roots[*].id", errors, profilePath);
 
-  // Branded ID IDs
+  // Branded ID IDs (use name as fallback, skip if neither present)
   const brandedIds: string[] = [];
   if (td?.branded_ids?.declarations) {
     for (const bid of td.branded_ids.declarations) {
-      brandedIds.push(bid.id);
+      const ident = bid.id ?? bid.name;
+      if (ident) brandedIds.push(ident);
     }
   }
   checkUniqueIds(brandedIds, "type_driven.branded_ids[*].id", errors, profilePath);

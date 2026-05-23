@@ -17,18 +17,22 @@ import type {
  * a useful message.
  */
 export class ContinueDevAdapter {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async runPreEditHook(_hook: PreEditHook): Promise<HookDecision> {
     throw createNotImplemented("runPreEditHook");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async runPostEditHook(_hook: PostEditHook): Promise<void> {
     throw createNotImplemented("runPostEditHook");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async runSessionStartHook(_hook: SessionStartHook): Promise<{ context: string }> {
     throw createNotImplemented("runSessionStartHook");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async runStopHook(_hook: StopHook): Promise<HookDecision> {
     throw createNotImplemented("runStopHook");
   }

@@ -33,12 +33,17 @@ for (const fixture of FIXTURES) {
         const result = await runFixtureOnBackend(fixture, spec);
 
         if (result.runnerSkipped) {
-          // pytest unavailable (or other runner missing): structural shape
-          // check then a clean vitest skip via context.skip().
+          // Check if skipping is explicitly allowed (development mode).
+          // Default: fail. Set STELE_CONFORMANCE_ALLOW_SKIP=1 for local dev.
+          if (process.env.STELE_CONFORMANCE_ALLOW_SKIP !== "1") {
+            throw new Error(
+              `Conformance runner unavailable for ${label}: ${result.runnerSkipReason ?? "test runner missing"}. ` +
+              "Set STELE_CONFORMANCE_ALLOW_SKIP=1 to skip during local development.",
+            );
+          }
           expect(result.report.schema_version, "schema_version").toBe("1");
           expect(Array.isArray(result.report.violations), "violations is array").toBe(true);
-          // Vitest 1.4 context.skip() takes no args; log reason then skip.
-          console.log(`[skip] ${label}: ${result.runnerSkipReason ?? "test runner unavailable"}`);
+          process.stderr.write(`[skip] ${label}: ${result.runnerSkipReason ?? "test runner unavailable"}\n`);
           context.skip();
           return;
         }

@@ -24,13 +24,25 @@ export interface ResolvedCommand {
  *   1. node_modules/.bin/<cmd> (and .cmd on Windows)
  *   2. Package manager exec (pnpm exec, npm exec, yarn dx)
  *   3. Original command (PATH fallback)
+ *
+ * If the command is itself a package manager (pnpm, npm, yarn, npx), skip the
+ * exec wrapper — it would produce "pnpm exec pnpm ..." which is wrong.
  */
+const PACKAGE_MANAGER_CMDS = new Set(["pnpm", "npm", "yarn", "npx"]);
+
 export function resolveCommand(
   cmd: string,
   projectDir: string,
 ): ResolvedCommand {
   const parts = parseShellCommand(cmd);
   const name = parts.command;
+
+  // If the command is already a package manager, resolve to absolute path.
+  // Wrapping "pnpm exec pnpm ..." is wrong, but execFile needs full path on Windows.
+  if (PACKAGE_MANAGER_CMDS.has(name)) {
+    const resolved = resolveExecutablePath(name, projectDir) ?? name;
+    return { command: resolved, args: parts.args };
+  }
 
   // Try local node_modules/.bin first
   const localPath = findLocalExecutable(name, projectDir);
@@ -111,25 +123,65 @@ function findPackageWrapper(
   // Priority order: pnpm > npm > yarn (matches common monorepo preferences)
   if (existsSync(join(lockDir, "pnpm-lock.yaml"))) {
     if (isCommandAvailable("pnpm")) {
-      return { executable: "pnpm", args: ["exec"] };
+      const resolved = resolveExecutablePath("pnpm", lockDir) ?? "pnpm";
+      return { executable: resolved, args: ["exec"] };
     }
   }
 
   if (existsSync(join(lockDir, "package-lock.json"))) {
     if (isCommandAvailable("npm")) {
-      return { executable: "npm", args: ["exec"] };
+      const resolved = resolveExecutablePath("npm", lockDir) ?? "npm";
+      return { executable: resolved, args: ["exec"] };
     }
   }
 
   if (existsSync(join(lockDir, "yarn.lock"))) {
     if (isCommandAvailable("yarn")) {
-      return { executable: "yarn", args: ["dx"] };
+      const resolved = resolveExecutablePath("yarn", lockDir) ?? "yarn";
+      return { executable: resolved, args: ["dx"] };
     }
   }
 
   // No lockfile found — try npm as a common default
   if (isCommandAvailable("npm")) {
-    return { executable: "npm", args: ["exec"] };
+    const resolved = resolveExecutablePath("npm", lockDir) ?? "npm";
+    return { executable: resolved, args: ["exec"] };
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolve a bare command name to an absolute path on PATH.
+ * Returns the absolute path if found, or undefined if not found.
+ */
+export function resolveExecutablePath(
+  command: string,
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  _projectDir: string,
+  /* eslint-enable @typescript-eslint/no-unused-vars */
+): string | undefined {
+  // If already absolute, return as-is
+  if (join(command) === command || command.startsWith(".")) {
+    return command;
+  }
+
+  const envPath = process.env.PATH;
+  if (!envPath) return undefined;
+
+  const isWin = platform() === "win32";
+  const extensions = isWin ? [".COM", ".EXE", ".BAT", ".CMD"] : [""];
+
+  for (const dir of envPath.split(isWin ? ";" : ":")) {
+    for (const ext of extensions) {
+      const candidate = join(dir, command + ext);
+      try {
+        accessSync(candidate);
+        return candidate;
+      } catch {
+        // Try next
+      }
+    }
   }
 
   return undefined;

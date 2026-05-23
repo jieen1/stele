@@ -37,7 +37,7 @@ async function createTempDir(): Promise<string> {
 
 async function readPreCommit(dir: string): Promise<PreCommitConfig> {
   const raw = await readFile(join(dir, ".pre-commit-config.yaml"), "utf-8");
-  return yaml.load(raw) as PreCommitConfig;
+  return yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as PreCommitConfig;
 }
 
 function collectHookIds(config: PreCommitConfig): string[] {

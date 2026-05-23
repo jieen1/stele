@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFile, mkdir, writeFile } from "node:fs/promises";
-import { lstatSync, renameSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstatSync, appendFileSync } from "node:fs";
 import path from "node:path";
 import { minimatch } from "minimatch";
 import { extractPathsFromValue } from "./path-utils.js";
@@ -12,9 +12,14 @@ import {
 } from "./shell-utils.js";
 const BASH_COMMAND_KEYS = ["command"];
 const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
+const MAX_PATTERN_LENGTH = 4096;
+const MAX_BRACKET_DEPTH = 5;
 const DEFAULT_PROTECTED = [
   "contract/**/*.stele",
   "contract/checker_impls/**/*",
+  "contract/design/**/*",
+  "contract/generated/**/*",
+  "contract/.baseline.json",
   "contract/.manifest.json",
   "tests/contract/**/*",
 ];
@@ -52,25 +57,11 @@ try {
   }
 
   await mkdir(path.dirname(observationPath), { recursive: true });
-  // Atomic append: read → append → write temp → rename.
-  // Prevents concurrent hook invocations from interleaving mid-line.
+  // Atomic append via appendFileSync: simpler and correct for ESM.
+  // The 'a' flag ensures OS-level atomic seek+write, so concurrent
+  // hook invocations cannot lose each other's writes.
   const content = `${JSON.stringify(observation)}\n`;
-  let existing = "";
-  try {
-    existing = await readFile(observationPath, "utf8");
-  } catch (error) {
-    // File may not exist on first write
-  }
-  const tmpPath = `${observationPath}.tmp.${process.pid}`;
-  await writeFile(tmpPath, existing + content, "utf8");
-  try {
-    // rename is atomic on POSIX. On Windows, rename is atomic only when
-    // source and target are on the same volume (same dir = same volume here).
-    await renameSync(tmpPath, observationPath);
-  } catch {
-    // Best-effort cleanup: unlink temp on failure
-    try { await readFile(tmpPath); } catch { /* no-op */ }
-  }
+  appendFileSync(observationPath, content);
 } catch {
   process.exit(0);
 }
@@ -90,7 +81,11 @@ function parseHookInput(stdin) {
     return {};
   }
 
-  return JSON.parse(stdin);
+  try {
+    return JSON.parse(stdin);
+  } catch {
+    return {};
+  }
 }
 
 async function loadConfig(projectDir) {
@@ -117,11 +112,16 @@ async function loadConfig(projectDir) {
 
 /**
  * Validate that a glob pattern is safe.
- * Rejects patterns with parent traversal, absolute paths, or bracket syntax
- * (which can be ReDoS vectors in minimatch).
+ * Rejects patterns with parent traversal, absolute paths, excessive length,
+ * or bracket syntax (which can be ReDoS vectors in minimatch).
  */
 function isSafeGlobPattern(pattern) {
   if (typeof pattern !== "string") {
+    return false;
+  }
+
+  // Reject overly long patterns
+  if (pattern.length > MAX_PATTERN_LENGTH) {
     return false;
   }
 
@@ -136,10 +136,16 @@ function isSafeGlobPattern(pattern) {
   }
 
   // Reject deeply nested bracket glob syntax (ReDoS vector in minimatch).
-  // Allow up to 2 bracket pairs (sufficient for [a-z], [!xyz], etc.)
-  // but reject deeply nested patterns like [[[[[...]]]]] which cause ReDoS.
-  if (pattern.split("[").length > 3) {
-    return false;
+  let depth = 0;
+  for (const char of pattern) {
+    if (char === "[") {
+      depth++;
+      if (depth > MAX_BRACKET_DEPTH) {
+        return false;
+      }
+    } else if (char === "]") {
+      depth--;
+    }
   }
 
   return true;
@@ -167,7 +173,7 @@ function extractTargetPaths(payload) {
 
 
 function extractBashCommand(payload) {
-  if (!isObject(payload) || payload.tool_name !== "Bash") {
+  if (!isObject(payload) || typeof payload.tool_name !== "string" || payload.tool_name.toLowerCase() !== "bash") {
     return null;
   }
 
@@ -497,7 +503,7 @@ function getProtectedDirectoryRootPattern(pattern) {
 }
 
 function matchGlob(relativePath, pattern) {
-  if (relativePath.length === 0) {
+  if (relativePath.length === 0 || !isSafeGlobPattern(pattern)) {
     return false;
   }
 

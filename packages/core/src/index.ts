@@ -32,7 +32,7 @@ export {
 } from "./generator/coordinator.js";
 export { lex } from "./lexer/lexer.js";
 export type { Token } from "./lexer/token.js";
-export { loadContract, validateContract } from "./loader/loadContract.js";
+export { loadContract, validateContract } from "./loader/load-contract.js";
 export type {
   ContractManifest,
   ManifestProtectedFile,
@@ -98,6 +98,22 @@ export { CORE_OPERATOR_SPECS, createCoreOperatorRegistry, createOperatorRegistry
 export { DEFAULT_PROTECTED_PATTERNS } from "./config/defaults.js";
 export { uniqueSortedStrings } from "./util/array.js";
 export { sanitizeIdentifier } from "./util/identifier.js";
+export {
+  ruleId,
+  contractPath,
+  sha256 as sha256Branded,
+  commandName,
+  isRuleId,
+  isContractPath,
+  isSha256,
+  isCommandName,
+} from "./util/branded-types.js";
+export type {
+  RuleId,
+  ContractPath,
+  Sha256,
+  CommandName,
+} from "./util/branded-types.js";
 export {
   buildInvariantTrace,
   formatExplainTrace,

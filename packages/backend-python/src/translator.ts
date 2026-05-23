@@ -1,5 +1,3 @@
-import { getPythonRuntimeSource, PYTEST_RUNTIME_PATH } from "./runtime.js";
-
 // Re-exported from extracted modules
 export {
   type PythonExpressionTranslator,

@@ -1,4 +1,4 @@
-import type { AstNode, ListNode, SourceSpan } from "../ast/types.js";
+import type { ListNode } from "../ast/types.js";
 import type {
   AgentDeclaration,
   AgentSingleValueField,
@@ -385,7 +385,8 @@ function readSingleValueField(node: ListNode, name: string): AgentSingleValueFie
  * Read a list of string values from a node.
  * Accepts identifiers (no quotes) for allowed-paths, denied-paths, and agents fields.
  */
-function readStringList(node: ListNode, label: string): string[] {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function readStringList(node: ListNode, _label: string): string[] {
   const result: string[] = [];
   for (const item of node.items) {
     if (item.kind === "string" || item.kind === "identifier") {

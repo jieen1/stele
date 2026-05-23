@@ -8,9 +8,10 @@ import {
   stat,
 } from "node:fs/promises";
 import { join } from "node:path";
+import { MAX_EVENT_LOG_SIZE } from "../config/defaults.js";
 import { SteleEvent } from "./types.js";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE = MAX_EVENT_LOG_SIZE;
 const MAX_ROTATIONS = 5;
 
 /**

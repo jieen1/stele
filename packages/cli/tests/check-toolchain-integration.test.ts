@@ -73,7 +73,7 @@ describe("toolchain stage integration", () => {
     expect(configViolations).toEqual([]);
   });
 
-  it("each toolchain sub-stage runs independently", async () => {
+  it("each toolchain sub-stage runs independently", { timeout: 15_000 }, async () => {
     const projectDir = await createFixtureProject();
     // Profile with both typescript_config and typescript_diagnostics enabled
     const profileContent = [

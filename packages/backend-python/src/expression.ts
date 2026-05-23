@@ -6,7 +6,7 @@ import { logicOperatorHandlers } from "./templates/logic.js";
 import { temporalOperatorHandlers } from "./templates/temporal.js";
 import { stringOperatorHandlers } from "./templates/string.js";
 import { toPythonString, readPathPart } from "./translation-utils.js";
-import { type TranslationContext, type PythonExpressionTranslator, type PythonOperatorHandler } from "./types.js";
+import { type TranslationContext, type PythonOperatorHandler } from "./types.js";
 import { createTranslationContext } from "./translation-utils.js";
 
 // ---------------------------------------------------------------------------

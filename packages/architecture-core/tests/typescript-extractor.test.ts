@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { createExtractor } from "../src/typescript-extractor.js";
 import type { DependencyEdge } from "../src/types.js";
 
 describe("createExtractor", () => {
-  const extractor = createExtractor({ projectDir: "/tmp" });
+  let extractor: Awaited<ReturnType<typeof createExtractor>>;
+
+  beforeAll(async () => {
+    extractor = await createExtractor({ projectDir: "/tmp" });
+  });
 
   it("extracts static imports", () => {
     const source = 'import { foo } from "./module";\nimport bar from "./other";';

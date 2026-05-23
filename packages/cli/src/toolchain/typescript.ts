@@ -1,5 +1,6 @@
 // tsc diagnostic parser — parses `tsc --pretty false` output into Stele violations.
 
+import { isAbsolute, relative, resolve as pathResolve } from "node:path";
 import type { TscDiagnostic, ToolchainViolation } from "./types.js";
 
 export interface TypeScriptToolchainOptions {
@@ -44,10 +45,21 @@ export function parseTscOutput(raw: string): TscDiagnostic[] {
 
 /**
  * Parse raw tsc output and convert directly to ToolchainViolation array.
+ *
+ * @param raw - Raw tsc output text.
+ * @param projectDir - Repository root directory.
+ * @param tsconfigDir - Directory containing the tsconfig.json that tsc used.
+ *                      In a monorepo, tsc outputs paths relative to this dir,
+ *                      not the repo root. When provided, package-relative paths
+ *                      are resolved to repo-relative paths.
  */
-export function parseTscOutputToViolations(raw: string, projectDir: string): ToolchainViolation[] {
+export function parseTscOutputToViolations(
+  raw: string,
+  projectDir: string,
+  tsconfigDir?: string,
+): ToolchainViolation[] {
   const diagnostics = parseTscOutput(raw);
-  return diagnostics.map((d) => diagnosticToViolation(d, projectDir));
+  return diagnostics.map((d) => diagnosticToViolation(d, projectDir, tsconfigDir));
 }
 
 // ---------------------------------------------------------------------------
@@ -104,19 +116,37 @@ function parseDiagnosticLine(line: string): TscDiagnostic | undefined {
 // Conversion
 // ---------------------------------------------------------------------------
 
-function diagnosticToViolation(d: TscDiagnostic, projectDir: string): ToolchainViolation {
-  const normalizedFile = d.file.includes(projectDir) ? d.file : d.file;
+function diagnosticToViolation(
+  d: TscDiagnostic,
+  projectDir: string,
+  tsconfigDir?: string,
+): ToolchainViolation {
+  let file = d.file;
+
+  // In a monorepo, tsc outputs paths relative to the tsconfig's rootDir,
+  // not the repo root. If tsconfigDir is provided and the file path is
+  // not already absolute or repo-relative, resolve it against tsconfigDir
+  // and convert to a repo-relative path.
+  if (tsconfigDir) {
+    const isRepoRelative = file.includes(projectDir) ||
+      file.startsWith("packages/") ||
+      isAbsolute(file);
+    if (!isRepoRelative) {
+      const resolved = pathResolve(tsconfigDir, file);
+      file = normalizeFilePath(relative(projectDir, resolved));
+    }
+  }
 
   return {
     ruleId: `typedriven.typescript.diagnostic.${d.code}`,
     ruleKind: "typescript-diagnostic",
-    file: normalizedFile,
+    file,
     line: d.line,
     column: d.column,
     code: d.code,
     message: d.message,
     severity: "error",
-    fix: `Fix TypeScript error ${d.code} in ${d.file}.`,
+    fix: `Fix TypeScript error ${d.code} in ${file}.`,
   };
 }
 

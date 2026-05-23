@@ -89,8 +89,10 @@ function generateHtml(contract: Contract): string {
       const cat = inv.category ? formatNode(inv.category.valueNode) : "none";
       const sev = inv.severity;
       const desc = inv.description ?? "";
-      const rationale = inv.rationale ? formatNode(inv.rationale.valueNode) : "";
-      const code = inv.assertExpression ? escapeHtml(formatNode(inv.assertExpression)) : "";
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _rationale = inv.rationale ? formatNode(inv.rationale.valueNode) : "";
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _code = inv.assertExpression ? escapeHtml(formatNode(inv.assertExpression)) : "";
       return `<tr class="inv-row" data-severity="${escapeHtml(sev)}" data-category="${escapeHtml(cat)}">
 <td><a href="#${escapeHtml(inv.id)}">${escapeHtml(inv.id)}</a></td>
 <td><span class="badge badge-${escapeHtml(sev.toLowerCase())}">${escapeHtml(sev)}</span></td>

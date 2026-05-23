@@ -1,5 +1,5 @@
 import { wrapExpression } from "../translator.js";
-import type { PythonExpressionTranslator, PythonOperatorHandler, TranslationContext } from "../translator.js";
+import type { PythonOperatorHandler } from "../translator.js";
 
 export const logicOperatorHandlers: Record<string, PythonOperatorHandler> = {
   and: (node, context, translate) => node.items.map((item) => wrapExpression(translate(item, context))).join(" and "),

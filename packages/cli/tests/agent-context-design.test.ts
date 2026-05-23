@@ -220,7 +220,7 @@ describe("buildAgentContext — generated rules have profile anchor and decision
     expect(source.rule_id).toBe("core-node.billing-invoice-aggregate");
     expect(source.profile_anchor).toBe("aggregate:invoice");
     expect(source.decision_id).toBe("invoice");
-    expect(source.enforcement_level).toBe("advisory");
+    expect(source.enforcement_level).toBe("partial");
   });
 });
 
@@ -493,7 +493,7 @@ describe("buildDesignOriginJson — provenance fields", () => {
     expect(json).not.toBeNull();
     expect(json!.profile_section).toBe("aggregate:invoice");
     expect(json!.origin).toBe("aggregate:invoice");
-    expect(json!.enforcement_level).toBe("advisory");
+    expect(json!.enforcement_level).toBe("partial");
     expect(json!.rule_kind).toBe("core-node");
   });
 });

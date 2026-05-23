@@ -208,8 +208,8 @@ describe("fingerprint validation", () => {
   it("accepts non-hex fingerprints (architecture violations use descriptive IDs)", async () => {
     const path = join(tmpDir, "non-hex-fp.json");
     const validBaseline = makeValidBaseline();
-    const [originalFp] = Object.keys(validBaseline.violations);
-    const validViolation = validBaseline.violations[originalFp];
+    const originalFp = Object.keys(validBaseline.violations)[0]!;
+    const validViolation = validBaseline.violations[originalFp]!;
 
     const nonHexFp = "core-domain-services->core-domain-primitives:src/path.ts:123";
     const nonHexBaseline = {

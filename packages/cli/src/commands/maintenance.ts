@@ -6,7 +6,7 @@ import { validateOutputPath } from "../utils/output-path.js";
 import { buildRawCheckReport, prepareCheckContext } from "./check.js";
 import { buildRuleIndex } from "./rules.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
-import { readManifest, verifyManifestIntegrity } from "../design-generator/manifest.js";
+import { verifyManifestIntegrity } from "../design-generator/manifest.js";
 import { hashFile } from "../design-profile/hash.js";
 
 const execFileAsync = promisify(execFile);

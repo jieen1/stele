@@ -74,7 +74,7 @@ export async function loadBackend(language: string, framework: string | undefine
     );
   }
 
-  const entry = candidates[0];
+  const entry = candidates[0]!;
   let mod: BackendModule;
 
   try {

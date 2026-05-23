@@ -45,7 +45,8 @@ const QUANTIFIER_MAP: Record<QuantifierOp, string> = {
   none: "steleNone",
 };
 
-const SORT_MAP: Record<SortOp, string> = {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _SORT_MAP: Record<SortOp, string> = {
   "sort-by": "steleSortBy",
   "sort-by-desc": "steleSortByDesc",
 };

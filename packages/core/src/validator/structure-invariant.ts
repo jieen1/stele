@@ -15,6 +15,8 @@ import type {
 } from "./structure-types.js";
 import { describeNode, validationError } from "./structure-error.js";
 
+/** Alias for complexity contract targeting. */
+export { parseInvariantDeclaration as validateInvariant };
 export function parseInvariantDeclaration(filePath: string, node: ListNode, groupId?: string): InvariantDeclaration {
   const idNode = node.items[0];
 

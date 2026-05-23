@@ -31,7 +31,7 @@
   },
   "scripts": {
     "build": "tsup && node -e \"import('fs').then(f=>f.default.cpSync('templates','dist/templates',{recursive:true}))\"",
-    "prepack": "npm run build",
+    "prepack": "npm run typecheck && npm run build",
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
@@ -52,7 +52,7 @@
     "@stele/mcp-server": "workspace:*",
     "commander": "^12.1.0",
     "glob-parent": "^6.0.2",
-    "js-yaml": "4.1.0",
+    "js-yaml": "^4.1.1",
     "minimatch": "^10.0.0",
     "typescript": "^5.7.3"
   },

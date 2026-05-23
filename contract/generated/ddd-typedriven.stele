@@ -84,7 +84,7 @@
   (description "Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.")
 
   (module backends-ts-domain
-    (path "packages/backend-typescript/src"))
+    (path "packages/backend-typescript/src/**"))
 
   (layer domain backends-ts-domain)
 
@@ -98,7 +98,7 @@
   (description "Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.")
 
   (module backends-py-domain
-    (path "packages/backend-python/src"))
+    (path "packages/backend-python/src/**"))
 
   (layer domain backends-py-domain)
 
@@ -176,23 +176,22 @@
   (module architecture-internal
     (path "packages/architecture-core/src/**"))
   (module backends-ts-internal
-    (path "packages/backend-typescript/src"))
+    (path "packages/backend-typescript/src/**"))
   (module backends-py-internal
-    (path "packages/backend-python/src"))
+    (path "packages/backend-python/src/**"))
   (module hooks-internal
     (path "packages/agent-hooks/src/handlers/**")
     (path "packages/agent-hooks/src/adapters/**")
-    (path "packages/agent-hooks/src/{install,util}/**")
   )
   (module mcp-internal
-    (path "packages/mcp-server/src/{server,sessions,types}/**")
-    (path "packages/mcp-server/src/{bin,tools}/**")
-  )
+    (path "packages/mcp-server/src/{server,sessions,types}/**"))
   (module hooks-infrastructure
     (path "packages/agent-hooks/src/{install,util}/**"))
   (module mcp-infrastructure
     (path "packages/mcp-server/src/{bin,tools}/**"))
 
+  (allow-dependency hooks-internal hooks-infrastructure)
+  (allow-dependency mcp-internal mcp-infrastructure)
 
   (deny-cycles)
   (fix "Use the declared ACL module instead of importing the target context directly."))

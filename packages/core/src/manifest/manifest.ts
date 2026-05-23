@@ -44,7 +44,8 @@ export type VerificationResult = {
 
 export async function writeManifest(paths: string[], manifestPath: string, contractHash: string): Promise<void> {
   const absoluteManifestPath = resolve(manifestPath);
-  const manifestDirectory = dirname(absoluteManifestPath);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _manifestDirectory = dirname(absoluteManifestPath);
   const manifestBaseDirectory = getManifestBaseDirectory(absoluteManifestPath);
   const files = await Promise.all(
     paths.map(async (path) => {

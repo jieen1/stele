@@ -21,11 +21,17 @@ export type MinimalModuleDeclaration = {
   paths: string[];
 };
 
+export type MinimalLayerDeclaration = {
+  id: string;
+  modules: string[];
+};
+
 export type ArchitectureContractOptions = {
   projectRoot: string;
   architecture: {
     id: string;
     modules: MinimalModuleDeclaration[];
+    layers?: MinimalLayerDeclaration[];
     allowDependencies: Array<{ from: string; to: string[] }>;
     denyCycles: boolean;
     tsconfig?: string;
@@ -61,23 +67,25 @@ function toFullModules(
 }
 
 // ----------------------------------------------------------------
-// Main entry point
+// Internal: Full result (used by stage.ts and public API)
 // ----------------------------------------------------------------
 
+export type ArchitectureEvaluationResult = {
+  dependencyViolations: ArchitectureViolation[];
+  cycleViolations: import("@stele/architecture-core").CycleViolation[];
+  layerDirectionViolations: import("@stele/architecture-core").LayerDirectionViolation[];
+  publicEntryViolations: import("@stele/architecture-core").PublicEntryViolation[];
+  unownedFiles: string[];
+  ambiguousFiles: Array<{ file: string; modules: string[] }>;
+};
+
 /**
- * Evaluate an architecture contract against the project's TypeScript source files.
- *
- * This is the public runtime entry point for generated architecture tests.
- * It loads source files, builds a dependency graph, and evaluates it against
- * the declared architecture constraints.
- *
- * All file paths are handled in POSIX format internally for consistent module
- * mapping. The TypeScript compiler API resolves absolute paths for imports,
- * but the module map keys remain relative POSIX paths for determinism.
+ * Internal: Evaluate architecture and return full structured result.
+ * Single source of truth for file discovery, graph building, and evaluation.
  */
-export async function evaluateArchitectureContract(
+export async function evaluateArchitectureFull(
   options: ArchitectureContractOptions,
-): Promise<ArchitectureViolation[]> {
+): Promise<ArchitectureEvaluationResult> {
   const { projectRoot, architecture } = options;
 
   // Discover source files across all module paths (relative POSIX paths)
@@ -100,7 +108,7 @@ export async function evaluateArchitectureContract(
   const tsconfigPath = architecture.tsconfig
     ? resolve(projectRoot, architecture.tsconfig)
     : undefined;
-  const extractor = createExtractor({ projectDir: projectRoot, tsconfigPath });
+  const extractor = await createExtractor({ projectDir: projectRoot, tsconfigPath });
   const allEdges: DependencyEdge[] = [];
   const unresolvedSpecifiers: Array<{ fromFile: string; specifier: string; line: number; column: number }> = [];
 
@@ -134,13 +142,9 @@ export async function evaluateArchitectureContract(
 
         const targetModule = moduleMap.fileToModule.get(normalizedTo);
         if (targetModule === undefined) {
-          // Resolved to a file not owned by any module — record as unresolved
-          unresolvedSpecifiers.push({
-            fromFile: file,
-            specifier: edge.specifier,
-            line: edge.line,
-            column: edge.column,
-          });
+          // Resolved to a file not owned by any module in this architecture.
+          // This is a cross-architecture dependency (e.g. cli → core). Skip it
+          // silently — each bounded context only evaluates its own modules.
           continue;
         }
 
@@ -164,16 +168,21 @@ export async function evaluateArchitectureContract(
     }
   }
 
-  // Build architecture declaration
+  // Build architecture declaration — layers and publicEntries now populated from
+  // the generated DDD file so that layer direction and public-entry checks run.
+  const layers: import("@stele/architecture-core").ArchitectureLayerDeclaration[] =
+    (architecture.layers ?? []).map((l) => ({
+      id: l.id,
+      modules: l.modules,
+      span: EMPTY_SPAN,
+    }));
+
   const declaration: ArchitectureDeclaration = {
     kind: "architecture",
     id: architecture.id,
     lang: "typescript",
     modules: fullModules,
-    layers: [],
-    // TODO(v2): `layers` and `publicEntries` are parsed/validated by `structure-architecture.ts`
-    // but not enforced at runtime in v1. They serve as documentation and agent guidance.
-    // See docs/internal/ddd-typedriven-gap-report.md (DOC-1) for status and v2 plan.
+    layers,
     allowDependencies: architecture.allowDependencies.map((d) => ({
       ...d,
       span: EMPTY_SPAN,
@@ -181,24 +190,23 @@ export async function evaluateArchitectureContract(
     denyCycles: architecture.denyCycles,
   };
 
-  // Build graph — propagate ambiguous files from module map
+  // Build graph — propagate unowned and ambiguous files from module map
   const graph: ArchitectureGraph = {
     architectureId: architecture.id,
     modules,
     edges: allEdges,
-    unownedFiles: [],
+    unownedFiles: moduleMap.unownedFiles,
     ambiguousFiles: moduleMap.ambiguousFiles,
     unresolvedSpecifiers,
   };
 
-  // Evaluate
+  // Evaluate — single evaluation, all violation types
   const result = evaluateArchitecture(declaration, graph);
 
-  // Convert violations
-  const violations: ArchitectureViolation[] = [];
-
+  // Convert dependency violations
+  const dependencyViolations: ArchitectureViolation[] = [];
   for (const violation of result.violations) {
-    violations.push({
+    dependencyViolations.push({
       fromModule: violation.fromModule,
       toModule: violation.toModule,
       fromFile: violation.fromFile,
@@ -208,9 +216,47 @@ export async function evaluateArchitectureContract(
     });
   }
 
-  // Convert cycle violations
+  // Surface ambiguous files
+  const ambiguousFiles = moduleMap.ambiguousFiles;
+
+  return {
+    dependencyViolations,
+    cycleViolations: result.cycleViolations,
+    layerDirectionViolations: result.layerDirectionViolations,
+    publicEntryViolations: result.publicEntryViolations,
+    unownedFiles: moduleMap.unownedFiles,
+    ambiguousFiles,
+  };
+}
+
+// ----------------------------------------------------------------
+// Main entry point
+// ----------------------------------------------------------------
+
+/**
+ * Evaluate an architecture contract against the project's TypeScript source files.
+ *
+ * This is the public runtime entry point for generated architecture tests.
+ * It loads source files, builds a dependency graph, and evaluates it against
+ * the declared architecture constraints.
+ *
+ * All file paths are handled in POSIX format internally for consistent module
+ * mapping. The TypeScript compiler API resolves absolute paths for imports,
+ * but the module map keys remain relative POSIX paths for determinism.
+ */
+export async function evaluateArchitectureContract(
+  options: ArchitectureContractOptions,
+): Promise<ArchitectureViolation[]> {
+  const result = await evaluateArchitectureFull(options);
+  const violations: ArchitectureViolation[] = [];
+
+  // Dependency violations
+  for (const v of result.dependencyViolations) {
+    violations.push(v);
+  }
+
+  // Cycle violations — report each edge in the cycle as a separate violation
   for (const cycleViolation of result.cycleViolations) {
-    // Report each edge in the cycle as a separate violation
     for (let i = 0; i < cycleViolation.modules.length - 1; i++) {
       violations.push({
         fromModule: cycleViolation.modules[i],
@@ -223,21 +269,32 @@ export async function evaluateArchitectureContract(
     }
   }
 
-  // Surface unresolved specifiers as configuration violations
-  for (const entry of unresolvedSpecifiers) {
-    const owningModule = moduleMap.fileToModule.get(entry.fromFile);
+  // Layer direction violations
+  for (const ldv of result.layerDirectionViolations) {
     violations.push({
-      fromModule: owningModule ?? "",
-      toModule: "",
-      fromFile: entry.fromFile,
-      specifier: `unresolved: "${entry.specifier}" not mapped to any module`,
-      line: entry.line,
-      column: entry.column,
+      fromModule: ldv.fromModule,
+      toModule: ldv.toModule,
+      fromFile: ldv.fromFile,
+      specifier: ldv.specifier,
+      line: ldv.line,
+      column: ldv.column,
     });
   }
 
-  // Surface ambiguous files as configuration violations
-  for (const entry of moduleMap.ambiguousFiles) {
+  // Public entry violations
+  for (const pev of result.publicEntryViolations) {
+    violations.push({
+      fromModule: pev.fromModule,
+      toModule: pev.toModule,
+      fromFile: pev.fromFile,
+      specifier: pev.specifier,
+      line: pev.line,
+      column: pev.column,
+    });
+  }
+
+  // Ambiguous files as configuration violations
+  for (const entry of result.ambiguousFiles) {
     violations.push({
       fromModule: entry.modules[0] ?? "",
       toModule: entry.modules[1] ?? "",

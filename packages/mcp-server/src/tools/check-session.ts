@@ -1,9 +1,8 @@
 import type { ViolationReport } from "@stele/core";
-import type { CheckResult, McpResult } from "../types.js";
+import type { McpResult } from "../types.js";
 import { toReportSummary } from "../types.js";
 import { validateProjectDir } from "../path-validation.js";
 import { getSessionState, readMaterialObservations } from "../session-state.js";
-import { loadProjectState } from "../contract-cache.js";
 import { runStele } from "../stele-binary.js";
 import { sanitizeError } from "../error-sanitizer.js";
 

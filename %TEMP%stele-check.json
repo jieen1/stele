@@ -1,0 +1,4306 @@
+{
+  "schema_version": "1",
+  "tool": "stele",
+  "command": "check",
+  "ok": false,
+  "summary": {
+    "invariant_count": 27,
+    "violation_count": 165,
+    "active_violation_count": 165,
+    "suppressed_violation_count": 0,
+    "out_of_scope_violation_count": 0
+  },
+  "violations": [
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts",
+        "line": 20,
+        "column": 24
+      },
+      "cause": {
+        "summary": "'_hook' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts: '_hook' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts",
+        "line": 24,
+        "column": 25
+      },
+      "cause": {
+        "summary": "'_hook' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts: '_hook' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts",
+        "line": 28,
+        "column": 29
+      },
+      "cause": {
+        "summary": "'_hook' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts: '_hook' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts",
+        "line": 32,
+        "column": 21
+      },
+      "cause": {
+        "summary": "'_hook' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\agent-hooks\\src\\adapters\\continue-dev.ts: '_hook' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\architecture-core\\tests\\evaluate.test.ts",
+        "line": 5,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'DependencyViolation' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\architecture-core\\tests\\evaluate.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\architecture-core\\tests\\evaluate.test.ts: 'DependencyViolation' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\architecture-core\\tests\\evaluate.test.ts",
+        "line": 6,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'CycleViolation' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\architecture-core\\tests\\evaluate.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\architecture-core\\tests\\evaluate.test.ts: 'CycleViolation' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\architecture-core\\tests\\typescript-extractor.test.ts",
+        "line": 3,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'DependencyEdge' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\architecture-core\\tests\\typescript-extractor.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\architecture-core\\tests\\typescript-extractor.test.ts: 'DependencyEdge' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\backend.ts",
+        "line": 46,
+        "column": 16
+      },
+      "cause": {
+        "summary": "'_contract' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\backend.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\backend.ts: '_contract' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\backend.ts",
+        "line": 46,
+        "column": 27
+      },
+      "cause": {
+        "summary": "'_config' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\backend.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\backend.ts: '_config' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\templates\\collection.ts",
+        "line": 48,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'SORT_MAP' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\templates\\collection.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\templates\\collection.ts: 'SORT_MAP' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 10,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'isComparisonOp' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'isComparisonOp' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 13,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'isAggregateOp' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'isAggregateOp' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 14,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'emitAggregate' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'emitAggregate' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 15,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'isQuantifierOp' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'isQuantifierOp' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 19,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'isBinaryArithOp' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'isBinaryArithOp' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 20,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'emitBinaryArith' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'emitBinaryArith' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 21,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'isVariadicArithOp' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'isVariadicArithOp' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 22,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'emitUnaryArith' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'emitUnaryArith' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 23,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'emitRound' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'emitRound' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 25,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'isStringOp' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'isStringOp' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 25,
+        "column": 22
+      },
+      "cause": {
+        "summary": "'emitStringBinary' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'emitStringBinary' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 25,
+        "column": 40
+      },
+      "cause": {
+        "summary": "'emitStringUnary' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'emitStringUnary' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 28,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'INDENT' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'INDENT' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 284,
+        "column": 25
+      },
+      "cause": {
+        "summary": "'translate' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'translate' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts",
+        "line": 596,
+        "column": 70
+      },
+      "cause": {
+        "summary": "'translate' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-go\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-go\\src\\translator.ts: 'translate' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\backend.ts",
+        "line": 54,
+        "column": 16
+      },
+      "cause": {
+        "summary": "'_contract' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\backend.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\backend.ts: '_contract' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\backend.ts",
+        "line": 54,
+        "column": 27
+      },
+      "cause": {
+        "summary": "'_config' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\backend.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\backend.ts: '_config' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\templates\\arithmetic.ts",
+        "line": 1,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\templates\\arithmetic.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\templates\\arithmetic.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\templates\\logic.ts",
+        "line": 1,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\templates\\logic.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\templates\\logic.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\templates\\string.ts",
+        "line": 1,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\templates\\string.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\templates\\string.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts",
+        "line": 17,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'INDENT' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\translator.ts: 'INDENT' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts",
+        "line": 225,
+        "column": 54
+      },
+      "cause": {
+        "summary": "'context' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\translator.ts: 'context' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts",
+        "line": 323,
+        "column": 9
+      },
+      "cause": {
+        "summary": "'prefix' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\translator.ts: 'prefix' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts",
+        "line": 426,
+        "column": 70
+      },
+      "cause": {
+        "summary": "'translate' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-java\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-java\\src\\translator.ts: 'translate' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderer.ts",
+        "line": 3,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'parseCodeShapeTarget' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderer.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderer.ts: 'parseCodeShapeTarget' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderer.ts",
+        "line": 3,
+        "column": 32
+      },
+      "cause": {
+        "summary": "'fileToModulePath' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderer.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderer.ts: 'fileToModulePath' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderers.ts",
+        "line": 10,
+        "column": 23
+      },
+      "cause": {
+        "summary": "'CodeShapeTarget' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderers.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\code-shape-renderers.ts: 'CodeShapeTarget' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\expression.ts",
+        "line": 9,
+        "column": 40
+      },
+      "cause": {
+        "summary": "'PythonExpressionTranslator' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\expression.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\expression.ts: 'PythonExpressionTranslator' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\templates\\logic.ts",
+        "line": 2,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'PythonExpressionTranslator' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\templates\\logic.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\templates\\logic.ts: 'PythonExpressionTranslator' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\templates\\logic.ts",
+        "line": 2,
+        "column": 66
+      },
+      "cause": {
+        "summary": "'TranslationContext' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\templates\\logic.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\templates\\logic.ts: 'TranslationContext' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\templates\\string.ts",
+        "line": 1,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'ListNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\templates\\string.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\templates\\string.ts: 'ListNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\translation-utils.ts",
+        "line": 88,
+        "column": 52
+      },
+      "cause": {
+        "summary": "'_context' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\translation-utils.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\translation-utils.ts: '_context' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\translator.ts",
+        "line": 1,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'getPythonRuntimeSource' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\translator.ts: 'getPythonRuntimeSource' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\src\\translator.ts",
+        "line": 1,
+        "column": 34
+      },
+      "cause": {
+        "summary": "'PYTEST_RUNTIME_PATH' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\src\\translator.ts: 'PYTEST_RUNTIME_PATH' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\tests\\code-shape-renderers.test.ts",
+        "line": 3,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'CodeShapeDeclaration' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\tests\\code-shape-renderers.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\tests\\code-shape-renderers.test.ts: 'CodeShapeDeclaration' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\tests\\scenario-serialization.test.ts",
+        "line": 7,
+        "column": 67
+      },
+      "cause": {
+        "summary": "'ScenarioOperation' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\tests\\scenario-serialization.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\tests\\scenario-serialization.test.ts: 'ScenarioOperation' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\tests\\scenario-serialization.test.ts",
+        "line": 144,
+        "column": 11
+      },
+      "cause": {
+        "summary": "'nameId' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\tests\\scenario-serialization.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\tests\\scenario-serialization.test.ts: 'nameId' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-python\\tests\\translation-utils.test.ts",
+        "line": 2,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'parseFile' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-python\\tests\\translation-utils.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-python\\tests\\translation-utils.test.ts: 'parseFile' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-rust\\src\\backend.ts",
+        "line": 50,
+        "column": 18
+      },
+      "cause": {
+        "summary": "'_contract' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-rust\\src\\backend.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-rust\\src\\backend.ts: '_contract' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-rust\\src\\backend.ts",
+        "line": 50,
+        "column": 29
+      },
+      "cause": {
+        "summary": "'_config' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-rust\\src\\backend.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-rust\\src\\backend.ts: '_config' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-rust\\src\\templates\\comparison.ts",
+        "line": 1,
+        "column": 24
+      },
+      "cause": {
+        "summary": "'ListNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-rust\\src\\templates\\comparison.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-rust\\src\\templates\\comparison.ts: 'ListNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-rust\\src\\translator.ts",
+        "line": 3,
+        "column": 32
+      },
+      "cause": {
+        "summary": "'isComparisonOperator' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-rust\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-rust\\src\\translator.ts: 'isComparisonOperator' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-rust\\src\\translator.ts",
+        "line": 438,
+        "column": 70
+      },
+      "cause": {
+        "summary": "'translate' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-rust\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-rust\\src\\translator.ts: 'translate' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-rust\\tests\\backend.test.ts",
+        "line": 19,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'ident' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-rust\\tests\\backend.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-rust\\tests\\backend.test.ts: 'ident' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-typescript\\src\\runtime\\_stele_runtime.ts",
+        "line": 1269,
+        "column": 77
+      },
+      "cause": {
+        "summary": "'predicateSource' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-typescript\\src\\runtime\\_stele_runtime.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-typescript\\src\\runtime\\_stele_runtime.ts: 'predicateSource' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\backend-typescript\\src\\translator.ts",
+        "line": 781,
+        "column": 70
+      },
+      "cause": {
+        "summary": "'_translate' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\backend-typescript\\src\\translator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\backend-typescript\\src\\translator.ts: '_translate' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\agentContext.ts",
+        "line": 231,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'findMatchingModule' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\agentContext.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\agentContext.ts: 'findMatchingModule' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\check-violations.ts",
+        "line": 7,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'STELE_BASELINE_FILE' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\check-violations.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\check-violations.ts: 'STELE_BASELINE_FILE' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\check.ts",
+        "line": 17,
+        "column": 8
+      },
+      "cause": {
+        "summary": "'VerificationResult' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\check.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\check.ts: 'VerificationResult' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\check.ts",
+        "line": 946,
+        "column": 24
+      },
+      "cause": {
+        "summary": "'code' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\check.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\check.ts: 'code' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts",
+        "line": 2,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'readFileSync' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts: 'readFileSync' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts",
+        "line": 8,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'getMetricStatus' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts: 'getMetricStatus' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts",
+        "line": 9,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'parseCoreNodeTarget' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts: 'parseCoreNodeTarget' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts",
+        "line": 10,
+        "column": 8
+      },
+      "cause": {
+        "summary": "'CoreNodeMeasurement' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts: 'CoreNodeMeasurement' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts",
+        "line": 13,
+        "column": 29
+      },
+      "cause": {
+        "summary": "'evaluateCoreNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts: 'evaluateCoreNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts",
+        "line": 74,
+        "column": 55
+      },
+      "cause": {
+        "summary": "'_config' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts: '_config' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts",
+        "line": 208,
+        "column": 41
+      },
+      "cause": {
+        "summary": "'filePath' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\complexity.ts: 'filePath' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\design\\explain.ts",
+        "line": 2,
+        "column": 29
+      },
+      "cause": {
+        "summary": "'GeneratedRuleEntry' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\design\\explain.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\design\\explain.ts: 'GeneratedRuleEntry' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts",
+        "line": 3,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'mkdir' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts: 'mkdir' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts",
+        "line": 4,
+        "column": 16
+      },
+      "cause": {
+        "summary": "'resolve' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts: 'resolve' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts",
+        "line": 6,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'PYTHON_CANDIDATES' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\dev.ts: 'PYTHON_CANDIDATES' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\doc.ts",
+        "line": 92,
+        "column": 13
+      },
+      "cause": {
+        "summary": "'rationale' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\doc.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\doc.ts: 'rationale' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\doc.ts",
+        "line": 93,
+        "column": 13
+      },
+      "cause": {
+        "summary": "'code' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\doc.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\doc.ts: 'code' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\explain.ts",
+        "line": 20,
+        "column": 8
+      },
+      "cause": {
+        "summary": "'DesignOriginInfo' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\explain.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\explain.ts: 'DesignOriginInfo' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts",
+        "line": 2,
+        "column": 17
+      },
+      "cause": {
+        "summary": "'mkdir' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts: 'mkdir' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts",
+        "line": 2,
+        "column": 61
+      },
+      "cause": {
+        "summary": "'writeFile' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts: 'writeFile' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts",
+        "line": 3,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'dirname' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts: 'dirname' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts",
+        "line": 11,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'normalizeContract' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts: 'normalizeContract' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts",
+        "line": 553,
+        "column": 16
+      },
+      "cause": {
+        "summary": "'includeRequiredProtectedFile' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\generate.ts: 'includeRequiredProtectedFile' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\init.ts",
+        "line": 1,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'readFile' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\init.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\init.ts: 'readFile' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\lock.ts",
+        "line": 38,
+        "column": 55
+      },
+      "cause": {
+        "summary": "'_options' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\lock.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\lock.ts: '_options' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\maintenance.ts",
+        "line": 9,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'readManifest' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\maintenance.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\maintenance.ts: 'readManifest' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\observe.ts",
+        "line": 2,
+        "column": 20
+      },
+      "cause": {
+        "summary": "'readdir' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\observe.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\observe.ts: 'readdir' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\observe.ts",
+        "line": 2,
+        "column": 29
+      },
+      "cause": {
+        "summary": "'stat' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\observe.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\observe.ts: 'stat' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\rules.ts",
+        "line": 16,
+        "column": 8
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\rules.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\rules.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\commands\\unlock.ts",
+        "line": 2,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'dirname' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\commands\\unlock.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\commands\\unlock.ts: 'dirname' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\design-generator\\ownership.ts",
+        "line": 6,
+        "column": 29
+      },
+      "cause": {
+        "summary": "'isAbsolute' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\design-generator\\ownership.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\design-generator\\ownership.ts: 'isAbsolute' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\design-generator\\render-stele.ts",
+        "line": 121,
+        "column": 26
+      },
+      "cause": {
+        "summary": "'_' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\design-generator\\render-stele.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\design-generator\\render-stele.ts: '_' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\design-profile\\validate.ts",
+        "line": 1,
+        "column": 39
+      },
+      "cause": {
+        "summary": "'Integration' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\design-profile\\validate.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\design-profile\\validate.ts: 'Integration' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\design-profile\\validate.ts",
+        "line": 1,
+        "column": 66
+      },
+      "cause": {
+        "summary": "'CoreInvariant' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\design-profile\\validate.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\design-profile\\validate.ts: 'CoreInvariant' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\toolchain\\command-resolver.ts",
+        "line": 7,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'execSync' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\toolchain\\command-resolver.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\toolchain\\command-resolver.ts: 'execSync' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\toolchain\\command-resolver.ts",
+        "line": 161,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'_projectDir' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\toolchain\\command-resolver.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\toolchain\\command-resolver.ts: '_projectDir' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\typescript-shape\\branded-ids.ts",
+        "line": 6,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'RULE_ID' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\typescript-shape\\branded-ids.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\typescript-shape\\branded-ids.ts: 'RULE_ID' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\src\\typescript-shape\\branded-ids.ts",
+        "line": 41,
+        "column": 43
+      },
+      "cause": {
+        "summary": "'checker' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\src\\typescript-shape\\branded-ids.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\src\\typescript-shape\\branded-ids.ts: 'checker' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\architecture-fixture.test.ts",
+        "line": 11,
+        "column": 8
+      },
+      "cause": {
+        "summary": "'ArchitectureContractOptions' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\architecture-fixture.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\architecture-fixture.test.ts: 'ArchitectureContractOptions' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\check.test.ts",
+        "line": 11,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'runCheck' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\check.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\check.test.ts: 'runCheck' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\check.test.ts",
+        "line": 12,
+        "column": 8
+      },
+      "cause": {
+        "summary": "'CheckCommandOptions' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\check.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\check.test.ts: 'CheckCommandOptions' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\check.test.ts",
+        "line": 286,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'captureStdout' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\check.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\check.test.ts: 'captureStdout' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\design-approvals.test.ts",
+        "line": 28,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'createProfile' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\design-approvals.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\design-approvals.test.ts: 'createProfile' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\design-approvals.test.ts",
+        "line": 141,
+        "column": 9
+      },
+      "cause": {
+        "summary": "'capturedOutput' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\design-approvals.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\design-approvals.test.ts: 'capturedOutput' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\design-diff.test.ts",
+        "line": 3,
+        "column": 34
+      },
+      "cause": {
+        "summary": "'ChangeClass' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\design-diff.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\design-diff.test.ts: 'ChangeClass' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts",
+        "line": 16,
+        "column": 8
+      },
+      "cause": {
+        "summary": "'GeneratedRuleEntry' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts: 'GeneratedRuleEntry' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts",
+        "line": 88,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'minimalProfile' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts: 'minimalProfile' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts",
+        "line": 298,
+        "column": 11
+      },
+      "cause": {
+        "summary": "'cdl' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\design-manifest.test.ts: 'cdl' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\events-writer.test.ts",
+        "line": 4,
+        "column": 21
+      },
+      "cause": {
+        "summary": "'beforeEach' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\events-writer.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\events-writer.test.ts: 'beforeEach' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\events-writer.test.ts",
+        "line": 4,
+        "column": 55
+      },
+      "cause": {
+        "summary": "'vi' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\events-writer.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\events-writer.test.ts: 'vi' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\incremental.test.ts",
+        "line": 142,
+        "column": 11
+      },
+      "cause": {
+        "summary": "'initialContractHash' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\incremental.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\incremental.test.ts: 'initialContractHash' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\maintenance-design-profile.test.ts",
+        "line": 1,
+        "column": 30
+      },
+      "cause": {
+        "summary": "'readFile' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\maintenance-design-profile.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\maintenance-design-profile.test.ts: 'readFile' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\observe.test.ts",
+        "line": 2,
+        "column": 16
+      },
+      "cause": {
+        "summary": "'resolve' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\observe.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\observe.test.ts: 'resolve' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\observe.test.ts",
+        "line": 22,
+        "column": 54
+      },
+      "cause": {
+        "summary": "'rest' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\observe.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\observe.test.ts: 'rest' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\cli\\tests\\typescript-shape-program.test.ts",
+        "line": 49,
+        "column": 11
+      },
+      "cause": {
+        "summary": "'a' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\cli\\tests\\typescript-shape-program.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\cli\\tests\\typescript-shape-program.test.ts: 'a' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\generator\\coordinator.ts",
+        "line": 3,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'DEFAULT_GENERATED_OUTPUT_DIR' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\generator\\coordinator.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\generator\\coordinator.ts: 'DEFAULT_GENERATED_OUTPUT_DIR' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\manifest\\manifest.ts",
+        "line": 47,
+        "column": 9
+      },
+      "cause": {
+        "summary": "'manifestDirectory' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\manifest\\manifest.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\manifest\\manifest.ts: 'manifestDirectory' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts",
+        "line": 18,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'RULE_ID_BRAND' is assigned a value but only used as a type."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts: 'RULE_ID_BRAND' is assigned a value but only used as a type."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts",
+        "line": 19,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'CONTRACT_PATH_BRAND' is assigned a value but only used as a type."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts: 'CONTRACT_PATH_BRAND' is assigned a value but only used as a type."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts",
+        "line": 20,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'SHA256_BRAND' is assigned a value but only used as a type."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts: 'SHA256_BRAND' is assigned a value but only used as a type."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts",
+        "line": 21,
+        "column": 7
+      },
+      "cause": {
+        "summary": "'COMMAND_NAME_BRAND' is assigned a value but only used as a type."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\util\\branded-types.ts: 'COMMAND_NAME_BRAND' is assigned a value but only used as a type."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts",
+        "line": 1,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts",
+        "line": 1,
+        "column": 34
+      },
+      "cause": {
+        "summary": "'SourceSpan' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts: 'SourceSpan' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts",
+        "line": 388,
+        "column": 41
+      },
+      "cause": {
+        "summary": "'label' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-agent.ts: 'label' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-architecture.ts",
+        "line": 1,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-architecture.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-architecture.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-architecture.ts",
+        "line": 1,
+        "column": 34
+      },
+      "cause": {
+        "summary": "'SourceSpan' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-architecture.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-architecture.ts: 'SourceSpan' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-code-shape.ts",
+        "line": 326,
+        "column": 3
+      },
+      "cause": {
+        "summary": "'_filePath' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-code-shape.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-code-shape.ts: '_filePath' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-core-node.ts",
+        "line": 1,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-core-node.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-core-node.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-parse.ts",
+        "line": 2,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'AstNode' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-parse.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-parse.ts: 'AstNode' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\structure-parse.ts",
+        "line": 2,
+        "column": 34
+      },
+      "cause": {
+        "summary": "'SourceSpan' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\structure-parse.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\structure-parse.ts: 'SourceSpan' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\uniqueness.ts",
+        "line": 2,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'ArchitectureDeclaration' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\uniqueness.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\uniqueness.ts: 'ArchitectureDeclaration' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\src\\validator\\uniqueness.ts",
+        "line": 2,
+        "column": 50
+      },
+      "cause": {
+        "summary": "'CoreNodeDeclaration' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\src\\validator\\uniqueness.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\src\\validator\\uniqueness.ts: 'CoreNodeDeclaration' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\tests\\error-codes.test.ts",
+        "line": 48,
+        "column": 17
+      },
+      "cause": {
+        "summary": "'code' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\tests\\error-codes.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\tests\\error-codes.test.ts: 'code' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\tests\\file-walk.test.ts",
+        "line": 9,
+        "column": 16
+      },
+      "cause": {
+        "summary": "'resolve' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\tests\\file-walk.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\tests\\file-walk.test.ts: 'resolve' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\tests\\file-walk.test.ts",
+        "line": 11,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'ExistingGeneratedEntry' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\tests\\file-walk.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\tests\\file-walk.test.ts: 'ExistingGeneratedEntry' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\tests\\layout.test.ts",
+        "line": 15,
+        "column": 9
+      },
+      "cause": {
+        "summary": "'node' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\tests\\layout.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\tests\\layout.test.ts: 'node' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\tests\\structure-shared.test.ts",
+        "line": 7,
+        "column": 34
+      },
+      "cause": {
+        "summary": "'SourceSpan' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\tests\\structure-shared.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\tests\\structure-shared.test.ts: 'SourceSpan' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\core\\tests\\validator-path-overlap.test.ts",
+        "line": 132,
+        "column": 11
+      },
+      "cause": {
+        "summary": "'project' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\core\\tests\\validator-path-overlap.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\core\\tests\\validator-path-overlap.test.ts: 'project' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\github-action\\__tests__\\annotate.test.ts",
+        "line": 1,
+        "column": 32
+      },
+      "cause": {
+        "summary": "'vi' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\github-action\\__tests__\\annotate.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\github-action\\__tests__\\annotate.test.ts: 'vi' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\github-action\\tests\\cli-runner.test.ts",
+        "line": 2,
+        "column": 25
+      },
+      "cause": {
+        "summary": "'CliResult' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\github-action\\tests\\cli-runner.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\github-action\\tests\\cli-runner.test.ts: 'CliResult' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\github-action\\tests\\cli-runner.test.ts",
+        "line": 2,
+        "column": 41
+      },
+      "cause": {
+        "summary": "'CliRunnerOptions' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\github-action\\tests\\cli-runner.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\github-action\\tests\\cli-runner.test.ts: 'CliRunnerOptions' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\src\\path-validation.ts",
+        "line": 1,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'existsSync' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\src\\path-validation.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\src\\path-validation.ts: 'existsSync' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check-session.ts",
+        "line": 2,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'CheckResult' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check-session.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check-session.ts: 'CheckResult' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check-session.ts",
+        "line": 6,
+        "column": 10
+      },
+      "cause": {
+        "summary": "'loadProjectState' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check-session.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check-session.ts: 'loadProjectState' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check.ts",
+        "line": 2,
+        "column": 15
+      },
+      "cause": {
+        "summary": "'CheckResult' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\src\\tools\\check.ts: 'CheckResult' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\context.ts",
+        "line": 123,
+        "column": 49
+      },
+      "cause": {
+        "summary": "'focusPaths' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\src\\tools\\context.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\src\\tools\\context.ts: 'focusPaths' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\tests\\session-state.test.ts",
+        "line": 5,
+        "column": 55
+      },
+      "cause": {
+        "summary": "'vi' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\tests\\session-state.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\tests\\session-state.test.ts: 'vi' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\tests\\stele-binary.test.ts",
+        "line": 50,
+        "column": 13
+      },
+      "cause": {
+        "summary": "'result' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\tests\\stele-binary.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\tests\\stele-binary.test.ts: 'result' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\tests\\stele-binary.test.ts",
+        "line": 58,
+        "column": 13
+      },
+      "cause": {
+        "summary": "'result' is assigned a value but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\tests\\stele-binary.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\tests\\stele-binary.test.ts: 'result' is assigned a value but never used."
+      }
+    },
+    {
+      "rule_id": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "rule_kind": "eslint",
+      "severity": "warning",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "rule"
+      },
+      "location": {
+        "path": "E:\\project\\stele\\packages\\mcp-server\\tests\\verify-package-identity.test.ts",
+        "line": 2,
+        "column": 16
+      },
+      "cause": {
+        "summary": "'resolve' is defined but never used."
+      },
+      "fingerprint": "typedriven.eslint.@typescript-eslint/no-unused-vars",
+      "scope_paths": [
+        "E:\\project\\stele\\packages\\mcp-server\\tests\\verify-package-identity.test.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Fix ESLint rule \"@typescript-eslint/no-unused-vars\" in E:\\project\\stele\\packages\\mcp-server\\tests\\verify-package-identity.test.ts: 'resolve' is defined but never used."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.hooks-internal",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/validate-edit.ts",
+        "line": 2,
+        "column": 36
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"hooks-internal\" via @stele/agent-hooks at packages/mcp-server/src/tools/validate-edit.ts:2:36"
+      },
+      "fingerprint": "mcp-internal→hooks-internal:packages/mcp-server/src/tools/validate-edit.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/validate-edit.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.hooks-internal.hooks-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/agent-hooks/src/install/cursor-installer.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"hooks-internal\" imports from \"hooks-infrastructure\" via ambiguous: owned by hooks-internal, hooks-infrastructure at packages/agent-hooks/src/install/cursor-installer.ts:0:0"
+      },
+      "fingerprint": "hooks-internal→hooks-infrastructure:packages/agent-hooks/src/install/cursor-installer.ts",
+      "scope_paths": [
+        "packages/agent-hooks/src/install/cursor-installer.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.hooks-internal.hooks-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/agent-hooks/src/util/bash-write-target.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"hooks-internal\" imports from \"hooks-infrastructure\" via ambiguous: owned by hooks-internal, hooks-infrastructure at packages/agent-hooks/src/util/bash-write-target.ts:0:0"
+      },
+      "fingerprint": "hooks-internal→hooks-infrastructure:packages/agent-hooks/src/util/bash-write-target.ts",
+      "scope_paths": [
+        "packages/agent-hooks/src/util/bash-write-target.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.hooks-internal.hooks-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/agent-hooks/src/util/known-safe-commands.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"hooks-internal\" imports from \"hooks-infrastructure\" via ambiguous: owned by hooks-internal, hooks-infrastructure at packages/agent-hooks/src/util/known-safe-commands.ts:0:0"
+      },
+      "fingerprint": "hooks-internal→hooks-infrastructure:packages/agent-hooks/src/util/known-safe-commands.ts",
+      "scope_paths": [
+        "packages/agent-hooks/src/util/known-safe-commands.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.hooks-internal.hooks-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/agent-hooks/src/util/path-glob.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"hooks-internal\" imports from \"hooks-infrastructure\" via ambiguous: owned by hooks-internal, hooks-infrastructure at packages/agent-hooks/src/util/path-glob.ts:0:0"
+      },
+      "fingerprint": "hooks-internal→hooks-infrastructure:packages/agent-hooks/src/util/path-glob.ts",
+      "scope_paths": [
+        "packages/agent-hooks/src/util/path-glob.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.hooks-internal.hooks-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/agent-hooks/src/util/stele-cli-shim.d.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"hooks-internal\" imports from \"hooks-infrastructure\" via ambiguous: owned by hooks-internal, hooks-infrastructure at packages/agent-hooks/src/util/stele-cli-shim.d.ts:0:0"
+      },
+      "fingerprint": "hooks-internal→hooks-infrastructure:packages/agent-hooks/src/util/stele-cli-shim.d.ts",
+      "scope_paths": [
+        "packages/agent-hooks/src/util/stele-cli-shim.d.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.hooks-internal.hooks-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/agent-hooks/src/util/stele-config-types.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"hooks-internal\" imports from \"hooks-infrastructure\" via ambiguous: owned by hooks-internal, hooks-infrastructure at packages/agent-hooks/src/util/stele-config-types.ts:0:0"
+      },
+      "fingerprint": "hooks-internal→hooks-infrastructure:packages/agent-hooks/src/util/stele-config-types.ts",
+      "scope_paths": [
+        "packages/agent-hooks/src/util/stele-config-types.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/bin/mcp-server.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/bin/mcp-server.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/bin/mcp-server.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/bin/mcp-server.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/check-session.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/check-session.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/check-session.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/check-session.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/check.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/check.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/check.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/check.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/context.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/context.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/context.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/context.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/explain-violation.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/explain-violation.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/explain-violation.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/explain-violation.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/index.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/index.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/index.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/index.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/list-contracts.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/list-contracts.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/list-contracts.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/list-contracts.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/observe.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/observe.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/observe.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/observe.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/propose-contract.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/propose-contract.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/propose-contract.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/propose-contract.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/status.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/status.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/status.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/status.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/validate-edit.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/validate-edit.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/validate-edit.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/validate-edit.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    },
+    {
+      "rule_id": "architecture.ddd-context-map.mcp-internal.mcp-infrastructure",
+      "rule_kind": "architecture_dependency",
+      "severity": "error",
+      "source": {
+        "tool": "stele",
+        "command": "check",
+        "kind": "architecture"
+      },
+      "location": {
+        "path": "packages/mcp-server/src/tools/why.ts",
+        "line": 0,
+        "column": 0
+      },
+      "cause": {
+        "summary": "Generated context map: cross-context dependencies must follow declared integration patterns.. Architecture violation: module \"mcp-internal\" imports from \"mcp-infrastructure\" via ambiguous: owned by mcp-internal, mcp-infrastructure at packages/mcp-server/src/tools/why.ts:0:0"
+      },
+      "fingerprint": "mcp-internal→mcp-infrastructure:packages/mcp-server/src/tools/why.ts",
+      "scope_paths": [
+        "packages/mcp-server/src/tools/why.ts"
+      ],
+      "status": "active",
+      "fix": {
+        "summary": "Use the declared ACL module instead of importing the target context directly."
+      }
+    }
+  ],
+  "notices": []
+}

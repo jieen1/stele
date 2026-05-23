@@ -1,5 +1,6 @@
+import { MAX_CHILD_PROCESS_BUFFER } from "../config/defaults.js";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile, lstat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import globParent from "glob-parent";
 import { minimatch } from "minimatch";
@@ -237,7 +238,7 @@ async function analyzePythonFiles(
     const { stdout } = await execFileAsync(runtime.command, [...runtime.args, scriptPath, payloadPath], {
       cwd: projectDir,
       windowsHide: true,
-      maxBuffer: 16 * 1024 * 1024,
+      maxBuffer: MAX_CHILD_PROCESS_BUFFER,
     });
 
     return JSON.parse(stdout) as PythonAnalysisResult;
@@ -940,6 +941,11 @@ async function walkRoot(directory: string, projectDir: string): Promise<string[]
     const absolutePath = resolve(directory, entry.name);
 
     if (entry.isDirectory()) {
+      // Skip symlinks to directories — prevents traversal outside project via symlink
+      const entryStat = await lstat(absolutePath);
+      if (entryStat.isSymbolicLink()) {
+        continue;
+      }
       files.push(...(await walkRoot(absolutePath, projectDir)));
       continue;
     }

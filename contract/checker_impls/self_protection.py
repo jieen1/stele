@@ -178,7 +178,7 @@ def _check_backend_present(language: str) -> dict[str, Any]:
 def config_schema_valid(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Verify stele.config.json contains all required fields."""
     config = _read_config()
-    required = {"version", "contractDir", "entry", "generatedDir", "targetLanguage", "testFramework"}
+    required = {"version", "contractDir", "entry", "generatedDir", "targetLanguage", "testFramework", "protected", "pathMode", "manifestPath", "checkerImplDir"}
     missing = required - set(config.keys())
     if missing:
         return {"passed": False, "message": f"Missing config fields: {sorted(missing)}"}
@@ -190,7 +190,7 @@ def manifest_version_stable(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     config = _read_config()
     manifest_path = _REPO_ROOT / "contract" / ".manifest.json"
     if not manifest_path.exists():
-        return {"passed": True, "message": "No manifest yet (first run)"}
+        return {"passed": False, "message": "Manifest is missing. Run 'stele check' to generate it."}
 
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -352,10 +352,11 @@ def no_secrets_in_source(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     skip_dirs = {"node_modules", "dist", "__pycache__", ".git"}
     violations: list[str] = []
 
-    for root, dirs, files in os.walk(str(_PACKAGES_DIR), followlinks=False):
+    for root, dirs, files in os.walk(str(_REPO_ROOT), followlinks=False):
         dirs[:] = [d for d in dirs if d not in skip_dirs and not d.startswith(".")]
         for fname in files:
-            if not any(fname.endswith(ext) for ext in extensions):
+            is_env_file = fname.startswith('.env')
+            if not any(fname.endswith(ext) for ext in extensions) and not is_env_file:
                 continue
             fpath = pathlib.Path(root) / fname
             try:
@@ -386,10 +387,15 @@ def no_secrets_in_source(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 def generation_deterministic(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Verify that generation is deterministic — same input produces same output.
 
+    HEURISTIC CHECK: This is a content scan, not a byte-stability verification.
+    It looks for common sources of nondeterminism in generated files.
+    True determinism verification requires comparing outputs across runs.
+
     Check generated files for timestamps, random values, UUIDs, or other
     nondeterministic content.
     """
-    generated_dir = _REPO_ROOT / "tests" / "contract"
+    config = _read_config()
+    generated_dir = _REPO_ROOT / config.get("generatedDir", "tests/contract")
     if not generated_dir.exists():
         return {"passed": True, "message": "No generated files yet"}
 
@@ -401,6 +407,15 @@ def generation_deterministic(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     )
     # Epoch milliseconds (13-digit numbers)
     epoch_pattern = re.compile(r"\b\d{13}\b")
+    # Non-deterministic sort output: object keys in apparent random order
+    # (e.g., mixed-case keys that suggest unsorted iteration over dict keys)
+    unsorted_keys_pattern = re.compile(
+        r"\{\s*[A-Z][a-z]+.*[a-z][A-Z]"  # uppercase then lowercase key pattern
+    )
+    # Randomized variable names or identifiers (common temp/random patterns)
+    random_id_pattern = re.compile(
+        r"(?:__tmp_|_rand_|_tmp_)[a-z0-9]{8,}"  # randomized temp identifiers
+    )
 
     for gen_file in sorted(generated_dir.rglob("*")):
         if gen_file.suffix in {".pyc"}:
@@ -412,6 +427,8 @@ def generation_deterministic(ctx: dict, **kwargs: Any) -> dict[str, Any]:
             (timestamp_pattern, "timestamp"),
             (uuid_pattern, "UUID"),
             (epoch_pattern, "epoch-timestamp"),
+            (unsorted_keys_pattern, "unsorted-keys"),
+            (random_id_pattern, "randomized-identifier"),
         ]:
             if pat.search(content):
                 return {
@@ -428,7 +445,8 @@ def path_no_traversal(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     1. File paths themselves (no `..` in resolved path outside generated dir)
     2. File contents (no `..`, null bytes, or URL-encoded traversal)
     """
-    generated_dir = _REPO_ROOT / "tests" / "contract"
+    config = _read_config()
+    generated_dir = _REPO_ROOT / config.get("generatedDir", "tests/contract")
     if not generated_dir.exists():
         return {"passed": True, "message": "No generated files yet"}
 
@@ -535,13 +553,41 @@ def operator_spec_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         return {"passed": False, "message": "CORE_OPERATOR_SPECS not found"}
 
     # Verify each operator block has name, parameters, returnType, description
-    # Extract name fields from defineOperator blocks
-    blocks = re.finditer(
-        r"defineOperator\s*\(\s*\{([^}]+)\}\s*\)", content, re.DOTALL
-    )
+    # Extract defineOperator blocks using brace-counting to handle nested braces.
+    # Simple regex like r"defineOperator\(\{...\}\)" breaks on nested "}".
+    def _extract_operator_blocks(text):
+        """Extract the inner content of each defineOperator({...}) block."""
+        results = []
+        marker = "defineOperator"
+        start = 0
+        while True:
+            idx = text.find(marker, start)
+            if idx == -1:
+                break
+            lp = text.find("(", idx)
+            if lp == -1:
+                start = idx + 1
+                break
+            lb = text.find("{", lp)
+            if lb == -1:
+                start = lp + 1
+                break
+            depth = 0
+            i = lb
+            while i < len(text):
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        results.append(text[lb+1:i])
+                        break
+                i += 1
+            start = i + 1
+        return results
+
     bad_blocks = []
-    for block in blocks:
-        block_text = block.group(1)
+    for block_text in _extract_operator_blocks(content):
         has_name = bool(re.search(r"name:\s*", block_text))
         has_params = bool(re.search(r"parameters:\s*", block_text))
         has_return = bool(re.search(r"returnType:\s*", block_text))
@@ -672,6 +718,65 @@ def hooks_fail_closed(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         return {
             "passed": False,
             "message": "stop-validate.js must block on contract failure",
+        }
+
+    # Fail-open detection: scan all hook scripts for patterns that indicate
+    # the hook allows execution to proceed on error (fail-open behavior).
+    hook_scripts_to_check = ["pre-tool-protect.js", "stop-validate.js",
+                              "observation-hook.js", "pre-tool-protect.js"]
+    fail_open_violations: list[str] = []
+
+    for script_name in sorted(set(hook_scripts_to_check)):
+        script_path = scripts_dir / script_name
+        if not script_path.exists():
+            continue
+        script_content = script_path.read_text(encoding="utf-8")
+        lines = script_content.splitlines()
+
+        # Check 1: Look for 'exit 0' or 'process.exit(0)' in error handling paths
+        # (not at the end of a success path)
+        in_error_handler = False
+        brace_depth = 0
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            # Track if we're inside a catch block
+            if re.search(r'\bcatch\s*\(', stripped) or re.search(r'\bexcept\b', stripped):
+                in_error_handler = True
+                brace_depth = 0
+            if in_error_handler:
+                brace_depth += stripped.count('{') - stripped.count('}')
+                # Check for exit 0 / process.exit(0) in error handler
+                if re.search(r'(?:process\.)?exit\s*\(\s*0\s*\)', stripped):
+                    fail_open_violations.append(
+                        f'{script_name}:{i+1} exit(0) in error handler (fail-open)'
+                    )
+                if brace_depth <= 0 and '{' in ''.join(lines[max(0,i-3):i]):
+                    in_error_handler = False
+
+        # Check 2: Look for missing try/except around critical operations
+        # (hooks that do file IO without error handling)
+        has_file_io = bool(re.search(r'(readFileSync|readFile|writeFileSync|fs\.)', script_content))
+        has_try_catch = 'try {' in script_content or 'try{' in script_content
+        if has_file_io and not has_try_catch:
+            fail_open_violations.append(
+                f'{script_name}: file IO without try/catch wrapper'
+            )
+
+        # Check 3: Look for hooks that return success on error
+        # e.g., 'return true' or 'resolve(' in catch blocks
+        catch_blocks = re.findall(
+            r'catch\s*\([^)]*\)\s*\{([^}]+)\}', script_content
+        )
+        for catch_body in catch_blocks:
+            if re.search(r'(?:return\s+(?:true|ok|pass)|resolve\s*\()', catch_body):
+                fail_open_violations.append(
+                    f'{script_name}: catch block returns success signal'
+                )
+
+    if fail_open_violations:
+        return {
+            "passed": False,
+            "message": f"Fail-open patterns detected: {'; '.join(fail_open_violations[:5])}",
         }
 
     return {"passed": True}

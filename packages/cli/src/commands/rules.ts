@@ -13,7 +13,6 @@ import {
   type InvariantDeclaration,
   type ScenarioDeclaration,
   type TypePolicyDeclaration,
-  type AstNode,
 } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
 import { readManifest, type GenerationManifest } from "../design-generator/manifest.js";
@@ -197,7 +196,10 @@ export async function buildRuleIndex(projectDir: string): Promise<RuleIndex> {
     project_dir: resolve(projectDir),
     entry: config.entry,
     generated_dir: config.generatedDir,
-    protected: [...config.protected],
+    protected: deduplicate([
+      ...config.protected,
+      ...extractGeneratedPaths(manifest),
+    ]),
     summary: {
       invariant_count: contract.invariants.length,
       checker_count: contract.checkers.length,
@@ -458,6 +460,15 @@ function buildProfileAnchors(profile: DesignProfile | null): Map<string, Profile
   }
 
   return map;
+}
+
+function extractGeneratedPaths(manifest: GenerationManifest | null): string[] {
+  if (!manifest?.generatedFiles) return [];
+  return manifest.generatedFiles.map((f) => f.path);
+}
+
+function deduplicate(items: string[]): string[] {
+  return [...new Set(items)];
 }
 
 function formatRuleIndexHuman(index: RuleIndex): string {

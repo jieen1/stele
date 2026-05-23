@@ -6,19 +6,19 @@ import type {
 import { parseCoreNodeTarget, getMetricStatus } from "./types.js";
 
 // ----------------------------------------------------------------
-// Character constants (avoid quoting issues)
+// Character constants
 // ----------------------------------------------------------------
 
-const CHAR_SLASH = String.fromCharCode(47);
-const CHAR_STAR = String.fromCharCode(42);
-const CHAR_DOUBLE_QUOTE = String.fromCharCode(34);
-const CHAR_SINGLE_QUOTE = String.fromCharCode(39);
-const CHAR_BACKTICK = String.fromCharCode(96);
-const CHAR_BACKSLASH = String.fromCharCode(92);
-const CHAR_SPACE = String.fromCharCode(32);
-const CHAR_TAB = String.fromCharCode(9);
-const CHAR_CR = String.fromCharCode(13);
-const CHAR_LF = String.fromCharCode(10);
+const CHAR_SLASH = "/";
+const CHAR_STAR = "*";
+const CHAR_DOUBLE_QUOTE = '"';
+const CHAR_SINGLE_QUOTE = "'";
+const CHAR_BACKTICK = "`";
+const CHAR_BACKSLASH = "\\";
+const CHAR_SPACE = " ";
+const CHAR_TAB = "\t";
+const CHAR_CR = "\r";
+const CHAR_LF = "\n";
 
 // ----------------------------------------------------------------
 // SLOC (Source Lines of Code)
@@ -392,6 +392,94 @@ export function findClassByName(
 
   const visit = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node) && node.name !== undefined && node.name.text === className) {
+      found = node;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  ts.forEachChild(sourceFile, visit);
+  return found;
+}
+
+/**
+ * Find a named function declaration, exported function variable, or export alias
+ * in a source file. When an export alias is found (e.g., `export { X as Y }`),
+ * resolve to the underlying function/variable declaration.
+ */
+export function findFunctionByName(
+  sourceFile: ts.SourceFile,
+  functionName: string,
+): ts.FunctionDeclaration | ts.VariableDeclaration | undefined {
+  let found: ts.FunctionDeclaration | ts.VariableDeclaration | undefined;
+
+  // First pass: direct match on function declaration or variable
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+
+    if (ts.isFunctionDeclaration(node) && node.name !== undefined && node.name.text === functionName) {
+      found = node;
+      return;
+    }
+
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === functionName) {
+      found = node;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  ts.forEachChild(sourceFile, visit);
+
+  // Second pass: check for export alias (e.g., `export { X as Y }`)
+  if (found === undefined) {
+    const resolveAlias = (node: ts.Node): void => {
+      if (found) return;
+
+      // Match export { originalName as aliasName }
+      if (ts.isExportSpecifier(node) && node.name && node.name.text === functionName) {
+        // `propertyName` (TS5) holds the original identifier
+        const originalName = node.propertyName;
+        if (originalName && ts.isIdentifier(originalName)) {
+          // Now search for the original name
+          const searchForOriginal = (n: ts.Node): void => {
+            if (found) return;
+            if (ts.isFunctionDeclaration(n) && n.name !== undefined && n.name.text === originalName.text) {
+              found = n;
+              return;
+            }
+            if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === originalName.text) {
+              found = n;
+              return;
+            }
+            ts.forEachChild(n, searchForOriginal);
+          };
+          ts.forEachChild(sourceFile, searchForOriginal);
+        }
+        return;
+      }
+
+      ts.forEachChild(node, resolveAlias);
+    };
+
+    ts.forEachChild(sourceFile, resolveAlias);
+  }
+
+  return found;
+}
+
+/**
+ * Find a named interface declaration in a TypeScript source file.
+ */
+export function findInterfaceByName(
+  sourceFile: ts.SourceFile,
+  interfaceName: string,
+): ts.InterfaceDeclaration | undefined {
+  let found: ts.InterfaceDeclaration | undefined;
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName) {
       found = node;
       return;
     }

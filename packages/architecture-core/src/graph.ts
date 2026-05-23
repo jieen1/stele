@@ -1,4 +1,5 @@
-import { resolve, isAbsolute } from "node:path";
+import { relative, resolve } from "node:path";
+import { minimatch } from "minimatch";
 import type {
   ArchitectureDeclaration,
   ArchitectureGraph,
@@ -6,16 +7,13 @@ import type {
   DependencyEdge,
 } from "./types.js";
 import { createExtractor } from "./typescript-extractor.js";
+import { expandBraces } from "./util.js";
 
 /**
  * Normalize an absolute path back to a relative POSIX path from the project directory.
  */
 function toProjectRelativePath(projectDir: string, absolutePath: string): string {
-  let rel = absolutePath.slice(projectDir.length);
-  if (rel.startsWith("/") || rel.startsWith("\\")) {
-    rel = rel.slice(1);
-  }
-  return rel.replace(/\\/g, "/");
+  return relative(projectDir, absolutePath).replaceAll("\\", "/");
 }
 
 /**
@@ -37,56 +35,17 @@ export function moduleBelongsToModule(
 }
 
 /**
- * Minimal glob matcher supporting `*` and `**`.
- * `*` matches anything except `/`, `**` matches anything including `/`.
+ * Match a file against a glob pattern, with brace expansion support.
+ * Uses minimatch for consistent behavior across all packages.
  */
-function pathMatchesPattern(path: string, pattern: string): boolean {
-  // Normalize to forward slashes
-  const p = path.replace(/\\/g, "/");
-  const pat = pattern.replace(/\\/g, "/");
-
-  // Convert glob pattern to regex
-  const regex = globToRegex(pat);
-  return regex.test(p);
-}
-
-function globToRegex(pattern: string): RegExp {
-  let regex = "";
-  let i = 0;
-
-  while (i < pattern.length) {
-    const ch = pattern[i];
-
-    if (ch === "*") {
-      if (i + 1 < pattern.length && pattern[i + 1] === "*") {
-        // **
-        if (i + 2 < pattern.length && pattern[i + 2] === "/") {
-          // **/ — matches zero or more directories
-          regex += "(?:[^/]+/)*";
-          i += 3;
-        } else {
-          // ** at end
-          regex += ".*";
-          i += 2;
-        }
-      } else {
-        // * — matches anything except /
-        regex += "[^/]*";
-        i += 1;
-      }
-    } else if (ch === "?") {
-      regex += "[^/]";
-      i += 1;
-    } else if (ch === "." || ch === "+" || ch === "(" || ch === ")" || ch === "|" || ch === "^" || ch === "$") {
-      regex += "\\" + ch;
-      i += 1;
-    } else {
-      regex += ch;
-      i += 1;
+function pathMatchesPattern(file: string, pattern: string): boolean {
+  const expanded = expandBraces(pattern);
+  for (const variant of expanded) {
+    if (minimatch(file, variant)) {
+      return true;
     }
   }
-
-  return new RegExp(`^${regex}$`);
+  return false;
 }
 
 /**
@@ -137,11 +96,11 @@ export function buildFileToModuleMap(
  *
  * Uses the TypeScript compiler API for import extraction — no regex-based parsing.
  */
-export function buildArchitectureGraph(
+export async function buildArchitectureGraph(
   declaration: ArchitectureDeclaration,
   projectDir: string,
   fileContents: Map<string, string>,
-): ArchitectureGraph {
+): Promise<ArchitectureGraph> {
   const allFiles = [...fileContents.keys()];
 
   // Build file-to-module mapping
@@ -162,7 +121,7 @@ export function buildArchitectureGraph(
   }
 
   // Create TS-based import extractor
-  const extractor = createExtractor({
+  const extractor = await createExtractor({
     projectDir,
     tsconfigPath: declaration.tsconfig ? `${projectDir}/${declaration.tsconfig}` : undefined,
   });
@@ -221,13 +180,9 @@ export function buildArchitectureGraph(
       const targetModule = fileToModule.get(normalizedTarget);
 
       if (targetModule === undefined) {
-        // File resolved but not owned by any module — record as unresolved
-        unresolvedSpecifiers.push({
-          fromFile: file,
-          specifier: edge.specifier,
-          line: edge.line,
-          column: edge.column,
-        });
+        // Resolved to a file not owned by any module in this architecture.
+        // This is a cross-architecture dependency (e.g. cli → core). Skip it
+        // silently — each bounded context only evaluates its own modules.
         continue;
       }
 

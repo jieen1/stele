@@ -17,7 +17,6 @@ import {
   formatDesignOriginLines,
   buildDesignOriginJson,
   resolveDesignOrigin,
-  type DesignOriginInfo,
 } from "./design-origin.js";
 
 export type ExplainOptions = {

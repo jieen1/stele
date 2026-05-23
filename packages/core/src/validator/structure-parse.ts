@@ -1,7 +1,6 @@
-import path from "node:path";
-import type { AstNode, ListNode, SourceSpan } from "../ast/types.js";
+import type { ListNode, ParsedFile } from "../ast/types.js";
 import { SteleError } from "../errors/SteleError.js";
-import type { ParsedFile } from "../ast/types.js";
+import { isPathWithin, pathDirname, pathResolve } from "../util/path-utils.js";
 import { describeNode, validationError } from "./structure-error.js";
 import { parseInvariantDeclaration } from "./structure-invariant.js";
 import { parseScenarioDeclaration } from "./structure-scenario.js";
@@ -194,19 +193,6 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   };
 }
 
-function isPathWithin(candidate: string, directory: string): boolean {
-  if (candidate === directory) {
-    return true;
-  }
-  // Case-insensitive on Windows (case-insensitive FS)
-  if (process.platform === "win32") {
-    const c = candidate.toLowerCase();
-    const d = directory.toLowerCase();
-    return c.startsWith(d + path.sep);
-  }
-  return candidate.startsWith(directory + path.sep);
-}
-
 function parseImportDeclaration(filePath: string, node: ListNode): ImportDeclaration {
   if (node.items.length !== 1 || node.items[0]?.kind !== "string") {
     throw new SteleError(
@@ -220,10 +206,10 @@ function parseImportDeclaration(filePath: string, node: ListNode): ImportDeclara
   }
 
   const value = node.items[0].value;
-  const resolvedPath = path.resolve(path.dirname(filePath), value);
+  const resolvedPath = pathResolve(pathDirname(filePath), value);
 
-  const contractDir = path.dirname(filePath);
-  const projectRoot = path.resolve(contractDir, "..");
+  const contractDir = pathDirname(filePath);
+  const projectRoot = pathResolve(contractDir, "..");
 
   if (!isPathWithin(resolvedPath, contractDir) && !isPathWithin(resolvedPath, projectRoot)) {
     throw new SteleError(

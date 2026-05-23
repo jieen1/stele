@@ -1,6 +1,6 @@
 import { SteleError } from "@stele/core";
 import type { AstNode, ListNode, Contract, InvariantDeclaration, ScenarioDeclaration } from "@stele/core";
-import { COMPARISON_OPERATORS, isComparisonOperator, renderComparison } from "./templates/comparison.js";
+import { COMPARISON_OPERATORS, renderComparison } from "./templates/comparison.js";
 import {
     renderAnd,
     renderIf,
@@ -435,7 +435,8 @@ function translateCollection(node: ListNode, context: TranslationContext): strin
  * Translate `(field (path root ...) field_name)` to Rust path access.
  * Extends an existing path by appending one field segment.
  */
-function translateField(node: ListNode, context: TranslationContext, translate: ExpressionTranslator): string {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function translateField(node: ListNode, context: TranslationContext, _translate: ExpressionTranslator): string {
     if (node.items.length !== 2) {
         throw new SteleError("E0603", "Backend Error", 'Operator "field" expects a path and a field name.', node.span, `Found ${node.items.length}.`, "Use (field (path account) cash).");
     }

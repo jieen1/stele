@@ -30,5 +30,8 @@
   "homepage": "https://github.com/stelehq/stele",
   "bugs": {
     "url": "https://github.com/stelehq/stele/issues"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.7"
   }
 }

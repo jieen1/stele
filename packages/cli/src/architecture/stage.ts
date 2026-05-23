@@ -1,18 +1,21 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { evaluateArchitecture, buildArchitectureGraph } from "@stele/architecture-core";
 import { createViolationReport } from "@stele/core";
 import type { Violation, ViolationReport } from "@stele/core";
-import { evaluateArchitectureContract, type ArchitectureContractOptions } from "../architecture-runtime.js";
-import { safeGlob } from "../utils/glob.js";
+import {
+  evaluateArchitectureFull,
+  type ArchitectureContractOptions,
+  type ArchitectureEvaluationResult,
+} from "../architecture-runtime.js";
 import type { PreparedCheckContext, ProtectedCheckState } from "./types.js";
+
+// ----------------------------------------------------------------
+// Main
+// ----------------------------------------------------------------
 
 /**
  * Build the architecture stage report for the check pipeline.
  *
- * Loads architecture declarations from the contract, evaluates each one
- * against the real TypeScript dependency graph, and returns violations.
- * Surfaces both dependency violations and cycle violations.
+ * Delegates to evaluateArchitectureFull for a single pass: file discovery,
+ * graph building, and evaluation. No duplicate graph building.
  */
 export async function buildArchitectureStageReport(
   context: PreparedCheckContext,
@@ -37,42 +40,20 @@ export async function buildArchitectureStageReport(
 
   for (const arch of architectures) {
     const runtimeArch = convertToRuntimeArch(arch);
-    const violations = await evaluateArchitectureContract({
+
+    // Single evaluation pass: dependency, cycle, layer, public entry, unowned
+    const result = await evaluateArchitectureFull({
       projectRoot: context.projectDir,
       architecture: runtimeArch,
     });
 
-    // Dependency violations
-    for (const v of violations) {
-      const prefix = arch.description ? `${arch.description}. ` : "";
-      const detail = `${prefix}Architecture violation: module "${v.fromModule}" imports from "${v.toModule}" via ${v.specifier} at ${v.fromFile}:${v.line}:${v.column}`;
-      const fixSummary = arch.fix
-        ? arch.fix
-        : `Remove the import of "${v.specifier}" or move the file to an allowed module.`;
-      allViolations.push({
-        rule_id: `architecture.${arch.id}.${v.fromModule}.${v.toModule}`,
-        rule_kind: "architecture_dependency" as const,
-        severity: "error" as const,
-        source: { tool: "stele", command, kind: "architecture" },
-        location: { path: v.fromFile, line: v.line, column: v.column },
-        cause: { summary: detail },
-        fingerprint: `${v.fromModule}→${v.toModule}:${v.fromFile}`,
-        scope_paths: [v.fromFile],
-        status: "active" as const,
-        fix: { summary: fixSummary },
-      });
-    }
-
-    // Cycle violations (from evaluateArchitecture result)
-    const cycleViolations = await evaluateCycleViolations(
-      context.projectDir,
-      runtimeArch,
-      arch,
-      command,
+    allViolations.push(
+      ...buildDependencyViolations(result, arch, command),
+      ...buildCycleViolations(result, runtimeArch, arch, command),
+      ...buildLayerDirectionViolations(result, arch, command),
+      ...buildPublicEntryViolations(result, arch, command),
+      ...buildUnownedFileViolations(result, arch, command),
     );
-    for (const cv of cycleViolations) {
-      allViolations.push(cv);
-    }
   }
 
   return createViolationReport({
@@ -86,98 +67,129 @@ export async function buildArchitectureStageReport(
   });
 }
 
-/**
- * Evaluate cycle violations for an architecture declaration.
- * Returns violations with rule_kind "architecture_cycle".
- */
-async function evaluateCycleViolations(
-  projectRoot: string,
-  runtimeArch: ArchitectureContractOptions["architecture"],
-  arch: { fix?: string; description?: string },
+// ----------------------------------------------------------------
+// Violation builders
+// ----------------------------------------------------------------
+
+function buildDependencyViolations(
+  result: ArchitectureEvaluationResult,
+  arch: { id: string; description?: string; fix?: string },
   command: string,
-): Promise<Violation[]> {
-  if (!runtimeArch.denyCycles) {
-    return [];
-  }
+): Violation[] {
+  return result.dependencyViolations.map((v) => {
+    const prefix = arch.description ? `${arch.description}. ` : "";
+    const detail = `${prefix}Architecture violation: module "${v.fromModule}" imports from "${v.toModule}" via ${v.specifier} at ${v.fromFile}:${v.line}:${v.column}`;
+    return {
+      rule_id: `architecture.${arch.id}.${v.fromModule}.${v.toModule}`,
+      rule_kind: "architecture_dependency" as const,
+      severity: "error" as const,
+      source: { tool: "stele", command, kind: "architecture" },
+      location: { path: v.fromFile, line: v.line, column: v.column },
+      cause: { summary: detail },
+      fingerprint: `${v.fromModule}→${v.toModule}:${v.fromFile}`,
+      scope_paths: [v.fromFile],
+      status: "active" as const,
+      fix: { summary: arch.fix ?? `Remove the import of "${v.specifier}" or move the file to an allowed module.` },
+    };
+  });
+}
 
-  // Discover source files
-  const allFiles: string[] = [];
-  for (const mod of runtimeArch.modules) {
-    for (const pathPattern of mod.paths) {
-      const files = safeGlob(pathPattern, { projectDir: projectRoot });
-      allFiles.push(...files);
-    }
-  }
-  const uniqueFiles = [...new Set(allFiles)].sort();
-
-  // Build file contents map for graph builder
-  const fileContents = new Map<string, string>();
-  for (const file of uniqueFiles) {
-    try {
-      const absPath = resolve(projectRoot, file);
-      const content = await readFile(absPath, "utf8");
-      fileContents.set(file, content);
-    } catch {
-      // Skip unreadable files
-    }
-  }
-
-  // Build declaration for graph builder
-  const declaration: import("@stele/architecture-core").ArchitectureDeclaration = {
-    kind: "architecture",
-    id: runtimeArch.id,
-    lang: "typescript",
-    tsconfig: runtimeArch.tsconfig,
-    modules: runtimeArch.modules.map((m) => ({
-      id: m.id,
-      paths: m.paths,
-      publicEntries: [],
-      span: { file: "", line: 0, column: 0 },
-    })),
-    layers: [],
-    allowDependencies: runtimeArch.allowDependencies.map((d) => ({
-      ...d,
-      span: { file: "", line: 0, column: 0 },
-    })),
-    denyCycles: runtimeArch.denyCycles,
-  };
-
-  const graph = buildArchitectureGraph(declaration, projectRoot, fileContents);
-  const result = evaluateArchitecture(declaration, graph);
-
-  process.stderr.write(`[STAGE DEBUG] cycle detection: edges=${graph.edges.length} cycleViolations=${result.cycleViolations.length}\n`);
-  for (const e of graph.edges) {
-    process.stderr.write(`  [STAGE DEBUG] edge: ${e.fromModule}(${e.fromFile}) -> ${e.toModule}(${e.toFile})\n`);
-  }
-
-  const violations: Violation[] = [];
-  for (const cycle of result.cycleViolations) {
+function buildCycleViolations(
+  result: ArchitectureEvaluationResult,
+  runtimeArch: ArchitectureContractOptions["architecture"],
+  arch: { description?: string; fix?: string },
+  command: string,
+): Violation[] {
+  return result.cycleViolations.map((cycle) => {
     const modulesStr = cycle.modules.join(" → ");
     const fileStr = cycle.edgeFiles.length > 0 ? cycle.edgeFiles.join(", ") : "multiple files";
     const prefix = arch.description ? `${arch.description}. ` : "";
-    const summary = `${prefix}Architecture cycle: ${modulesStr} (files: ${fileStr})`;
 
-    const firstFile = cycle.edgeFiles[0] ?? "";
-    const fixSummary = arch.fix
-      ? arch.fix
-      : `Break the cycle by refactoring the dependency between modules: ${modulesStr}`;
-
-    violations.push({
+    return {
       rule_id: `architecture.${runtimeArch.id}.cycle.${cycle.modules.sort().join(".")}`,
       rule_kind: "architecture_cycle" as const,
       severity: "error" as const,
       source: { tool: "stele", command, kind: "architecture" },
-      location: { path: firstFile },
-      cause: { summary },
+      location: { path: cycle.edgeFiles[0] ?? "" },
+      cause: { summary: `${prefix}Architecture cycle: ${modulesStr} (files: ${fileStr})` },
       fingerprint: `architecture_cycle.${runtimeArch.id}.${cycle.modules.sort().join(".")}`,
       scope_paths: cycle.edgeFiles,
       status: "active" as const,
-      fix: { summary: fixSummary },
-    });
-  }
-
-  return violations;
+      fix: { summary: arch.fix ?? `Break the cycle by refactoring the dependency between modules: ${modulesStr}` },
+    };
+  });
 }
+
+function buildLayerDirectionViolations(
+  result: ArchitectureEvaluationResult,
+  arch: { id: string; description?: string; fix?: string },
+  command: string,
+): Violation[] {
+  return result.layerDirectionViolations.map((ldv) => {
+    const prefix = arch.description ? `${arch.description}. ` : "";
+    return {
+      rule_id: `architecture.${arch.id}.layer-direction.${ldv.fromModule}.${ldv.toModule}`,
+      rule_kind: "architecture_layer_direction" as const,
+      severity: "error" as const,
+      source: { tool: "stele", command, kind: "architecture" },
+      location: { path: ldv.fromFile, line: ldv.line ?? 0, column: ldv.column ?? 0 },
+      cause: {
+        summary: `${prefix}Layer direction violation: ${ldv.fromLayer} (${ldv.fromModule}) imports from ${ldv.toLayer} (${ldv.toModule}) via ${ldv.specifier} at ${ldv.fromFile}`,
+      },
+      fingerprint: `layer-direction.${arch.id}.${ldv.fromModule}.${ldv.toModule}:${ldv.fromFile}`,
+      scope_paths: [ldv.fromFile],
+      status: "active" as const,
+      fix: { summary: arch.fix ?? `Move import into ${ldv.toLayer} layer or restructure layer dependency.` },
+    };
+  });
+}
+
+function buildPublicEntryViolations(
+  result: ArchitectureEvaluationResult,
+  arch: { id: string; description?: string; fix?: string },
+  command: string,
+): Violation[] {
+  return result.publicEntryViolations.map((pev) => {
+    const prefix = arch.description ? `${arch.description}. ` : "";
+    return {
+      rule_id: `architecture.${arch.id}.public-entry.${pev.fromModule}.${pev.toModule}`,
+      rule_kind: "architecture_public_entry" as const,
+      severity: "error" as const,
+      source: { tool: "stele", command, kind: "architecture" },
+      location: { path: pev.fromFile, line: pev.line ?? 0, column: pev.column ?? 0 },
+      cause: {
+        summary: `${prefix}Public entry violation: ${pev.fromModule} imports internal file ${pev.toFile} from ${pev.toModule} via ${pev.specifier}. Allowed entries: ${pev.publicEntries.join(", ")}.`,
+      },
+      fingerprint: `public-entry.${arch.id}.${pev.fromModule}.${pev.toModule}:${pev.fromFile}`,
+      scope_paths: [pev.fromFile],
+      status: "active" as const,
+      fix: { summary: arch.fix ?? `Import through a public entry point of ${pev.toModule}.` },
+    };
+  });
+}
+
+function buildUnownedFileViolations(
+  result: ArchitectureEvaluationResult,
+  arch: { id: string },
+  command: string,
+): Violation[] {
+  return result.unownedFiles.map((uf) => ({
+    rule_id: `architecture.${arch.id}.unowned-file`,
+    rule_kind: "architecture_unowned_file" as const,
+    severity: "error" as const,
+    source: { tool: "stele", command, kind: "architecture" },
+    location: { path: uf },
+    cause: { summary: `Unowned file: ${uf} is not matched by any module in architecture ${arch.id}` },
+    fingerprint: `unowned-file.${arch.id}:${uf}`,
+    scope_paths: [uf],
+    status: "active" as const,
+    fix: { summary: `Assign ${uf} to a module or add an ignore pattern.` },
+  }));
+}
+
+// ----------------------------------------------------------------
+// Conversion
+// ----------------------------------------------------------------
 
 /**
  * Convert a parsed ArchitectureDeclaration to the runtime options shape.
@@ -185,6 +197,7 @@ async function evaluateCycleViolations(
 function convertToRuntimeArch(arch: {
   id: string;
   modules: { id: string; paths: string[] }[];
+  layers?: { id: string; modules: string[] }[];
   allowDependencies: Array<{ from: string; to: string[] }>;
   denyCycles: boolean;
   tsconfig?: string;
@@ -195,6 +208,10 @@ function convertToRuntimeArch(arch: {
     modules: arch.modules.map((m) => ({
       id: m.id,
       paths: m.paths,
+    })),
+    layers: arch.layers?.map((l) => ({
+      id: l.id,
+      modules: l.modules,
     })),
     allowDependencies: arch.allowDependencies,
     denyCycles: arch.denyCycles,

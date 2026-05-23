@@ -67,7 +67,7 @@ export async function runDesignPropose(
     const files = readdirSync(proposalsDir).filter((f) => f.endsWith(".yaml"));
     for (const file of files) {
       const raw = readFileSync(resolve(proposalsDir, file), "utf8");
-      const parsed = yaml.load(raw) as Record<string, unknown>;
+      const parsed = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>;
       if (String(parsed.id) === opts.id && String(parsed.kind) === proposalType) {
         process.stderr.write(`[design] Proposal "${opts.id}" (kind: ${proposalType}) already exists in proposals/\n`);
         process.exitCode = 1;

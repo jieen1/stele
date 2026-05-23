@@ -1,5 +1,5 @@
 import { loadProfile, profilePathExists } from "../../design-profile/load.js";
-import { readManifest, type GeneratedRuleEntry } from "../../design-generator/manifest.js";
+import { readManifest } from "../../design-generator/manifest.js";
 
 export type DesignExplainOptions = {
   json?: boolean;

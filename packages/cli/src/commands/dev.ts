@@ -1,9 +1,10 @@
 import { execFile } from "node:child_process";
 import { watch, type FSWatcher } from "node:fs";
-import { mkdir, readdir, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { readdir, stat } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
-import { PYTHON_CANDIDATES, resolvePythonRuntime } from "../utils/shared-utils.js";
+import { MAX_EVENT_LOG_SIZE } from "../config/defaults.js";
+import { resolvePythonRuntime } from "../utils/shared-utils.js";
 import { runGenerate } from "./generate.js";
 import { checkProject } from "./check.js";
 
@@ -104,7 +105,7 @@ async function runDevCycle(projectDir: string): Promise<void> {
     const { stdout, stderr } = await execFileAsync(pythonRuntime.command, [...pythonRuntime.args, "-m", "pytest", "tests/contract", "-q", "--tb=short"], {
       cwd: projectDir,
       windowsHide: true,
-      maxBuffer: 10 * 1024 * 1024,
+      maxBuffer: MAX_EVENT_LOG_SIZE,
     });
     process.stdout.write(stdout);
     if (stderr && !stderr.includes("no tests ran")) {

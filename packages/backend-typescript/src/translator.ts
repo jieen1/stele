@@ -778,6 +778,7 @@ function translateValue(node: ListNode, context: TranslationContext, translate: 
   return translate(node.items[0]!, context);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function translateField(node: ListNode, context: TranslationContext, _translate: ExpressionTranslator): string {
   if (node.items.length !== 2) {
     throw new SteleError(

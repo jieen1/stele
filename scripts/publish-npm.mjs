@@ -34,8 +34,16 @@ async function main() {
   const packDir = options.packDir ?? join(tempRoot, "packs");
 
   try {
-    await mkdir(packDir, { recursive: true });
+    // Pre-publish gates: build FIRST (so stele check uses fresh dist), then verify.
+    // Order: build → typecheck → test → stele check → pack.
     await runTool(pnpmTool, ["build"], { cwd: repoRoot });
+    await runTool(pnpmTool, ["-r", "run", "typecheck"], { cwd: repoRoot });
+    await runTool(pnpmTool, ["-r", "run", "test"], { cwd: repoRoot });
+    await run("node", [join(repoRoot, "packages", "cli", "dist", "index.js"), "check", "--format", "json"], {
+      cwd: repoRoot,
+    });
+
+    await mkdir(packDir, { recursive: true });
 
     const tarballs = [];
 

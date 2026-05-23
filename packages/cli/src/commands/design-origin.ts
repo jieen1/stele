@@ -4,7 +4,7 @@
 
 import { readManifest, type GeneratedRuleEntry } from "../design-generator/manifest.js";
 
-export type EnforcementLevel = "hard" | "advisory";
+export type EnforcementLevel = "hard" | "partial" | "advisory";
 
 export type DesignOriginInfo = {
   profileSection: string;
@@ -56,7 +56,9 @@ function findManifestEntry(
 }
 
 function inferEnforcementLevel(entry: GeneratedRuleEntry): EnforcementLevel {
-  return entry.ruleKind === "architecture" ? "hard" : "advisory";
+  // Core-nodes are complexity measurements (SLOC, cyclomatic, method-count),
+  // not behavioral pass/fail contracts. "partial" reflects this accurately.
+  return entry.ruleKind === "architecture" ? "hard" : "partial";
 }
 
 /**

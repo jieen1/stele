@@ -190,26 +190,34 @@ async function resolveCommandOnPath(commands, pathValue) {
   return null;
 }
 
-function spawnCommand(commandPath, args, cwd) {
+function spawnCommand(commandPath, args, cwd, timeoutMs) {
   const env = {
     ...process.env,
     CLAUDE_PROJECT_DIR: cwd,
   };
 
-  // commandPath is resolved by our own resolution logic (resolveSteleCommand)
-  // and never comes from user/agent input.
-  // args are hardcoded strings (e.g., ["agent-context"]).
-  // No user-controlled data reaches spawn, so shell: true carries no injection risk.
-  return spawn(commandPath, args, {
+  // On Windows, .cmd/.bat files require shell: true (CMD handles them).
+  // On POSIX, shell: false for defense-in-depth — no shell interpolation needed.
+  const child = spawn(commandPath, args, {
     cwd,
     env,
-    shell: true,
+    shell: process.platform === "win32",
     stdio: ["ignore", "pipe", "pipe"],
   });
+
+  if (timeoutMs) {
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      setTimeout(() => { try { child.kill("SIGKILL"); } catch { /* already dead */ } }, 5000);
+    }, timeoutMs);
+    timer.unref();
+  }
+
+  return child;
 }
 
-async function runCommand({ commandPath, args, cwd }) {
-  const child = spawnCommand(commandPath, args, cwd);
+async function runCommand({ commandPath, args, cwd, timeoutMs = 60000 }) {
+  const child = spawnCommand(commandPath, args, cwd, timeoutMs);
   let stdout = "";
   let stderr = "";
 

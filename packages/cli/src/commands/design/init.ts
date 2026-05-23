@@ -127,7 +127,7 @@ type Answers = {
 function loadAnswers(filePath: string, projectDir: string): Answers {
   const fullPath = resolve(projectDir, filePath);
   const text = readFileSync(fullPath, "utf8");
-  return yaml.load(text) as Answers;
+  return yaml.load(text, { schema: yaml.JSON_SCHEMA }) as Answers;
 }
 
 /**

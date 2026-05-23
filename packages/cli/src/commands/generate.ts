@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readdir, realpath, rm, stat, unlink, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { lstat, readdir, realpath, rm, stat, unlink } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 import { posix, win32 } from "node:path";
 import {
   CORE_OPERATOR_SPECS,
@@ -8,7 +8,6 @@ import {
   coordinateGeneration,
   hashManifestSha256,
   loadContract,
-  normalizeContract,
   normalizeFile,
   posixNormalize,
   readHashManifest,
@@ -548,40 +547,6 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
   );
 
   return results.flat();
-}
-
-async function includeRequiredProtectedFile(
-  projectDir: string,
-  manifestPath: string,
-  projectRelativePath: string,
-  matchedPaths: Set<string>,
-): Promise<void> {
-  const absolutePath = resolve(projectDir, projectRelativePath);
-
-  if (absolutePath === manifestPath) {
-    return;
-  }
-
-  try {
-    const entryStats = await lstat(absolutePath);
-    const normalizedPath = normalizeProjectRelativePath(projectDir, absolutePath);
-
-    if (entryStats.isSymbolicLink()) {
-      throw new Error(`Protected file scanning does not allow symbolic links or other non-regular entries: ${normalizedPath}.`);
-    }
-
-    if (!entryStats.isFile()) {
-      throw new Error(`Protected file scanning does not allow non-regular entries: ${normalizedPath}.`);
-    }
-
-    matchedPaths.add(absolutePath);
-  } catch (error) {
-    if (isMissingFileError(error)) {
-      return;
-    }
-
-    throw error;
-  }
 }
 
 function uniqueSortedPaths(paths: string[]): string[] {

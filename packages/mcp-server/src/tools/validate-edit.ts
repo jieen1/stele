@@ -38,7 +38,7 @@ export function createValidateEditTool(): {
         },
         newText: {
           type: "string",
-          description: "The new file content (optional, for pre-write validation)",
+          description: "The new file content (optional, for pre-write validation). Max 64KB.",
         },
       },
       required: ["filePath"],

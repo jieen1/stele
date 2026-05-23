@@ -241,7 +241,9 @@ describe("computeMaxCyclomaticComplexity", () => {
   public method(): void {
     try {
       throw new Error();
-    } catch (e) {}
+    } catch (e) {
+      // expected — empty by design; this source string is test data for cyclomatic complexity
+    }
   }
 }
 `;

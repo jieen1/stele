@@ -216,7 +216,7 @@ describe("buildAgentContext -- generated_rule_sources fallback to generatedRules
     const cnSource = context.generated_rule_sources!.find((s) => s.rule_id === "core-node.billing-invoice-aggregate");
     expect(cnSource).toBeDefined();
     expect(cnSource!.profile_anchor).toBe("aggregate:invoice");
-    expect(cnSource!.enforcement_level).toBe("advisory");
+    expect(cnSource!.enforcement_level).toBe("partial");
     expect(cnSource!.decision_id).toBe("invoice");
   });
 });

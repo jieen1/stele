@@ -16,8 +16,31 @@ function escapeString(s: string): string {
   * Normalize a layer value (string or string[]) into an array of glob paths.
   */
 function normalizeLayer(layer: string | string[]): string[] {
-  if (typeof layer === "string") return [layer];
-  return layer;
+  const paths = typeof layer === "string" ? [layer] : layer;
+  return paths.map((p) => ensureGlobSuffix(p));
+}
+
+/**
+ * Ensure a path ends with a glob suffix (`/**`) so that `minimatch` matches
+ * files inside the directory, not just the directory itself.
+ *
+ * Single-file paths (e.g., "server.ts", "model.py") are left as-is — they
+ * already identify exactly one file and should not be turned into directory
+ * globs like "server.ts/**".
+ */
+function ensureGlobSuffix(path: string): string {
+  if (path.endsWith("/**") || path.includes("/**/*.ts") || path.includes("/**/*.js")) {
+    return path;
+  }
+  // Single-file path — do not append glob suffix
+  if (path.match(/\.(ts|tsx|js|jsx|py|go|rs|java|kt|scala)$/)) {
+    return path;
+  }
+  // Plain directory path like "packages/backend-typescript/src" — needs glob suffix
+  if (!path.includes("**") && !path.includes("*")) {
+    return `${path}/**`;
+  }
+  return path;
 }
 
 function layerModuleId(contextId: string, layerName: string): string {
@@ -103,6 +126,7 @@ export function renderContextArchitecture(
 function buildLayerRoleMap(ctx: Context): Array<[string, string[]]> {
   const roles: Array<[string, string[]]> = [];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for (const [layerName, _] of Object.entries(ctx.layers)) {
     const modId = layerModuleId(ctx.id, layerName);
     const role = mapLayerToRole(layerName);
@@ -260,9 +284,9 @@ export function renderAclIntegration(
     if (toCtx.layers.application) {
       internalPaths.push(...normalizeLayer(toCtx.layers.application));
     }
-    if (toCtx.layers.infrastructure) {
-      internalPaths.push(...normalizeLayer(toCtx.layers.infrastructure));
-    }
+    // Omit infrastructure from internal — it's already registered as a separate
+    // infrastructure module. Including it here causes ambiguous ownership (files
+    // match both {ctx}-internal and {ctx}-infrastructure).
 
     if (internalPaths.length > 0) {
       const toInternalMod = `${integration.to}-internal`;
@@ -284,6 +308,16 @@ export function renderAclIntegration(
   }
 
   lines.push("");
+
+  // Allow-dependency rules: same-context internal → infrastructure
+  // Handlers/adapters (internal) legitimately use utility functions from infrastructure.
+  for (const ctx of contexts) {
+    const internalMod = `${ctx.id}-internal`;
+    const infraMod = layerModuleId(ctx.id, "infrastructure");
+    if (moduleSet.has(internalMod) && moduleSet.has(infraMod)) {
+      lines.push(`  (allow-dependency ${internalMod} ${infraMod})`);
+    }
+  }
 
   // Allow-dependency rules for each integration
   for (const integration of integrations) {

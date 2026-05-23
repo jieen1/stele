@@ -1266,7 +1266,8 @@ export function steleExists(coll: unknown, pred: (item: unknown) => boolean, pre
  * "filtered set is non-empty" is meaningful). The witness records
  * `collection_size` and `predicate_source`; no specific failed item.
  */
-export function steleWhere(coll: unknown, pred: (item: unknown) => boolean, predicateSource: string): unknown[] {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function steleWhere(coll: unknown, pred: (item: unknown) => boolean, _predicateSource: string): unknown[] {
   const items = assertCollection("where", coll);
   const matched: unknown[] = [];
   for (let i = 0; i < items.length; i += 1) {

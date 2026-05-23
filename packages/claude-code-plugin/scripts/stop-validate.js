@@ -87,11 +87,23 @@ async function main() {
   const pythonCommandPath = await resolvePythonCommand(projectDir, pathValue);
 
   if (pythonCommandPath === null) {
-    blockStop(
-      'Unable to run "python -m pytest tests/contract -q". Checked project-local .venv, nested **/.venv environments, and PATH. Ensure Python and pytest are available in the project venv or on PATH.\n',
-    );
-    return;
-  }
+    // Python not available — check if this project has a Python target language.
+    // If no tests/contract/ directory exists, skip pytest gracefully.
+    const testsDir = path.join(projectDir, "tests", "contract");
+    const hasContractTests = await fileExists(testsDir);
+
+    if (!hasContractTests) {
+      process.stderr.write(
+        "Stele note: Python/pytest not found and no tests/contract/ directory. Skipping pytest check.\n",
+      );
+    } else {
+      blockStop(
+        'Unable to run "python -m pytest tests/contract -q". Checked project-local .venv, nested **/.venv environments, and PATH. Ensure Python and pytest are available in the project venv or on PATH.\n',
+      );
+      return;
+    }
+    // If no contract tests exist, skip pytest and continue.
+  } else {
 
   const pytestResult = await runCommand({
     stageName: "pytest tests/contract",
@@ -111,6 +123,35 @@ async function main() {
     blockStopWithContractRecovery(`pytest tests/contract failed with exit code ${pytestResult.code}.\n`);
     return;
   }
+  }
+
+  // Run TypeScript tests (pnpm). Gracefully skip if pnpm is not available —
+  // not all Stele projects are pnpm monorepos.
+  const pnpmCommandPath = await resolveCommandOnPath(
+    process.platform === "win32" ? ["pnpm.cmd", "pnpm.bat"] : ["pnpm"],
+    pathValue,
+  );
+
+  // Only run pnpm test if this looks like a Node.js project (has package.json).
+  // Not all Stele-protected projects are pnpm monorepos.
+  const packageJsonPath = path.join(projectDir, "package.json");
+  const hasPackageJson = await fileExists(packageJsonPath);
+
+  if (pnpmCommandPath !== null && hasPackageJson) {
+    const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+    const pnpmResult = await runCommand({
+      stageName: "pnpm test",
+      commandPath: pnpmCommand,
+      args: ["test"],
+      cwd: projectDir,
+      env: { STELE_CONFORMANCE_ALLOW_SKIP: "1" },
+    });
+
+    if (pnpmResult.code !== 0) {
+      blockStopWithContractRecovery(`pnpm test failed with exit code ${pnpmResult.code}.\n`);
+      return;
+    }
+  }
 
   await maybeRequestMaintenanceReview(hookPayload, steleCommandPath);
 
@@ -120,26 +161,39 @@ async function main() {
   }
 }
 
-function spawnCommand(commandPath, args, cwd) {
+function spawnCommand(commandPath, args, cwd, timeoutMs, extraEnv) {
   const env = {
     ...process.env,
     CLAUDE_PROJECT_DIR: cwd,
+    ...extraEnv,
   };
 
   // commandPath is resolved by our own resolution logic (resolveSteleCommand / resolvePythonCommand)
   // and never comes from user/agent input.
   // args are hardcoded strings in this script (e.g., ["check"], ["-m", "pytest", ...]).
-  // No user-controlled data reaches spawn, so shell: true carries no injection risk.
-  return spawn(commandPath, args, {
+  // On Windows, .cmd/.bat files require shell: true (CMD handles them).
+  // On POSIX, shell: false for defense-in-depth — no shell interpolation needed.
+  const child = spawn(commandPath, args, {
     cwd,
     env,
-    shell: true,
+    shell: process.platform === "win32",
     stdio: ["ignore", "pipe", "pipe"],
   });
+
+  if (timeoutMs) {
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      setTimeout(() => { try { child.kill("SIGKILL"); } catch { /* already dead */ } }, 5000);
+    }, timeoutMs);
+    // Avoid keeping child alive for timer alone
+    timer.unref();
+  }
+
+  return child;
 }
 
-async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = true, blockOnSpawnError = true }) {
-  const child = spawnCommand(commandPath, args, cwd);
+async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = true, blockOnSpawnError = true, timeoutMs = 120000, env: extraEnv }) {
+  const child = spawnCommand(commandPath, args, cwd, timeoutMs, extraEnv);
   let stdout = "";
   let stderr = "";
 
@@ -285,11 +339,7 @@ function parseHookInput(stdin) {
     return {};
   }
 
-  try {
-    return JSON.parse(stdin);
-  } catch {
-    return {};
-  }
+  return JSON.parse(stdin);
 }
 
 function resolveSessionId(payload) {
@@ -318,7 +368,7 @@ async function fileExists(filePath) {
 }
 
 function safeFileName(value) {
-  return value.replace(/[^A-Za-z0-9._-]/gu, "_");
+  return value.replace(/[^A-Za-z0-9._-]/gu, "_").slice(0, 128);
 }
 
 function isPytestUnavailable(stderr) {

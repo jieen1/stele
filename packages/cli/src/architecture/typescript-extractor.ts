@@ -9,7 +9,7 @@ import {
  * All TypeScript AST-based extraction is handled by the architecture-core
  * package to avoid bundling TypeScript in this package.
  */
-export function createExtractor(options: ExtractorOptions) {
+export async function createExtractor(options: ExtractorOptions) {
   return createTsextractor(options);
 }
 

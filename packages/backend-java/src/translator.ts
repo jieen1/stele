@@ -14,7 +14,7 @@ import { logicOperatorHandlers, wrapForLogical } from "./templates/logic.js";
 import { stringOperatorHandlers } from "./templates/string.js";
 import { temporalOperatorHandlers } from "./templates/temporal.js";
 
-const INDENT = "    ";
+// INDENT constant removed (was unused)
 
 /**
  * Reserved-word set used by `sanitizeJavaIdentifier`.
@@ -222,7 +222,8 @@ function renderInvariantTest(
   return lines;
 }
 
-function renderCheckerArgs(args: readonly AstNode[], context: TranslationContext): string {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function renderCheckerArgs(args: readonly AstNode[], _context: TranslationContext): string {
   if (args.length === 0) {
     return "Collections.emptyList()";
   }
@@ -319,8 +320,8 @@ function renderJavaMap(value: Record<string, unknown>): string {
   return lines.join("\n");
 }
 
-function renderJavaValue(value: unknown, indent: number): string {
-  const prefix = "    ".repeat(indent);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function renderJavaValue(value: unknown, _indent: number): string {
   if (value === null) return "null";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") {
@@ -423,7 +424,8 @@ function translateValue(node: ListNode, context: TranslationContext, translate: 
   return translate(node.items[0]!, context);
 }
 
-function translateField(node: ListNode, context: TranslationContext, translate: ExpressionTranslator): string {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function translateField(node: ListNode, context: TranslationContext, _translate: ExpressionTranslator): string {
   if (node.items.length !== 2) {
     throw new SteleError("E0603", "Backend Error", 'Operator "field" expects a path and a field name.',
       node.span, `Found ${node.items.length} operand(s).`, "Use a form like (field (path account) cash).");

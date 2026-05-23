@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import { minimatch } from "minimatch";
 import { isAbsolute, relative, resolve } from "node:path";
+import { expandBraces } from "./glob-utils.js";
 
 const IGNORE_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage", ".stele"]);
 
@@ -28,10 +29,15 @@ export function safeGlob(pattern: string, options: GlobOptions): string[] {
     throw new Error(`safeGlob: pattern must not contain "..", got "${normalized}"`);
   }
 
+  // Expand brace expressions before walking (minimatch doesn't support them natively)
+  const expandedPatterns = expandBraces(normalized);
+
   const results = new Set<string>();
   const projectDir = resolve(options.projectDir);
 
-  walkDirectory(projectDir, projectDir, normalized, results);
+  for (const pattern of expandedPatterns) {
+    walkDirectory(projectDir, projectDir, pattern, results);
+  }
 
   return [...results].sort();
 }

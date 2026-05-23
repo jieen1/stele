@@ -8,6 +8,8 @@ export {
   evaluateArchitecture,
   findDependencyViolations,
   findCycleViolations,
+  findLayerDirectionViolations,
+  findPublicEntryViolations,
   detectCycles,
 } from "./evaluate.js";
 export {
@@ -16,3 +18,6 @@ export {
 export type {
   ExtractorOptions,
 } from "./typescript-extractor.js";
+export {
+  expandBraces,
+} from "./util.js";

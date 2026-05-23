@@ -68,7 +68,7 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     name: "Loader Error",
     message: "Unable to read contract file",
     category: 2,
-    source: "loader/loadContract.ts",
+    source: "loader/load-contract.ts",
   },
   E0202: {
     name: "Loader Error",
@@ -80,7 +80,7 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     name: "Loader Error",
     message: "Circular import detected",
     category: 2,
-    source: "loader/loadContract.ts",
+    source: "loader/load-contract.ts",
   },
   E0204: {
     name: "Loader Error",

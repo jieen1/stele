@@ -7,25 +7,10 @@ import {
   type ScenarioDeclaration,
   type ScenarioOperation,
 } from "@stele/core";
-import { isComparisonOp, emitComparison } from "./templates/comparison.js";
+import { emitComparison } from "./templates/comparison.js";
 import { emitAnd, emitOr, emitNot, emitImplies, emitIff, emitWhen } from "./templates/logic.js";
-import {
-  isAggregateOp,
-  emitAggregate,
-  isQuantifierOp,
-  emitQuantifier,
-} from "./templates/collection.js";
-import {
-  isBinaryArithOp,
-  emitBinaryArith,
-  isVariadicArithOp,
-  emitUnaryArith,
-  emitRound,
-} from "./templates/arithmetic.js";
-import { isStringOp, emitStringBinary, emitStringUnary } from "./templates/string.js";
+import { emitQuantifier } from "./templates/collection.js";
 import { emitTemporalBinary, emitStateBefore, emitStateAfter, emitModified } from "./templates/temporal.js";
-
-const INDENT = "\t";
 
 /**
  * Reserved Go identifiers that must not be used as generated symbols.
@@ -281,7 +266,8 @@ function translateNode(node: AstNode, context: TranslationContext): string {
  * Map of operator names to handler functions.
  */
 const OPERATOR_HANDLERS: Record<string, (node: ListNode, context: TranslationContext, translate: ExpressionTranslator) => string> = {
-  path: (node, context, translate) => translatePath(node, context),
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  path: (node, context, _translate) => translatePath(node, context),
   field: (node, context, translate) => translateField(node, context, translate),
   collection: (node, context) => translateCollection(node, context),
   value: (node, context, translate) => {
@@ -593,7 +579,8 @@ function translateCollection(node: ListNode, context: TranslationContext): strin
  * Translate `(field (path root ...) field_name)` to Go path access.
  * Extends an existing path by appending one field segment.
  */
-function translateField(node: ListNode, context: TranslationContext, translate: ExpressionTranslator): string {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function translateField(node: ListNode, context: TranslationContext, _translate: ExpressionTranslator): string {
   if (node.items.length !== 2) {
     throw new SteleError("E0603", "Backend Error", 'Operator "field" expects a path and a field name.', node.span, `Found ${node.items.length} operand(s).`, "Use (field (path account) cash).");
   }

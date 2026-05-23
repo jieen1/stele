@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-20T14:18:58.763Z",
+  "generated_at": "2026-05-22T16:02:41.173Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/.gitkeep": {
@@ -8,28 +8,28 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "f0c8c2470cdab5df46e160748b6ca7b58088b86028ae9a17d0212dc1bb6338b1",
-      "size": 33296
+      "sha256": "71cbb29a495e20191852f3da79e2172d1b7273f2640600c338454e4c9cb03f66",
+      "size": 39064
     },
     "contract/checker_impls/test_negative.py": {
       "sha256": "967ff1bc48dd333637dd181067710ffea855e553c76c04cc2696a0c86bae8898",
       "size": 21860
     },
     "contract/design/manifest.json": {
-      "sha256": "19a675ad51702c4bcfaf6f19b6a20827926a98fa691414b0b3574718e5a51bb9",
-      "size": 29507
+      "sha256": "a92c5fdc71848afb319fcf681cbed8db7c33f0296f434f4916b99a30a8c6d511",
+      "size": 29513
     },
     "contract/design/profile.yaml": {
-      "sha256": "ce02ba807b519860a39d80c91aecafca93c8a6ac362de41ca5b7884932827cd4",
-      "size": 12132
+      "sha256": "7cdeee4e6e064a3b926e415aaddc1273858f38e7a3082a67b1af70ac7a1d343f",
+      "size": 15212
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "21b25d036e5905e47b631ac7a553327dfc26c07f7da3f2e0cc38f30e52df5e13",
-      "size": 12551
+      "sha256": "cf78d84143956193aa4d8be3664d5bed62ca30712bbf46c40d4c0f519863009f",
+      "size": 12562
     },
     "contract/main.stele": {
-      "sha256": "e104fb97f585c3aa50118bea9742f23a8e9a0da363e12885542fb8c7fcad12c2",
-      "size": 10263
+      "sha256": "dff55506c99b20f11afa2b87574ca2974bce1f99753a9b2b03e4311a4741f399",
+      "size": 10541
     },
     "tests/contract/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -48,5 +48,5 @@
       "size": 6086
     }
   },
-  "contract_hash": "1816e6aa3ce0ef8d487d4194b0f9e1923b8f75ae3e971ad9ebceb84d247b0613"
+  "contract_hash": "8dbcc20e5e2429cc8e230b1bfb1531c3a6589ffdc010017b12fc9fecc3464f02"
 }

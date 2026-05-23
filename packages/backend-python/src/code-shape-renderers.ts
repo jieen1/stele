@@ -7,7 +7,7 @@ import {
   type TypePolicyDeclaration,
 } from "@stele/core";
 import { SteleError } from "@stele/core";
-import { INDENT, type CodeShapeTarget } from "./types.js";
+import { INDENT } from "./types.js";
 import { parseCodeShapeTarget, fileToModulePath } from "./code-shape-target.js";
 import { toPythonString } from "./translation-utils.js";
 

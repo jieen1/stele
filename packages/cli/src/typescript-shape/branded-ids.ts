@@ -3,7 +3,8 @@ import { dirname, resolve } from "node:path";
 import { minimatch } from "minimatch";
 import type { BrandedIdDeclaration, BrandedIdViolation, BrandedIdCheckOptions } from "./types.js";
 
-const RULE_ID = "typedriven.shape.branded-id";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _RULE_ID = "typedriven.shape.branded-id";
 
 /** Parse "path/to/file.ts::TypeName" into { filePath, typeName }. */
 function parseTypeTarget(
@@ -38,7 +39,8 @@ function toPosixPath(p: string): string {
 /**
  * Check if a ts.Type is the primitive string type.
  */
-function isPrimitiveString(type: ts.Type, checker: ts.TypeChecker): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function isPrimitiveString(type: ts.Type, _checker: ts.TypeChecker): boolean {
   // The intrinsic `string` type has TypeFlags.String (value 4)
   if (type.flags === ts.TypeFlags.String) return true;
 

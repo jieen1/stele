@@ -20,9 +20,13 @@ project:
     - "packages/architecture-core/src"
     - "packages/backend-typescript/src"
     - "packages/backend-python/src"
+    - "packages/backend-go/src"
+    - "packages/backend-java/src"
+    - "packages/backend-rust/src"
     - "packages/agent-hooks/src"
     - "packages/mcp-server/src"
     - "packages/claude-code-plugin/src"
+    - "packages/github-action/src"
   ignore:
     - "**/tests/**"
     - "**/__tests__/**"
@@ -212,7 +216,7 @@ ddd:
       architecture_style: hexagonal
       root: "packages/agent-hooks/src"
       layers:
-        protocol: "packages/agent-hooks/src/{protocol}/**"
+        protocol: "packages/agent-hooks/src/{protocol.ts,protocol/**}"
         domain: "packages/agent-hooks/src/handlers/**"
         application: "packages/agent-hooks/src/adapters/**"
         infrastructure: "packages/agent-hooks/src/{install,util}/**"
@@ -225,8 +229,48 @@ ddd:
       architecture_style: hexagonal
       root: "packages/mcp-server/src"
       layers:
-        application: "packages/mcp-server/src/{server,sessions,types}/**"
+        application: "packages/mcp-server/src/{server.ts,sessions/**,types.ts,session-state.ts}"
         infrastructure: "packages/mcp-server/src/{bin,tools}/**"
+      aggregate_roots: []
+
+    - id: backends-go
+      decision_ref: d1
+      name: Go Test Backend
+      subdomain_type: supporting
+      architecture_style: transaction_script
+      root: "packages/backend-go/src"
+      layers:
+        domain: "packages/backend-go/src/**"
+      aggregate_roots: []
+
+    - id: backends-java
+      decision_ref: d1
+      name: Java Test Backend
+      subdomain_type: supporting
+      architecture_style: transaction_script
+      root: "packages/backend-java/src"
+      layers:
+        domain: "packages/backend-java/src/**"
+      aggregate_roots: []
+
+    - id: backends-rust
+      decision_ref: d1
+      name: Rust Test Backend
+      subdomain_type: supporting
+      architecture_style: transaction_script
+      root: "packages/backend-rust/src"
+      layers:
+        domain: "packages/backend-rust/src/**"
+      aggregate_roots: []
+
+    - id: github-action
+      decision_ref: d1
+      name: GitHub Action Integration
+      subdomain_type: supporting
+      architecture_style: hexagonal
+      root: "packages/github-action/src"
+      layers:
+        domain: "packages/github-action/src/**"
       aggregate_roots: []
 
     - id: plugin
@@ -266,6 +310,22 @@ ddd:
       decision_ref: d1
     - from: cli
       to: mcp
+      pattern: published_language
+      decision_ref: d1
+    - from: backends-go
+      to: core
+      pattern: published_language
+      decision_ref: d1
+    - from: backends-java
+      to: core
+      pattern: published_language
+      decision_ref: d1
+    - from: backends-rust
+      to: core
+      pattern: published_language
+      decision_ref: d1
+    - from: github-action
+      to: core
       pattern: published_language
       decision_ref: d1
     - from: backends-ts
@@ -348,15 +408,36 @@ ddd:
 type_driven:
   enabled: true
   branded_ids:
-    mode: advisory
-    declarations: []
+    mode: hard
+    declarations:
+      - name: RuleId
+        base_type: string
+        invariant: "matches /^[a-z][a-z0-9_.]*$/"
+      - name: ContractPath
+        base_type: string
+        invariant: "matches /^[^/]+\\.stele$/"
+      - name: Sha256
+        base_type: string
+        invariant: "matches /^[0-9a-f]{64}$/"
+      - name: PackageName
+        base_type: string
+        invariant: "matches /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
   smart_constructors:
-    mode: advisory
-    value_objects: []
+    mode: hard
+    value_objects:
+      - name: RuleId
+        constructor: "parseRuleId(input: string): RuleId"
+        deny_raw: true
+      - name: ContractPath
+        constructor: "parseContractPath(input: string): ContractPath"
+        deny_raw: true
+      - name: Sha256
+        constructor: "parseSha256(input: string): Sha256"
+        deny_raw: true
   adt:
-    mode: advisory
+    mode: hard
   type_state:
-    mode: advisory
+    mode: hard
 
 toolchain_contracts:
   typescript_config:
@@ -372,4 +453,13 @@ toolchain_contracts:
     enabled: true
     command: "pnpm --filter @stele/cli run typecheck"
   eslint:
-    enabled: false
+    enabled: true
+    command: "npx eslint --format json ."
+    format: json
+    rules:
+      - "@typescript-eslint/no-unused-vars"
+      - "@typescript-eslint/no-explicit-any"
+    warning_is_error: true
+
+self_constraints:
+  no_baseline: true

@@ -120,7 +120,8 @@ interface Context {
   error?: string;
 }
 
-async function buildContext(projectDir: string, focusPaths: string[]): Promise<Context> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function buildContext(projectDir: string, _focusPaths: string[]): Promise<Context> {
   const contractDir = join(projectDir, "contract");
   const context: Context = {
     projectDir,

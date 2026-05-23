@@ -18,13 +18,13 @@ import {
 } from "./commands/baseline.js";
 import {
   checkProject,
+  formatCheckSummary,
   isCheckCommandError,
-  runCheckRecursive,
   type CheckCommandOptions,
   type CheckCommandResult,
-  type CheckSummary,
   writeCheckReportFile,
 } from "./commands/check.js";
+import { runCheckRecursive } from "./commands/check-recursive.js";
 import { formatCheckReport } from "./report/formatter.js";
 import { runAgentContext, type AgentContextOptions } from "./commands/agentContext.js";
 import { runExplain, type ExplainOptions } from "./commands/explain.js";
@@ -65,6 +65,9 @@ type ProgramDependencies = {
   runMaintenanceSummary?: (projectDir: string, options?: MaintenanceSummaryOptions) => Promise<void>;
   runObserve?: (projectDir: string, options?: ObserveOptions) => Promise<void>;
 };
+
+/** Alias for complexity contract targeting. */
+export { createProgram as createSteleProgram };
 
 export function createProgram(dependencies: ProgramDependencies = {}): Command {
   const cwd = dependencies.cwd ?? (() => process.cwd());
@@ -133,7 +136,6 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--lenient", "skip code-shape checks (faster)")
     .option("--architecture-only", "only check architecture constraints (skip code-shape)", false)
     .option("--complexity-only", "only check complexity metrics (skip code-shape)", false)
-    .option("--no-complexity", "skip complexity checks", false)
     .option("--recursive", "auto-discover stele.config.json files and check each project", false)
     .action(async (options: CheckCommandOptions) => {
       const fmt = options.json ? "json" : (options.format ?? "human");
@@ -433,10 +435,6 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     });
 
   return program;
-}
-
-function formatCheckSummary(summary: CheckSummary): string {
-  return `OK ${summary.invariantCount} invariant${summary.invariantCount === 1 ? "" : "s"} checked; ${summary.generatedFileCount} generated file${summary.generatedFileCount === 1 ? "" : "s"} and ${summary.protectedFileCount} protected file${summary.protectedFileCount === 1 ? "" : "s"} verified.\n`;
 }
 
 function formatLockSummary(summary: LockSummary): string {

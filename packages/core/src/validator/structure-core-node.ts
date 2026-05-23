@@ -1,4 +1,4 @@
-import type { AstNode, ListNode } from "../ast/types.js";
+import type { ListNode } from "../ast/types.js";
 import type {
   CoreNodeDeclaration,
   CoreNodeMetricBoundary,
