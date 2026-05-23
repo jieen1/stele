@@ -32,11 +32,16 @@
  *   couldn't recover it on its own is forgiven for this caller.
  */
 
-import { compilePattern, parseNodeId } from "@stele/call-graph-core";
+import {
+  compilePattern,
+  parseNodeId,
+  resolveExternPattern,
+} from "@stele/call-graph-core";
 import type {
   CallGraph,
   CallGraphEdge,
   CallGraphNode,
+  ExternAliasRegistry,
 } from "@stele/call-graph-core";
 import type {
   Contract,
@@ -70,6 +75,14 @@ export interface EvaluateTypeStateOptions {
    * contribute to the returned `violations` array.
    */
   readonly strictMode?: boolean;
+  /**
+   * Round 4 D-07: cross-language alias registry built from
+   * `(extern-alias ...)` declarations in the contract. When present, any
+   * `extern:<logical-name>::...` target pattern on a type-state declaration
+   * is resolved through this registry before being matched against the
+   * call graph.
+   */
+  readonly externAliases?: ExternAliasRegistry;
 }
 
 export interface EvaluateTypeStateStats {
@@ -129,7 +142,20 @@ function simpleGlobToRegExp(glob: string): RegExp {
  *      (e.g. the pattern includes `(arity)` or `**::`), delegate to
  *      `@stele/call-graph-core`'s `compilePattern` for full NodeId matching.
  */
-function buildTargetMatcher(target: string): TargetMatcher {
+function buildTargetMatcher(
+  target: string,
+  callGraphLanguage: CallGraph["language"],
+  externAliases: ExternAliasRegistry | undefined,
+): TargetMatcher {
+  // Round 4 D-07: resolve `extern:` patterns through the registry first;
+  // downstream parsing (sepIdx split, compilePattern dispatch) sees the
+  // already-resolved per-language form.
+  if (externAliases !== undefined) {
+    const resolved = resolveExternPattern(target, callGraphLanguage, externAliases);
+    if (resolved !== null) {
+      target = resolved;
+    }
+  }
   const sepIdx = target.lastIndexOf("::");
   if (sepIdx < 0) {
     // Defensive: shouldn't reach here (validator enforces `::`), but degrade
@@ -188,12 +214,16 @@ function buildTargetMatcher(target: string): TargetMatcher {
  * SubmittedOrder). When any mapping target's TypeName matches a node's
  * container/symbol, that node is considered a target method of this decl.
  */
-function buildStateTypeMappingMatcher(decl: TypeStateDeclaration): TargetMatcher | null {
+function buildStateTypeMappingMatcher(
+  decl: TypeStateDeclaration,
+  callGraphLanguage: CallGraph["language"],
+  externAliases: ExternAliasRegistry | undefined,
+): TargetMatcher | null {
   if (decl.stateTypeMapping.length === 0) {
     return null;
   }
   const matchers: TargetMatcher[] = decl.stateTypeMapping.map((m) =>
-    buildTargetMatcher(m.target),
+    buildTargetMatcher(m.target, callGraphLanguage, externAliases),
   );
   return {
     matches: (id: string) => matchers.some((m) => m.matches(id)),
@@ -285,13 +315,15 @@ interface CompiledDeclaration {
 
 function compileDeclarations(
   declarations: readonly TypeStateDeclaration[],
+  callGraphLanguage: CallGraph["language"],
+  externAliases: ExternAliasRegistry | undefined,
 ): readonly CompiledDeclaration[] {
   const out: CompiledDeclaration[] = [];
   for (const decl of declarations) {
     out.push({
       decl,
-      targetMatcher: buildTargetMatcher(decl.target),
-      stateTypeMatcher: buildStateTypeMappingMatcher(decl),
+      targetMatcher: buildTargetMatcher(decl.target, callGraphLanguage, externAliases),
+      stateTypeMatcher: buildStateTypeMappingMatcher(decl, callGraphLanguage, externAliases),
     });
   }
   return Object.freeze(out);
@@ -348,7 +380,7 @@ function indexInferences(
 export async function evaluateTypeStates(
   options: EvaluateTypeStateOptions,
 ): Promise<EvaluateTypeStateResult> {
-  const { contract, callGraph, extractor } = options;
+  const { contract, callGraph, extractor, externAliases } = options;
   const strictMode = options.strictMode ?? true;
 
   const declarations = contract.typeStates;
@@ -373,7 +405,7 @@ export async function evaluateTypeStates(
     projectRoot: callGraph.projectRoot,
   });
   const inferIndex = indexInferences(inferResult);
-  const compiled = compileDeclarations(declarations);
+  const compiled = compileDeclarations(declarations, callGraph.language, externAliases);
 
   const violations: Violation[] = [];
   const notices: Violation[] = [];

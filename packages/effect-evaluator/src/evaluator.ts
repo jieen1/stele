@@ -27,7 +27,12 @@
  * fix-hint (see fix-hint.ts).
  */
 
-import { compilePattern, type CompiledPattern } from "@stele/call-graph-core";
+import {
+  compilePattern,
+  resolveExternPattern,
+  type CompiledPattern,
+  type ExternAliasRegistry,
+} from "@stele/call-graph-core";
 import type { CallGraph, CallGraphNode } from "@stele/call-graph-core";
 import type {
   Contract,
@@ -63,6 +68,15 @@ export interface EvaluateEffectOptions {
    * widen the set.
    */
   readonly strictMode?: boolean;
+  /**
+   * Round 4 D-07: cross-language alias registry built from
+   * `(extern-alias ...)` declarations in the contract. When present, any
+   * `extern:<logical-name>::...` pattern in an effect policy's scope or
+   * an annotation target is resolved through this registry before being
+   * matched against the call graph. Without the registry these patterns
+   * fall through to literal matching, which never resolves cross-language.
+   */
+  readonly externAliases?: ExternAliasRegistry;
 }
 
 export interface EvaluateEffectStats {
@@ -91,10 +105,19 @@ function flattenDeclaredEffects(contract: Contract): ReadonlySet<string> {
 
 function compileAnnotationTargets(
   annotation: EffectAnnotationDeclaration,
+  callGraphLanguage: CallGraph["language"],
+  externAliases: ExternAliasRegistry | undefined,
 ): readonly CompiledPattern[] {
   const out: CompiledPattern[] = [];
-  for (const t of annotation.target) {
-    out.push(compilePattern(t));
+  for (const raw of annotation.target) {
+    let pattern = raw;
+    if (externAliases !== undefined) {
+      const resolved = resolveExternPattern(pattern, callGraphLanguage, externAliases);
+      if (resolved !== null) {
+        pattern = resolved;
+      }
+    }
+    out.push(compilePattern(pattern));
   }
   return out;
 }
@@ -112,12 +135,15 @@ function buildInitialEffects(
   contract: Contract,
   callGraph: CallGraph,
   annotationsByNode: ReadonlyMap<string, readonly string[]>,
+  externAliases: ExternAliasRegistry | undefined,
 ): ReadonlyMap<string, ReadonlySet<string>> {
   const out = new Map<string, ReadonlySet<string>>();
-  // Pre-compile annotation patterns once.
+  // Pre-compile annotation patterns once. Round 4 D-07: extern-alias
+  // resolution happens at compile time so `extern:logical-name::Sym`
+  // targets are rewritten into the call-graph's actual language form.
   const compiledAnnotations = contract.effectAnnotations.map((a) => ({
     annotation: a,
-    patterns: compileAnnotationTargets(a),
+    patterns: compileAnnotationTargets(a, callGraph.language, externAliases),
   }));
 
   for (const node of callGraph.nodes) {
@@ -220,7 +246,7 @@ function applyUnresolvedFailClosed(
 export async function evaluateEffects(
   options: EvaluateEffectOptions,
 ): Promise<EvaluateEffectResult> {
-  const { contract, callGraph, extractor } = options;
+  const { contract, callGraph, extractor, externAliases } = options;
   const strictMode = options.strictMode ?? true;
 
   // Step 1 — declared effect name table.
@@ -236,6 +262,7 @@ export async function evaluateEffects(
     contract,
     callGraph,
     extracted.annotationsByNode,
+    externAliases,
   );
 
   // Step 4 — apply CDL suppressions.
@@ -316,6 +343,7 @@ export async function evaluateEffects(
         effectiveByNode: widenedPropagation.effectiveByNode,
         directByNode: widenedPropagation.directByNode,
         declaredEffects,
+        externAliases,
       });
       for (const match of matches) {
         // If the offending effect was injected by D-CG-5 widening AND the
@@ -349,6 +377,7 @@ export async function evaluateEffects(
         effectiveByNode: widenedPropagation.effectiveByNode,
         directByNode: widenedPropagation.directByNode,
         declaredEffects,
+        externAliases,
       });
       for (const match of matches) {
         if (

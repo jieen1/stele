@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   createViolation,
   createViolationReport,
+  type ExternAliasDeclaration,
   type Violation,
   type ViolationReport,
 } from "@stele/core";
@@ -14,7 +15,12 @@ import {
   tsCallGraphExtractor,
   tsTypeStateInferenceExtractor,
 } from "@stele/backend-typescript";
-import type { CallGraph } from "@stele/call-graph-core";
+import {
+  buildExternAliasRegistry,
+  type CallGraph,
+  type ExternAlias,
+  type ExternAliasRegistry,
+} from "@stele/call-graph-core";
 import type { TypeStateInferenceExtractor } from "@stele/type-state-evaluator";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
@@ -41,6 +47,25 @@ export interface TypeStateStageDeps {
    * notice path.
    */
   readonly strictMode?: boolean;
+  /** Round 4 D-07 — pre-built registry override for tests. */
+  readonly externAliases?: ExternAliasRegistry;
+}
+
+function buildContractExternAliasRegistry(
+  declarations: readonly ExternAliasDeclaration[] | undefined,
+): ExternAliasRegistry | undefined {
+  if (declarations === undefined || declarations.length === 0) {
+    return undefined;
+  }
+  const aliases: ExternAlias[] = declarations.map((d) => ({
+    logicalName: d.id,
+    typescript: d.typescript,
+    python: d.python,
+    go: d.go,
+    java: d.java,
+    rust: d.rust,
+  }));
+  return buildExternAliasRegistry(aliases);
 }
 
 /**
@@ -182,6 +207,10 @@ export async function buildTypeStateStage(
   const evaluate = deps.evaluate ?? evaluateTypeStates;
   const extractor = deps.extractor ?? tsTypeStateInferenceExtractor;
   const strictMode = deps.strictMode ?? true;
+  // Round 4 D-07: cross-language alias registry construction mirrors the
+  // trace + effect stages — see those for rationale.
+  const externAliases =
+    deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
 
   let result: EvaluateTypeStateResult;
   try {
@@ -190,6 +219,7 @@ export async function buildTypeStateStage(
       callGraph,
       extractor,
       strictMode,
+      externAliases,
     });
   } catch (error) {
     return createViolationReport({

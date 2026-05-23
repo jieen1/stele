@@ -17,8 +17,14 @@
  * scopes (full NodeId globs, extern: support).
  */
 
-import { compilePattern, type CompiledPattern } from "@stele/call-graph-core";
-import type { CallGraph, CallGraphNode } from "@stele/call-graph-core";
+import {
+  compilePattern,
+  resolveExternPattern,
+  type CallGraph,
+  type CallGraphNode,
+  type CompiledPattern,
+  type ExternAliasRegistry,
+} from "@stele/call-graph-core";
 import type { EffectPolicyDeclaration } from "@stele/core";
 
 import { expandEffectPatterns } from "./effect-set.js";
@@ -35,6 +41,8 @@ export interface CheckForbidOptions {
   readonly effectiveByNode: ReadonlyMap<string, ReadonlySet<string>>;
   readonly directByNode: ReadonlyMap<string, ReadonlySet<string>>;
   readonly declaredEffects: ReadonlySet<string>;
+  /** Round 4 D-07 — cross-language alias resolver for `extern:` scopes. */
+  readonly externAliases?: ExternAliasRegistry;
 }
 
 /**
@@ -43,7 +51,7 @@ export interface CheckForbidOptions {
  * within each node ordered lexicographically.
  */
 export function checkForbid(options: CheckForbidOptions): readonly PolicyMatch[] {
-  const { policy, callGraph, effectiveByNode, directByNode, declaredEffects } = options;
+  const { policy, callGraph, effectiveByNode, directByNode, declaredEffects, externAliases } = options;
   if (policy.forbid === undefined || policy.forbid.length === 0) {
     return Object.freeze([]);
   }
@@ -56,6 +64,7 @@ export function checkForbid(options: CheckForbidOptions): readonly PolicyMatch[]
     callGraph,
     effectiveByNode,
     directByNode,
+    externAliases,
     test: (effect) => forbidden.has(effect),
   });
 }
@@ -66,6 +75,8 @@ export interface CheckAllowOnlyOptions {
   readonly effectiveByNode: ReadonlyMap<string, ReadonlySet<string>>;
   readonly directByNode: ReadonlyMap<string, ReadonlySet<string>>;
   readonly declaredEffects: ReadonlySet<string>;
+  /** Round 4 D-07 — cross-language alias resolver for `extern:` scopes. */
+  readonly externAliases?: ExternAliasRegistry;
 }
 
 /**
@@ -75,7 +86,7 @@ export interface CheckAllowOnlyOptions {
  * the spec).
  */
 export function checkAllowOnly(options: CheckAllowOnlyOptions): readonly PolicyMatch[] {
-  const { policy, callGraph, effectiveByNode, directByNode, declaredEffects } = options;
+  const { policy, callGraph, effectiveByNode, directByNode, declaredEffects, externAliases } = options;
   if (policy.allowOnly === undefined) {
     return Object.freeze([]);
   }
@@ -85,6 +96,7 @@ export function checkAllowOnly(options: CheckAllowOnlyOptions): readonly PolicyM
     callGraph,
     effectiveByNode,
     directByNode,
+    externAliases,
     test: (effect) => !allowed.has(effect),
   });
 }
@@ -95,11 +107,12 @@ interface CollectOptions {
   readonly effectiveByNode: ReadonlyMap<string, ReadonlySet<string>>;
   readonly directByNode: ReadonlyMap<string, ReadonlySet<string>>;
   readonly test: (effect: string) => boolean;
+  readonly externAliases?: ExternAliasRegistry;
 }
 
 function collectMatches(options: CollectOptions): readonly PolicyMatch[] {
-  const { policy, callGraph, effectiveByNode, directByNode, test } = options;
-  const scopePatterns = compileScope(policy.targetScope);
+  const { policy, callGraph, effectiveByNode, directByNode, test, externAliases } = options;
+  const scopePatterns = compileScope(policy.targetScope, callGraph.language, externAliases);
   const matches: PolicyMatch[] = [];
 
   // Deterministic node iteration order.
@@ -132,10 +145,21 @@ function collectMatches(options: CollectOptions): readonly PolicyMatch[] {
   return Object.freeze(matches);
 }
 
-function compileScope(patterns: readonly string[]): readonly CompiledPattern[] {
+function compileScope(
+  patterns: readonly string[],
+  callGraphLanguage: CallGraph["language"],
+  registry: ExternAliasRegistry | undefined,
+): readonly CompiledPattern[] {
   const out: CompiledPattern[] = [];
-  for (const p of patterns) {
-    out.push(compilePattern(p));
+  for (const raw of patterns) {
+    let pattern = raw;
+    if (registry !== undefined) {
+      const resolved = resolveExternPattern(pattern, callGraphLanguage, registry);
+      if (resolved !== null) {
+        pattern = resolved;
+      }
+    }
+    out.push(compilePattern(pattern));
   }
   return out;
 }
@@ -157,8 +181,9 @@ function matchAny(nodeId: string, patterns: readonly CompiledPattern[]): boolean
 export function resolveScopeNodes(
   callGraph: CallGraph,
   scopePatterns: readonly string[],
+  externAliases?: ExternAliasRegistry,
 ): readonly string[] {
-  const compiled = compileScope(scopePatterns);
+  const compiled = compileScope(scopePatterns, callGraph.language, externAliases);
   const ids: string[] = [];
   for (const n of callGraph.nodes) {
     if (matchAny(n.id, compiled)) {

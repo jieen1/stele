@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   createViolation,
   createViolationReport,
+  type ExternAliasDeclaration,
   type Violation,
   type ViolationReport,
 } from "@stele/core";
@@ -15,7 +16,12 @@ import {
   tsCallGraphExtractor,
   tsEffectAnnotationExtractor,
 } from "@stele/backend-typescript";
-import type { CallGraph } from "@stele/call-graph-core";
+import {
+  buildExternAliasRegistry,
+  type CallGraph,
+  type ExternAlias,
+  type ExternAliasRegistry,
+} from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
 import {
@@ -41,6 +47,25 @@ export interface EffectStageDeps {
    * exercise the notice path.
    */
   readonly strictMode?: boolean;
+  /** Round 4 D-07 — pre-built registry override for tests. */
+  readonly externAliases?: ExternAliasRegistry;
+}
+
+function buildContractExternAliasRegistry(
+  declarations: readonly ExternAliasDeclaration[] | undefined,
+): ExternAliasRegistry | undefined {
+  if (declarations === undefined || declarations.length === 0) {
+    return undefined;
+  }
+  const aliases: ExternAlias[] = declarations.map((d) => ({
+    logicalName: d.id,
+    typescript: d.typescript,
+    python: d.python,
+    go: d.go,
+    java: d.java,
+    rust: d.rust,
+  }));
+  return buildExternAliasRegistry(aliases);
 }
 
 /**
@@ -182,6 +207,11 @@ export async function buildEffectStage(
   const evaluate = deps.evaluate ?? evaluateEffects;
   const extractor = deps.extractor ?? tsEffectAnnotationExtractor;
   const strictMode = deps.strictMode ?? true;
+  // Round 4 D-07: build the cross-language alias registry from the
+  // contract's (extern-alias ...) declarations and pass it to the
+  // evaluator alongside the call graph + extractor.
+  const externAliases =
+    deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
 
   let result: EvaluateEffectResult;
   try {
@@ -190,6 +220,7 @@ export async function buildEffectStage(
       callGraph,
       extractor,
       strictMode,
+      externAliases,
     });
   } catch (error) {
     return createViolationReport({
