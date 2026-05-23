@@ -34,7 +34,7 @@
   (description "Manifest format version must not change without a version bump."))
 
 (checker exit-codes-valid
-  (description "CLI exit codes must match spec: 7 codes, all with correct values."))
+  (description "CLI exit codes must match spec: 8 codes (0/1/2/3/4/5/6/99), all with correct values."))
 
 (checker cdl-no-single-quotes
   (description "No .stele file shall contain single-quoted strings."))
@@ -84,7 +84,7 @@
   (description "Core error module must have SteleError class."))
 
 (checker cli-exit-code-enum-complete
-  (description "ExitCode enum must define all 7 codes with subclasses."))
+  (description "ExitCode enum must define all 8 codes with subclasses."))
 
 (checker protected-pattern-safe
   (description "Protected patterns must not escape project root."))
@@ -161,12 +161,12 @@
 
 (invariant EXIT_CODES_MATCH_SPEC
   (severity error)
-  (description "CLI exit codes: ALL 7 codes must be defined with correct values.")
+  (description "CLI exit codes: ALL 8 codes must be defined with correct values (SUCCESS=0, USER_ERROR=1, CONTRACT_FAIL=2, TAMPER_DETECTED=3, GENERATION_FAIL=4, CONFIG_ERROR=5, SCORE_BELOW_THRESHOLD=6, INTERNAL_ERROR=99).")
   (uses-checker exit-codes-valid))
 
 (invariant CLI_EXIT_CODE_ENUM_COMPLETE
   (severity error)
-  (description "ExitCode enum must define SUCCESS, USER_ERROR, CONTRACT_FAIL, TAMPER_DETECTED, GENERATION_FAIL, CONFIG_ERROR, INTERNAL_ERROR with subclasses.")
+  (description "ExitCode enum must define SUCCESS, USER_ERROR, CONTRACT_FAIL, TAMPER_DETECTED, GENERATION_FAIL, CONFIG_ERROR, SCORE_BELOW_THRESHOLD, INTERNAL_ERROR with subclasses.")
   (uses-checker cli-exit-code-enum-complete))
 
 ; ============================================================================

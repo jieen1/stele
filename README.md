@@ -273,7 +273,7 @@ Stele protects itself. The project's `contract/main.stele` contains **35+ invari
 
 - Backend registry integrity (all 5 languages present)
 - Operator registry (70+ operators, consistent specs)
-- Exit code alignment with spec (all 7 codes)
+- Exit code alignment with spec (all 8 codes: 0/1/2/3/4/5/6/99)
 - Manifest hashing algorithm (SHA-256 enforced)
 - Type system stability (9 structural types)
 - Hook security (fail-closed, complete registration)

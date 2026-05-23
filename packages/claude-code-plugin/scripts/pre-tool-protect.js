@@ -555,14 +555,55 @@ function extractTeeTargetsFromSegment(tokens) {
  * invoked from extractor functions that run early in the hook lifecycle.
  */
 function _firstRealCommandIndex(wordTokens) {
-  for (let i = 0; i < wordTokens.length; i += 1) {
+  // Round 6 L-01 fix: track whether we just consumed a wrapper so we
+  // know to also skip the wrapper's own flag arguments (and their
+  // values, if any). Pre-L-01 the helper returned `i` at the first flag
+  // following a wrapper — e.g. `sudo -u root python3 -c …` returned
+  // idx=1 (`-u`), which then failed the interpreter/file-op/git
+  // basename check and skipped the whole segment.
+  let i = 0;
+  while (i < wordTokens.length) {
     const v = wordTokens[i].value;
     // env-prefix assignment: NAME=value (NAME starts with letter or _).
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(v)) continue;
-    // Wrapper command: skip and look at the next word.
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(v)) {
+      i += 1;
+      continue;
+    }
+    // Wrapper command: skip the wrapper token, plus any subsequent
+    // flag tokens (and the value following a flag-with-value like
+    // `sudo -u <user>` / `nice -n <num>` / `env -i`). The flag-value
+    // heuristic: a flag whose value isn't a dash-prefixed token gets
+    // consumed together.
     if (_SHELL_WRAPPER_NAMES.has(path.posix.basename(v))) {
-      // `env` may carry its own `KEY=val` pairs after itself; the next
-      // iteration's env-prefix check handles those.
+      i += 1;
+      // Consume the wrapper's flag arguments. We're conservative —
+      // consume any token starting with `-`, plus the immediate
+      // following non-flag token (which is typically the flag's
+      // value). This handles `sudo -u user`, `nice -n 10`, `env -i`,
+      // `stdbuf -oL`, `time -p`, etc.
+      while (i < wordTokens.length && wordTokens[i].value.startsWith("-")) {
+        i += 1;
+        // The next token may be the flag's value (no `-`); peek
+        // and consume if it doesn't look like a command itself.
+        if (
+          i < wordTokens.length &&
+          !wordTokens[i].value.startsWith("-") &&
+          !_INTERPRETER_NAMES.has(path.posix.basename(wordTokens[i].value)) &&
+          path.posix.basename(wordTokens[i].value) !== "git" &&
+          path.posix.basename(wordTokens[i].value) !== "cp" &&
+          path.posix.basename(wordTokens[i].value) !== "mv" &&
+          path.posix.basename(wordTokens[i].value) !== "ln" &&
+          path.posix.basename(wordTokens[i].value) !== "rsync" &&
+          path.posix.basename(wordTokens[i].value) !== "install" &&
+          path.posix.basename(wordTokens[i].value) !== "truncate" &&
+          path.posix.basename(wordTokens[i].value) !== "chmod" &&
+          path.posix.basename(wordTokens[i].value) !== "chown" &&
+          path.posix.basename(wordTokens[i].value) !== "dd" &&
+          path.posix.basename(wordTokens[i].value) !== "tee"
+        ) {
+          i += 1;
+        }
+      }
       continue;
     }
     return i;

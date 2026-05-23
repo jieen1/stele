@@ -1496,6 +1496,78 @@ _STRING_LITERAL_RE = re.compile(
 )
 
 
+def _strip_js_comments_quote_aware(source: str) -> str:
+    """Round 6 L-02: strip JS line + block comments WITHOUT touching
+    characters that fall inside a quoted string literal. Tracks `"`,
+    `'`, and `` ` `` strings; recognizes the escape character so an
+    escaped quote `\"` doesn't close the string early. Tolerates
+    unterminated strings by treating EOF as the close.
+
+    Returns the source with all comments replaced by single spaces
+    (preserves character offsets approximately and prevents two
+    adjacent identifiers from accidentally fusing).
+    """
+    out: list[str] = []
+    i = 0
+    n = len(source)
+    state = "code"  # code | line_comment | block_comment | string
+    string_quote = ""
+    while i < n:
+        ch = source[i]
+        nxt = source[i + 1] if i + 1 < n else ""
+        if state == "code":
+            if ch == "/" and nxt == "/":
+                state = "line_comment"
+                i += 2
+                continue
+            if ch == "/" and nxt == "*":
+                state = "block_comment"
+                i += 2
+                continue
+            if ch == '"' or ch == "'" or ch == "`":
+                state = "string"
+                string_quote = ch
+                out.append(ch)
+                i += 1
+                continue
+            out.append(ch)
+            i += 1
+            continue
+        if state == "line_comment":
+            if ch == "\n":
+                state = "code"
+                out.append("\n")
+                i += 1
+                continue
+            i += 1
+            continue
+        if state == "block_comment":
+            if ch == "*" and nxt == "/":
+                state = "code"
+                out.append(" ")  # preserve token boundary
+                i += 2
+                continue
+            i += 1
+            continue
+        if state == "string":
+            if ch == "\\":
+                # Escape next char (preserve both chars in output).
+                out.append(ch)
+                if i + 1 < n:
+                    out.append(source[i + 1])
+                    i += 2
+                else:
+                    i += 1
+                continue
+            out.append(ch)
+            if ch == string_quote:
+                state = "code"
+                string_quote = ""
+            i += 1
+            continue
+    return "".join(out)
+
+
 def _extract_string_array(source: str, anchor: str) -> set[str] | None:
     """Find the array literal following `anchor =` in source and return its
     string literals as a set. Returns None when the anchor is missing.
@@ -1541,18 +1613,15 @@ def _extract_string_array(source: str, anchor: str) -> set[str] | None:
     if end == -1:
         return None
     body = source[lb + 1:end]
-    # Strip BOTH single-line `// …` comments AND `/* … */` block comments
-    # before string-literal extraction. Otherwise an agent could hide a
-    # removed pattern in a comment and the checker would still see the
-    # literal in the set. (Round 5 I-06.)
-    #
-    # The block-comment stripper anchors on `\n\s*/*` (start-of-line `/*`)
-    # so glob patterns inside quoted strings like "packages/*/tsup.config.ts"
-    # or "contract/**/*.stele" — whose `/*/` and `/**/` substrings would
-    # otherwise look like comment open/close pairs to a naive regex —
-    # are preserved.
-    body = re.sub(r"(^|\n)\s*/\*[\s\S]*?\*/", lambda m: m.group(1), body)
-    body = re.sub(r"//[^\n]*", "", body)
+    # Round 6 L-02: strip BOTH single-line `// …` and `/* … */` block
+    # comments via a quote-aware state machine. The pre-L-02 regex only
+    # stripped start-of-line block comments to preserve glob patterns
+    # inside quoted strings like "packages/*/tsup.config.ts" — but that
+    # let an INLINE `/* "phantom" */` comment after a real entry inject
+    # phantom literals into the extracted set, masking a real removal.
+    # The state machine reads `"`/`'`/`` ` `` quotes and only enters
+    # comment-strip mode when not inside a quoted string.
+    body = _strip_js_comments_quote_aware(body)
     # Round 5 K-04: refuse if the body contains spread (`...`), template-
     # literal entries (backticks), or any non-string identifier — the
     # checker cannot reason about runtime-computed entries, so we treat
@@ -1602,8 +1671,8 @@ def _count_string_literals_in_array(source: str, anchor: str) -> int | None:
     if end == -1:
         return None
     body = source[lb + 1:end]
-    body = re.sub(r"(^|\n)\s*/\*[\s\S]*?\*/", lambda m: m.group(1), body)
-    body = re.sub(r"//[^\n]*", "", body)
+    # Same Round 6 L-02 quote-aware stripper used by _extract_string_array.
+    body = _strip_js_comments_quote_aware(body)
     return sum(1 for _ in _STRING_LITERAL_RE.finditer(body))
 
 

@@ -549,6 +549,13 @@ const _PROTECTED_WALK_SKIP_DIRS = new Set([
   ".cache",
   "dist",
   "coverage",
+  // Round 6 M-04: skip ephemeral pytest + Python compile caches. The
+  // protected glob `contract/checker_impls/**/*` would otherwise hash
+  // every byte under `.pytest_cache/` and `__pycache__/`, and any
+  // pytest run that mutates nodeids (add/remove/skip a test) would
+  // immediately produce manifest drift on the next `stele check`.
+  ".pytest_cache",
+  "__pycache__",
 ]);
 
 async function walkProtectedRoot(directory: string, projectDir: string): Promise<string[]> {

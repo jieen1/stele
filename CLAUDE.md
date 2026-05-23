@@ -6,7 +6,7 @@ Notes for AI assistants working in this repository. Keep changes small, determin
 
 Stele is a contract management framework. Users adopt it to lock business invariants into protected files an agent cannot edit, regenerate tests deterministically, and have Claude Code refuse direct writes to protected paths. The v0.1 runtime targets Python applications using `pytest`.
 
-This repo is a **pnpm monorepo** with eight publishable packages:
+This repo is a **pnpm monorepo**. The publishable packages today:
 
 - `packages/core` — TypeScript core: lexer → parser → validator → normalizer → registry → manifest → generator coordinator → report.
 - `packages/backend-python` — TypeScript translator that turns validated CDL into pytest source, plus the Python runtime helper.
@@ -17,8 +17,15 @@ This repo is a **pnpm monorepo** with eight publishable packages:
 - `packages/cli` — the `stele` executable (Commander.js).
 - `packages/claude-code-plugin` — hook scripts, slash command docs, subagent prompts, and skill prompts.
 - `packages/agent-hooks` — shared hook SDK (`matchProtectedPath`, etc.).
+- `packages/mcp-server` — MCP server bridging Stele to Claude Code / Cursor / other agents.
+- `packages/github-action` — packaged GitHub Action for CI.
+- `packages/call-graph-core` — language-agnostic call-graph data structures and `extern:` resolver used by every Phase B evaluator.
+- `packages/trace-evaluator`, `packages/type-state-evaluator`, `packages/effect-evaluator`, `packages/type-driven-evaluator` — Phase B mechanism evaluators (TS source today; Python/Go/Rust/Java backends in B.2/B.3).
+- `packages/architecture-core` — architecture/layering primitives used by the CLI's architecture stage.
 
-The repo is self-protected via `contract/main.stele` (15 invariants) and `packages/claude-code-plugin` hooks. Bugs in security-critical paths are caught by `stele check`.
+Run `pnpm -r ls --json --depth -1 | jq '[.[].name]'` for the live list — the count grows with new evaluators / backends.
+
+The repo is self-protected via `contract/main.stele` (currently 35 invariants — run `stele list` for the live count) and `packages/claude-code-plugin` hooks. Bugs in security-critical paths are caught by `stele check`.
 
 ## Workspace commands
 
