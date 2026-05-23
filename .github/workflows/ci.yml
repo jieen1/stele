@@ -25,16 +25,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: python -m pip install pytest
-      - run: pnpm test
+
+      # Round 3 P1-1: self-protection runs BEFORE the bulk pnpm test fan-out.
+      # ALL_EVALUATORS_COMPILE inspects every evaluator's dist/, which means
+      # we need `pnpm build` to have succeeded; once it has, the pytest check
+      # validates the actual self-protection contract before any later step
+      # has a chance to mask a missing-dist failure behind TS7016 / import
+      # errors. Original ordering put `pnpm test` first, so a deleted dist
+      # in a downstream package would surface as a vitest import error and
+      # the agent fixing it might never see the precise self-protection
+      # violation.
       - run: pnpm build
+      - run: python -m pytest tests/contract -q
+      - run: node packages/cli/dist/index.js check
+
+      - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test:packed-adoption
-      # Round 3 P0-2: Stele's own self-protection invariants (ALL_EVALUATORS_COMPILE,
-      # STRICT_MODE_DEFAULT_IN_CI, FIX_HINT_REQUIRES_ANALYSIS_BRANCH, and the other
-      # path/import safety checks) live in this repo's own contract. Run them here.
-      - run: node packages/cli/dist/index.js check
-      - run: python -m pytest tests/contract -q
       # Adoption smoke: a clean checkout of fixtures/python-app must generate,
       # pytest, and check successfully.
       - run: node ../../packages/cli/dist/index.js generate
