@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
+  annotateCrossRuleViolations,
   createViolationReport,
   formatViolationReportHuman,
   formatViolationReportJson,
@@ -267,7 +268,15 @@ async function prepareCheckFilters(context: PreparedCheckContext, options: Check
 // ----------------------------------------------------------------
 
 function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
-  const violations = reports.flatMap((report) => report.violations);
+  const rawViolations = reports.flatMap((report) => report.violations);
+  // Round 3 P1-4: cross-rule annotation runs at the merged layer so a
+  // trace.X.foo and effect.Y.bar firing on the same caller node now learn
+  // about each other via `also_violates` + `cross_rule_note`. The function
+  // is idempotent — re-annotating a per-evaluator-already-annotated set is
+  // safe and produces the same fields. Only `violations` carries Violation
+  // values; `notices` is `ContractNotice[]` (a different shape) and does
+  // not participate in cross-rule grouping.
+  const violations = annotateCrossRuleViolations(rawViolations);
   const notices = reports.flatMap((report) => report.notices);
   const activeViolationCount = violations.filter((violation) => (violation.status ?? "active") === "active").length;
   const suppressedViolationCount = violations.filter((violation) => violation.status === "suppressed").length;
