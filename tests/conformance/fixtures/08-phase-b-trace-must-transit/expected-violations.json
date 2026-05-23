@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "tool": "stele",
+  "command": "check",
+  "ok": false,
+  "summary": {
+    "violation_count": 1,
+    "active_violation_count": 1
+  },
+  "violations": [
+    {
+      "rule_id": "trace.DB_VIA_REPOSITORY.missing_transit",
+      "rule_kind": "trace_violation",
+      "severity": "error",
+      "source": { "tool": "stele", "command": "check", "kind": "trace" },
+      "cause": {
+        "summary": "Controller.load reaches Database.query without transiting any pattern from must-transit."
+      },
+      "scope_paths": ["src/controller.ts"]
+    }
+  ]
+}

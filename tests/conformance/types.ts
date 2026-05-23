@@ -29,6 +29,12 @@ export type Fixture = {
   baseConfig: Record<string, unknown>;
   /** Whether this fixture exercises features only Python supports today (e.g. EP06 code-shape). */
   requiresCodeShape?: boolean;
+  /**
+   * Round 3 P0-9: Phase B mechanisms (trace / type-state / effect) currently
+   * only have a TypeScript backend. When this flag is true the conformance
+   * runner skips the fixture on non-TS backends with a clear reason.
+   */
+  requiresPhaseB?: boolean;
 };
 
 /**

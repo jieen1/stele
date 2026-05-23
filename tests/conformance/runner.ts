@@ -29,23 +29,45 @@ for (const fixture of FIXTURES) {
         continue;
       }
 
+      // Round 3 P0-9: Phase B mechanisms are TypeScript-only until
+      // per-language call-graph extractors land for Python / Go / Rust /
+      // Java. Mark the fixtures with a `phase-b-` prefix so they skip
+      // cleanly on every other backend.
+      if (fixture.requiresPhaseB === true && spec.language !== "typescript") {
+        test.skip(`on ${label} backend (Phase B mechanisms TS-only today)`, () => {
+          // intentionally empty
+        });
+        continue;
+      }
+
       test(`on ${label} backend`, async (context) => {
         const result = await runFixtureOnBackend(fixture, spec);
 
         if (result.runnerSkipped) {
-          // Check if skipping is explicitly allowed (development mode).
-          // Default: fail. Set STELE_CONFORMANCE_ALLOW_SKIP=1 for local dev.
-          if (process.env.STELE_CONFORMANCE_ALLOW_SKIP !== "1") {
-            throw new Error(
-              `Conformance runner unavailable for ${label}: ${result.runnerSkipReason ?? "test runner missing"}. ` +
-              "Set STELE_CONFORMANCE_ALLOW_SKIP=1 to skip during local development.",
-            );
+          // Round 3 P0-9: Phase B fixtures derive their entire expected
+          // output from `stele check --json` (the trace/type-state/effect
+          // evaluators run inside the CLI itself), so a missing framework
+          // test runner is irrelevant — we still get a meaningful report.
+          // Fall through to assertViolationReportsEqual for those.
+          if (fixture.requiresPhaseB !== true) {
+            // Check if skipping is explicitly allowed (development mode).
+            // Default: fail. Set STELE_CONFORMANCE_ALLOW_SKIP=1 for local dev.
+            if (process.env.STELE_CONFORMANCE_ALLOW_SKIP !== "1") {
+              throw new Error(
+                `Conformance runner unavailable for ${label}: ${result.runnerSkipReason ?? "test runner missing"}. ` +
+                "Set STELE_CONFORMANCE_ALLOW_SKIP=1 to skip during local development.",
+              );
+            }
+            expect(result.report.schema_version, "schema_version").toBe("1");
+            expect(Array.isArray(result.report.violations), "violations is array").toBe(true);
+            process.stderr.write(`[skip] ${label}: ${result.runnerSkipReason ?? "test runner unavailable"}\n`);
+            context.skip();
+            return;
           }
-          expect(result.report.schema_version, "schema_version").toBe("1");
-          expect(Array.isArray(result.report.violations), "violations is array").toBe(true);
-          process.stderr.write(`[skip] ${label}: ${result.runnerSkipReason ?? "test runner unavailable"}\n`);
-          context.skip();
-          return;
+          process.stderr.write(
+            `[phase-b] ${label}: framework runner unavailable (${result.runnerSkipReason ?? "n/a"}); ` +
+            `validating stele check --json output only.\n`,
+          );
         }
 
         assertViolationReportsEqual(result.report, fixture.expectedViolations);

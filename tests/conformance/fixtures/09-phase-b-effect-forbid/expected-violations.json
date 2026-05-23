@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "tool": "stele",
+  "command": "check",
+  "ok": false,
+  "summary": {
+    "violation_count": 1,
+    "active_violation_count": 1
+  },
+  "violations": [
+    {
+      "rule_id": "effect.NO_IO_IN_UI.forbidden_effect",
+      "rule_kind": "effect_violation",
+      "severity": "error",
+      "source": { "tool": "stele", "command": "check", "kind": "effect" },
+      "cause": {
+        "summary": "Function `src/components/UserCard.ts::UserCard(1)` has forbidden effect `db.read` under policy `NO_IO_IN_UI`."
+      },
+      "scope_paths": ["src/components/UserCard.ts"]
+    }
+  ]
+}

@@ -63,6 +63,10 @@ async function loadFixture(id: string, dir: string): Promise<Fixture> {
     // EP06: Code-shape fixtures only run on the Python backend in v0.2.
     // The TypeScript backend tests skip via runner.ts when this flag is set.
     requiresCodeShape: id.includes("code-shape"),
+    // Round 3 P0-9: Phase B mechanisms (trace / type-state / effect) require
+    // a TypeScript call-graph extractor; until Python / Go / Rust / Java
+    // backends land, fixtures named with `phase-b-` are TS-only.
+    requiresPhaseB: id.includes("phase-b-"),
   };
 }
 
@@ -377,6 +381,9 @@ async function copyFixtureSources(fixtureDir: string, workDir: string): Promise<
   await maybeCopyOptionalFile(join(fixtureDir, "Cargo.lock"), join(workDir, "Cargo.lock"));
   await maybeCopyOptionalFile(join(fixtureDir, "go.mod"), join(workDir, "go.mod"));
   await maybeCopyOptionalFile(join(fixtureDir, "pom.xml"), join(workDir, "pom.xml"));
+  // Round 3 P0-9: TypeScript Phase B fixtures ship a tsconfig.json so the
+  // call-graph extractor can resolve modules during `stele check`.
+  await maybeCopyOptionalFile(join(fixtureDir, "tsconfig.json"), join(workDir, "tsconfig.json"));
   // Rust needs an empty src/lib.rs so `cargo test` can compile.
   await maybeCopyOptionalDir(join(fixtureDir, "src"), join(workDir, "src"));
 }
