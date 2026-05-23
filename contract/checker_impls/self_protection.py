@@ -1292,6 +1292,44 @@ def _analyze_fix_hint_structure(body: str) -> list[str]:
             "`[A]` branch is empty or too short — must describe a concrete code repair",
         )
 
+    # Round 4 D-09: stronger content-inversion guard. The legacy structural
+    # check accepted any text in the [A] region as long as the literal
+    # `[A] Code issue` anchor was present. An adversarial hint that says
+    #   `[A] Code issue — n/a, this is purely a contract problem, do nothing`
+    # would pass. Require the [A] region to contain at least one action verb
+    # from a small whitelist that names a code-side repair.
+    a_lower = a_region.lower()
+    _A_ACTION_VERBS = (
+        "fix",
+        "change",
+        "update",
+        "replace",
+        "edit",
+        "refactor",
+        "remove",
+        "add",
+        "rewrite",
+        "annotate",
+        "introduce",
+        "delete",
+        "move",
+    )
+    # Accept either (a) a literal action verb in the [A] body, OR (b) a
+    # template-string interpolation that delegates the action advice to a
+    # helper function. The latter is what trace-evaluator's defaultFixHint
+    # does — it template-interpolates `codeIssueAdvice(kind, …)` whose
+    # branches each begin with a verb like "Insert" / "Route" / "Stop".
+    has_verb = any(verb in a_lower for verb in _A_ACTION_VERBS)
+    has_delegated_action = "${" in a_region and "}" in a_region
+    if not (has_verb or has_delegated_action):
+        failures.append(
+            "`[A]` branch must contain at least one code-action verb "
+            "(fix/change/update/replace/edit/refactor/remove/add/rewrite/"
+            "annotate/introduce/delete/move) OR delegate via a "
+            "`${codeBranch}` template-string — otherwise it does not "
+            "describe a concrete code repair",
+        )
+
     # The [B] region is everything from `[B] Contract issue` onward; it must
     # carry the propose flow + a pointer at the YAML proposal store.
     b_region = body[match_b.start():]
@@ -1579,6 +1617,241 @@ def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 f"Default protected lists disagree in {len(violations)} place(s): "
                 + "; ".join(
                     f"{v['file']} — {v['message']}" for v in violations[:5]
+                )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+# ---------------------------------------------------------------------------
+# Round 4 Phase 3 — Stele dogfood checkers
+#
+# CLAUDE.md / spec rules that previously had zero mechanical enforcement now
+# get a checker apiece. Each one is language-independent (regex on file
+# content) so it works regardless of the project's targetLanguage — that
+# lets Stele dogfood Phase B-shape rules even before per-language extractors
+# land for Python/Go/Rust/Java.
+# ---------------------------------------------------------------------------
+
+
+_ESM_RELATIVE_IMPORT_RE = re.compile(
+    r"^\s*(?:import|export)[^\n]*?\bfrom\s+[\"'](\.[^\"']+)[\"']",
+    re.MULTILINE,
+)
+
+
+def esm_relative_imports_keep_js(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 4 E-02: CLAUDE.md says "ESM only — TypeScript files use `.js`
+    extensions in relative imports". Without enforcement an agent can
+    drop the `.js` suffix and the npm consumer's runtime resolution
+    fails (Node ESM does not infer extensions).
+
+    Scan every `packages/*/src/**/*.ts` file. For each relative import
+    (`./foo` or `../foo`) assert the specifier ends in `.js`. We allow
+    a few well-known directory-shaped specifiers (e.g. `./foo/index`
+    is not idiomatic in this repo but harmless if present).
+    """
+    violations: list[dict[str, Any]] = []
+    for pkg_dir in sorted(_PACKAGES_DIR.glob("*")):
+        if not pkg_dir.is_dir():
+            continue
+        src_dir = pkg_dir / "src"
+        if not src_dir.is_dir():
+            continue
+        for ts_file in src_dir.rglob("*.ts"):
+            if "node_modules" in ts_file.parts or "dist" in ts_file.parts:
+                continue
+            if str(ts_file).endswith(".d.ts"):
+                continue
+            try:
+                content = ts_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for m in _ESM_RELATIVE_IMPORT_RE.finditer(content):
+                specifier = m.group(1)
+                if specifier.endswith((".json", ".css", ".svg", ".png", ".jpg", ".node", ".js")):
+                    continue
+                line_no = content.count("\n", 0, m.start()) + 1
+                violations.append({
+                    "file": str(ts_file.relative_to(_REPO_ROOT)),
+                    "line": line_no,
+                    "column": None,
+                    "message": (
+                        f"relative import \"{specifier}\" must end in `.js` "
+                        f"so the file resolves under native ESM (CLAUDE.md)"
+                    ),
+                })
+
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} relative TS import(s) missing `.js` suffix: "
+                + "; ".join(
+                    f"{v['file']}:{v['line']}" for v in violations[:5]
+                )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+# Permission-gate hooks: must fail closed (deny on uncaught error).
+# Observation / context hooks (observation-hook.js, lifecycle-context.js)
+# are intentionally fail-OPEN by design — a logging or context-injection
+# error must NOT block the agent's tool call. CLAUDE.md "Hooks fail closed"
+# applies to the permission-gating subset only.
+_HOOK_SCRIPTS_DOGFOOD = [
+    "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+    "packages/claude-code-plugin/scripts/stop-validate.js",
+]
+
+
+def hook_entrypoints_fail_closed(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 4 E-04: CLAUDE.md "Hooks fail closed." Generalises the
+    legacy `hooks_fail_closed` checker — which only inspected
+    `pre-tool-protect.js` — to all four hook entrypoint scripts. Each
+    must contain an outer `try { ... } catch (...) { ... process.exit(non-zero) }`
+    pattern so an uncaught error in the hook becomes a deny instead of a
+    silent allow.
+    """
+    violations: list[dict[str, Any]] = []
+    for rel_path in _HOOK_SCRIPTS_DOGFOOD:
+        abs_path = _REPO_ROOT / rel_path
+        if not abs_path.is_file():
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": "hook script missing",
+            })
+            continue
+        content = abs_path.read_text(encoding="utf-8", errors="replace")
+        # Heuristic but strict: require a top-level `try {` followed (within
+        # the file) by `catch` and a `process.exit(` with a non-zero arg.
+        # The legacy `hooks_fail_closed` checker uses the same pattern; we
+        # extend it to the other three scripts.
+        if "try {" not in content:
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": "no top-level `try {` block — hook will not fail closed on errors",
+            })
+            continue
+        if not re.search(r"catch\s*\(", content):
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": "no catch handler",
+            })
+            continue
+        # The fail-closed exit pattern in this repo is one of:
+        #   - process.exit(<non-zero-literal>) — hard stop, e.g. process.exit(2)
+        #   - process.exit(<NAMED_CONSTANT>)   — e.g. process.exit(STOP_BLOCK_EXIT_CODE)
+        #   - failClosed(...)                  — pre-tool-protect's own helper
+        # Accept any of these forms.
+        has_literal_nonzero = bool(re.search(r"process\.exit\(\s*[1-9]", content))
+        has_named_exit_constant = bool(
+            re.search(r"process\.exit\(\s*[A-Z][A-Z0-9_]*\s*\)", content),
+        )
+        has_fail_closed = "failClosed(" in content
+        if not (has_literal_nonzero or has_named_exit_constant or has_fail_closed):
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": (
+                    "no `process.exit(<non-zero>)` and no `failClosed(...)` "
+                    "call — hook may exit silently on a thrown error"
+                ),
+            })
+
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} hook entrypoint(s) do not fail closed: "
+                + "; ".join(
+                    f"{v['file']}: {v['message']}" for v in violations[:5]
+                )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+_STELE_PACKAGE_PREFIX_RE = re.compile(
+    r"\bfrom\s+[\"']@stele/([a-z][\w\-]*)[\"']",
+)
+# Forbidden inbound deps from inside @stele/core. The validator legitimately
+# references shared types from `@stele/call-graph-core` (NodeId helpers used
+# at parse time for `extern:` patterns) so that dep is allowed. Every other
+# @stele/* package would invert the layering.
+_CORE_FORBIDDEN_DEPS = {
+    "cli",
+    "backend-python",
+    "backend-go",
+    "backend-rust",
+    "backend-java",
+    "backend-typescript",
+    "agent-hooks",
+    "claude-code-plugin",
+    "mcp-server",
+    "github-action",
+    "conformance-tests",
+    "effect-evaluator",
+    "trace-evaluator",
+    "type-state-evaluator",
+    "type-driven-evaluator",
+    "architecture-core",
+}
+
+
+def core_has_no_stele_deps(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 4 E-08: README/CLAUDE.md describe @stele/core as the leaf of
+    the dependency direction (`core ← backend-* ← cli`). Without
+    mechanical enforcement, an agent can `import {…} from "@stele/cli"`
+    inside `packages/core/src/...` and the package layering silently
+    inverts.
+
+    Scan every `packages/core/src/**/*.ts` for `@stele/<x>` imports;
+    each one must NOT match `_CORE_FORBIDDEN_DEPS`.
+    """
+    core_src = _PACKAGES_DIR / "core" / "src"
+    if not core_src.is_dir():
+        return {"passed": True, "message": "no @stele/core/src", "violations": []}
+    violations: list[dict[str, Any]] = []
+    for ts_file in core_src.rglob("*.ts"):
+        if not ts_file.is_file():
+            continue
+        try:
+            content = ts_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for m in _STELE_PACKAGE_PREFIX_RE.finditer(content):
+            pkg = m.group(1)
+            if pkg in _CORE_FORBIDDEN_DEPS:
+                line_no = content.count("\n", 0, m.start()) + 1
+                violations.append({
+                    "file": str(ts_file.relative_to(_REPO_ROOT)),
+                    "line": line_no,
+                    "column": None,
+                    "message": (
+                        f"forbidden import `@stele/{pkg}` — @stele/core must be a "
+                        f"leaf package"
+                    ),
+                })
+
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} forbidden cross-package import(s) inside @stele/core: "
+                + "; ".join(
+                    f"{v['file']}:{v['line']} ({v['message']})" for v in violations[:5]
                 )
             ),
             "violations": violations,

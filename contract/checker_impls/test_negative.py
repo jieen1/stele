@@ -653,6 +653,52 @@ def test_strict_mode_default_in_ci_via_referenced_script():
     return _pass_if_false(result, "strict_mode_default_in_ci_via_referenced_script")
 
 
+def test_fix_hint_requires_analysis_branch_content_inversion():
+    """Round 4 D-09: rewrite the [A] body to say "do nothing on the
+    code side" with no action verb and no delegated template — the
+    anchor labels are still correct but the content tells the agent
+    that the code side has nothing to fix, which inverts the meaning.
+    The stronger D-09 check requires a code-action verb OR a delegated
+    interpolation in the [A] region; without either, refuse."""
+    _reset_caches()
+    fix_hint_ts = sp._PACKAGES_DIR / "type-state-evaluator" / "src" / "fix-hint.ts"
+    if not fix_hint_ts.is_file():
+        print("  SKIP: type-state-evaluator/src/fix-hint.ts not present")
+        return True
+    original = fix_hint_ts.read_text(encoding="utf-8")
+    # Surgically rewrite the [A] body to remove every action verb and any
+    # template interpolation, while preserving the [A] / [B] anchor labels
+    # and propose flow text so the legacy structural check passes. The new
+    # D-09 content-inversion guard should still catch it.
+    action_verbs = (
+        "Change", "change", "Replace", "replace", "Refactor", "refactor",
+        "Remove", "remove", "Insert", "insert", "Add", "add",
+        "Annotate", "annotate", "Move", "move", "Delete", "delete",
+        "Update", "update", "Edit", "edit", "Fix", "fix", "Stop", "Route",
+        "Introduce", "introduce", "Rewrite", "rewrite",
+    )
+    tampered = original
+    # Hollow out the codeBranch body — replace it with verb-less text + no
+    # template interpolation.
+    tampered = re.sub(
+        r"const codeBranch = \[[\s\S]*?\]\.join\(\"\\n\"\);",
+        "const codeBranch = ['no action required on the code side', 'situation is irrelevant'].join(\"\\n\");",
+        tampered,
+        count=1,
+    )
+    # Then scrub residual action verbs from the rest of the file so the
+    # check can't satisfy itself via leftover text in [A] regions in
+    # OTHER functions in the same file.
+    for verb in action_verbs:
+        tampered = tampered.replace(verb, "describing")
+    fix_hint_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.fix_hint_requires_analysis_branch({})
+    finally:
+        fix_hint_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "fix_hint_requires_analysis_branch_content_inversion")
+
+
 def test_fix_hint_requires_analysis_branch_semantic_inversion():
     """Round 3 P1-2: rewrite the [A] anchor in trace-evaluator to claim it
     is the Contract branch. Every required substring (`code issue`, `contract
@@ -730,6 +776,8 @@ def main() -> int:
         # Round 4 E-11 + D-10
         ("strict_mode_default_in_ci_via_package_json_script", test_strict_mode_default_in_ci_via_package_json_script),
         ("strict_mode_default_in_ci_via_python_script_delegation", test_strict_mode_default_in_ci_via_python_script_delegation),
+        # Round 4 D-09: content-inversion guard
+        ("fix_hint_requires_analysis_branch_content_inversion", test_fix_hint_requires_analysis_branch_content_inversion),
     ]
 
     print("=" * 60)

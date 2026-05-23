@@ -1,0 +1,62 @@
+schema_version: 1
+kind: invariant
+proposal_id: 2026-05-23-e08-core-has-no-stele-deps
+
+# Round 4 Reviewer E E-05: this proposal seeds the
+# `contract/design/proposals/*.yaml` directory with a real worked
+# example so the propose-and-approve workflow has an in-repo proof of
+# the path, instead of being purely theoretical. (CLAUDE.md and
+# docs/spec/cdl.md describe the workflow but no historical proposal
+# existed prior to this commit.)
+#
+# The proposal corresponds to Round 4 Reviewer E E-08:
+#
+#   "@stele/core" must be the leaf of the dependency direction
+#   (core ← backend-* ← cli). An agent that imports from @stele/cli
+#   or @stele/backend-* inside packages/core/src would silently
+#   invert the layering. The README and CLAUDE.md call this out
+#   prose-only; the new invariant CORE_HAS_NO_STELE_DEPS adds the
+#   mechanical check.
+
+title: "Add CORE_HAS_NO_STELE_DEPS self-protection invariant"
+
+motivation: |
+  Stele advertises `@stele/core` as the leaf-level dependency in the
+  monorepo: every other workspace package may depend on `@stele/core`,
+  but `@stele/core` itself should depend on nothing except its single
+  approved dep `@stele/call-graph-core`. The README and CLAUDE.md both
+  document this direction, but until Round 4 there was zero mechanical
+  enforcement — a quiet `import { x } from "@stele/cli"` slipped past
+  human review could invert the layering silently.
+
+invariant:
+  id: CORE_HAS_NO_STELE_DEPS
+  severity: error
+  description: |
+    Round 4 E-08 / CLAUDE.md: @stele/core is the leaf of the dependency
+    direction `core ← backend-* ← cli`. An agent that imports from
+    @stele/cli or @stele/backend-* inside packages/core/src would
+    silently invert the layering.
+  checker: core-has-no-stele-deps
+
+implementation:
+  - Add a `core_has_no_stele_deps` Python checker in
+    `contract/checker_impls/self_protection.py` that scans every
+    `packages/core/src/**/*.ts` for `from "@stele/<x>"` import
+    statements and asserts `<x>` is not in the forbidden-deps set.
+  - The forbidden set excludes `@stele/call-graph-core` — the validator
+    legitimately uses NodeId helpers from there at parse time.
+  - Register the checker in `tests/contract/conftest.py`.
+  - Add the matching invariant to `contract/main.stele`.
+
+approved_by_request:
+  reason: |
+    Closes Reviewer E P0 gap; same pattern as existing dependency-
+    direction invariants. Low risk — a regex import scan with a
+    well-defined allow-list.
+
+affected_paths:
+  - packages/core/src/**/*.ts
+  - contract/checker_impls/self_protection.py
+  - tests/contract/conftest.py
+  - contract/main.stele

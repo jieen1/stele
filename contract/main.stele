@@ -320,4 +320,28 @@
   (description "Round 4 D-13: packages/core/src/config/defaults.ts (DEFAULT_PROTECTED_PATTERNS), packages/cli/src/config/defaults.ts (DEFAULT_CONFIG.protected), and packages/claude-code-plugin/scripts/pre-tool-protect.js (DEFAULT_PROTECTED) must declare byte-equal sets of protected patterns. A future fix that updates one and forgets the others silently drops defense-in-depth for some path category.")
   (uses-checker default-protected-consistent))
 
+(checker esm-relative-imports-keep-js
+  (description "Every relative `import … from \"./X\"` in TS source must end in `.js` for native-ESM resolution."))
+
+(invariant ESM_RELATIVE_IMPORTS_KEEP_JS
+  (severity error)
+  (description "Round 4 E-02 / CLAUDE.md: TypeScript files use `.js` extensions in relative imports because the packages ship as native ESM and Node's resolver does not infer extensions. A future agent dropping the `.js` suffix would silently break consumers on the npm registry.")
+  (uses-checker esm-relative-imports-keep-js))
+
+(checker hook-entrypoints-fail-closed
+  (description "Every permission-gate hook script must declare an outer try/catch + non-zero exit (or failClosed call)."))
+
+(invariant HOOK_ENTRYPOINTS_FAIL_CLOSED
+  (severity error)
+  (description "Round 4 E-04 / CLAUDE.md: pre-tool-protect.js and stop-validate.js MUST fail closed on uncaught errors — i.e., catch and call process.exit(<non-zero>) or failClosed(). Observation / context hooks are intentionally fail-open and are NOT under this invariant.")
+  (uses-checker hook-entrypoints-fail-closed))
+
+(checker core-has-no-stele-deps
+  (description "@stele/core source must not import from other @stele/* packages (except @stele/call-graph-core, which is a legitimate leaf dep)."))
+
+(invariant CORE_HAS_NO_STELE_DEPS
+  (severity error)
+  (description "Round 4 E-08 / CLAUDE.md: @stele/core is the leaf of the dependency direction `core ← backend-* ← cli`. An agent that imports from @stele/cli or @stele/backend-* inside packages/core/src would silently invert the layering.")
+  (uses-checker core-has-no-stele-deps))
+
 (import "generated/ddd-typedriven.stele")

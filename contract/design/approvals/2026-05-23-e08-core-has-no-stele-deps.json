@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "kind": "proposal-approval",
+  "proposal_id": "2026-05-23-e08-core-has-no-stele-deps",
+  "approved_by": "stele-maintainer",
+  "approved_at": "2026-05-23T00:00:00.000Z",
+  "diff_classification": "additive",
+  "reason": "Round 4 E-05 seed: add CORE_HAS_NO_STELE_DEPS invariant + checker. Approval recorded as the in-repo worked example of the proposal-and-approve workflow described in CLAUDE.md and docs/spec/cdl.md.",
+  "affected_generated_rules": [],
+  "affected_source_scope": [
+    "packages/core/src/**/*.ts",
+    "contract/checker_impls/self_protection.py",
+    "tests/contract/conftest.py",
+    "contract/main.stele"
+  ],
+  "note": "This approval is part of the proposal-flow exemplar; the actual invariant + checker landed in the Round 4 Phase 3 commit. Future agents reading this file have a concrete template for the propose -> approve -> generate sequence."
+}
