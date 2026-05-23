@@ -1,0 +1,17 @@
+(metadata
+  (stele-version "0.1")
+  (project "type-state-fixture-01-allowed-op-ok"))
+
+(type-state ORDER_LIFECYCLE
+  (description "Order lifecycle — addItem is allowed in Draft.")
+  (target "src/order.ts::Order")
+  (severity "error")
+  (states Draft Submitted Paid Cancelled)
+  (initial Draft)
+  (terminal Cancelled)
+  (transition (from Draft) (via submit) (to Submitted))
+  (transition (from Submitted) (via pay) (to Paid))
+  (transition (from Draft Submitted) (via cancel) (to Cancelled))
+  (allowed-ops Draft addItem submit cancel)
+  (allowed-ops Submitted pay cancel)
+  (fix-hint "If the rule is correct, refactor the call order around `Order.addItem`. If the rule is wrong, propose a design update via `stele design propose --type-state ORDER_LIFECYCLE`. Do NOT edit the contract directly."))

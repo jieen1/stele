@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "typestate.ORDER_LIFECYCLE.inference_failed",
+    "rule_kind": "type_state_violation",
+    "severity": "warning",
+    "priority": "major",
+    "location": { "path": "src/handler.ts" },
+    "group_id_pattern": "::processOrder\\(1\\)",
+    "cause": { "summary_contains": "inference failed" }
+  }
+]

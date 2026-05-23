@@ -1,0 +1,21 @@
+(metadata
+  (stele-version "0.1")
+  (project "type-state-fixture-06-binding-suppresses-inference-fail"))
+
+(type-state ORDER_LIFECYCLE
+  (description "Order lifecycle.")
+  (target "src/order.ts::Order")
+  (severity "error")
+  (states Draft Submitted Paid Cancelled)
+  (initial Draft)
+  (terminal Cancelled)
+  (transition (from Draft) (via submit) (to Submitted))
+  (transition (from Submitted) (via pay) (to Paid))
+  (transition (from Draft Submitted) (via cancel) (to Cancelled))
+  (allowed-ops Draft addItem submit cancel)
+  (allowed-ops Submitted pay cancel)
+  (fix-hint "If reported, see `src/handler.ts:processOrder` and either restructure the call or add a `(type-state-binding)`. Use `stele design propose --type-state ORDER_LIFECYCLE` to revise the rule."))
+
+(type-state-binding
+  (function "src/handler.ts::processOrder(1)")
+  (param 0 state Submitted))

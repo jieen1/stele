@@ -1,0 +1,20 @@
+(metadata
+  (stele-version "0.1")
+  (project "type-state-fixture-12-go-style-target-glob"))
+
+(type-state ORDER_LIFECYCLE
+  (description "Go-style separate-types: states map to concrete classes; the top-level target uses a glob.")
+  (target "src/order.ts::*Order")
+  (severity "error")
+  (states Draft Submitted Paid)
+  (initial Draft)
+  (terminal Paid)
+  (state-type-mapping
+    Draft "src/order.ts::DraftOrder"
+    Submitted "src/order.ts::SubmittedOrder"
+    Paid "src/order.ts::PaidOrder")
+  (transition (from Draft) (via submit) (to Submitted))
+  (transition (from Submitted) (via pay) (to Paid))
+  (allowed-ops Draft addItem submit)
+  (allowed-ops Submitted pay)
+  (fix-hint "If reported, restructure the call order in `src/scenario.ts`. Use `stele design propose --type-state ORDER_LIFECYCLE` to revise."))

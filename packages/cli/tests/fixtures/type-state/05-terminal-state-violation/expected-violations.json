@@ -1,0 +1,11 @@
+[
+  {
+    "rule_id": "typestate.ORDER_LIFECYCLE.disallowed_op",
+    "rule_kind": "type_state_violation",
+    "severity": "error",
+    "priority": "blocking",
+    "location": { "path": "src/scenario.ts" },
+    "group_id_pattern": "::main\\(0\\)",
+    "cause": { "summary_contains": "addItem" }
+  }
+]

@@ -1,0 +1,17 @@
+(metadata
+  (stele-version "0.1")
+  (project "type-state-fixture-11-allowed-ops-explicit"))
+
+(type-state ORDER_LIFECYCLE
+  (description "addItem is allowed in Submitted via (allowed-ops), even though it is not a transition.")
+  (target "src/order.ts::Order")
+  (severity "error")
+  (states Draft Submitted Paid Cancelled)
+  (initial Draft)
+  (terminal Cancelled)
+  (transition (from Draft) (via submit) (to Submitted))
+  (transition (from Submitted) (via pay) (to Paid))
+  (transition (from Draft Submitted) (via cancel) (to Cancelled))
+  (allowed-ops Draft addItem submit cancel)
+  (allowed-ops Submitted addItem pay cancel)
+  (fix-hint "If reported, see `src/scenario.ts` and reorder around `Order.addItem`. Use `stele design propose --type-state ORDER_LIFECYCLE` to revise."))

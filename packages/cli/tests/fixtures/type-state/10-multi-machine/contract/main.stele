@@ -1,0 +1,32 @@
+(metadata
+  (stele-version "0.1")
+  (project "type-state-fixture-10-multi-machine"))
+
+(type-state ORDER_LIFECYCLE
+  (description "Order lifecycle — evaluated independently of the payment machine.")
+  (target "src/order.ts::Order")
+  (severity "error")
+  (states Draft Submitted Paid Cancelled)
+  (initial Draft)
+  (terminal Cancelled)
+  (transition (from Draft) (via submit) (to Submitted))
+  (transition (from Submitted) (via pay) (to Paid))
+  (transition (from Draft Submitted) (via cancel) (to Cancelled))
+  (allowed-ops Draft addItem submit cancel)
+  (allowed-ops Submitted pay cancel)
+  (fix-hint "If reported, see `src/scenario.ts` and restructure the order calls. Use `stele design propose --type-state ORDER_LIFECYCLE` to revise."))
+
+(type-state PAYMENT_LIFECYCLE
+  (description "Payment lifecycle — evaluated independently of the order machine.")
+  (target "src/payment.ts::Payment")
+  (severity "error")
+  (states Pending Authorized Captured Refunded)
+  (initial Pending)
+  (terminal Refunded)
+  (transition (from Pending) (via authorize) (to Authorized))
+  (transition (from Authorized) (via capture) (to Captured))
+  (transition (from Captured) (via refund) (to Refunded))
+  (allowed-ops Pending authorize)
+  (allowed-ops Authorized capture)
+  (allowed-ops Captured refund)
+  (fix-hint "If reported, restructure the payment calls in `src/scenario.ts`. Use `stele design propose --type-state PAYMENT_LIFECYCLE` to revise."))
