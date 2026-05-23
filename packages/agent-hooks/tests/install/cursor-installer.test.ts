@@ -8,7 +8,26 @@ import {
   renderRulesMarkdown,
   uninstall,
 } from "../../src/install/cursor-installer.js";
-import { DEFAULT_CONFIG } from "@stele/cli";
+import type { SteleConfig } from "../../src/util/stele-config-types.js";
+
+const DEFAULT_CONFIG: SteleConfig = {
+  version: "0.1",
+  contractDir: "contract",
+  entry: "contract/main.stele",
+  generatedDir: "tests/contract",
+  checkerImplDir: "contract/checker_impls",
+  manifestPath: "contract/.manifest.json",
+  targetLanguage: "python",
+  testFramework: "pytest",
+  pathMode: "auto",
+  protected: [
+    "contract/**/*.stele",
+    "contract/checker_impls/**/*",
+    "contract/.baseline.json",
+    "contract/.manifest.json",
+    "tests/contract/**/*",
+  ],
+};
 
 const tempDirs: string[] = [];
 

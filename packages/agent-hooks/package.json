@@ -61,14 +61,6 @@
     "@stele/core": "workspace:*",
     "minimatch": "^10.0.0"
   },
-  "peerDependencies": {
-    "@stele/cli": "workspace:*"
-  },
-  "peerDependenciesMeta": {
-    "@stele/cli": {
-      "optional": true
-    }
-  },
   "license": "MIT",
   "repository": "github:stelehq/stele",
   "homepage": "https://github.com/stelehq/stele",

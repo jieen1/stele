@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { createPreEditProtect } from "../../src/handlers/pre-edit-protect.js";
 import type { AgentHookContext } from "../../src/protocol.js";
-import { DEFAULT_CONFIG, type SteleConfig } from "@stele/cli";
+import type { SteleConfig } from "../../src/util/stele-config-types.js";
+
+const DEFAULT_CONFIG: SteleConfig = {
+  version: "0.1",
+  contractDir: "contract",
+  entry: "contract/main.stele",
+  generatedDir: "tests/contract",
+  checkerImplDir: "contract/checker_impls",
+  manifestPath: "contract/.manifest.json",
+  targetLanguage: "python",
+  testFramework: "pytest",
+  pathMode: "auto",
+  protected: [
+    "contract/**/*.stele",
+    "contract/checker_impls/**/*",
+    "contract/.baseline.json",
+    "contract/.manifest.json",
+    "tests/contract/**/*",
+  ],
+};
 
 const PROJECT_ROOT = "/tmp/project";
 

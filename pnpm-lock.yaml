@@ -39,9 +39,6 @@ importers:
 
   packages/agent-hooks:
     dependencies:
-      '@stele/cli':
-        specifier: workspace:*
-        version: link:../cli
       '@stele/core':
         specifier: workspace:*
         version: link:../core
