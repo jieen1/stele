@@ -2,7 +2,7 @@
   {
     "rule_id": "trace.DEEP_CHAIN_RULE.path_exceeded_max_depth",
     "rule_kind": "trace_violation",
-    "severity": "warning",
+    "severity": "error",
     "priority": "minor",
     "group_id_pattern": "::F0::run\\(1\\)$",
     "cause": { "summary_contains": "exceeded the analyzer depth cap" }

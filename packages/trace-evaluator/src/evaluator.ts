@@ -49,6 +49,13 @@ export interface EvaluateTraceOptions {
   readonly externAliases?: ExternAliasRegistry;
   readonly maxDepth?: number;
   readonly maxPaths?: number;
+  /**
+   * Round 2 D-CG-2 + Round 3 P0-5: in strict mode (default `true`), a
+   * truncated path enumeration surfaces at the policy's configured severity
+   * — incomplete analysis is treated as failure-to-prove. Lenient callers
+   * (`false`) keep the legacy advisory `warning`.
+   */
+  readonly strictMode?: boolean;
 }
 
 export interface EvaluateTraceStats {
@@ -180,6 +187,7 @@ export function evaluateTracePolicies(
     externAliases,
     maxDepth = 10,
     maxPaths = 100,
+    strictMode = true,
   } = options;
 
   const violations: Violation[] = [];
@@ -280,14 +288,21 @@ export function evaluateTracePolicies(
 
         if (result.stats.truncated) {
           pathsCappedTotal += 1;
-          notices.push(
-            buildViolation({
-              policy,
-              kind: "path_exceeded_max_depth",
-              callerId: caller.id,
-              callGraph,
-            }),
-          );
+          // Round 3 P0-5: in strict mode this becomes an actual violation (not
+          // merely a notice) because the analyzer cannot prove the policy
+          // holds for the truncated paths.
+          const depthCapViolation = buildViolation({
+            policy,
+            kind: "path_exceeded_max_depth",
+            callerId: caller.id,
+            callGraph,
+            strictMode,
+          });
+          if (strictMode) {
+            violations.push(depthCapViolation);
+          } else {
+            notices.push(depthCapViolation);
+          }
         }
       }
 

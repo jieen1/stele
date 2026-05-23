@@ -282,9 +282,9 @@ describe("evaluateTracePolicies — scope & exempt", () => {
   });
 });
 
-describe("evaluateTracePolicies — path_exceeded_max_depth notice", () => {
-  it("emits warning notice when DFS hits depth cap", () => {
-    // Build chain A -> B -> C -> D -> E -> F  with maxDepth=3
+describe("evaluateTracePolicies — path_exceeded_max_depth (strict vs lenient)", () => {
+  function buildDepthCapFixture() {
+    // Chain A -> B -> C -> D -> E -> F  with maxDepth=3
     const chain = ["A", "B", "C", "D", "E", "F"].map((n) =>
       mkNode({ id: `src/${n.toLowerCase()}.ts::${n}(0)`, filePath: `src/${n.toLowerCase()}.ts` }),
     );
@@ -302,16 +302,52 @@ describe("evaluateTracePolicies — path_exceeded_max_depth notice", () => {
       scope: ["src/a.ts::A(*)"],
       fixHint: "Shorten the chain — see `src/a.ts:1`.",
     });
+    return { graph, policy };
+  }
+
+  it("strict mode (default): truncation surfaces as a violation at policy severity", () => {
+    // Round 3 P0-5: in strict mode, the analyzer cannot prove the rule holds
+    // for the truncated paths, so the depth-cap event MUST surface as a
+    // first-class violation at the policy's severity, not a downgraded notice.
+    const { graph, policy } = buildDepthCapFixture();
     const result = evaluateTracePolicies({
       contract: mkContract([policy]),
       callGraph: graph,
       maxDepth: 3,
     });
-    // No violation: the real rule didn't fire because we never reached F.
-    expect(result.violations).toHaveLength(0);
-    // But a notice should have been emitted.
+    const depthCap = result.violations.find(
+      (v) => v.rule_id === "trace.DEEP_RULE.path_exceeded_max_depth",
+    );
+    expect(depthCap).toBeDefined();
+    expect(depthCap!.severity).toBe("error");
+    expect(depthCap!.priority).toBe("minor");
+    // No analogous notice — strict mode promotes it.
+    expect(
+      result.notices.some(
+        (n) => n.rule_id === "trace.DEEP_RULE.path_exceeded_max_depth",
+      ),
+    ).toBe(false);
+  });
+
+  it("lenient mode (strictMode=false): keeps legacy advisory notice + warning", () => {
+    const { graph, policy } = buildDepthCapFixture();
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+      maxDepth: 3,
+      strictMode: false,
+    });
+    expect(
+      result.violations.some(
+        (v) => v.rule_id === "trace.DEEP_RULE.path_exceeded_max_depth",
+      ),
+    ).toBe(false);
     expect(result.notices.length).toBeGreaterThan(0);
-    expect(result.notices.some((n) => n.rule_id === "trace.DEEP_RULE.path_exceeded_max_depth")).toBe(true);
+    expect(
+      result.notices.some(
+        (n) => n.rule_id === "trace.DEEP_RULE.path_exceeded_max_depth",
+      ),
+    ).toBe(true);
     expect(result.notices[0]!.severity).toBe("warning");
     expect(result.notices[0]!.priority).toBe("minor");
   });
