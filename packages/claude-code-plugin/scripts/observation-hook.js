@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+// Round 5 J-10: removed unused `writeFile` import — the appendFileSync
+// flow is the only file-writing path here.
+import { mkdir, readFile } from "node:fs/promises";
 import { lstatSync, appendFileSync } from "node:fs";
 import path from "node:path";
 import { minimatch } from "minimatch";
@@ -71,8 +73,13 @@ try {
 
   const observationPath = path.join(projectDir, ".stele", "agent", "session-observations.jsonl");
 
-  // Reject symlinked observation path to prevent write redirection
-  if (isSymlinkedPath(path.dirname(observationPath))) {
+  // Round 5 J-07: check the FILE for a symlink, not just its parent dir.
+  // An attacker symlinking session-observations.jsonl to /dev/null
+  // would otherwise silently swallow the audit log.
+  if (
+    isSymlinkedPath(path.dirname(observationPath)) ||
+    isSymlinkedPath(observationPath)
+  ) {
     process.exit(0);
   }
 

@@ -57,9 +57,20 @@ for (const fixture of FIXTURES) {
             // explicit-non-binary failures — but the common "pytest not
             // installed" / "go not installed" case shouldn't drown the
             // local-dev test signal in 7 spurious failures.
+            // Round 5 J-12: tighten the auto-skip regex. The legacy
+            // pattern `/not installed|test runner missing|runner not yet
+            // wired/i` was too permissive — any future runner whose real
+            // error message happened to mention "test runner missing"
+            // (e.g. PATH misconfiguration in CI) would have been silently
+            // skipped. The new pattern requires the exact "<binary> not
+            // installed" phrasing the per-language runners emit (see
+            // runner-impl.ts) plus the explicit "vitest runner not yet
+            // wired" sentinel.
             const skipReason = result.runnerSkipReason ?? "";
             const isMissingFrameworkBinary =
-              /not installed|test runner missing|runner not yet wired/i.test(skipReason);
+              /^(?:pytest|go|cargo|mvn) not installed$/.test(skipReason) ||
+              /^vitest runner not yet wired in conformance runner$/.test(skipReason) ||
+              /test runner not yet wired in conformance runner$/.test(skipReason);
             if (
               process.env.STELE_CONFORMANCE_ALLOW_SKIP !== "1" &&
               !isMissingFrameworkBinary

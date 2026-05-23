@@ -257,16 +257,21 @@ def manifest_version_stable(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 
 
 def exit_codes_valid(ctx: dict, **kwargs: Any) -> dict[str, Any]:
-    """Verify CLI exit codes match the spec — ALL 7 codes checked."""
+    """Verify CLI exit codes match the spec — ALL 8 codes checked.
+
+    Round 5 K-07: added SCORE_BELOW_THRESHOLD=6 which already lived in
+    errors.ts + the CLI spec but was missing from this checker. The
+    invariant description was likewise updated from "7 codes" to "8 codes".
+    """
     errors_ts = _PACKAGES_DIR / "cli" / "src" / "errors.ts"
     if not errors_ts.exists():
         return {"passed": False, "message": "errors.ts not found"}
 
     content = errors_ts.read_text(encoding="utf-8")
 
-    # Parse ExitCode = { NAME: NUMBER, ... } block
     # Expected: SUCCESS=0, USER_ERROR=1, CONTRACT_FAIL=2, TAMPER_DETECTED=3,
-    #           GENERATION_FAIL=4, CONFIG_ERROR=5, INTERNAL_ERROR=99
+    #           GENERATION_FAIL=4, CONFIG_ERROR=5, SCORE_BELOW_THRESHOLD=6,
+    #           INTERNAL_ERROR=99
     expected_codes = {
         "SUCCESS": "0",
         "USER_ERROR": "1",
@@ -274,6 +279,7 @@ def exit_codes_valid(ctx: dict, **kwargs: Any) -> dict[str, Any]:
         "TAMPER_DETECTED": "3",
         "GENERATION_FAIL": "4",
         "CONFIG_ERROR": "5",
+        "SCORE_BELOW_THRESHOLD": "6",
         "INTERNAL_ERROR": "99",
     }
 
@@ -1561,6 +1567,46 @@ def _extract_string_array(source: str, anchor: str) -> set[str] | None:
     }
 
 
+def _count_string_literals_in_array(source: str, anchor: str) -> int | None:
+    """Round 5 I-17: count raw string-literal occurrences in the array
+    following `anchor` (without set-canonicalization). Used alongside
+    `_extract_string_array` to detect intra-list duplicates."""
+    idx = source.find(anchor)
+    if idx == -1:
+        return None
+    pos = idx + len(anchor)
+    lb = -1
+    while pos < len(source):
+        candidate = source.find("[", pos)
+        if candidate == -1:
+            return None
+        tail = source[candidate + 1:].lstrip(" \t")
+        if tail.startswith("]"):
+            pos = candidate + 1
+            continue
+        lb = candidate
+        break
+    if lb == -1:
+        return None
+    depth = 0
+    end = -1
+    for i in range(lb, len(source)):
+        ch = source[i]
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    if end == -1:
+        return None
+    body = source[lb + 1:end]
+    body = re.sub(r"(^|\n)\s*/\*[\s\S]*?\*/", lambda m: m.group(1), body)
+    body = re.sub(r"//[^\n]*", "", body)
+    return sum(1 for _ in _STRING_LITERAL_RE.finditer(body))
+
+
 def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Round 4 D-13: the three "default protected patterns" lists must
     agree byte-for-byte (modulo ordering):
@@ -1618,8 +1664,29 @@ def default_protected_consistent(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 "message": f"could not extract array following '{anchor}'",
             })
             continue
+        # Round 5 I-17: additionally detect duplicate entries within a
+        # single list. Without this, `["x", "x"]` looks identical to
+        # `["x"]` after set-canonicalization, so an agent could pad a
+        # list with duplicates to make a removal invisible.
+        raw_count = _count_string_literals_in_array(content, anchor)
+        if raw_count is not None and raw_count != len(entries):
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": (
+                    f"list contains {raw_count - len(entries)} duplicate "
+                    f"entry/entries — checker uses set semantics so duplicates "
+                    f"hide divergence"
+                ),
+            })
         extracted.append((rel_path, entries))
 
+    # Round 5 I-17: additionally check that no single list contains a
+    # duplicate entry — a set-equality comparison would silently mask
+    # `["x", "x"]` against `["x"]`. We track raw counts above by
+    # re-parsing the body and asserting len(list) == len(set).
+    # (Implemented as a per-source pre-check.)
     if len(extracted) >= 2:
         base_path, base_set = extracted[0]
         for other_path, other_set in extracted[1:]:

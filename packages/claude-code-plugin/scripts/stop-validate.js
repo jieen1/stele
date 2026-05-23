@@ -543,9 +543,10 @@ function blockStop(message) {
   process.exit(STOP_BLOCK_EXIT_CODE);
 }
 
-function blockStopWithContractRecovery(message) {
-  blockStop(`${message}${CONTRACT_RECOVERY_GUIDANCE}`);
-}
+// Round 5 J-09: removed `blockStopWithContractRecovery` — the helper was
+// defined but never invoked. CLAUDE.md "When you remove code, remove it"
+// applies; if a future code-path needs the contract-recovery flavour of
+// blockStop, it can be re-introduced together with the call site.
 
 /**
  * Loop guard: when the same Stop-time failure recurs back-to-back, the second
@@ -677,6 +678,21 @@ async function writeStopState(stateFilePath, state) {
 async function clearStopState() {
   try {
     const stateFilePath = path.join(projectDir, STOP_STATE_FILE);
+    // Round 5 J-05: mirror writeStopState's symlink guard. An agent that
+    // swaps the state file with a symlink between writeStopState and
+    // clearStopState would otherwise redirect the clear-write to any
+    // path the symlink points at.
+    try {
+      const stat = lstatSync(stateFilePath);
+      if (stat.isSymbolicLink()) {
+        process.stderr.write(
+          `[stop-validate] Refusing to clear-write through symlinked stop-state.json at ${stateFilePath}.\n`,
+        );
+        return;
+      }
+    } catch {
+      // File doesn't exist yet — proceed.
+    }
     await writeFile(
       stateFilePath,
       `${JSON.stringify(

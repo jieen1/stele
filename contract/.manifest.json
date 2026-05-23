@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-23T16:56:12.629Z",
+  "generated_at": "2026-05-23T17:03:51.268Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -15,13 +15,29 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
+    "contract/checker_impls/.pytest_cache/.gitignore": {
+      "sha256": "3ed731b65d06150c138e2dadb0be0697550888a6b47eb8c45ecc9adba8b8e9bd",
+      "size": 37
+    },
+    "contract/checker_impls/.pytest_cache/CACHEDIR.TAG": {
+      "sha256": "37dc88ef9a0abeddbe81053a6dd8fdfb13afb613045ea1eb4a5c815a74a3bde4",
+      "size": 191
+    },
+    "contract/checker_impls/.pytest_cache/README.md": {
+      "sha256": "73fd6fccdd802c419a6b2d983d6c3173b7da97558ac4b589edec2dfe443db9ad",
+      "size": 302
+    },
+    "contract/checker_impls/.pytest_cache/v/cache/nodeids": {
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "size": 2
+    },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "b2fa8a60f9f15778a64f314166e5731d823a65e08e2351363293b3271a6a30dc",
-      "size": 79468
+      "sha256": "295010e64d863f4db9f2a8024badd2c5f699bad29ab1b651fd6ba172d32a83a8",
+      "size": 82048
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "830696e27d80ef5810aff768051caa3c73e5976a999f8df63e9c2ce01896a73b",
-      "size": 34380
+      "sha256": "c9b55a0ed57c00ae10a3cbc52ae9e7d85c93e216cc5971b476ed28e18c316f8c",
+      "size": 38179
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
@@ -108,8 +124,8 @@
       "size": 6317
     },
     "packages/claude-code-plugin/scripts/observation-hook.js": {
-      "sha256": "9fc41205fc7d112442165e88735dbf556204c5caa09eb6a97881a203f2af8def",
-      "size": 15204
+      "sha256": "b8d20b81cf00d14440e47d073a6bddc97354cc5571512de275377e6d331aa46d",
+      "size": 15486
     },
     "packages/claude-code-plugin/scripts/path-utils.js": {
       "sha256": "92b294611fe9424b07d1ebfb0c5a782be4d07463fbc41253d7f3808127d7a687",
@@ -124,8 +140,8 @@
       "size": 3941
     },
     "packages/claude-code-plugin/scripts/stop-validate.js": {
-      "sha256": "edc882000b27afbdbae8fb51c85c4e5e7687a1cbf824fcd0fe9b057661d564ab",
-      "size": 22244
+      "sha256": "53a4837f51ab7f04a2778541692a8d5da5d4877bd64fd3bceff7d0af0894ae68",
+      "size": 23005
     },
     "packages/cli/package.json": {
       "sha256": "5b0dae678a4ae78e0ea64d7ae8d1aa60209cd049848b5a3184a255e817837788",

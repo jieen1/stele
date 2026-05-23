@@ -653,6 +653,84 @@ def test_strict_mode_default_in_ci_via_referenced_script():
     return _pass_if_false(result, "strict_mode_default_in_ci_via_referenced_script")
 
 
+def test_default_protected_consistent_drops_pattern_in_one_list():
+    """Round 5 I-13: remove `.stele/stop-state.json` from the core list
+    only, verify the consistency checker catches the divergence."""
+    _reset_caches()
+    core_defaults = sp._PACKAGES_DIR / "core" / "src" / "config" / "defaults.ts"
+    if not core_defaults.is_file():
+        print("  SKIP: core defaults.ts missing")
+        return True
+    original = core_defaults.read_text(encoding="utf-8")
+    tampered = original.replace('".stele/stop-state.json"', '"REMOVED-FOR-NEGTEST"', 1)
+    core_defaults.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.default_protected_consistent({})
+    finally:
+        core_defaults.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "default_protected_consistent_drops_pattern_in_one_list")
+
+
+def test_esm_relative_imports_keep_js_missing_suffix():
+    """Round 5 I-13: write a TS file with a relative import missing the
+    .js suffix; the E-02 checker must catch it."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_esm.ts"
+    target.write_text(
+        'import { foo } from "./missing-suffix";\nexport const x = foo;\n',
+        encoding="utf-8",
+    )
+    try:
+        result = sp.esm_relative_imports_keep_js({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "esm_relative_imports_keep_js_missing_suffix")
+
+
+def test_hook_entrypoints_fail_closed_catch_swallows_error():
+    """Round 5 I-13: rewrite a hook script so its catch block swallows
+    errors (no process.exit / failClosed / blockStop). The new K-02
+    body-scoped check must catch it."""
+    _reset_caches()
+    hook = sp._PACKAGES_DIR / "claude-code-plugin" / "scripts" / "pre-tool-protect.js"
+    if not hook.is_file():
+        print("  SKIP: pre-tool-protect.js missing")
+        return True
+    original = hook.read_text(encoding="utf-8")
+    # Replace the literal `failClosed(` call inside catch bodies with a
+    # console.error (so the catch swallows). Preserve all other
+    # process.exit references elsewhere in the file (so the file-scope
+    # OR'd legacy check would still pass — only the new body-scoped
+    # check catches this).
+    tampered = original.replace("failClosed(", "console.error(")
+    hook.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.hook_entrypoints_fail_closed({})
+    finally:
+        hook.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "hook_entrypoints_fail_closed_catch_swallows_error")
+
+
+def test_core_has_no_stele_deps_dynamic_import():
+    """Round 5 I-13: add a dynamic `import("@stele/cli")` to a core
+    file; the K-03 wider regex must catch it (legacy regex required
+    `from` keyword and missed dynamic imports)."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_dyn.ts"
+    target.write_text(
+        'export async function loadCli() {\n'
+        '  const m = await import("@stele/cli");\n'
+        '  return m;\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    try:
+        result = sp.core_has_no_stele_deps({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "core_has_no_stele_deps_dynamic_import")
+
+
 def test_fix_hint_requires_analysis_branch_content_inversion():
     """Round 4 D-09: rewrite the [A] body to say "do nothing on the
     code side" with no action verb and no delegated template — the
@@ -778,6 +856,11 @@ def main() -> int:
         ("strict_mode_default_in_ci_via_python_script_delegation", test_strict_mode_default_in_ci_via_python_script_delegation),
         # Round 4 D-09: content-inversion guard
         ("fix_hint_requires_analysis_branch_content_inversion", test_fix_hint_requires_analysis_branch_content_inversion),
+        # Round 5 I-13: negative tests for the four Round-4 dogfood checkers
+        ("default_protected_consistent_drops_pattern_in_one_list", test_default_protected_consistent_drops_pattern_in_one_list),
+        ("esm_relative_imports_keep_js_missing_suffix", test_esm_relative_imports_keep_js_missing_suffix),
+        ("hook_entrypoints_fail_closed_catch_swallows_error", test_hook_entrypoints_fail_closed_catch_swallows_error),
+        ("core_has_no_stele_deps_dynamic_import", test_core_has_no_stele_deps_dynamic_import),
     ]
 
     print("=" * 60)

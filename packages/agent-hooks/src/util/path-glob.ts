@@ -249,7 +249,11 @@ function matchGlob(relativePath: string, pattern: string): boolean {
 
   return minimatch(relativePath, pattern, {
     dot: true,
-    nocase: process.platform === "win32",
+    // Round 5 J-06: also case-insensitive on macOS (APFS/HFS+ are
+    // case-preserving but case-insensitive by default), so a write to
+    // `Contract/Main.stele` still resolves to inode `contract/main.stele`.
+    // Linux is case-sensitive by default.
+    nocase: process.platform === "win32" || process.platform === "darwin",
   });
 }
 
@@ -290,5 +294,10 @@ function normalizeAbsolutePrefix(value: string): string {
 }
 
 function normalizeForComparison(value: string): string {
-  return process.platform === "win32" ? value.toLowerCase() : value;
+  // Round 5 J-06: macOS APFS/HFS+ are case-insensitive by default —
+  // lowercase those paths too so the match semantics line up with how
+  // the OS resolves them.
+  return process.platform === "win32" || process.platform === "darwin"
+    ? value.toLowerCase()
+    : value;
 }

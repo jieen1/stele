@@ -31,7 +31,8 @@ export type RecursiveLockResult = {
   jsonOutput?: string;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Round 5 J-11: removed unused eslint-disable directive — `_options` is
+// referenced inside the body so the lint rule wouldn't have fired.
 export async function runLock(projectDir: string, _options: LockOptions): Promise<void> {
   await lockProject(projectDir, _options);
 }
