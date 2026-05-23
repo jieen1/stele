@@ -168,8 +168,8 @@ describe("buildTraceStage — empty contract", () => {
   });
 });
 
-describe("buildTraceStage — non-typescript target language", () => {
-  it("returns ok with a warning violation for python", async () => {
+describe("buildTraceStage — non-typescript target language (Round 4 F-A-02 fail-loud)", () => {
+  it("fails loud with an error violation for python", async () => {
     const policy = mkPolicy({ id: "P1", target: [DB], denyDirect: [CTRL] });
     const context = mkContext({
       contract: mkContract([policy]),
@@ -181,17 +181,15 @@ describe("buildTraceStage — non-typescript target language", () => {
       extractCallGraph: extract,
     });
 
-    expect(report.ok).toBe(true);
+    expect(report.ok).toBe(false);
     expect(report.violations).toHaveLength(1);
     expect(report.violations[0]!.rule_id).toBe("trace.not-yet-supported.python");
-    expect(report.violations[0]!.severity).toBe("warning");
-    // Warning still counts in the report summary, but `ok: true` keeps the
-    // check passing.
+    expect(report.violations[0]!.severity).toBe("error");
     expect(report.summary.violation_count).toBe(1);
     expect(extract).not.toHaveBeenCalled();
   });
 
-  it("returns ok with a warning violation for go", async () => {
+  it("fails loud with an error violation for go", async () => {
     const policy = mkPolicy({ id: "P1", target: [DB] });
     const context = mkContext({
       contract: mkContract([policy]),
@@ -200,8 +198,9 @@ describe("buildTraceStage — non-typescript target language", () => {
 
     const report = await buildTraceStage(context, PROTECTED_STATE, "check");
 
-    expect(report.ok).toBe(true);
+    expect(report.ok).toBe(false);
     expect(report.violations[0]!.rule_id).toBe("trace.not-yet-supported.go");
+    expect(report.violations[0]!.severity).toBe("error");
   });
 });
 

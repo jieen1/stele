@@ -73,31 +73,37 @@ export async function buildTraceStage(
 
   const language = context.config.targetLanguage;
   if (language !== "typescript") {
+    // Round 4 F-A-02: fail loud, not silent. Before this change the stage
+    // returned ok:true with a warning-severity advisory — meaning a
+    // Python/Go/Rust/Java project that declared (trace-policy …) would
+    // silently pass `stele check` even though the mechanism was unenforced.
+    // Now we emit an error-severity violation + ok:false so the contract
+    // surface and the enforcement surface stay in sync.
     return createViolationReport({
       tool: "stele",
       command,
-      ok: true,
+      ok: false,
       summary: {
         invariant_count: protectedState.summary.invariantCount,
         generated_file_count: protectedState.summary.generatedFileCount,
         protected_file_count: protectedState.summary.protectedFileCount,
-        violation_count: 0,
+        violation_count: 1,
       },
       violations: [
         createViolation({
           rule_id: `trace.not-yet-supported.${language}`,
           rule_kind: "trace_unsupported_language",
-          severity: "warning",
+          severity: "error",
           source: { tool: "stele", command, kind: "rule" },
           location: { path: "contract" },
           cause: {
-            summary: `trace-policy not yet supported for targetLanguage="${language}"; see Phase B roadmap.`,
+            summary: `trace-policy not yet supported for targetLanguage="${language}". Round 4 F-A-02: failing loud so the contract surface matches the enforcement surface.`,
           },
           scope_paths: ["contract"],
           status: "active",
           fix: {
             summary:
-              "Stele Phase B.1 supports TypeScript only. Python lands in B.2; Go/Java/Rust in B.3.",
+              "Stele Phase B.1 supports TypeScript only. Either remove the (trace-policy …) declarations from this contract, or wait for the Python/Go/Java/Rust backend to land (B.2/B.3).",
           },
         }),
       ],

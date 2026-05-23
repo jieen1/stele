@@ -104,31 +104,33 @@ export async function buildEffectStage(
 
   const language = context.config.targetLanguage;
   if (language !== "typescript") {
+    // Round 4 F-A-02: fail loud (error+ok:false) instead of silent
+    // warning. See trace stage for the full rationale.
     return createViolationReport({
       tool: "stele",
       command,
-      ok: true,
+      ok: false,
       summary: {
         invariant_count: protectedState.summary.invariantCount,
         generated_file_count: protectedState.summary.generatedFileCount,
         protected_file_count: protectedState.summary.protectedFileCount,
-        violation_count: 0,
+        violation_count: 1,
       },
       violations: [
         createViolation({
           rule_id: `effect.not-yet-supported.${language}`,
           rule_kind: "effect_unsupported_language",
-          severity: "warning",
+          severity: "error",
           source: { tool: "stele", command, kind: "rule" },
           location: { path: "contract" },
           cause: {
-            summary: `effect-policy not yet supported for targetLanguage="${language}"; see Phase B roadmap.`,
+            summary: `effect-policy not yet supported for targetLanguage="${language}". Round 4 F-A-02: failing loud so the contract surface matches the enforcement surface.`,
           },
           scope_paths: ["contract"],
           status: "active",
           fix: {
             summary:
-              "Stele Phase B.1 supports TypeScript only. Python/Rust/Java/Go land in later milestones.",
+              "Stele Phase B.1 supports TypeScript only. Either remove the (effect-policy …) declarations or wait for B.2/B.3 backend coverage.",
           },
         }),
       ],

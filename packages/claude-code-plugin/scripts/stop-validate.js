@@ -623,6 +623,25 @@ function normalizeForFingerprint(text) {
 
 async function readStopState(stateFilePath) {
   try {
+    // Round 4 P2-1: refuse to read a symlinked .stele/stop-state.json. An
+    // agent that replaced the file with a symlink to /dev/null or to an
+    // attacker-controlled path could (a) erase the loop-guard fingerprint
+    // every read, OR (b) read attacker-shaped JSON. Either way the loop
+    // guard is defeated. Fail closed by treating it as "no state" — the
+    // hook then degrades to the legacy "always block" behaviour, which is
+    // the right thing under tampering.
+    const stat = lstatSync(stateFilePath);
+    if (stat.isSymbolicLink()) {
+      process.stderr.write(
+        `[stop-validate] Refusing symlinked stop-state.json at ${stateFilePath}; ` +
+          `treating as no state (fail-closed). Round 4 P2-1.\n`,
+      );
+      return null;
+    }
+    if (!stat.isFile()) {
+      // Same fail-closed posture for sockets / FIFOs / devices.
+      return null;
+    }
     const raw = await readFile(stateFilePath, "utf8");
     const parsed = JSON.parse(raw);
     return isObject(parsed) ? parsed : null;
@@ -633,6 +652,20 @@ async function readStopState(stateFilePath) {
 
 async function writeStopState(stateFilePath, state) {
   try {
+    // Round 4 P2-1: same symlink-rejection on write — refuse to follow a
+    // symlink that's been placed where the state file should live, which
+    // would otherwise let an attacker point a write at any target.
+    try {
+      const stat = lstatSync(stateFilePath);
+      if (stat.isSymbolicLink()) {
+        process.stderr.write(
+          `[stop-validate] Refusing to write through symlinked stop-state.json at ${stateFilePath}.\n`,
+        );
+        return;
+      }
+    } catch {
+      // File doesn't exist yet — that's normal first-run, proceed.
+    }
     await mkdir(path.dirname(stateFilePath), { recursive: true });
     await writeFile(stateFilePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
   } catch {

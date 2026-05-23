@@ -239,17 +239,18 @@ describe("buildEffectStage — non-typescript target language", () => {
       extractor: STUB_EXTRACTOR,
     });
 
-    expect(report.ok).toBe(true);
+    // Round 4 F-A-02: non-TS targets fail loud now.
+    expect(report.ok).toBe(false);
     expect(report.violations).toHaveLength(1);
     expect(report.violations[0]!.rule_id).toBe(
       "effect.not-yet-supported.python",
     );
-    expect(report.violations[0]!.severity).toBe("warning");
+    expect(report.violations[0]!.severity).toBe("error");
     expect(extract).not.toHaveBeenCalled();
     expect(evaluate).not.toHaveBeenCalled();
   });
 
-  it("returns ok with a warning notice for rust", async () => {
+  it("fails loud for rust (Round 4 F-A-02)", async () => {
     const policy = mkEffectPolicy({ id: "NO_NET" });
     const context = mkContext({
       contract: mkContract([policy]),
@@ -258,10 +259,11 @@ describe("buildEffectStage — non-typescript target language", () => {
 
     const report = await buildEffectStage(context, PROTECTED_STATE, "check");
 
-    expect(report.ok).toBe(true);
+    expect(report.ok).toBe(false);
     expect(report.violations[0]!.rule_id).toBe(
       "effect.not-yet-supported.rust",
     );
+    expect(report.violations[0]!.severity).toBe("error");
   });
 });
 
