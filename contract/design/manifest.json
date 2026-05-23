@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "d882dc2041aabcfcc95605d69f32858836325577b8938495726d4e4d087a615c",
+  "profileHash": "1131e1bf1a9063a788bd83fe49d853c1871c37765a85567aae038af460fb14d2",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "ab006b831b3320c9b95246f5025774e684bbfabf"
+    "git_sha": "f081fab2358413b0e1bdea8bd6a71729140664f5"
   },
   "templates": [
     "ddd-typedriven"
@@ -93,8 +93,8 @@
           "context_name": "Hooks"
         }
       ],
-      "fileHash": "1f3a4a61c6096b6b74d52995cbd4cf579bb241f792d39ce16d030c9b7ea40c14",
-      "cdl": "(architecture \"ddd-hooks\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: hooks context must preserve DDD layer direction.\")\n\n  (module hooks-protocol\n    (path \"packages/agent-hooks/src/{protocol}/**\"))\n  (module hooks-domain\n    (path \"packages/agent-hooks/src/handlers/**\"))\n  (module hooks-application\n    (path \"packages/agent-hooks/src/adapters/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n\n  (layer protocol hooks-protocol)\n  (layer domain hooks-domain)\n  (layer application hooks-application)\n  (layer infrastructure hooks-infrastructure)\n\n  (allow-dependency hooks-domain hooks-protocol hooks-infrastructure)\n  (allow-dependency hooks-application hooks-protocol hooks-domain hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-protocol)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "373e8061eadc52789c2d02f64649b09e72577409e2bd8c786582a0b9a7f31750",
+      "cdl": "(architecture \"ddd-hooks\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: hooks context must preserve DDD layer direction.\")\n\n  (module hooks-protocol\n    (path \"packages/agent-hooks/src/{protocol.ts,protocol/**}\"))\n  (module hooks-domain\n    (path \"packages/agent-hooks/src/handlers/**\"))\n  (module hooks-application\n    (path \"packages/agent-hooks/src/adapters/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n\n  (layer protocol hooks-protocol)\n  (layer domain hooks-domain)\n  (layer application hooks-application)\n  (layer infrastructure hooks-infrastructure)\n\n  (allow-dependency hooks-domain hooks-protocol hooks-infrastructure)\n  (allow-dependency hooks-application hooks-protocol hooks-domain hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-protocol)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-mcp",
@@ -107,8 +107,64 @@
           "context_name": "Mcp"
         }
       ],
-      "fileHash": "274982a8653232f88951594f8fee96bb7debf278707782c8e7231dd21070101b",
-      "cdl": "(architecture \"ddd-mcp\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: mcp context must preserve DDD layer direction.\")\n\n  (module mcp-application\n    (path \"packages/mcp-server/src/{server,sessions,types}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin,tools}/**\"))\n\n  (layer application mcp-application)\n  (layer infrastructure mcp-infrastructure)\n\n  (allow-dependency mcp-application mcp-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "3be2630d2065e881ddb5910d09e1549fae22289e870eec0db403688a3c19d48a",
+      "cdl": "(architecture \"ddd-mcp\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: mcp context must preserve DDD layer direction.\")\n\n  (module mcp-application\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n\n  (layer application mcp-application)\n  (layer infrastructure mcp-infrastructure)\n\n  (allow-dependency mcp-infrastructure mcp-application)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-backends-go",
+      "ruleKind": "architecture",
+      "origin": "context:backends-go",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "backends-go",
+          "context_name": "Backends-go"
+        }
+      ],
+      "fileHash": "934f23af2feadd55bddfb4f6ad98733933ab3b473d079f61137f2f787964f71f",
+      "cdl": "(architecture \"ddd-backends-go\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-go context must preserve DDD layer direction.\")\n\n  (module backends-go-domain\n    (path \"packages/backend-go/src/**\"))\n\n  (layer domain backends-go-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-backends-java",
+      "ruleKind": "architecture",
+      "origin": "context:backends-java",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "backends-java",
+          "context_name": "Backends-java"
+        }
+      ],
+      "fileHash": "754924aad52c3ad9394d25990cbf3c4e2496a027f1549c9d03379a9ac5da4797",
+      "cdl": "(architecture \"ddd-backends-java\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-java context must preserve DDD layer direction.\")\n\n  (module backends-java-domain\n    (path \"packages/backend-java/src/**\"))\n\n  (layer domain backends-java-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-backends-rust",
+      "ruleKind": "architecture",
+      "origin": "context:backends-rust",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "backends-rust",
+          "context_name": "Backends-rust"
+        }
+      ],
+      "fileHash": "1592fada425c3676c42401618955946d6679931f38a94d7d71d1f088fd7094d9",
+      "cdl": "(architecture \"ddd-backends-rust\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-rust context must preserve DDD layer direction.\")\n\n  (module backends-rust-domain\n    (path \"packages/backend-rust/src/**\"))\n\n  (layer domain backends-rust-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-github-action",
+      "ruleKind": "architecture",
+      "origin": "context:github-action",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "github-action",
+          "context_name": "Github-action"
+        }
+      ],
+      "fileHash": "8ff17a0f89dfd521b00ec80b2e1d91db6e3f15847473f21ec5380aec767b2553",
+      "cdl": "(architecture \"ddd-github-action\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: github-action context must preserve DDD layer direction.\")\n\n  (module github-action-domain\n    (path \"packages/github-action/src/**\"))\n\n  (layer domain github-action-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-plugin",
@@ -134,8 +190,8 @@
           "decision_id": "q1-bounded-contexts"
         }
       ],
-      "fileHash": "d503224e9d74489c0fc8519b477f7862aae5a28b4b1088aa79c649979a00593e",
-      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src/**\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src/**\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{server,sessions,types}/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin,tools}/**\"))\n\n  (allow-dependency hooks-internal hooks-infrastructure)\n  (allow-dependency mcp-internal mcp-infrastructure)\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
+      "fileHash": "9ca2f751ee30e49eb7e31de881afb0409639a2d068df53e43235409eb7d44643",
+      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src/**\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src/**\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n\n  (allow-dependency hooks-internal hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-internal)\n  (allow-dependency mcp-internal mcp-infrastructure)\n  (allow-dependency mcp-infrastructure mcp-internal)\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
     },
     {
       "ruleId": "core-node.core-operator-registry-aggregate",
@@ -268,17 +324,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-22T05:56:13.143Z",
+  "generatedAt": "2026-05-23T03:27:55.419Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "cf78d84143956193aa4d8be3664d5bed62ca30712bbf46c40d4c0f519863009f"
+      "hash": "991f943da03862e7f2fd34dc0ab0aa188b967df4977092cabec1b59b8815928e"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "cf78d84143956193aa4d8be3664d5bed62ca30712bbf46c40d4c0f519863009f",
+      "sha256": "991f943da03862e7f2fd34dc0ab0aa188b967df4977092cabec1b59b8815928e",
       "rules": [
         {
           "id": "architecture.ddd-core",
@@ -371,6 +427,62 @@
             {
               "decision_id": "ddd-context-mcp",
               "profile_anchor": "ddd.contexts.mcp",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-backends-go",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-backends-go",
+              "profile_anchor": "ddd.contexts.backends-go",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-backends-java",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-backends-java",
+              "profile_anchor": "ddd.contexts.backends-java",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-backends-rust",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-backends-rust",
+              "profile_anchor": "ddd.contexts.backends-rust",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-github-action",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-github-action",
+              "profile_anchor": "ddd.contexts.github-action",
               "question_id": "Q1",
               "selected_option": "by_business_function"
             }

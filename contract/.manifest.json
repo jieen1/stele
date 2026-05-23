@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-22T16:02:41.173Z",
+  "generated_at": "2026-05-23T03:27:55.994Z",
   "stele_version": "0.1.0",
   "protected_files": {
     "contract/checker_impls/.gitkeep": {
@@ -8,45 +8,45 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "71cbb29a495e20191852f3da79e2172d1b7273f2640600c338454e4c9cb03f66",
-      "size": 39064
+      "sha256": "f6d37a7faf1c0ff637ae0bae6fd758fec55c0549cc6624ad1ecafb7e76ea7919",
+      "size": 39631
     },
     "contract/checker_impls/test_negative.py": {
       "sha256": "967ff1bc48dd333637dd181067710ffea855e553c76c04cc2696a0c86bae8898",
       "size": 21860
     },
     "contract/design/manifest.json": {
-      "sha256": "a92c5fdc71848afb319fcf681cbed8db7c33f0296f434f4916b99a30a8c6d511",
-      "size": 29513
+      "sha256": "16fe3a13d4415d414c1147e27a2bb7a63746d46297d76d7e5bf081ab479c6614",
+      "size": 35100
     },
     "contract/design/profile.yaml": {
-      "sha256": "7cdeee4e6e064a3b926e415aaddc1273858f38e7a3082a67b1af70ac7a1d343f",
-      "size": 15212
+      "sha256": "1131e1bf1a9063a788bd83fe49d853c1871c37765a85567aae038af460fb14d2",
+      "size": 14859
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "cf78d84143956193aa4d8be3664d5bed62ca30712bbf46c40d4c0f519863009f",
-      "size": 12562
+      "sha256": "991f943da03862e7f2fd34dc0ab0aa188b967df4977092cabec1b59b8815928e",
+      "size": 15510
     },
     "contract/main.stele": {
-      "sha256": "dff55506c99b20f11afa2b87574ca2974bce1f99753a9b2b03e4311a4741f399",
-      "size": 10541
+      "sha256": "37378c8cfab40445444a42c9c6013d685dbbf3da8481c6d3cb98656799a692e8",
+      "size": 10688
     },
     "tests/contract/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "tests/contract/_stele_runtime.py": {
-      "sha256": "2e890969bfa942db9f9b3579412d0fab7e8369c47064ca36981b30708cfa7968",
-      "size": 31781
+      "sha256": "93a29170aa9f3b3a293eaac1e4f1ce17ee6721dac85bef8023be6903ef838a54",
+      "size": 30931
     },
     "tests/contract/conftest.py": {
       "sha256": "180071b48edb5ba48f3184ae9e51033e046345412732773abf5eb4825be8e1b8",
       "size": 3971
     },
     "tests/contract/test_contract.py": {
-      "sha256": "a398561ba409a0736d953dfce033ee7bed251bffe471df9438dfa960317823c6",
-      "size": 6086
+      "sha256": "a181b4c4b06cc5478848d4f3b7b2babeed74c220bf7a447748fd7da19185f5ec",
+      "size": 6302
     }
   },
-  "contract_hash": "8dbcc20e5e2429cc8e230b1bfb1531c3a6589ffdc010017b12fc9fecc3464f02"
+  "contract_hash": "69e3809a815fd761fd39060d9c9b5cc4c2b81dd06f09d3423ec17b877a740970"
 }

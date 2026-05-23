@@ -229,8 +229,11 @@ ddd:
       architecture_style: hexagonal
       root: "packages/mcp-server/src"
       layers:
-        application: "packages/mcp-server/src/{server.ts,sessions/**,types.ts,session-state.ts}"
-        infrastructure: "packages/mcp-server/src/{bin,tools}/**"
+        application: "packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}"
+        infrastructure: "packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}"
+      layer_dependencies:
+        infrastructure:
+          - application
       aggregate_roots: []
 
     - id: backends-go
