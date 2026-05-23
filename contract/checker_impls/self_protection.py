@@ -994,6 +994,231 @@ def protected_pattern_safe(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     return {"passed": True}
 
 
+# ---------------------------------------------------------------------------
+# Phase B self-protection: evaluator packages, CI strictness, fix-hint shape
+# ---------------------------------------------------------------------------
+
+
+_PHASE_B_EVALUATOR_PACKAGES = [
+    "@stele/call-graph-core",
+    "@stele/trace-evaluator",
+    "@stele/type-state-evaluator",
+    "@stele/effect-evaluator",
+    "@stele/type-driven-evaluator",
+]
+
+
+def all_evaluators_compile(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Verify every Phase B evaluator package has dist/index.js + dist/index.d.ts.
+
+    Derives the package dir from the npm name (e.g. "@stele/trace-evaluator"
+    -> "packages/trace-evaluator") and checks the two required build artifacts.
+    """
+    violations: list[dict[str, Any]] = []
+    for package_name in _PHASE_B_EVALUATOR_PACKAGES:
+        if not package_name.startswith("@stele/"):
+            violations.append({
+                "file": package_name,
+                "line": None,
+                "column": None,
+                "message": f"unrecognized package name '{package_name}'",
+            })
+            continue
+        package_dir_name = package_name.split("/", 1)[1]
+        pkg_dir = _PACKAGES_DIR / package_dir_name
+        index_js = pkg_dir / "dist" / "index.js"
+        index_dts = pkg_dir / "dist" / "index.d.ts"
+        if not index_js.is_file():
+            violations.append({
+                "file": str(index_js.relative_to(_REPO_ROOT)),
+                "line": None,
+                "column": None,
+                "message": f"{package_name}: missing dist/index.js",
+            })
+        if not index_dts.is_file():
+            violations.append({
+                "file": str(index_dts.relative_to(_REPO_ROOT)),
+                "line": None,
+                "column": None,
+                "message": f"{package_name}: missing dist/index.d.ts",
+            })
+
+    if violations:
+        return {
+            "passed": False,
+            "message": "Some evaluator packages are not built: " + "; ".join(
+                v["message"] for v in violations[:5]
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+def strict_mode_default_in_ci(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Verify no CI workflow passes --lenient-* flags to stele check.
+
+    Scans .github/workflows/*.yml and .github/workflows/*.yaml for any
+    occurrence of "--lenient-". Absence of the directory is treated as
+    passing — the repo simply has no CI config yet.
+    """
+    workflows_dir = _REPO_ROOT / ".github" / "workflows"
+    if not workflows_dir.is_dir():
+        return {
+            "passed": True,
+            "message": "No .github/workflows/ directory",
+            "violations": [],
+        }
+
+    violations: list[dict[str, Any]] = []
+    workflow_files = sorted(
+        list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
+    )
+    for wf in workflow_files:
+        try:
+            content = wf.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for lineno, line in enumerate(content.splitlines(), 1):
+            idx = line.find("--lenient-")
+            if idx != -1:
+                violations.append({
+                    "file": str(wf.relative_to(_REPO_ROOT)),
+                    "line": lineno,
+                    "column": idx + 1,
+                    "message": (
+                        f"CI workflow uses lenient flag: {line.strip()[:120]}"
+                    ),
+                })
+
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"CI workflows pass --lenient-* flags in {len(violations)} location(s): "
+                + "; ".join(
+                    f"{v['file']}:{v['line']}" for v in violations[:5]
+                )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+_FIX_HINT_SOURCES = [
+    "packages/trace-evaluator/src/fix-hint-substitution.ts",
+    "packages/type-state-evaluator/src/fix-hint.ts",
+    "packages/effect-evaluator/src/fix-hint.ts",
+]
+
+_FIX_HINT_REQUIRED_KEYWORDS = ["code issue", "contract issue", "propose", "[A]", "[B]"]
+
+
+def _extract_exported_function_bodies(source: str) -> list[tuple[str, int, str]]:
+    """Extract exported TS function bodies via brace counting.
+
+    Returns a list of (function_name, line_no, body_text) tuples for every
+    `export function NAME(...)` declaration found. The body text is the
+    region between the first `{` after the signature and its matching `}`.
+    """
+    results: list[tuple[str, int, str]] = []
+    decl_pattern = re.compile(r"\bexport\s+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+    for match in decl_pattern.finditer(source):
+        name = match.group(1)
+        # find first opening brace after signature
+        lb = source.find("{", match.end())
+        if lb == -1:
+            continue
+        depth = 0
+        i = lb
+        while i < len(source):
+            ch = source[i]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    body = source[lb + 1:i]
+                    line_no = source.count("\n", 0, match.start()) + 1
+                    results.append((name, line_no, body))
+                    break
+            i += 1
+    return results
+
+
+def fix_hint_requires_analysis_branch(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Verify default fix-hint generators contain the A/B analysis branch.
+
+    For each evaluator's fix-hint source file, locate every exported function
+    whose name starts with `default` or ends in `FixHint` (heuristic for
+    default-fix-hint generators). Helpers such as `proposeExitText` are
+    skipped. Each candidate's body must contain all five required substrings
+    (case-insensitive for the words; literal for `[A]` / `[B]`):
+        "code issue", "contract issue", "propose", "[A]", "[B]"
+    """
+    violations: list[dict[str, Any]] = []
+    for rel_path in _FIX_HINT_SOURCES:
+        abs_path = _REPO_ROOT / rel_path
+        if not abs_path.is_file():
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": "fix-hint source file missing",
+            })
+            continue
+        source = abs_path.read_text(encoding="utf-8", errors="replace")
+        functions = _extract_exported_function_bodies(source)
+        # Heuristic: default-fix-hint generators start with `default`. This
+        # excludes helpers like `proposeExitText` and `substituteFixHint`
+        # (which substitutes placeholders but doesn't itself emit a hint).
+        candidates = [
+            (name, line_no, body)
+            for (name, line_no, body) in functions
+            if name.startswith("default")
+        ]
+        if not candidates:
+            violations.append({
+                "file": rel_path,
+                "line": None,
+                "column": None,
+                "message": "no default-fix-hint function found",
+            })
+            continue
+        for name, line_no, body in candidates:
+            missing: list[str] = []
+            for keyword in _FIX_HINT_REQUIRED_KEYWORDS:
+                if keyword in ("[A]", "[B]"):
+                    if keyword not in body:
+                        missing.append(keyword)
+                else:
+                    if keyword.lower() not in body.lower():
+                        missing.append(keyword)
+            if missing:
+                violations.append({
+                    "file": rel_path,
+                    "line": line_no,
+                    "column": None,
+                    "message": (
+                        f"{name} missing analysis-branch keywords: "
+                        + ", ".join(missing)
+                    ),
+                })
+
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} fix-hint function(s) lack required analysis-branch keywords: "
+                + "; ".join(
+                    f"{v['file']}:{v['line']} {v['message']}"
+                    for v in violations[:5]
+                )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
 def inline_version_sync(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Verify inline version strings match package.json versions."""
     # Get version from packages/cli/package.json

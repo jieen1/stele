@@ -119,25 +119,19 @@ ddd:
         presentation: "packages/cli/src/{commands,index}/**"
         application: "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**"
         design-domain: "packages/cli/src/{design-profile,design-generator}/**"
-        type-domain: "packages/cli/src/typescript-shape/**"
         toolchain: "packages/cli/src/toolchain/**"
         infrastructure: "packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**"
       layer_dependencies:
         presentation:
           - application
           - design-domain
-          - type-domain
           - toolchain
           - infrastructure
         application:
           - design-domain
-          - type-domain
           - toolchain
           - infrastructure
         design-domain:
-          - type-domain
-          - infrastructure
-        type-domain:
           - infrastructure
       aggregate_roots:
         - id: check-orchestrator
@@ -285,6 +279,57 @@ ddd:
         domain: "packages/claude-code-plugin/src/**"
       aggregate_roots: []
 
+    - id: call-graph-core
+      decision_ref: d1
+      name: Call Graph Core
+      subdomain_type: core
+      architecture_style: transaction_script
+      root: "packages/call-graph-core/src"
+      layers:
+        domain: "packages/call-graph-core/src/**"
+      aggregate_roots: []
+
+    - id: trace-evaluator
+      decision_ref: d1
+      name: Trace-Based Policy Evaluator
+      subdomain_type: core
+      architecture_style: transaction_script
+      root: "packages/trace-evaluator/src"
+      layers:
+        domain: "packages/trace-evaluator/src/**"
+      aggregate_roots: []
+
+    - id: type-state-evaluator
+      decision_ref: d1
+      name: Type-State Evaluator
+      subdomain_type: core
+      architecture_style: transaction_script
+      root: "packages/type-state-evaluator/src"
+      layers:
+        domain: "packages/type-state-evaluator/src/**"
+      aggregate_roots: []
+
+    - id: effect-evaluator
+      decision_ref: d1
+      name: Effect System Evaluator
+      subdomain_type: core
+      architecture_style: transaction_script
+      root: "packages/effect-evaluator/src"
+      layers:
+        domain: "packages/effect-evaluator/src/**"
+      aggregate_roots: []
+
+    - id: type-driven-evaluator
+      decision_ref: d1
+      name: Type-Driven Evaluator (branded-id + smart-ctor + future)
+      subdomain_type: core
+      architecture_style: transaction_script
+      root: "packages/type-driven-evaluator/src"
+      layers:
+        domain: "packages/type-driven-evaluator/src/**"
+      aggregate_roots: []
+
+
   shared_kernels:
     - id: agent-hooks-shared
       paths:
@@ -359,6 +404,62 @@ ddd:
       to: hooks
       pattern: published_language
       decision_ref: d1
+    - from: cli
+      to: trace-evaluator
+      pattern: published_language
+      decision_ref: d1
+    - from: cli
+      to: type-state-evaluator
+      pattern: published_language
+      decision_ref: d1
+    - from: cli
+      to: effect-evaluator
+      pattern: published_language
+      decision_ref: d1
+    - from: cli
+      to: type-driven-evaluator
+      pattern: published_language
+      decision_ref: d1
+    - from: trace-evaluator
+      to: core
+      pattern: published_language
+      decision_ref: d1
+    - from: trace-evaluator
+      to: call-graph-core
+      pattern: published_language
+      decision_ref: d1
+    - from: type-state-evaluator
+      to: core
+      pattern: published_language
+      decision_ref: d1
+    - from: type-state-evaluator
+      to: call-graph-core
+      pattern: published_language
+      decision_ref: d1
+    - from: effect-evaluator
+      to: core
+      pattern: published_language
+      decision_ref: d1
+    - from: effect-evaluator
+      to: call-graph-core
+      pattern: published_language
+      decision_ref: d1
+    - from: backends-ts
+      to: call-graph-core
+      pattern: published_language
+      decision_ref: d1
+    - from: backends-ts
+      to: effect-evaluator
+      pattern: published_language
+      decision_ref: d1
+    - from: backends-ts
+      to: type-state-evaluator
+      pattern: published_language
+      decision_ref: d1
+    - from: call-graph-core
+      to: core
+      pattern: published_language
+      decision_ref: d1
 
   core_invariants:
     - id: inv-core-purity
@@ -369,7 +470,7 @@ ddd:
         kind: external-tool
         external_tool_ref: "architecture.ddd-core"
     - id: inv-no-cli-domain-import
-      description: CLI commands layer must not import from design-domain, type-domain, or core directly - only through application layer
+      description: CLI commands layer must not import from design-domain or core directly - only through application layer
       evolvability: never
       status: enforced
       enforcement:
@@ -437,8 +538,6 @@ type_driven:
       - name: Sha256
         constructor: "parseSha256(input: string): Sha256"
         deny_raw: true
-  adt:
-    mode: hard
   type_state:
     mode: hard
 

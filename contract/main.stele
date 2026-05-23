@@ -283,4 +283,33 @@
   (severity error)
   (description "Generated file paths must not escape the output directory via traversal.")
   (uses-checker path-no-traversal))
+
+; ============================================================================
+; Phase B self-protection: evaluators, CI strict mode, fix-hint analysis branch
+; ============================================================================
+
+(checker all-evaluators-compile
+  (description "Every Phase B evaluator package must build to dist/index.js + dist/index.d.ts."))
+
+(checker strict-mode-default-in-ci
+  (description "Stele's own CI workflow must not pass --lenient-* flags to stele check."))
+
+(checker fix-hint-requires-analysis-branch
+  (description "Every default fix-hint in evaluator source must force agents to analyze [A] code issue vs [B] contract issue before acting."))
+
+(invariant ALL_EVALUATORS_COMPILE
+  (severity error)
+  (description "@stele/call-graph-core, @stele/trace-evaluator, @stele/type-state-evaluator, @stele/effect-evaluator, @stele/type-driven-evaluator must each have buildable TypeScript with dist/index.js and dist/index.d.ts present.")
+  (uses-checker all-evaluators-compile))
+
+(invariant STRICT_MODE_DEFAULT_IN_CI
+  (severity error)
+  (description "Self-protection: this repo's CI workflow must use Stele's default strict behavior. No --lenient-effects, --lenient-typestate, --lenient-callgraph, --lenient-trace flags in .github/workflows/.")
+  (uses-checker strict-mode-default-in-ci))
+
+(invariant FIX_HINT_REQUIRES_ANALYSIS_BRANCH
+  (severity error)
+  (description "Default fix-hint generators in trace/type-state/effect evaluators MUST contain the keywords 'code issue', 'contract issue', 'propose', '[A]', '[B]'. This prevents agents from auto-fixing stale rules; forces them to first decide whether to fix the code or propose a contract change.")
+  (uses-checker fix-hint-requires-analysis-branch))
+
 (import "generated/ddd-typedriven.stele")

@@ -1,10 +1,10 @@
 # Stele CDL Specification
 
-This document describes the Stele Contract Definition Language (CDL) implemented by the v0.1 toolchain in this repository. It is intentionally narrow: the source of truth is the shipped parser, validator, manifest logic, and Python backend behavior.
+This document describes the Stele Contract Definition Language (CDL) as implemented by the v0.3 (Phase B) toolchain in this repository. It is intentionally narrow: the source of truth is the shipped parser, validator, manifest logic, evaluators, and Python backend behavior. The `since` markers on individual operators and forms indicate the introducing version (v0.1, v0.2, or v0.3).
 
 ## Status and scope
 
-CDL v0.1 is an s-expression language for declaring invariants, checker-backed rules, scenario setup flows, imports, groups, and metadata. The shipped backend target is Python + pytest.
+CDL is an s-expression language for declaring invariants, checker-backed rules, scenario setup flows, imports, groups, code-shape constraints, architecture/core-node declarations, type-driven declarations (branded-id, smart-ctor), trace-based policies, type-state machines, and effect declarations / annotations / policies / suppressions. The shipped backend targets are Python + pytest (full coverage), TypeScript + vitest (Phase B evaluator surface), Go, Java, and Rust (test generation only — Phase B call-graph extractors are TypeScript-first; see "Phase B summary" for the deferred extractor work).
 
 The toolchain currently consists of:
 
@@ -15,7 +15,8 @@ The toolchain currently consists of:
 - static type checking against the built-in operator table
 - normalized contract hashing
 - manifest verification for protected files
-- Python pytest generation
+- Python, TypeScript, Go, Java, and Rust test generation
+- Phase B evaluators: call-graph cache, trace-based policy, type-state machine, effect system, type-driven (branded-id, smart-ctor)
 
 ## Lexical grammar
 
@@ -59,7 +60,7 @@ Empty lists are invalid because every list head must be an identifier.
 
 ## Top-level declarations
 
-Only these top-level declarations are valid in v0.1:
+The shipped CDL grammar (v0.3, Phase B) accepts only the following top-level declarations. Forms introduced after v0.1 carry the introducing phase or version in their dedicated section.
 
 - `metadata`
 - `import`
@@ -68,10 +69,22 @@ Only these top-level declarations are valid in v0.1:
 - `group`
 - `invariant`
 - `scenario`
-- `agent`
-- `scope`
-- `inter-agent-contract`
-- `conflict`
+- `boundary`
+- `class-shape`
+- `function-shape`
+- `type-policy`
+- `file-policy`
+- `architecture`
+- `core-node`
+- `branded-id`
+- `smart-ctor`
+- `trace-policy`
+- `type-state`
+- `type-state-binding`
+- `effect-declarations`
+- `effect-annotation`
+- `effect-policy`
+- `effect-suppression`
 
 Any other top-level declaration fails validation with `E0301`.
 
@@ -281,86 +294,6 @@ Supported scenario body expressions in v0.1:
 
 The lexer does not support `$`-prefixed interpolation syntax in v0.1, so scenario references are always explicit forms such as `(ref fund id)`.
 
-## Agent declarations
-
-Agent declarations define identities, permissions, and conflict resolution for multi-agent systems.
-
-### `agent`
-
-Form:
-
-```lisp
-(agent "code-reviewer"
-  (description "Reviews code changes for quality and compliance.")
-  (allowed-paths "src/**" "tests/**")
-  (denied-paths "contract/**" "config/**"))
-```
-
-The first item must be an identifier or string literal. Fields:
-
-- `description`: exactly one string or identifier (optional)
-- `allowed-paths`: zero or more string literals (optional)
-- `denied-paths`: zero or more string literals (optional)
-
-Agent identity is determined by the first item. Duplicate `description` fields fail with `E0317`.
-
-### `scope`
-
-Form:
-
-```lisp
-(scope "code-reviewer"
-  (path "src/lib/**")
-  (path "tests/lib/**"))
-```
-
-The first item must be an identifier or string literal representing the agent id. Each `(path "...")` form declares a path pattern owned by that agent. At least one path is required.
-
-### `inter-agent-contract`
-
-Form:
-
-```lisp
-(inter-agent-contract "review-before-merge"
-  (description "All feature-writer changes must be reviewed.")
-  (agents "code-reviewer" "feature-writer")
-  (requires "feature-writer" (path "src/**") (approved-by "code-reviewer")))
-```
-
-The first item must be an identifier or string literal. Fields:
-
-- `description`: exactly one string or identifier (optional)
-- `agents`: one or more agent id string literals (required)
-- `requires`: one or more requirement clauses (required)
-
-Each `(requires ...)` clause has the form:
-
-```lisp
-(requires "agent-id" (path "pattern") (approved-by "approver-id"))
-```
-
-### `conflict`
-
-Form:
-
-```lisp
-(conflict (path "src/core/engine.ts")
-  (agents "feature-writer" "perf-optimizer")
-  (resolution "last-writer-wins")
-  (fallback "manual-review"))
-```
-
-The first item must be a `(path "...")` form. Fields:
-
-- `path`: exactly one string literal (required, first position)
-- `agents`: zero or more agent id string literals (optional)
-- `resolution`: exactly one strategy (required)
-- `fallback`: exactly one strategy (optional)
-
-Valid resolution strategies: `last-writer-wins`, `manual-review`, `merge-strategy`, `contract-gated`.
-
-Agent declarations are consumed by the MCP server's `stele-validate-edit` tool and the agent policy evaluation engine. They do not affect invariant verification or test generation in v0.1.
-
 ### `architecture`
 
 Form:
@@ -419,6 +352,152 @@ The first item must be an identifier or string literal representing the core-nod
 Metric boundaries must satisfy `ideal <= max`. Metric names must be valid for the declared role.
 
 Complexity violations occur when a metric value exceeds its `max` boundary. Notices are emitted when values exceed `ideal` but remain below `max`. Notices do not cause non-zero exit codes.
+
+## Trace-Based Policy
+
+`trace-policy` declarations express call-chain rules over the static call graph. They are part of Phase B and are recognised by the CDL parser today; the runtime evaluator ships in B.1 targeting TypeScript source. See `docs/design/phase-b/02-trace-based-policy.md` for the semantics.
+
+Form:
+
+```lisp
+(trace-policy DB_VIA_REPOSITORY
+  (description "All OrderService DB access goes through Repository.")
+  (severity "error")
+  (target "**::OrderService::*")
+  (must-transit "**::Repository::*")
+  (deny-direct "extern:pg::query(*)")
+  (scope "src/**/*.ts")
+  (exempt "src/admin/**::*" (reason "admin tooling bypasses repo"))
+  (fix-hint "wrap the call in `Repository.findById` — see src/repo.ts:42"))
+```
+
+The first item must be an identifier or string literal representing the policy id. Fields:
+
+- `description`: optional, exactly one string literal.
+- `severity`: optional string literal, defaults to `"error"`. Allowed values: `"error"` and `"warning"`. Any other value fails with `E0336`.
+- `target`: **required**, one or more NodeId patterns identifying the source frames the policy applies to. An empty `(target)` or a missing field fails with `E0332`.
+- `must-transit`: every call from `target` to a forbidden sink must transit through at least one matching frame.
+- `must-be-preceded-by`: every invocation of `target` must be preceded earlier in the chain by a matching frame.
+- `must-be-followed-by`: every invocation of `target` must be followed in the chain by a matching frame.
+- `deny-direct`: direct calls from `target` to a matching frame are forbidden.
+- `deny-transit`: any call chain rooted at `target` that ever transits a matching frame is forbidden.
+- `scope`: optional, one or more glob patterns narrowing which files participate. Default: whole project.
+- `exempt`: optional, repeated. Each entry is `(exempt "<pattern>" (reason "<why>"))`. The reason is mandatory (`E0334`).
+- `fix-hint`: optional string. To be useful for agents, the hint must contain either a backtick-quoted code snippet (\`Repository.find\`) or a `file:line` reference (`src/repo.ts:42`); vague prose fails with `E0339`.
+
+A policy that declares only a `target` and no constraint clause fails with `E0333` — it would impose no rule on the call graph.
+
+Patterns follow the NodeId pattern grammar from `@stele/call-graph-core` (see `pattern-matcher.ts`). Examples:
+
+```
+**::Repository::find(2)             ; exact arity
+**::Order::pay(2)#abc12345          ; disambiguator (collision-safe)
+extern:stripe::*                    ; extern logical-name match
+src/**/*.{ts,py}::*                 ; brace expansion
+```
+
+Empty patterns, trailing `::`, or malformed arities such as `(notanumber)` fail with `E0335`.
+
+Example — guard a side-effect with audit logging:
+
+```lisp
+(trace-policy AUDIT_AFTER_MUTATION
+  (description "Mutating operations must be followed by an audit log write.")
+  (target "**::*Service::update(*)" "**::*Service::delete(*)")
+  (must-be-followed-by "**::AuditLog::write(*)")
+  (fix-hint "call `AuditLog.write` immediately after the mutation"))
+```
+
+Error codes:
+
+- `E0330` — trace-policy missing id
+- `E0331` — duplicate trace-policy id (raised by uniqueness pass)
+- `E0332` — missing or empty `(target ...)`
+- `E0333` — no `must-*` or `deny-*` constraints
+- `E0334` — exempt entry missing `(reason "...")`
+- `E0335` — pattern syntax error (empty, trailing `::`, malformed arity, non-string)
+- `E0336` — invalid severity value
+- `E0337` — duplicate field (e.g. two `(target ...)`)
+- `E0338` — unknown field
+- `E0339` — fix-hint not actionable (no code reference, no file:line)
+
+## Type State
+
+`type-state` declarations lock a type's state machine into the contract: which states a value can occupy, how it transitions between them, and which operations are valid in each state. They are part of Phase B and are recognised by the CDL parser today; the runtime evaluator ships in B.1 targeting TypeScript and Python. See `docs/design/phase-b/03-type-state.md` for the semantics.
+
+Form:
+
+```lisp
+(type-state ORDER_LIFECYCLE
+  (description "Order can only transition: Draft → Submitted → Paid → Shipped, or Cancel/Refund branches.")
+  (severity "error")
+  (target "src/models/order.ts::Order")
+
+  (states Draft Submitted Paid Shipped Cancelled Refunded)
+  (initial Draft)
+  (terminal Shipped Cancelled Refunded)
+
+  (transition (from Draft)     (via submit)  (to Submitted))
+  (transition (from Submitted) (via pay)     (to Paid))
+  (transition (from Submitted) (via cancel)  (to Cancelled))
+  (transition (from Paid)      (via ship)    (to Shipped))
+  (transition (from Paid)      (via refund)  (to Refunded))
+
+  (allowed-ops Draft addItem removeItem submit)
+  (allowed-ops Submitted cancel pay)
+  (allowed-ops Paid ship refund)
+
+  (fix-hint "Check the order's current state before invoking `Order.addItem`."))
+```
+
+The first item must be an identifier or string literal representing the state machine id. Fields:
+
+- `description`: optional, exactly one string literal.
+- `severity`: optional string literal, defaults to `"error"`. Allowed values: `"error"` and `"warning"`.
+- `target`: **required**, exactly one string. Either a `path::TypeName` form (TypeScript / Rust phantom-state case, e.g. `"src/models/order.ts::Order"`) or a NodeId glob (Go separate-types case, e.g. `"src/order/**::*Order"`). Empty, whitespace-only, missing `::`, or trailing `::` fails with `E0342`.
+- `states`: **required**, one or more state symbols. An empty `(states)` fails with `E0343`.
+- `initial`: **required**, exactly one state symbol that must appear in `(states ...)`. Missing or out-of-set fails with `E0344`.
+- `terminal`: optional, zero or more state symbols. Each must appear in `(states ...)` (`E0345`). Terminal states must not appear as the source of any transition (`E0348`).
+- `state-type-mapping`: optional. Pairs of `<state> "<path>::<TypeName>"` for Go separate-types projects where each state corresponds to a distinct concrete type. The list must have an even number of entries.
+- `transition`: optional, repeated. Each transition has exactly one `(from <state> [<state> ...])`, `(via <method>)`, and `(to <state>)`. Multi-source sugar `(from A B)` declares one transition with multiple source states (Round 1 N-4). All `from` / `to` states must appear in `(states ...)` (`E0346`).
+- `allowed-ops`: optional, one per state. Each entry is `(allowed-ops <state> <method> [<method> ...])`. The state must appear in `(states ...)` (`E0347`); each state may be declared at most once.
+- `fix-hint`: optional string. Same actionability rule as `trace-policy` — must contain a backtick-quoted snippet or a `file:line` reference, or it fails with `E0349`.
+
+Type-state ids must be unique across the project. The target also must be unique — a single type can have only one state machine. Both collisions raise `E0341` in the uniqueness pass.
+
+Error codes:
+
+- `E0340` — type-state missing id
+- `E0341` — duplicate type-state id or duplicate target (uniqueness pass)
+- `E0342` — missing or malformed target (must be `path::TypeName` or a NodeId glob)
+- `E0343` — `(states ...)` is empty
+- `E0344` — initial state is not in `(states ...)` or missing
+- `E0345` — terminal contains a non-state
+- `E0346` — transition.from or transition.to references a non-state
+- `E0347` — `(allowed-ops <state> ...)` references a state not in `(states ...)`
+- `E0348` — terminal state appears in `(transition (from ...) ...)`
+- `E0349` — unknown field, duplicate field, malformed clause, or vague fix-hint
+
+## Type State Binding
+
+`type-state-binding` declarations annotate a function parameter's expected type-state. They give the runtime evaluator cross-function propagation hints (Round 1 MC-2): without explicit binding, type-state inference does not flow across function call boundaries.
+
+Form:
+
+```lisp
+(type-state-binding
+  (function "src/order/handler.ts::OrderHandler::process(1)")
+  (param 0 state Submitted))
+```
+
+Fields:
+
+- `function`: **required**, exactly one NodeId string identifying the function whose parameters are being bound. Empty strings fail with `E0349`.
+- `param`: **required**, repeated. Each clause has the literal form `(param <index> state <state-name>)`. The index is a non-negative integer; the state is a non-empty identifier or string. Each parameter index may appear at most once per binding (`E0349`).
+
+All malformed `type-state-binding` declarations — unknown fields, missing function, missing param, malformed param clause, duplicate function — raise `E0349`. The form intentionally reuses `E0349` rather than allocating new codes, so the effect-system error range (`E0350-E0359`) stays untouched.
+
+Bindings are project-unique by `function` NodeId: two bindings for the same function NodeId raise `E0349` in the uniqueness pass.
 
 ## Expressions and operator semantics
 
@@ -739,19 +818,249 @@ For the Python backend, Stele manages these files:
 
 The generated runtime helper implements path traversal, sum helpers, checker invocation, modified-state comparison, and scenario execution helpers. `tests/contract/conftest.py` is application-owned and is allowed to remain alongside the generated files.
 
+## Violation schema
+
+Each violation surfaced by `stele check` carries the following stable fields:
+
+- `rule_id` (string) — fully qualified rule identifier, e.g. `typedriven.branded-id.OrderId`.
+- `rule_kind` (string) — high-level rule family.
+- `severity` (`error` | `warning` | `info`) — current shipped values; Phase B evaluators may emit additional severities that sort with `info`.
+- `source`, `location`, `cause`, `fix`, `fingerprint`, `scope_paths`, `status`, `suppressed_by`, `introduced_in` — see `@stele/core` `Violation` type.
+
+Phase B Round 2 (reviewer E, P0) adds five optional fields used by trace, type-state, and effect evaluators to help agents triage multiple violations. They are all optional and default safely so Phase A baselines remain unchanged:
+
+- `priority` (`blocking` | `major` | `minor`, default `major`) — sort hint for agents processing many violations.
+- `group_id` (string, default `""`) — same-root-cause identifier. Typically a function NodeId or file path.
+- `also_violates` (string[]) — other `rule_id`s firing on the same root.
+- `resolves_with` (string[]) — `rule_id`s whose fix is expected to make this one disappear.
+- `cross_rule_note` (string) — human-readable coupling note, e.g. "moving this code will not resolve the trace violations".
+
+Agents should sort violations using `compareViolationsByPriority` (exported from `@stele/core`): priority → group_id → severity → location. The fingerprint deliberately excludes these advisory fields so editorial changes to them do not invalidate baselines.
+
+## Effect System
+
+The effect system declares which side effects (e.g. `db.read`, `http.outgoing`, `payment.charge`) a function performs, and lets a contract restrict which scopes are allowed to acquire those effects through the call graph. The four cooperating top-level forms are parsed today; the runtime evaluator ships in B.1 targeting TypeScript and Python. See `docs/design/phase-b/04-effect-system.md` for the propagation semantics.
+
+Effect names follow lowercase dot-notation: `^[a-z][a-z0-9._-]*$` (e.g. `db.read`, `payment.charge`). Because identifiers in CDL cannot contain `.`, dotted effect names must be written as string literals (`"db.read"`); bare single-segment names (`render`) are accepted as identifiers.
+
+### `effect-declarations`
+
+The project-level name table for effects. Each file may declare at most one `(effect-declarations ...)` block; multiple files may contribute disjoint blocks that get merged.
+
+```lisp
+(effect-declarations
+  (effect "db.read"        (description "Reading from database"))
+  (effect "db.write"       (description "Writing to database"))
+  (effect "http.outgoing"  (description "Outbound HTTP request"))
+  (effect "payment.charge" (description "Calling payment provider for charge")))
+```
+
+Fields:
+
+- `(effect <name> [(description "<string>")])`: required, one or more entries. The name must match the dot-notation pattern or it fails with `E0350`. The description, when present, is a single string literal.
+
+Constraints:
+
+- Each file may contain at most one `(effect-declarations ...)` block (`E0351`, raised by the uniqueness pass).
+- An effect name may be declared at most once across all files (`E0352`).
+
+Error codes:
+
+- `E0350` — effect name violates lowercase dot-notation
+- `E0351` — multiple `(effect-declarations ...)` blocks in the same file
+- `E0352` — same effect name declared in more than one block
+- `E0353` — `(effect ...)` entry is missing the name
+- `E0354` — unknown field inside `(effect-declarations ...)` or `(effect ...)`
+
+### `effect-annotation`
+
+Attaches one or more effects to functions or methods matched by NodeId patterns.
+
+```lisp
+(effect-annotation
+  (target "extern:typeorm::*" "**/db/raw/**::*")
+  (annotates "db.read" "db.write"))
+```
+
+Fields:
+
+- `target`: **required**, one or more NodeId patterns. Patterns share the trace-policy `compilePattern` syntax; malformed patterns fail with `E0335`.
+- `annotates`: **required**, one or more effect names or globs (e.g. `payment.*`). Cross-referencing the declared effect set is deferred to the evaluator stage — the parser only enforces the dot-notation pattern.
+
+Error codes:
+
+- `E0335` — pattern syntax error in `(target ...)`
+- `E0355` — missing or empty `(target ...)`
+- `E0356` — missing or empty `(annotates ...)`
+- `E0359` — unknown field
+
+### `effect-policy`
+
+Restricts which effects functions matched by `target-scope` may acquire. A policy uses **exactly one** of `(forbid ...)` or `(allow-only ...)`.
+
+```lisp
+(effect-policy NO_IO_IN_UI
+  (description "UI components must be pure render functions.")
+  (target-scope "**/views/**" "**/components/**")
+  (forbid "db.read" "db.write" "http.outgoing" "payment.charge")
+  (fix-hint "Move IO out of UI. Pass pre-fetched data via props — see `useLoaderData`."))
+
+(effect-policy PURE_LIB_ONLY
+  (target-scope "**/lib/pure/**")
+  (allow-only "time.now")
+  (fix-hint "Pure library functions cannot call `db.*` or `http.*`. Inject side-effectful collaborators."))
+```
+
+Fields:
+
+- `<ID>`: required, identifier or string literal.
+- `description`: optional, single string literal.
+- `severity`: optional `"error"` or `"warning"`, defaults to `"error"`. Anything else fails with `E0336`.
+- `target-scope`: **required**, one or more NodeId patterns. Pattern syntax errors raise `E0335`.
+- `forbid` and `allow-only`: exactly one of the two is required. `(allow-only)` with no entries is legal — it means "no effects allowed in this scope".
+- `fix-hint`: optional. Must reference code with backticks or cite a `file:line` location; vague hints fail with `E0339`.
+
+Policy ids must be unique across the project (`E0359` in the uniqueness pass).
+
+Error codes:
+
+- `E0335` — pattern syntax error
+- `E0336` — invalid severity
+- `E0339` — fix-hint is not actionable
+- `E0358` — both `(forbid ...)` and `(allow-only ...)` declared
+- `E0359` — unknown field, missing both `forbid` / `allow-only`, or duplicate policy id
+
+### `effect-suppression`
+
+The **only** way to suppress an effect on a specific function. Source-code annotations (`@stele:effects.suppress`) are intentionally ignored — suppression must live in a contract file so an agent cannot bypass the system from inside the codebase. Round 2 D-CG-1 mandates a non-empty `(reason "...")`.
+
+```lisp
+(effect-suppression
+  (target "src/cache/cached-get.ts::cachedGet(1)")
+  (suppresses "db.read")
+  (reason "Caching wrapper around getUser. The db.read leakage is intentional for the cache-invalidation path."))
+```
+
+Fields:
+
+- `target`: **required**, a single NodeId string identifying the function whose effects are suppressed.
+- `suppresses`: **required**, one or more effect names or globs.
+- `reason`: **required**, non-empty string literal. Empty or missing reason fails with `E0357`.
+- `severity`: optional `"warning"` or `"error"`, defaults to `"warning"`. `--strict-effects` upgrades all suppressions to `"error"` at evaluation time.
+
+Error codes:
+
+- `E0336` — invalid severity
+- `E0357` — missing or empty `(reason "...")`
+- `E0359` — unknown field, missing target, or missing suppresses
+
+## Fix-hint A/B analysis branch
+
+Stele's default fix-hints force agents to first determine whether a violation reflects a code issue or a contract issue, and only act after deciding.
+
+Every default fix-hint emitted by the trace, type-state, and effect evaluators contains five required substrings: `code issue`, `contract issue`, `propose`, `[A]`, `[B]`. This is enforced by the self-protection invariant `FIX_HINT_REQUIRES_ANALYSIS_BRANCH` declared in `contract/main.stele` and the `fix-hint-requires-analysis-branch` checker.
+
+Agent workflow:
+
+- **`[A]` Code issue** — the rule is correct, the code is wrong: apply the suggested code change.
+- **`[B]` Contract issue** — the rule itself is wrong, outdated, or no-longer-applicable: do **not** edit the contract directly. Investigate first (`git log`, `stele why <id>`, `stele explain effect <node>`). Document rationale (research, alternatives, impact). Submit `stele design propose <type> --id <id>` and wait for user approval.
+
+Agents that "auto-fix" by going straight to `[A]` without considering `[B]` miss contract drift. Stele's hook system blocks direct edits to `contract/` files regardless, but the explicit `[A]`/`[B]` prompt aims to prevent the wrong fix from being applied in the wrong direction.
+
+User-authored fix-hints in `(trace-policy ...)`, `(type-state ...)`, and `(effect-policy ...)` are checked only against the actionability rule (must contain backtick-quoted code or a `file:line` reference; otherwise `E0339`). The A/B-branch requirement applies to the **default** hints emitted by the evaluator source, not to author overrides.
+
+## CLI commands relevant to Phase B
+
+The CLI exposes the following Phase-B-aware commands. All flag and argument shapes shown below are the ones registered today by the `stele` executable; flags not listed here are not part of the v0.3 contract.
+
+### `stele check`
+
+Runs the full pipeline: registry → toolchain → protected → call-graph cache → trace → type-state → effect → type-driven → other. The base command takes no Phase-B-specific CLI flags in v0.3 — the trace, type-state, and effect stages run in their default strict mode (`strictMode = true`). Strict mode routes unresolved-call and inference failures to violations; lenient mode (currently only reachable via programmatic stage options) emits notices instead. The repo's own self-protection invariant `STRICT_MODE_DEFAULT_IN_CI` forbids passing `--lenient-effects`, `--lenient-typestate`, `--lenient-callgraph`, or `--lenient-trace` from `.github/workflows/`.
+
+Existing `check` options: `--diff [ref]`, `--diff-from <base>`, `--format <human|json|sarif>`, `--report-file <path>`, `--lenient` (skip code-shape checks), `--architecture-only`, `--complexity-only`, `--recursive`.
+
+### `stele explain effect <node-id>`
+
+Shows the effect propagation chain and the applicable effect policies for a function or method. Useful when answering "why is `db.read` reported on this function?".
+
+Options:
+
+- `--json` (declared on the parent `explain` command) — emit machine-readable JSON.
+- `--no-cache` — force re-extraction of the call graph (skip the on-disk cache).
+
+### `stele design propose <type>`
+
+Add-only design proposal command. The proposed change is written to `contract/design/proposals/<timestamp>-<id>.yaml`, then diffed against the current profile; proposals that introduce non-additive changes (weakening or restructuring) are rejected with exit code 1.
+
+`<type>` is one of:
+
+- `invariant` — propose a new DDD core invariant.
+- `branded-id` — propose a new branded-id declaration.
+- `aggregate` — propose a new aggregate root.
+
+Required option: `--id <id>`. Optional: `--description <text>`, `--evolvability <value>`, `--type-name <name>`, `--target <path>`.
+
+Phase B trace-policy, type-state, and effect-policy proposals are made by writing a YAML file under `contract/design/proposals/` and having a human approve it through `stele design approve`; direct edits to `contract/**/*.stele` are blocked by the Claude Code plugin hooks.
+
 ## Errors and exit codes
 
 ### Core error families
 
 - `E0001`-`E0003`: lexical errors
-- `E0101`-`E0102`: parser errors
-- `E0201`-`E0203`: loader errors
-- `E0301`-`E0322`: validation errors
-- `E0401`-`E0404`: manifest errors
+- `E0101`-`E0103`: parser errors
+- `E0201`-`E0204`: loader errors
+- `E0301`-`E0359`: validation errors (E0330-E0339 are trace-policy specific; E0340-E0349 are type-state / type-state-binding specific; E0350-E0359 are effect-system specific)
+- `E0401`-`E0405`: manifest errors
 - `E0501`-`E0505`: generator errors
 - `E0601`-`E0606`: Python backend errors
 
 All core diagnostics carry a category and, when available, file/line/column span information.
+
+### Phase B validation error codes
+
+The table below lists every validation error code in the Phase B range (E0317-E0359). Messages are quoted verbatim from `packages/core/src/errors/error-codes.ts`; the source column names the validator module that raises the code.
+
+| Code | Source | Description |
+| --- | --- | --- |
+| `E0317` | `validator/structure-scenario.ts` | Scenario declaration error (unknown/repeated fields, format, missing required clauses) |
+| `E0318` | `validator/structure-code-shape.ts` | Code shape declaration error (boundary, class-shape, function-shape, type-policy, file-policy) |
+| `E0319` | `validator/structure-invariant.ts` | Structural invariant violation |
+| `E0323` | `validator/structure-architecture.ts` | Architecture declaration error (modules, layers, allow-dependency, deny-cycles) |
+| `E0324` | `validator/structure-core-node.ts` | Core-node declaration error (target, role, metrics) |
+| `E0325` | `validator/uniqueness.ts` | Duplicate architecture id |
+| `E0326` | `validator/uniqueness.ts` | Duplicate core-node id |
+| `E0327` | `validator/structure-type-driven.ts` | Branded-id declaration error (id, target, base-type, pattern, entity-scope) |
+| `E0328` | `validator/structure-type-driven.ts` | Smart-ctor declaration error (id, constructor, deny-raw, target) |
+| `E0330` | `validator/structure-trace-policy.ts` | Trace-policy declaration is missing its id |
+| `E0331` | `validator/uniqueness.ts` | Duplicate trace-policy id |
+| `E0332` | `validator/structure-trace-policy.ts` | Trace-policy is missing the required `(target ...)` field |
+| `E0333` | `validator/structure-trace-policy.ts` | Trace-policy must declare at least one must-*/deny-* constraint |
+| `E0334` | `validator/structure-trace-policy.ts` | Trace-policy exempt entry is missing `(reason "...")` |
+| `E0335` | `validator/structure-trace-policy.ts` | Trace-policy pattern has invalid syntax |
+| `E0336` | `validator/structure-trace-policy.ts` | Trace-policy severity must be `"error"` or `"warning"` |
+| `E0337` | `validator/structure-trace-policy.ts` | Trace-policy declares the same field twice |
+| `E0338` | `validator/structure-trace-policy.ts` | Trace-policy contains an unknown field |
+| `E0339` | `validator/structure-trace-policy.ts` | Trace-policy fix-hint must reference code (`...`) or a `file:line` location |
+| `E0340` | `validator/structure-type-state.ts` | Type-state declaration is missing its id |
+| `E0341` | `validator/uniqueness.ts` | Duplicate type-state id or target (one type can only have one state machine) |
+| `E0342` | `validator/structure-type-state.ts` | Type-state missing or malformed target (expected `path::TypeName` or NodeId glob) |
+| `E0343` | `validator/structure-type-state.ts` | Type-state declares an empty `(states ...)` field |
+| `E0344` | `validator/structure-type-state.ts` | Type-state initial state is not in `(states ...)` |
+| `E0345` | `validator/structure-type-state.ts` | Type-state terminal contains a non-state |
+| `E0346` | `validator/structure-type-state.ts` | Type-state `transition.from` or `transition.to` references a non-state |
+| `E0347` | `validator/structure-type-state.ts` | Type-state `(allowed-ops <state> ...)` references a non-state |
+| `E0348` | `validator/structure-type-state.ts` | Type-state terminal state appears in `(transition (from ...) ...)` |
+| `E0349` | `validator/structure-type-state.ts` | Type-state or type-state-binding has an unknown/malformed field |
+| `E0350` | `validator/structure-effect.ts` | Effect name violates lowercase dot-notation pattern |
+| `E0351` | `validator/uniqueness.ts` | Multiple `(effect-declarations ...)` blocks in the same file |
+| `E0352` | `validator/structure-effect.ts` | Effect name declared in multiple effect-declarations blocks |
+| `E0353` | `validator/structure-effect.ts` | Effect-declarations entry is missing the effect name |
+| `E0354` | `validator/structure-effect.ts` | Effect-declarations contains an unknown field |
+| `E0355` | `validator/structure-effect.ts` | Effect-annotation is missing the required `(target ...)` field |
+| `E0356` | `validator/structure-effect.ts` | Effect-annotation is missing the required `(annotates ...)` field |
+| `E0357` | `validator/structure-effect.ts` | Effect-suppression is missing or has an empty `(reason "...")` field |
+| `E0358` | `validator/structure-effect.ts` | Effect-policy declares both `(forbid ...)` and `(allow-only ...)` |
+| `E0359` | `validator/structure-effect.ts` | Effect-policy/annotation/suppression has an unknown field or missing both forbid/allow-only |
 
 ### CLI exit codes
 
@@ -767,3 +1076,44 @@ All core diagnostics carry a category and, when available, file/line/column span
 - `99`: internal error
 
 The Claude Code plugin's `Stop` hook blocks completion on any non-zero `stele check` exit.
+
+## Deprecation history
+
+Phase B removes the multi-agent CDL forms (`agent`, `scope`, `inter-agent-contract`, `conflict`). These forms had a parser in v0.2 but no evaluator and were never enforced. The original spec text claimed MCP validate-edit integration; this was inaccurate — `validate-edit` only reads protected file patterns. The forms are removed entirely in v0.3.
+
+## Phase B summary
+
+This is the consolidated index of everything Phase B (v0.3) introduces. It is descriptive — authoritative grammar lives in the sections above.
+
+New top-level forms:
+
+- `trace-policy` — call-chain rules over the static call graph.
+- `type-state` — locked state machines for a target type (states, transitions, allowed-ops).
+- `type-state-binding` — cross-function parameter state hints for the type-state evaluator.
+- `effect-declarations` — project-level effect name table.
+- `effect-annotation` — attach effects to functions / methods via NodeId patterns.
+- `effect-policy` — restrict which effects may be acquired through a target scope (`forbid` or `allow-only`).
+- `effect-suppression` — contract-only suppression of an effect on a specific function, with a mandatory `(reason "...")`.
+
+New validation error codes:
+
+- Trace-policy: `E0330`-`E0339` (10 codes).
+- Type-state and type-state-binding: `E0340`-`E0349` (10 codes; binding reuses `E0349`).
+- Effect system: `E0350`-`E0359` (10 codes).
+
+New self-protection invariants in `contract/main.stele` (also visible to `stele check` as part of the 31-invariant baseline):
+
+- `ALL_EVALUATORS_COMPILE` — every Phase B evaluator package (`@stele/call-graph-core`, `@stele/trace-evaluator`, `@stele/type-state-evaluator`, `@stele/effect-evaluator`, `@stele/type-driven-evaluator`) must build to `dist/index.js` + `dist/index.d.ts`.
+- `STRICT_MODE_DEFAULT_IN_CI` — `.github/workflows/` may not pass `--lenient-effects`, `--lenient-typestate`, `--lenient-callgraph`, or `--lenient-trace`.
+- `FIX_HINT_REQUIRES_ANALYSIS_BRANCH` — every default fix-hint emitted by a trace, type-state, or effect evaluator must contain the substrings `code issue`, `contract issue`, `propose`, `[A]`, `[B]`.
+
+CLI surface added in Phase B:
+
+- `stele explain effect <node-id>` (with `--json` from the parent `explain` command and a child-level `--no-cache`).
+- `stele design propose <type>` with `<type>` in `{invariant, branded-id, aggregate}`; trace-policy, type-state, and effect-policy proposals route through the same YAML-under-`contract/design/proposals/` mechanism.
+
+Out of scope for v0.3 (deferred):
+
+- Call-graph extractors for Go, Java, and Rust. The Phase B evaluators currently consume only the TypeScript extractor; Python is covered by the type-state and effect evaluators but the call-graph extractor is TypeScript-first. Cross-language extractor coverage is tracked under B.3.
+- Top-level CLI flags such as `--strict-effects`, `--strict-typestate`, `--strict-trace`, `--strict-callgraph`, or `--trace-max-depth` are not exposed by the `stele check` command in v0.3. Strict mode is the implicit default; lenient mode is reachable only via programmatic stage options and `--lenient-*` flags are forbidden in this repo's CI by `STRICT_MODE_DEFAULT_IN_CI`.
+- `stele design propose --trace-policy <id>` / `--type-state <id>` / `--effect-policy <id>` flag shapes are not registered in v0.3. Use the YAML proposal workflow described above.

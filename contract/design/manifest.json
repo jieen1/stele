@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "1131e1bf1a9063a788bd83fe49d853c1871c37765a85567aae038af460fb14d2",
+  "profileHash": "67037669397e03ef323418615268d516cc818788af71da48149a5665aee60671",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "f081fab2358413b0e1bdea8bd6a71729140664f5"
+    "git_sha": "8b895498fe0438c010b6422cec643d3b3ffa3fb9"
   },
   "templates": [
     "ddd-typedriven"
@@ -37,8 +37,8 @@
           "context_name": "Cli"
         }
       ],
-      "fileHash": "fbb80b54a2f4799a0c3248b5e7dda9b5694ab44fe0a11c664b9bac2d0a5b5ff9",
-      "cdl": "(architecture \"ddd-cli\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.\")\n\n  (module cli-presentation\n    (path \"packages/cli/src/{commands,index}/**\"))\n  (module cli-application\n    (path \"packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**\"))\n  (module cli-design-domain\n    (path \"packages/cli/src/{design-profile,design-generator}/**\"))\n  (module cli-type-domain\n    (path \"packages/cli/src/typescript-shape/**\"))\n  (module cli-toolchain\n    (path \"packages/cli/src/toolchain/**\"))\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n\n  (layer presentation cli-presentation)\n  (layer application cli-application)\n  (layer design-domain cli-design-domain)\n  (layer type-domain cli-type-domain)\n  (layer toolchain cli-toolchain)\n  (layer infrastructure cli-infrastructure)\n\n  (allow-dependency cli-presentation cli-application cli-design-domain cli-type-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-application cli-design-domain cli-type-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-design-domain cli-type-domain cli-infrastructure)\n  (allow-dependency cli-type-domain cli-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "7d57fa490ef9fdf40e549114d4807bf3e199ec12e6a0a726670c80c817a4cc4d",
+      "cdl": "(architecture \"ddd-cli\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.\")\n\n  (module cli-presentation\n    (path \"packages/cli/src/{commands,index}/**\"))\n  (module cli-application\n    (path \"packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**\"))\n  (module cli-design-domain\n    (path \"packages/cli/src/{design-profile,design-generator}/**\"))\n  (module cli-toolchain\n    (path \"packages/cli/src/toolchain/**\"))\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n\n  (layer presentation cli-presentation)\n  (layer application cli-application)\n  (layer design-domain cli-design-domain)\n  (layer toolchain cli-toolchain)\n  (layer infrastructure cli-infrastructure)\n\n  (allow-dependency cli-presentation cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-design-domain cli-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-architecture",
@@ -181,6 +181,76 @@
       "cdl": "(architecture \"ddd-plugin\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: plugin context must preserve DDD layer direction.\")\n\n  (module plugin-domain\n    (path \"packages/claude-code-plugin/src/**\"))\n\n  (layer domain plugin-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
+      "ruleId": "architecture.ddd-call-graph-core",
+      "ruleKind": "architecture",
+      "origin": "context:call-graph-core",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "call-graph-core",
+          "context_name": "Call-graph-core"
+        }
+      ],
+      "fileHash": "f68c48ce379dbca5ee663e40994e8623d714b80e9b95effb4a43bd726b307c23",
+      "cdl": "(architecture \"ddd-call-graph-core\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: call-graph-core context must preserve DDD layer direction.\")\n\n  (module call-graph-core-domain\n    (path \"packages/call-graph-core/src/**\"))\n\n  (layer domain call-graph-core-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-trace-evaluator",
+      "ruleKind": "architecture",
+      "origin": "context:trace-evaluator",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "trace-evaluator",
+          "context_name": "Trace-evaluator"
+        }
+      ],
+      "fileHash": "29478c68ce78f29437f8e1548a84c3841c19428ee2ecbd0f8420fecf2539917c",
+      "cdl": "(architecture \"ddd-trace-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: trace-evaluator context must preserve DDD layer direction.\")\n\n  (module trace-evaluator-domain\n    (path \"packages/trace-evaluator/src/**\"))\n\n  (layer domain trace-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-type-state-evaluator",
+      "ruleKind": "architecture",
+      "origin": "context:type-state-evaluator",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "type-state-evaluator",
+          "context_name": "Type-state-evaluator"
+        }
+      ],
+      "fileHash": "e5250d780fea5bd2d578af5e3a431ece3ad1af49b74183586fd554d2a7c60e93",
+      "cdl": "(architecture \"ddd-type-state-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: type-state-evaluator context must preserve DDD layer direction.\")\n\n  (module type-state-evaluator-domain\n    (path \"packages/type-state-evaluator/src/**\"))\n\n  (layer domain type-state-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-effect-evaluator",
+      "ruleKind": "architecture",
+      "origin": "context:effect-evaluator",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "effect-evaluator",
+          "context_name": "Effect-evaluator"
+        }
+      ],
+      "fileHash": "4e73cad6f7fdc46f0ca678a8903b3d13c87177d757f9b2e213fa3a2dff014e75",
+      "cdl": "(architecture \"ddd-effect-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: effect-evaluator context must preserve DDD layer direction.\")\n\n  (module effect-evaluator-domain\n    (path \"packages/effect-evaluator/src/**\"))\n\n  (layer domain effect-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
+      "ruleId": "architecture.ddd-type-driven-evaluator",
+      "ruleKind": "architecture",
+      "origin": "context:type-driven-evaluator",
+      "origins": [
+        {
+          "type": "context",
+          "context_id": "type-driven-evaluator",
+          "context_name": "Type-driven-evaluator"
+        }
+      ],
+      "fileHash": "bda41a35f91c18a64cc1b39e010f7aca9a4432a0234a347f21c27137440fd5d4",
+      "cdl": "(architecture \"ddd-type-driven-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: type-driven-evaluator context must preserve DDD layer direction.\")\n\n  (module type-driven-evaluator-domain\n    (path \"packages/type-driven-evaluator/src/**\"))\n\n  (layer domain type-driven-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+    },
+    {
       "ruleId": "architecture.ddd-context-map",
       "ruleKind": "architecture",
       "origin": "integration:all",
@@ -190,8 +260,8 @@
           "decision_id": "q1-bounded-contexts"
         }
       ],
-      "fileHash": "9ca2f751ee30e49eb7e31de881afb0409639a2d068df53e43235409eb7d44643",
-      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src/**\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src/**\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n\n  (allow-dependency hooks-internal hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-internal)\n  (allow-dependency mcp-internal mcp-infrastructure)\n  (allow-dependency mcp-infrastructure mcp-internal)\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
+      "fileHash": "fabb78f16309ac5f58390a69971d18d39a10605a3e052a75063e863332ecf4fa",
+      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src/**\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src/**\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n  (module trace-evaluator-internal\n    (path \"packages/trace-evaluator/src/**\"))\n  (module type-state-evaluator-internal\n    (path \"packages/type-state-evaluator/src/**\"))\n  (module effect-evaluator-internal\n    (path \"packages/effect-evaluator/src/**\"))\n  (module type-driven-evaluator-internal\n    (path \"packages/type-driven-evaluator/src/**\"))\n  (module call-graph-core-internal\n    (path \"packages/call-graph-core/src/**\"))\n\n  (allow-dependency hooks-internal hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-internal)\n  (allow-dependency mcp-internal mcp-infrastructure)\n  (allow-dependency mcp-infrastructure mcp-internal)\n  (allow-dependency cli-infrastructure core-internal)\n  (allow-dependency cli-infrastructure architecture-internal)\n  (allow-dependency cli-infrastructure backends-ts-internal)\n  (allow-dependency cli-infrastructure backends-py-internal)\n  (allow-dependency cli-infrastructure hooks-internal)\n  (allow-dependency cli-infrastructure mcp-internal)\n  (allow-dependency backends-ts-internal core-internal)\n  (allow-dependency backends-py-internal core-internal)\n  (allow-dependency architecture-internal core-internal)\n  (allow-dependency hooks-infrastructure core-internal)\n  (allow-dependency mcp-infrastructure core-internal)\n  (allow-dependency mcp-infrastructure hooks-internal)\n  (allow-dependency cli-infrastructure trace-evaluator-internal)\n  (allow-dependency cli-infrastructure type-state-evaluator-internal)\n  (allow-dependency cli-infrastructure effect-evaluator-internal)\n  (allow-dependency cli-infrastructure type-driven-evaluator-internal)\n  (allow-dependency trace-evaluator-internal core-internal)\n  (allow-dependency trace-evaluator-internal call-graph-core-internal)\n  (allow-dependency type-state-evaluator-internal core-internal)\n  (allow-dependency type-state-evaluator-internal call-graph-core-internal)\n  (allow-dependency effect-evaluator-internal core-internal)\n  (allow-dependency effect-evaluator-internal call-graph-core-internal)\n  (allow-dependency backends-ts-internal call-graph-core-internal)\n  (allow-dependency backends-ts-internal effect-evaluator-internal)\n  (allow-dependency backends-ts-internal type-state-evaluator-internal)\n  (allow-dependency call-graph-core-internal core-internal)\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
     },
     {
       "ruleId": "core-node.core-operator-registry-aggregate",
@@ -324,17 +394,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-23T03:27:55.419Z",
+  "generatedAt": "2026-05-23T09:26:01.134Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "991f943da03862e7f2fd34dc0ab0aa188b967df4977092cabec1b59b8815928e"
+      "hash": "5d28bafd67407e84139de18a19e33062a3e430ba0a9190069883f36722d06a91"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "991f943da03862e7f2fd34dc0ab0aa188b967df4977092cabec1b59b8815928e",
+      "sha256": "5d28bafd67407e84139de18a19e33062a3e430ba0a9190069883f36722d06a91",
       "rules": [
         {
           "id": "architecture.ddd-core",
@@ -497,6 +567,76 @@
             {
               "decision_id": "ddd-context-plugin",
               "profile_anchor": "ddd.contexts.plugin",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-call-graph-core",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-call-graph-core",
+              "profile_anchor": "ddd.contexts.call-graph-core",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-trace-evaluator",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-trace-evaluator",
+              "profile_anchor": "ddd.contexts.trace-evaluator",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-type-state-evaluator",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-type-state-evaluator",
+              "profile_anchor": "ddd.contexts.type-state-evaluator",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-effect-evaluator",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-effect-evaluator",
+              "profile_anchor": "ddd.contexts.effect-evaluator",
+              "question_id": "Q1",
+              "selected_option": "by_business_function"
+            }
+          ],
+          "enforcement_level": "hard",
+          "source": "generated"
+        },
+        {
+          "id": "architecture.ddd-type-driven-evaluator",
+          "kind": "architecture",
+          "origins": [
+            {
+              "decision_id": "ddd-context-type-driven-evaluator",
+              "profile_anchor": "ddd.contexts.type-driven-evaluator",
               "question_id": "Q1",
               "selected_option": "by_business_function"
             }

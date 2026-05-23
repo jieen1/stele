@@ -42,8 +42,6 @@
     (path "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**"))
   (module cli-design-domain
     (path "packages/cli/src/{design-profile,design-generator}/**"))
-  (module cli-type-domain
-    (path "packages/cli/src/typescript-shape/**"))
   (module cli-toolchain
     (path "packages/cli/src/toolchain/**"))
   (module cli-infrastructure
@@ -52,14 +50,12 @@
   (layer presentation cli-presentation)
   (layer application cli-application)
   (layer design-domain cli-design-domain)
-  (layer type-domain cli-type-domain)
   (layer toolchain cli-toolchain)
   (layer infrastructure cli-infrastructure)
 
-  (allow-dependency cli-presentation cli-application cli-design-domain cli-type-domain cli-toolchain cli-infrastructure)
-  (allow-dependency cli-application cli-design-domain cli-type-domain cli-toolchain cli-infrastructure)
-  (allow-dependency cli-design-domain cli-type-domain cli-infrastructure)
-  (allow-dependency cli-type-domain cli-infrastructure)
+  (allow-dependency cli-presentation cli-application cli-design-domain cli-toolchain cli-infrastructure)
+  (allow-dependency cli-application cli-design-domain cli-toolchain cli-infrastructure)
+  (allow-dependency cli-design-domain cli-infrastructure)
 
   (deny-cycles)
   (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
@@ -220,6 +216,76 @@
   (deny-cycles)
   (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
 
+(architecture "ddd-call-graph-core"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: call-graph-core context must preserve DDD layer direction.")
+
+  (module call-graph-core-domain
+    (path "packages/call-graph-core/src/**"))
+
+  (layer domain call-graph-core-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-trace-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: trace-evaluator context must preserve DDD layer direction.")
+
+  (module trace-evaluator-domain
+    (path "packages/trace-evaluator/src/**"))
+
+  (layer domain trace-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-type-state-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: type-state-evaluator context must preserve DDD layer direction.")
+
+  (module type-state-evaluator-domain
+    (path "packages/type-state-evaluator/src/**"))
+
+  (layer domain type-state-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-effect-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: effect-evaluator context must preserve DDD layer direction.")
+
+  (module effect-evaluator-domain
+    (path "packages/effect-evaluator/src/**"))
+
+  (layer domain effect-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
+(architecture "ddd-type-driven-evaluator"
+  (lang typescript)
+  (tsconfig "packages/cli/tsconfig.json")
+  (description "Generated from contract/design/profile.yaml: type-driven-evaluator context must preserve DDD layer direction.")
+
+  (module type-driven-evaluator-domain
+    (path "packages/type-driven-evaluator/src/**"))
+
+  (layer domain type-driven-evaluator-domain)
+
+
+  (deny-cycles)
+  (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))
+
 (architecture "ddd-context-map"
   (lang typescript)
   (tsconfig "packages/cli/tsconfig.json")
@@ -245,11 +311,47 @@
     (path "packages/agent-hooks/src/{install,util}/**"))
   (module mcp-infrastructure
     (path "packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}"))
+  (module trace-evaluator-internal
+    (path "packages/trace-evaluator/src/**"))
+  (module type-state-evaluator-internal
+    (path "packages/type-state-evaluator/src/**"))
+  (module effect-evaluator-internal
+    (path "packages/effect-evaluator/src/**"))
+  (module type-driven-evaluator-internal
+    (path "packages/type-driven-evaluator/src/**"))
+  (module call-graph-core-internal
+    (path "packages/call-graph-core/src/**"))
 
   (allow-dependency hooks-internal hooks-infrastructure)
   (allow-dependency hooks-infrastructure hooks-internal)
   (allow-dependency mcp-internal mcp-infrastructure)
   (allow-dependency mcp-infrastructure mcp-internal)
+  (allow-dependency cli-infrastructure core-internal)
+  (allow-dependency cli-infrastructure architecture-internal)
+  (allow-dependency cli-infrastructure backends-ts-internal)
+  (allow-dependency cli-infrastructure backends-py-internal)
+  (allow-dependency cli-infrastructure hooks-internal)
+  (allow-dependency cli-infrastructure mcp-internal)
+  (allow-dependency backends-ts-internal core-internal)
+  (allow-dependency backends-py-internal core-internal)
+  (allow-dependency architecture-internal core-internal)
+  (allow-dependency hooks-infrastructure core-internal)
+  (allow-dependency mcp-infrastructure core-internal)
+  (allow-dependency mcp-infrastructure hooks-internal)
+  (allow-dependency cli-infrastructure trace-evaluator-internal)
+  (allow-dependency cli-infrastructure type-state-evaluator-internal)
+  (allow-dependency cli-infrastructure effect-evaluator-internal)
+  (allow-dependency cli-infrastructure type-driven-evaluator-internal)
+  (allow-dependency trace-evaluator-internal core-internal)
+  (allow-dependency trace-evaluator-internal call-graph-core-internal)
+  (allow-dependency type-state-evaluator-internal core-internal)
+  (allow-dependency type-state-evaluator-internal call-graph-core-internal)
+  (allow-dependency effect-evaluator-internal core-internal)
+  (allow-dependency effect-evaluator-internal call-graph-core-internal)
+  (allow-dependency backends-ts-internal call-graph-core-internal)
+  (allow-dependency backends-ts-internal effect-evaluator-internal)
+  (allow-dependency backends-ts-internal type-state-evaluator-internal)
+  (allow-dependency call-graph-core-internal core-internal)
 
   (deny-cycles)
   (fix "Use the declared ACL module instead of importing the target context directly."))
