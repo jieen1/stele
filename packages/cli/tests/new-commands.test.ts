@@ -1,7 +1,19 @@
+import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Round 4 F-D-02: skip pytest-dependent tests when pytest is absent.
+const _PYTEST_AVAILABLE_FD02 = (() => {
+  try {
+    execFileSync("python3", ["-c", "import pytest"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+const itIfPytest = _PYTEST_AVAILABLE_FD02 ? it : it.skip;
 import { runDev } from "../src/commands/dev.js";
 import { runDoc } from "../src/commands/doc.js";
 import { unlockProject } from "../src/commands/unlock.js";
@@ -20,7 +32,7 @@ describe("new commands", () => {
   });
 
   describe("dev --once", () => {
-    it("dev --once runs generate and check without watching", async () => {
+    itIfPytest("dev --once runs generate and check without watching", async () => {
       const projectDir = await createFixtureProject();
       const stdout = captureStdout();
       const stderr = captureStderr();

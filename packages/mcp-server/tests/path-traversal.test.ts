@@ -19,14 +19,21 @@ describe("path traversal protection", () => {
     }
   });
 
-  it("rejects UNC path on Windows", () => {
-    const uncPath = "\\\\server\\share";
-    const result = validateProjectDir(uncPath);
-    expect("error" in result).toBe(true);
-    if ("error" in result) {
-      expect(result.error).toContain("UNC");
-    }
-  });
+  // Round 4 F-D-03: UNC path detection is a Windows-specific path-shape
+  // concern; the same input on Linux gets normalized to a regular path
+  // and doesn't trigger the rejection. Pin to win32 so the test only
+  // runs where it's meaningful.
+  (process.platform === "win32" ? it : it.skip)(
+    "rejects UNC path on Windows",
+    () => {
+      const uncPath = "\\\\server\\share";
+      const result = validateProjectDir(uncPath);
+      expect("error" in result).toBe(true);
+      if ("error" in result) {
+        expect(result.error).toContain("UNC");
+      }
+    },
+  );
 
   it("rejects Windows namespace path", () => {
     const nsPath = "\\\\?\\C:\\windows\\system32";

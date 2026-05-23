@@ -7,6 +7,13 @@ import { readFileSync } from "node:fs";
 
 const tempDirs: string[] = [];
 
+// Round 4 D-02 follow-up: design-approvals tests run runDesignApprove
+// non-interactively; the new human-identity gate requires either an
+// interactive TTY or STELE_APPROVED_BY env. Set the env for the entire
+// suite so every test exercises the post-gate code paths.
+const _previousApprovedBy = process.env.STELE_APPROVED_BY;
+process.env.STELE_APPROVED_BY = "test-fixture";
+
 afterEach(() => {
   // Cleanup temp directories
   for (const dir of tempDirs) {
@@ -17,6 +24,15 @@ afterEach(() => {
     }
   }
   tempDirs.length = 0;
+});
+
+// Restore the original env after the suite completes.
+process.on("exit", () => {
+  if (_previousApprovedBy === undefined) {
+    delete process.env.STELE_APPROVED_BY;
+  } else {
+    process.env.STELE_APPROVED_BY = _previousApprovedBy;
+  }
 });
 
 async function createTempDir(): Promise<string> {

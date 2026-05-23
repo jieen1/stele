@@ -21,15 +21,18 @@ describe("validateProjectDir", () => {
     expect(result.path).toBeUndefined();
   });
 
-  it("rejects UNC paths", () => {
-    // On Windows, resolve() may handle UNC differently, so check what we can
-    const result = validateProjectDir("\\\\malicious\\unc\\path");
-    // The resolved path may or may not start with \\ depending on platform
-    // The UNC check catches the original trimmed path via resolve()
-    if (result.error) {
-      expect(result.error).toContain("UNC paths");
-    }
-  });
+  // Round 4 F-D-03: UNC path rejection is a Windows-specific behavior;
+  // on Linux the same input becomes a regular missing-file error
+  // ("Path does not exist or is not accessible"). Pin to win32.
+  (process.platform === "win32" ? it : it.skip)(
+    "rejects UNC paths",
+    () => {
+      const result = validateProjectDir("\\\\malicious\\unc\\path");
+      if (result.error) {
+        expect(result.error).toContain("UNC paths");
+      }
+    },
+  );
 
   it("returns resolved path for valid directory", () => {
     // Use the package's own directory — it exists and is a directory

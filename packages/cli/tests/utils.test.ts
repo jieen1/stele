@@ -102,10 +102,17 @@ describe("toProjectRelativePath", () => {
     expect(result).toBe("src/file.stele");
   });
 
-  it("normalizes backslashes on Windows-style paths", () => {
-    const result = toProjectRelativePath("C:\\Users\\project", "C:\\Users\\project\\src\\file.stele");
-    expect(result).toBe("src/file.stele");
-  });
+  // Round 4 F-D-02: the path resolver behaves differently per platform
+  // (path.relative on Linux treats `C:\Users\project` as a literal name);
+  // pin this test to Windows so it doesn't false-fail on Linux dev machines
+  // / CI runners. CI runs the same suite on the matrix's Windows leg.
+  (process.platform === "win32" ? it : it.skip)(
+    "normalizes backslashes on Windows-style paths",
+    () => {
+      const result = toProjectRelativePath("C:\\Users\\project", "C:\\Users\\project\\src\\file.stele");
+      expect(result).toBe("src/file.stele");
+    },
+  );
 
   it("handles paths outside the project directory", () => {
     const result = toProjectRelativePath("/home/user/project", "/home/user/other/file.stele");

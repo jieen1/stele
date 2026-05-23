@@ -34,7 +34,7 @@ Phase B 新增三个机械联锁机制：
 3. **新增 invariant 自检自身设计**：
    - `ALL_EVALUATORS_COMPILE` —— Phase B 新包必须可编译
    - `STRICT_MODE_DEFAULT_IN_CI` —— 本仓库 CI 不允许 lenient flag
-   - `FIX_HINT_NOT_VAGUE` —— CDL 中 fix-hint 必须含可粘贴代码片段
+   - `FIX_HINT_REQUIRES_ANALYSIS_BRANCH` (renamed from `FIX_HINT_NOT_VAGUE` in Round 3 P1-2, severity promoted `warning → error` in Round 4 F-C-01) —— Every default fix-hint must teach the [A] code-issue / [B] contract-issue split + reference the propose flow + the proposals dir.
 4. **Unresolved fail-closed**：callgraph 无法解析的调用在 effect / trace 评估中**默认违例**，agent 必须显式 annotation 或重构。
 
 ### 关键 UX 设计（Round 2 强化）
@@ -135,14 +135,24 @@ Round 1 修订已落入 draft 文件。Round 2 修订涉及以下文件，在 Ph
   (description "Self-protection: this repo's CI workflow must use Stele's default strict behavior (no --lenient-* opt-outs).")
   (uses-checker strict-mode-default-in-ci))
 
-(checker fix-hint-not-vague
-  (description "Every fix-hint in protected .stele files must include a backtick-quoted code snippet or file:line reference."))
+(checker fix-hint-requires-analysis-branch
+  (description "Every default fix-hint emitted by a trace/type-state/effect evaluator must teach the [A] code-issue / [B] contract-issue split."))
 
-(invariant FIX_HINT_NOT_VAGUE
-  (severity warning)
-  (description "fix-hint substantive guidance: must contain executable hint text, not pure prose.")
-  (uses-checker fix-hint-not-vague))
+(invariant FIX_HINT_REQUIRES_ANALYSIS_BRANCH
+  (severity error)
+  (description "fix-hint substantive guidance: every default hint must contain the literal anchors `[A] Code issue` and `[B] Contract issue`, the trailing `Choose [A] or [B] before acting` prompt, and a pointer at the propose flow.")
+  (uses-checker fix-hint-requires-analysis-branch))
 ```
+
+> **Round 4 F-C-01 update.** The invariant historically declared above as
+> `FIX_HINT_NOT_VAGUE` (severity `warning`) was renamed and promoted during
+> Round 3 P1-2: shipping as `FIX_HINT_REQUIRES_ANALYSIS_BRANCH` at severity
+> `error`. The structural check anchors on the canonical `[A] Code issue`
+> and `[B] Contract issue` literals, requires a code-action verb (or a
+> template-string interpolation) inside the `[A]` region, and rejects the
+> hint when the `[B]` region misses the propose flow / proposals-dir
+> pointer. The pre-rename name is preserved here as a historical pointer
+> only — `docs/spec/cdl.md` is authoritative.
 
 ## 四、Phase B 实施 Sub-Agent 任务图
 

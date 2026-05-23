@@ -269,7 +269,7 @@ npx stele check --diff-from main  # only report violations in changed files
 
 ## Self-Protection
 
-Stele protects itself. The project's `contract/main.stele` contains **27 invariants** that verify:
+Stele protects itself. The project's `contract/main.stele` contains **35+ invariants** (see `stele list` for the live count) that verify:
 
 - Backend registry integrity (all 5 languages present)
 - Operator registry (70+ operators, consistent specs)

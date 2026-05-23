@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,6 +9,22 @@ import * as backendPython from "../src/index";
 
 const tempDirs: string[] = [];
 const execFileAsync = promisify(execFile);
+
+// Round 4 F-D-01: skip-if guard for the local-dev case where pytest is
+// not installed. Without this, 10 of these tests fail not because of a
+// regression but because the test environment lacks pytest — drowning
+// real failures in noise. The CI workflow installs pytest before
+// running this suite (see .github/workflows/ci.yml) so detection runs
+// once at module load and the suite still exercises everything in CI.
+const _PYTEST_AVAILABLE = (() => {
+  try {
+    execFileSync("python3", ["-c", "import pytest"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+const itIfPytest = _PYTEST_AVAILABLE ? it : it.skip;
 
 describe("@stele/backend-python translator", () => {
   afterEach(async () => {
@@ -106,7 +122,7 @@ describe("@stele/backend-python translator", () => {
     ].join("\n"));
   });
 
-  it("writes package-shaped pytest artifacts that import and collect with python -m pytest", async () => {
+  itIfPytest("writes package-shaped pytest artifacts that import and collect with python -m pytest", async () => {
     const contract = await createContract({
       "main.stele": [
         "(invariant ACCT_001",
@@ -138,7 +154,7 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
-  it("runs cross-table filtered sum, avg, min, and max aggregations", async () => {
+  itIfPytest("runs cross-table filtered sum, avg, min, and max aggregations", async () => {
     const contract = await createContract({
       "main.stele": [
         "(invariant BUDGETS_MATCH_TRANSACTIONS",
@@ -205,7 +221,7 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
-  it("disambiguates sanitized sibling invariant ids so pytest collects both tests", async () => {
+  itIfPytest("disambiguates sanitized sibling invariant ids so pytest collects both tests", async () => {
     const contract = await createContract({
       "main.stele": [
         "(invariant A-B",
@@ -237,7 +253,7 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("2 passed");
   });
 
-  it("allocates keyword-safe quantifier bindings for generated pytest", async () => {
+  itIfPytest("allocates keyword-safe quantifier bindings for generated pytest", async () => {
     const contract = await createContract({
       "main.stele": [
         "(invariant KW_BINDING",
@@ -303,7 +319,7 @@ describe("@stele/backend-python translator", () => {
     expect(testSource).toContain('assert (stele_get_path(stele_assert_context["pnl"], ["value"])) > (0)');
   });
 
-  it("runs modified assertions against state-before/state-after through the generated runtime", async () => {
+  itIfPytest("runs modified assertions against state-before/state-after through the generated runtime", async () => {
     const contract = await createContract({
       "main.stele": [
         "(invariant BALANCE_MODIFIED",
@@ -356,7 +372,7 @@ describe("@stele/backend-python translator", () => {
     expect(testSource).toContain('assert stele_is_modified(stele_assert_context, ["account","balance"])');
   });
 
-  it("executes python-import scenarios end to end with sandbox fixtures and captured state", async () => {
+  itIfPytest("executes python-import scenarios end to end with sandbox fixtures and captured state", async () => {
     const contract = await createContract({
       "main.stele": [
         "(scenario fund-pnl-flow",
@@ -410,7 +426,7 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
-  it("executes scenario-backed temporal assertions against merged scenario state", async () => {
+  itIfPytest("executes scenario-backed temporal assertions against merged scenario state", async () => {
     const contract = await createContract({
       "main.stele": [
         "(scenario account-balance-flow",
@@ -460,7 +476,7 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
-  it("fails generated pytest when scenario-backed assertions are false", async () => {
+  itIfPytest("fails generated pytest when scenario-backed assertions are false", async () => {
     const contract = await createContract({
       "main.stele": [
         "(scenario fund-pnl-flow",
@@ -514,7 +530,7 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 failed");
   });
 
-  it("allocates scope-unique nested quantifier bindings when sanitized names collide", async () => {
+  itIfPytest("allocates scope-unique nested quantifier bindings when sanitized names collide", async () => {
     const contract = await createContract({
       "main.stele": [
         "(invariant NESTED_BINDINGS",
@@ -548,7 +564,7 @@ describe("@stele/backend-python translator", () => {
     expect(result.stdout).toContain("1 passed");
   });
 
-  it("parenthesizes comparison operands so boolean expressions keep CDL precedence", async () => {
+  itIfPytest("parenthesizes comparison operands so boolean expressions keep CDL precedence", async () => {
     const contract = await createContract({
       "main.stele": [
         "(invariant PRECEDENCE_OR",

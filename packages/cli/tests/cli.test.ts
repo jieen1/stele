@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -70,7 +70,15 @@ describe("stele CLI", () => {
     await expect(pathExists(join(projectDir, "contract", "main.stele"))).resolves.toBe(false);
   });
 
-  it("init scaffold supports scenario-backed pytest generation and execution out of the box", async () => {
+  // Round 4 F-D-02: skip when pytest isn't installed locally.
+  ((() => {
+    try {
+      execFileSync("python3", ["-c", "import pytest"], { stdio: "ignore" });
+      return it;
+    } catch {
+      return it.skip;
+    }
+  })())("init scaffold supports scenario-backed pytest generation and execution out of the box", async () => {
     const projectDir = await createTempDir();
 
     await runInit(projectDir, { language: "python" });
