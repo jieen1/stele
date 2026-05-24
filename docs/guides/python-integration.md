@@ -342,6 +342,26 @@ npx stele check
 - the current contract hash still matches the locked manifest
 - no new protected files were added without a fresh lock
 
+## Phase B contracts on Python projects (F-A-02 fail-loud)
+
+A Python project that adopts Stele can author **scenario / invariant / code-shape** contracts and have them enforced today. The Phase B contracts that ship with the `@stele/trace-evaluator`, `@stele/type-state-evaluator`, and `@stele/effect-evaluator` packages — namely `trace-policy`, `type-state`, `type-state-binding`, `effect-policy`, `effect-annotation`, `effect-declarations`, and `effect-suppression` — are **TypeScript-only** at v0.1. They reach into the TypeScript call graph and type checker, and the equivalent Python implementation has not landed.
+
+To avoid a fail-open surface where these contracts could be merged on a Python project and silently succeed, the runtime intentionally fails loud (Round 4 F-A-02):
+
+```text
+[error] trace-policy not yet supported for targetLanguage="python".
+        Round 4 F-A-02: failing loud so the contract surface matches the
+        enforcement surface.
+```
+
+If you see this on `stele check`, the fix is one of:
+
+1. Remove the Phase B form from your contract (`trace-policy`, `type-state`, etc) and replace it with a regular `invariant` + `checker` if the property can be expressed as runtime data.
+2. Wait for the Python evaluator (tracked under `docs/strategy/roadmap.md`).
+3. As an opt-in escape hatch, scope the contract to TypeScript subprojects only and run those through the TypeScript backend instead.
+
+`stele check` exits non-zero in this case (`SCORE_BELOW_THRESHOLD` or `CONTRACT_FAIL` depending on configuration). It does **not** silently downgrade to success — that distinction is part of the project contract and is exercised by the self-protection test suite.
+
 ## Packed adoption caveat
 
 Pre-publish installation is real and continuously verified, but it is still tarball-based. The automation currently proves that a fresh Python app can install the packed `@stele/core`, `@stele/backend-python`, and `@stele/cli` tarballs together, initialize, generate, run pytest, explicitly lock the initial baseline, and then pass `stele check`.

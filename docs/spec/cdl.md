@@ -354,6 +354,157 @@ Metric boundaries must satisfy `ideal <= max`. Metric names must be valid for th
 
 Complexity violations occur when a metric value exceeds its `max` boundary. Notices are emitted when values exceed `ideal` but remain below `max`. Notices do not cause non-zero exit codes.
 
+## Code-Shape declarations
+
+Code-shape declarations express structural rules over a single named target in source code (currently `(lang python)` only). They are evaluated against the parsed source at the named `target` path. Every code-shape form shares the same header: `(<form> <id> (lang python) (target "<file-or-symbol>") ...)`. The five forms listed below differ only in which `(must-have-*)` / `(deny-*)` fields they accept.
+
+### `boundary`
+
+Form:
+
+```lisp
+(boundary "ledger-write-boundary"
+  (lang python)
+  (target "app/ledger.py::LedgerService")
+  (deny-import "app.audit_log" "app.session")
+  (deny-call "exec" "eval")
+  (allow-target "app.repositories.*"))
+```
+
+Fields:
+
+- `lang`: exactly one identifier or string (required). Currently only `python` is supported.
+- `target`: exactly one string (required). A dotted symbol path, optionally `path/to/file.py::ClassName`.
+- `deny-import`: zero or more import names that the target file must not import.
+- `deny-call`: zero or more callee names that the target body must not invoke.
+- `allow-target`: zero or more glob patterns scoping which call/import sites the rule applies to.
+
+Code: `E0318`.
+
+### `class-shape`
+
+Form:
+
+```lisp
+(class-shape "OrderService"
+  (lang python)
+  (target "app/order/service.py::OrderService")
+  (must-have-field "repository" (type "OrderRepository"))
+  (must-have-method "place" "cancel")
+  (must-extend "ServiceBase"))
+```
+
+Fields:
+
+- `must-have-field`: one or more `(must-have-field "name" (type "T"))` entries; the `type` form is optional.
+- `must-have-method`: zero or more method names the class must declare.
+- `must-extend`: zero or more base classes the class must extend.
+
+Code: `E0318`.
+
+### `function-shape`
+
+Form:
+
+```lisp
+(function-shape "place-order"
+  (lang python)
+  (target "app/order/service.py::OrderService::place")
+  (must-have-call "Repository.save")
+  (must-have-decorator "@transactional")
+  (must-have-parameter "order"))
+```
+
+Fields:
+
+- `must-have-call`: zero or more callee names the function body must contain.
+- `must-have-decorator`: zero or more decorator strings the function must carry (`@`-prefix optional).
+- `must-have-parameter`: zero or more parameter names the function must declare.
+
+Code: `E0318`.
+
+### `type-policy`
+
+Form:
+
+```lisp
+(type-policy "no-any"
+  (lang python)
+  (target "app/order/**")
+  (deny-type "typing.Any" "Any")
+  (require-type "OrderId"))
+```
+
+Fields:
+
+- `deny-type`: zero or more type names that must not appear as annotations under the target glob.
+- `require-type`: zero or more type names that must appear at least once under the target glob.
+
+Code: `E0318`.
+
+### `file-policy`
+
+Form:
+
+```lisp
+(file-policy "module-headers"
+  (lang python)
+  (target "app/**/__init__.py")
+  (must-contain "from __future__ import annotations")
+  (must-end-with "\n"))
+```
+
+Fields:
+
+- `must-contain`: zero or more substring fragments every matching file must contain.
+- `must-end-with`: zero or more strings every matching file must end with.
+
+Code: `E0318`.
+
+## Type-Driven declarations
+
+Type-driven declarations (Round 3 P0-7 and on) lock down value-object shape and constructor discipline. They are evaluated by `@stele/type-driven-evaluator`.
+
+### `branded-id`
+
+Form:
+
+```lisp
+(branded-id RuleId
+  (target "packages/core/src/types/rule-id.ts::RuleId")
+  (base-type string)
+  (pattern "^[A-Z][A-Z0-9_]*$")
+  (entity-scope "Rule"))
+```
+
+Fields:
+
+- `target`: exactly one string (required). `path/to/file.ts::TypeName`.
+- `base-type`: exactly one string or identifier (required). The primitive base (e.g. `string`, `number`).
+- `pattern`: exactly one string (optional). A regex the brand value must match.
+- `entity-scope`: exactly one string (optional). The entity the brand belongs to — used by uniqueness checks across branded ids.
+
+Code: `E0327`.
+
+### `smart-ctor`
+
+Form:
+
+```lisp
+(smart-ctor RuleId
+  (constructor "parseRuleId")
+  (deny-raw "true")
+  (target "packages/core/src/types/rule-id.ts::RuleId"))
+```
+
+Fields:
+
+- `constructor`: exactly one string (required). The name of the validating constructor that callers must use.
+- `deny-raw`: `(deny-raw "true")` or `(deny-raw "false")` (optional, default `false`). When `true`, callers must not construct the type via raw `as`-casts or object literals.
+- `target`: exactly one string (optional, recommended). Pins the value-object type the constructor governs.
+
+Code: `E0328`.
+
 ## Trace-Based Policy
 
 `trace-policy` declarations express call-chain rules over the static call graph. They are part of Phase B and are recognised by the CDL parser today; the runtime evaluator ships in B.1 targeting TypeScript source. See `docs/design/phase-b/02-trace-based-policy.md` for the semantics.
