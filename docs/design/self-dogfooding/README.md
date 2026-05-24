@@ -291,7 +291,87 @@ These items are explicitly NOT part of this plan:
 Append every non-trivial decision here with date + brief rationale.
 The decision log is part of the plan and is reviewed in Phase 7.
 
-(empty — to be filled in during implementation)
+### 2026-05-24 — Phase 2 sub-agent
+
+- **Used `(lang typescript)` for all 9 landed code-shape contracts.** Per
+  the prompt; matches V-04. No `(lang python)` declarations introduced.
+- **Code-shape IDs must start with a lowercase letter.** The branded
+  `RuleId` constructor in `@stele/core` validates with
+  `/^[a-z][A-Za-z0-9._:-]*$/`. Phase doc used `UPPER_SNAKE` (e.g.,
+  `CORE_NO_FS_WRITE_FROM_NON_MANIFEST`); landed as `lowercase-kebab`
+  (e.g., `core-no-fs-write-from-non-manifest`). CDL identifier syntax
+  also forbids dots / colons in identifiers, so namespace-style ids
+  like `stele.phase2.foo` are not valid either.
+- **`(deny-import "module::name")` is a no-op on the current TS analyzer.**
+  `analyzeTypeScriptFiles` only emits the module specifier as an import
+  candidate, not `module.name`. The Python analyzer emits both. Updated
+  the boundary contracts to deny entire modules with an explicit
+  `(allow-target …)` list. Phase 7 follow-up suggested: extend the TS
+  analyzer to also emit `module.namedExport` candidates for parity with
+  the Python analyzer; this enables finer-grained boundary contracts.
+- **`(deny-call …)` only matches MODULE-LEVEL calls in both languages.**
+  The Python `iter_non_nested` walker skips into function bodies, and
+  the TS file-level walk likewise excludes calls captured inside
+  `readClassDeclaration` / `readFunctionDeclaration` / `readArrowFunction`.
+  Function-body call detection happens only inside `function-shape`
+  declarations against a specific function selector. Documented inside
+  the contract as a maintenance note.
+- **`@stele/backend-python` now skips TS-lang code-shapes.** The
+  pre-Phase-2 renderer always emitted `test_code_shape.py` pytest tests
+  for ALL code-shape declarations, including `(lang typescript)` ones —
+  which then tried to parse `.ts` source via Python's `ast` module and
+  SyntaxErrored on the first hyphen or `:`. Renderer (`backend.ts`,
+  `code-shape-renderer.ts`) and layout (`core/src/generator/layout.ts`)
+  now filter to `(lang python)`. `(lang typescript)` declarations are
+  exclusively the CLI's in-process TS evaluator's responsibility.
+- **TS analyzer now accepts `.js` / `.mjs` / `.cjs`.** Updated
+  `isTypeScriptFilePath` + new `scriptKindFor` helper to support ESM
+  hook scripts. The phase doc already noted this should work; the
+  filter was lying. Files outside `(target …)` patterns remain
+  unaffected by minimatch upstream.
+- **`CliCommandError.exitCode` promoted from parameter property to
+  explicit field declaration.** The TS analyzer's `readClassDeclaration`
+  only collects `ts.isPropertyDeclaration` members; parameter properties
+  (`constructor(readonly exitCode: ExitCode, …)`) are stored on the
+  instance at runtime but invisible to the class-shape analyzer. Small
+  refactor; behaviour identical at runtime.
+- **`pre-tool-protect.js` top-level body wrapped in `async main()`.** The
+  phase doc's `hook-fail-closed-v2` selector required a `::main` anchor;
+  the file previously had no `main()` and ran top-level `try { … }
+  catch { failClosed(…) }`. The new wrapper preserves the same outer
+  try/catch + `failClosed` inside `main`, so the existing Round 4 E-04
+  `HOOK_ENTRYPOINTS_FAIL_CLOSED` invariant continues to pass.
+
+### Phase 2 deferred items (re-scope to Phase 7)
+
+Three of the 12 phase-doc contracts were removed during Phase 2 because
+making them land required cross-Phase-2 refactors:
+
+1. **`MANIFEST_ENGINE_SHAPE`** — phase doc targets
+   `packages/core/src/manifest/manifest.ts::Manifest`. The actual
+   declaration is `export type ContractManifest = { … }`, a TypeScript
+   type alias. The TS analyzer's `collectClassMatches` only resolves
+   `ts.isClassDeclaration` nodes; type aliases yield no anchor. Phase 7
+   options: (a) refactor `ContractManifest` to a real class, with a
+   small migration in `writeManifest`/`verifyManifest`; or (b) extend
+   the analyzer to recognise type aliases for class-shape selectors
+   (more useful, broader change).
+2. **`VIOLATION_REPORT_SHAPE`** — phase doc targets
+   `packages/core/src/report/types.ts::ViolationReport`. Same root
+   cause as (1): `ViolationReport` is a type alias.
+3. **`RULE_ID_FIELDS_BRANDED`** — phase doc targets
+   `packages/core/src/report/types.ts::Violation` with
+   `(require-type "RuleId")`. Same root cause: `Violation` is a type
+   alias. Also requires the cascading retype of `Violation.rule_id`
+   from `string` to `RuleId`, with knock-on changes across the cli
+   command modules and ~30 vitest fixtures that build `Violation`
+   objects with raw-string `rule_id`. Recommended Phase 7 sequencing:
+   first land class-shape selector support for type aliases (or
+   migrate `Violation` to a class), then re-introduce the contract.
+
+All three are tracked here as Phase 7 follow-ups; no source change
+to `Violation` / `ContractManifest` / `ViolationReport` was applied
+in Phase 2.
 
 ---
 
