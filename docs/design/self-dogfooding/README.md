@@ -1,0 +1,288 @@
+# Self-Dogfooding Plan — Stele Adopts Its Own Full Toolkit
+
+**Status:** draft (pre-review)
+**Date:** 2026-05-24
+**Owner:** main agent
+**Tracking ID:** `selfdogfood-2026Q2`
+
+## Why this document exists
+
+Stele currently uses **2 of the 14 mechanisms** it advertises on its own
+source code (`invariant` + custom `checker`, plus partial use of
+`architecture` + `core-node` via the auto-generated DDD profile). The
+other 12 mechanisms are built, tested, exported as npm packages, and
+documented — but **zero contracts in `contract/main.stele` use them on
+Stele's own code**.
+
+This is unacceptable for a product that says "AI agents can't break
+your contracts": Stele must hold itself to the same bar it asks of
+adopters. This document plans the work to close that gap.
+
+The plan is intentionally **detailed enough that a sub-agent can
+execute any phase without drift**. Each phase below specifies:
+
+- Exact scope (what's in / out)
+- Required architectural changes (with file paths and signatures)
+- Every new contract to be written (with the exact CDL form)
+- Negative test obligations
+- Acceptance criteria (commands + expected output)
+- Rollback strategy if the phase fails review
+- Cross-phase invariants that must hold
+
+Anything not explicitly stated here is **out of scope** for that
+phase and must be deferred to a future round.
+
+## Definitions used throughout this document
+
+- **Mechanism**: one of Stele's 14 advertised contract types (see
+  `docs/spec/cdl.md` § Top-level declarations). The 14 are:
+  `metadata` / `import` / `operator` / `checker` / `group` /
+  `invariant` / `scenario` / `boundary` / `class-shape` /
+  `function-shape` / `type-policy` / `file-policy` / `architecture` /
+  `core-node` / `branded-id` / `smart-ctor` / `trace-policy` /
+  `type-state` / `type-state-binding` / `effect-declarations` /
+  `effect-annotation` / `effect-policy` / `effect-suppression` /
+  `extern-alias`. (That's actually 23 forms — the 14 we count
+  excludes `metadata` / `import` / `operator` / `checker` / `group` /
+  `scenario` / `extern-alias` / `effect-declarations` /
+  `effect-annotation` / `effect-suppression` / `type-state-binding`
+  which are either framework plumbing or sub-declarations of other
+  forms. The 12 unused-on-Stele are listed below.)
+
+- **The 12 unused mechanisms on Stele itself** (the target of this work):
+  1. `trace-policy`
+  2. `type-state`
+  3. `type-state-binding`
+  4. `effect-declarations` (declares the effect alphabet)
+  5. `effect-annotation`
+  6. `effect-policy`
+  7. `effect-suppression`
+  8. `boundary` (code-shape)
+  9. `class-shape`
+  10. `function-shape`
+  11. `type-policy`
+  12. `file-policy`
+
+  Plus partially-used:
+  - `branded-id` / `smart-ctor` — declared in
+    `contract/generated/ddd-typedriven.stele` but 0 real call sites
+    in source.
+
+- **Stele project = the target**: the contracts written in this plan
+  go in `contract/main.stele` (or new `contract/modules/*.stele`
+  files imported by main) of THIS repo and apply to THIS repo's
+  source tree.
+
+- **Phase / Step / Acceptance / Negative test**: terms from the
+  existing rounds (Round 4 onwards) — same semantics.
+
+## The architectural blocker (Phase 0 must come first)
+
+`stele.config.json` has a single `targetLanguage` field. Today it's
+`"python"` for this repo because the 42 self-protection checkers are
+Python and run under pytest. **But the Phase B evaluators (trace /
+type-state / effect) dispatch on the same `targetLanguage` field** —
+which means you can't write a TypeScript `trace-policy` for THIS
+repo's TS source while keeping pytest as the test runner.
+
+**The fix** (Phase 0): allow `stele.config.json` to declare a
+per-phase language override:
+
+```jsonc
+{
+  "targetLanguage": "python",
+  "testFramework": "pytest",
+  "phaseLanguages": {
+    "trace": "typescript",
+    "typeState": "typescript",
+    "effect": "typescript",
+    "codeShape": "both",         // 注意：code-shape 已经按 declaration.lang dispatch；这字段只控制 default
+    "architecture": "typescript" // (already implicit today via design profile)
+  },
+  "tsconfig": "tsconfig.base.json"
+}
+```
+
+Without Phase 0, Phases 3 / 4 / 5 cannot land — they're literally
+blocked by the dispatch logic. So Phase 0 is non-optional.
+
+## Plan structure
+
+| Phase | Topic | Mechanism(s) Covered | Estimated Effort | Blocks |
+|---|---|---|---|---|
+| **0** | Multi-language config infrastructure | (none — plumbing) | 1.5–2 days | 3, 4, 5 |
+| **1** | branded-id / smart-ctor real adoption | `branded-id`, `smart-ctor` (existing 5 + 1 new) | 3–4 days | (none) |
+| **2** | Code-shape rules | `boundary`, `class-shape`, `function-shape`, `type-policy`, `file-policy` | 3 days | 6 |
+| **3** | Trace-policy rules | `trace-policy` | 3 days | (none) |
+| **4** | Effect-policy rules + alphabet + annotations + suppressions | `effect-declarations`, `effect-annotation`, `effect-policy`, `effect-suppression` | 3–4 days | (none) |
+| **5** | Type-state lifecycles | `type-state`, `type-state-binding` | 4 days | (none) |
+| **6** | DDD aggregate-root strengthening (class-shape applied to aggregates) | reuses `class-shape` | 1.5 days | — |
+| **7** | Documentation + Round 15+ independent reviewer cycle | — | 2–3 days + reviewer turn-around | — |
+
+**Total estimated effort:** 21–24 working days, plus reviewer
+turn-around in Phase 7.
+
+**Total expected new invariants:** ~42 (project goes from 42 → ~84).
+**Total expected new negative tests:** ~42 (project goes from 59 → ~101).
+
+## Phase documents
+
+Each phase has its own document with full implementation detail:
+
+- [phase-0-multi-language-config.md](phase-0-multi-language-config.md)
+- [phase-1-branded-types.md](phase-1-branded-types.md)
+- [phase-2-code-shape.md](phase-2-code-shape.md)
+- [phase-3-trace-policy.md](phase-3-trace-policy.md)
+- [phase-4-effect-policy.md](phase-4-effect-policy.md)
+- [phase-5-type-state.md](phase-5-type-state.md)
+- [phase-6-aggregate-root-shapes.md](phase-6-aggregate-root-shapes.md)
+- [phase-7-docs-and-review.md](phase-7-docs-and-review.md)
+
+## Cross-cutting rules (apply to all phases)
+
+These rules apply to every phase. A sub-agent executing any phase
+must respect them.
+
+### CC-1 No silent skipping
+
+If a step in a phase fails, **stop the phase and surface the
+failure**. Do not skip steps. The phase document marks every step
+"required" or "optional"; the optional ones may be skipped only if
+explicitly noted.
+
+### CC-2 Negative test obligation
+
+Every new invariant / checker / contract MUST have a paired negative
+test in `contract/checker_impls/test_negative.py` (or its TypeScript
+equivalent for non-Python checkers, if applicable). The negative test
+must:
+
+1. Mutate something in source to violate the contract
+2. Run the checker
+3. Assert it fails with the expected violation id
+4. Restore the original source
+
+No exceptions. A phase is not complete until all its negative tests
+pass.
+
+### CC-3 Stele check + pytest must stay green
+
+After every step in a phase, the following must all return exit 0:
+
+```
+pnpm build
+node packages/cli/dist/index.js check
+.venv/bin/python -m pytest tests/contract -q
+.venv/bin/python contract/checker_impls/test_negative.py
+```
+
+If any goes red, the step is incomplete.
+
+### CC-4 No backward-compat shims
+
+Any source change made under this plan MUST be a clean cut (per
+CLAUDE.md). No `// removed:` markers, no compat shims, no temporary
+flags. If the change is too big for a single commit, split it into
+multiple commits where each commit is itself green.
+
+### CC-5 No new tests are deleted to make a phase pass
+
+If a phase change breaks an existing test, the FIX is to either:
+(a) update the test to assert the NEW correct behavior, or
+(b) revise the phase to preserve the old behavior.
+
+Deleting tests to make the phase pass is forbidden.
+
+### CC-6 Lockstep manifest discipline
+
+After every phase:
+
+1. `node packages/cli/dist/index.js lock --reason "Phase N: <summary>"`
+2. Commit the manifest change in the SAME commit as the source change
+3. Verify `stele check` exits 0
+
+### CC-7 Single-author commit + Co-Authored-By footer
+
+Each phase produces ONE commit (or a small series, e.g. 1 architecture +
+1 contract + 1 source). All commits end with:
+
+```
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+```
+
+### CC-8 No new dependencies
+
+This plan introduces NO new npm dependencies. If a phase needs a
+library not already present, the phase must be redesigned.
+
+### CC-9 No targetLanguage change without approval
+
+Phase 0 introduces `phaseLanguages` as an ADDITIONAL field. The
+existing `targetLanguage: "python"` for this repo MUST NOT change.
+
+### CC-10 Reviewer cycle is non-optional
+
+Phase 7 is mandatory. The plan is not "done" until at least one
+independent reviewer round (Round 15+) returns 0 substantive
+findings. Reviewer findings get fixed in additional commits, not
+silenced.
+
+## Risk register
+
+| Risk | Mitigation | Phase |
+|---|---|---|
+| `phaseLanguages` introduces breaking change for adopters | Make the field optional with safe defaults; document migration | 0 |
+| branded-id mass adoption triggers 100+ TS errors | Land branded types one type at a time (5 sub-commits) | 1 |
+| Trace-policy on this repo is slow (call-graph extraction) | Add cache; benchmark before/after | 3 |
+| Effect-policy too aggressive — flags hash-manifest.ts | Pre-write the `effect-suppression` declarations | 4 |
+| Type-state requires core-type refactor (Manifest / Approval) | Land Phase 5 BEHIND Phase 1 (branded types already done) so the refactor surface is well-typed | 5 |
+| Reviewer rounds find HIGH bypass that requires re-doing a Phase | Plan the reviewer turn-around explicitly in Phase 7 — budget 2 review rounds | 7 |
+
+## Out of scope
+
+These items are explicitly NOT part of this plan:
+
+- Adding Phase B support for Go / Rust / Java (separate roadmap item)
+- Switching `targetLanguage` away from `"python"`
+- New evaluator packages
+- New CDL forms beyond the 23 already shipped
+- npm publishing prep
+- Performance tuning of generated tests
+- IDE plugin work
+- Adopting these contracts in user-facing fixtures (`examples/finance-guard/`, etc.)
+
+## Decision log (must be appended as work progresses)
+
+Append every non-trivial decision here with date + brief rationale.
+The decision log is part of the plan and is reviewed in Phase 7.
+
+(empty — to be filled in during implementation)
+
+---
+
+## Execution model
+
+This document is executed by a series of sub-agents (one per phase).
+The main agent:
+
+1. Reads this README.md and the per-phase document
+2. Spawns a sub-agent with the per-phase document as input
+3. Receives the sub-agent's completion report
+4. Verifies CC-3 (all green) before moving to the next phase
+5. After all phases: spawns the reviewer sub-agent for Phase 7
+
+A sub-agent that is asked to execute a phase MUST:
+
+- Read this README.md first
+- Read its phase document
+- Refuse to take actions not specified by the phase document
+- Surface any ambiguity in writing before acting
+- Run CC-3 before and after every step
+- Return a detailed completion report to the main agent
+
+A sub-agent may NOT:
+
+- Skip required steps
+- Modify the plan documents themselves (only the main agent can)
+- Open new scope from "while I'm here, this looks bad" — file a
+  Phase 7 follow-up note instead
