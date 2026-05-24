@@ -733,6 +733,19 @@
 ; (deferred follow-up work, not blocking).
 ; ============================================================================
 
+(type-state APPROVAL_LIFECYCLE
+  (description "An Approval record cannot be written to disk before the human-identity gate has run. Lifecycle: Drafting (created from raw payload) → IdentityChecked (resolveApprovedBy passed) → Signed (writeFileSync persisted). The on-disk path must only ever see a Signed approval.")
+  (target "packages/cli/src/commands/design/approval-lifecycle.ts::Approval")
+  (severity "error")
+  (states Drafting IdentityChecked Signed)
+  (initial Drafting)
+  (terminal Signed)
+  (transition (from Drafting) (via attachApprovedBy) (to IdentityChecked))
+  (transition (from IdentityChecked) (via signApproval) (to Signed))
+  (allowed-ops Drafting attachApprovedBy)
+  (allowed-ops IdentityChecked signApproval)
+  (fix-hint "Route the approval through `draftApproval(...)` → `attachApprovedBy(...)` → `signApproval(...)` in `packages/cli/src/commands/design/approval-lifecycle.ts`; the persist site must only accept `Approval<\"Signed\">`. If the lifecycle itself is wrong, propose an update via `stele design propose --type-state APPROVAL_LIFECYCLE` — do NOT edit the contract directly."))
+
 (type-state MANIFEST_LIFECYCLE
   (description "Stele's ContractManifest is born Unloaded, becomes Loaded once parsed from disk, Locked once written via writeAtomic, and Verified once the on-disk SHA-256 set has been re-validated. Skipping a step is a violation of the lifecycle.")
   (target "packages/core/src/manifest/lifecycle.ts::Manifest")
