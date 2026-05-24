@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+# Round 15 HIGH finding: a `return` statement inside a pytest test function
+# is silently ignored — the test is recorded as PASSED no matter what value
+# it returns. Promote that warning to an error so any future test that uses
+# `return True/False` instead of `assert ...` fails loudly.
+filterwarnings = [
+    "error::pytest.PytestReturnNotNoneWarning",
+]
