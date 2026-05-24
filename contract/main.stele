@@ -608,4 +608,17 @@
   (scope "packages/cli/src/commands/check.ts")
   (fix-hint "[A] Call `loadContract(resolve(projectDir, config.entry))` before constructing the context in `packages/cli/src/commands/check.ts:161`. [B] If a different loader is needed, declare an extern-alias and route through it."))
 
+; 3.3 — In generate.ts, every writeAtomic call must be preceded in the same
+; caller body by a call to coordinateGeneration. Without the coordinator,
+; backend output isn't validated against the contract before being written;
+; this is the body-level expression of "generate must go through the
+; coordinator before any generated file lands on disk".
+(trace-policy GENERATE_VIA_COORDINATOR
+  (description "runGenerate must call coordinateGeneration before any writeAtomic — backend output must transit the core coordinator.")
+  (severity "error")
+  (target "extern:stele-core::writeAtomic(*)")
+  (must-be-preceded-by "extern:stele-core::coordinateGeneration(*)")
+  (scope "packages/cli/src/commands/generate.ts")
+  (fix-hint "[A] Call `coordinateGeneration(contract, backend, config)` before writing files in `packages/cli/src/commands/generate.ts:99`. [B] If the coordinator is broken, fix it — don't route around it."))
+
 (import "generated/ddd-typedriven.stele")
