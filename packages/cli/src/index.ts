@@ -3,9 +3,23 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { realpathSync } from "node:fs";
 import { posix } from "node:path";
 import { Command, Option } from "commander";
+import { commandName } from "@stele/core";
 
 export { DEFAULT_CONFIG, type SteleConfig } from "./config/defaults.js";
 export { loadConfig } from "./config/loadConfig.js";
+
+/**
+ * Phase 1.5 self-dogfooding helper: validate a CLI command name through
+ * the `commandName` smart constructor, then concatenate any positional
+ * argument spec (e.g. `<node-id>`, `[options]`) Commander accepts in the
+ * first argument of `program.command(...)`. The CommandName branded type
+ * only admits lowercase-with-dashes — positional specs would fail the
+ * shape check, so we keep them outside the brand.
+ */
+function cmdSpec(name: string, positional = ""): string {
+  const validated = commandName(name);
+  return positional ? `${validated} ${positional}` : validated;
+}
 
 import { runAddChecker } from "./commands/addChecker.js";
 import { formatCacheClean, formatCacheInfo, runCacheClean, runCacheInfo } from "./commands/cache.js";
@@ -107,11 +121,11 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       program.help();
     });
 
-  program.command("version").description("Print Stele CLI version.").action(() => {
+  program.command(cmdSpec("version")).description("Print Stele CLI version.").action(() => {
     process.stdout.write(formatVersion());
   });
   program
-    .command("baseline-init")
+    .command(cmdSpec("baseline-init"))
     .description("Initialize a baseline to suppress known contract violations.")
     .requiredOption("--reason <reason>", "reason for creating the baseline")
     .action(async (options: BaselineCommandOptions) => {
@@ -121,7 +135,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }
     });
   program
-    .command("baseline-update")
+    .command(cmdSpec("baseline-update"))
     .description("Update an existing baseline with the latest contract state.")
     .requiredOption("--reason <reason>", "reason for updating the baseline")
     .action(async (options: BaselineCommandOptions) => {
@@ -131,7 +145,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }
     });
   program
-    .command("check")
+    .command(cmdSpec("check"))
     .description("Verify contract invariants against generated tests and protected files.")
     .option("--diff [ref]", "only check invariants in contract files that changed since the given git ref (default: HEAD)")
     .option("--diff-from <base>", "limit failures to files changed since the given git base")
@@ -192,7 +206,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }
     });
   program
-    .command("generate")
+    .command(cmdSpec("generate"))
     .description("Generate contract test files from the contract source.")
     .option("--force", "ignore the incremental cache; regenerate every file")
     .option("--no-cache", "skip cache (do not read or write); always regenerate")
@@ -230,7 +244,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }
     });
   program
-    .command("lock")
+    .command(cmdSpec("lock"))
     .description("Lock the manifest by recording SHA-256 hashes of all protected files.")
     .option("--reason <reason>", "reason for locking the manifest")
     .option("--json", "emit aggregate JSON output (only with --recursive)")
@@ -259,7 +273,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }
     });
   program
-    .command("list")
+    .command(cmdSpec("list"))
     .description("List all contract invariants with their metadata.")
     .option("--severity <severity>", "filter by severity level")
     .option("--category <category>", "filter by category")
@@ -267,12 +281,12 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--format <format>", "output format (table|json)", "table")
     .action((options) => list(cwd(), options));
   program
-    .command("rules")
+    .command(cmdSpec("rules"))
     .description("Display the contract rule inventory with severity and category details.")
     .option("--json", "emit machine-readable rule inventory")
     .action((options: RulesOptions) => rules(cwd(), options));
   const explainCommand = program
-    .command("explain")
+    .command(cmdSpec("explain"))
     .description("Explain a contract rule or effect propagation chain.");
   explainCommand
     .argument("[id]", "invariant id (or use a subcommand)")
@@ -285,7 +299,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       await explain(cwd(), id, options);
     });
   const effectSubcommand = explainCommand
-    .command("effect <node-id>")
+    .command(cmdSpec("effect", "<node-id>"))
     .description("Show effect propagation chain and applicable policies for a node.")
     .option("--no-cache", "force re-extraction of the call graph (skip on-disk cache).")
     .action(async (nodeId: string) => {
@@ -308,24 +322,24 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }
     });
   program
-    .command("agent-context")
+    .command(cmdSpec("agent-context"))
     .description("Generate context for AI agents about the current contract state.")
     .option("--json", "emit machine-readable agent context")
     .option("--focus <paths...>", "focus context on one or more changed files")
     .action((options: AgentContextOptions) => agentContext(cwd(), options));
   program
-    .command("why <id-or-fingerprint>")
+    .command(cmdSpec("why", "<id-or-fingerprint>"))
     .description("Show the rationale behind a contract violation.")
     .option("--json", "emit machine-readable why output")
     .action((idOrFingerprint, options: WhyOptions) => why(cwd(), idOrFingerprint, options));
   program
-    .command("add-checker <checker-id>")
+    .command(cmdSpec("add-checker", "<checker-id>"))
     .description("Add a new checker implementation for external validation.")
     .action((checkerId) => addChecker(cwd(), checkerId));
   program
-    .command("propose")
+    .command(cmdSpec("propose"))
     .description("Add contract knowledge through constrained proposal commands.")
-    .command("invariant")
+    .command(cmdSpec("invariant"))
     .description("Propose a new contract invariant.")
     .requiredOption("--id <id>", "unique invariant identifier")
     .requiredOption("--severity <severity>", "severity level (error|warning|info)")
@@ -347,23 +361,23 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }),
     );
   program
-    .command("maintenance-summary")
+    .command(cmdSpec("maintenance-summary"))
     .description("Summarize contract maintenance activity across changes.")
     .option("--from <git-ref>", "compare against the given git reference")
     .option("--output <path>", "write the summary to a file")
     .action((options: MaintenanceSummaryOptions) => maintenanceSummary(cwd(), options));
   program
-    .command("observe")
+    .command(cmdSpec("observe"))
     .description("Analyze agent observation data for invariant health trends.")
     .option("--json", "emit the observation summary as JSON")
     .option("--since <iso-date>", "filter observations since the given ISO date")
     .action((options: ObserveOptions) => observe(cwd(), options));
   program
-    .command("mcp")
+    .command(cmdSpec("mcp"))
     .description("Start MCP server for AI agent integration")
     .action(() => startMcpServer());
   program
-    .command("init")
+    .command(cmdSpec("init"))
     .description("Initialize Stele in the current project.")
     .addOption(new Option("--language <language>", "target language").default("python").choices(SUPPORTED_LANGUAGES))
     .option("--dry-run", "show what files would be created without writing")
@@ -371,14 +385,14 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--ci <provider>", "add CI workflow (github-actions|gitlab-ci)")
     .action((options) => init(cwd(), options));
   program
-    .command("dev")
+    .command(cmdSpec("dev"))
     .description("Watch for contract changes and auto-regenerate")
     .option("--once", "run once and exit (no watch)")
     .action(async (options: DevOptions) => {
       await runDev(cwd(), options);
     });
   program
-    .command("unlock")
+    .command(cmdSpec("unlock"))
     .description("Temporarily remove manifest and baseline locks (emergency only)")
     .requiredOption("--reason <reason>")
     .option("--confirm")
@@ -400,7 +414,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       }
     });
   program
-    .command("doc")
+    .command(cmdSpec("doc"))
     .description("Generate contract documentation")
     .option("--format <format>", "output format (markdown|html)", "markdown")
     .option("--output <path>", "output directory")
@@ -408,7 +422,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
       await runDoc(cwd(), options);
     });
   program
-    .command("score")
+    .command(cmdSpec("score"))
     .description("Compute a 0-10 contract health score.")
     .option("--json", "emit score as JSON")
     .option("--threshold <n>", "fail with exit code 6 if score is below threshold", parseFloat)
@@ -417,11 +431,11 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     });
 
   const complexityCommand = program
-    .command("complexity")
+    .command(cmdSpec("complexity"))
     .description("Analyze code complexity and core-node metrics.");
 
   complexityCommand
-    .command("suggest")
+    .command(cmdSpec("suggest"))
     .description("Scan project for classes that should have core-node contracts.")
     .option("--json", "emit JSON output")
     .option("--output <path>", "write results to a file")
@@ -430,7 +444,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     });
 
   complexityCommand
-    .command("measure")
+    .command(cmdSpec("measure"))
     .description("Measure declared core-node metrics.")
     .option("--json", "emit JSON output")
     .option("--output <path>", "write results to a file")
@@ -439,7 +453,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     });
 
   program
-    .command("install")
+    .command(cmdSpec("install"))
     .description("Install Stele integration with an agent IDE (currently: cursor).")
     .requiredOption("--agent <name>", "agent name (cursor | claude-code | continue-dev)")
     .option("--enable-shell", "Enable composer-rule shell hooks (Cursor only)", false)
@@ -451,11 +465,11 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   addDesignCommand(program);
 
   const cacheCommand = program
-    .command("cache")
+    .command(cmdSpec("cache"))
     .description("Manage Stele incremental generation cache (contract/.cache/hash-manifest.json).");
 
   cacheCommand
-    .command("clean")
+    .command(cmdSpec("clean"))
     .description("Delete contract/.cache/hash-manifest.json (forces full regeneration on next 'stele generate').")
     .action(async () => {
       const result = await runCacheClean(cwd());
@@ -463,7 +477,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     });
 
   cacheCommand
-    .command("info")
+    .command(cmdSpec("info"))
     .description("Show incremental cache stats (entries, size, generated_at).")
     .action(async () => {
       const result = await runCacheInfo(cwd());

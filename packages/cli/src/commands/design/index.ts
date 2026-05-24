@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { commandName } from "@stele/core";
 import { runDesignInit } from "./init.js";
 import { runDesignGenerate } from "./generate.js";
 import { runDesignCheck } from "./check.js";
@@ -8,7 +9,7 @@ import { runDesignPropose } from "./propose.js";
 import { runDesignApprove } from "./approve.js";
 
 export function addDesignCommand(program: Command): void {
-  const cmd = new Command("design");
+  const cmd = new Command(commandName("design"));
   cmd.description("Manage DDD + Type-Driven design profiles");
 
   cmd.addCommand(makeInitCmd());
@@ -23,7 +24,7 @@ export function addDesignCommand(program: Command): void {
 }
 
 function makeInitCmd(): Command {
-  const cmd = new Command("init");
+  const cmd = new Command(commandName("init"));
   cmd.description("Create a design profile from a preset");
   cmd.option("--preset <name>", "preset name (e.g. ddd-typedriven)");
   cmd.option("--answers <path>", "path to answers YAML file");
@@ -35,7 +36,7 @@ function makeInitCmd(): Command {
 }
 
 function makeGenerateCmd(): Command {
-  const cmd = new Command("generate");
+  const cmd = new Command(commandName("generate"));
   cmd.description("Compile design profile into generated contracts");
   cmd.option("--dry-run", "show output without writing");
   cmd.option("--force", "force overwrite of generated outputs");
@@ -45,7 +46,7 @@ function makeGenerateCmd(): Command {
 }
 
 function makeCheckCmd(): Command {
-  const cmd = new Command("check");
+  const cmd = new Command(commandName("check"));
   cmd.description("Verify design profile integrity and generated-output drift");
   cmd.option("--profile-only", "validate schema and paths without requiring generation");
   cmd.option("--json", "output JSON");
@@ -54,7 +55,7 @@ function makeCheckCmd(): Command {
 }
 
 function makeExplainCmd(): Command {
-  const cmd = new Command("explain");
+  const cmd = new Command(commandName("explain"));
   cmd.description("Explain a generated rule's design profile origin");
   cmd.argument("<target>", 'e.g. "context:billing", "rule:architecture.ddd.billing.domain.infrastructure", "type:InvoiceId"');
   cmd.option("--json", "output JSON");
@@ -63,7 +64,7 @@ function makeExplainCmd(): Command {
 }
 
 function makeDiffCmd(): Command {
-  const cmd = new Command("diff");
+  const cmd = new Command(commandName("diff"));
   cmd.description("Compare two design profiles and classify changes");
   cmd.option("--from <ref>", "base commit or ref (e.g. main)");
   cmd.option("--json", "output JSON");
@@ -72,7 +73,7 @@ function makeDiffCmd(): Command {
 }
 
 function makeProposeCmd(): Command {
-  const cmd = new Command("propose");
+  const cmd = new Command(commandName("propose"));
   cmd.description("Propose an add-only design change (agent-safe path)");
   cmd.argument(
     "<type>",
@@ -90,7 +91,7 @@ function makeProposeCmd(): Command {
 }
 
 function makeApproveCmd(): Command {
-  const cmd = new Command("approve");
+  const cmd = new Command(commandName("approve"));
   cmd.description("Write explicit approval evidence for reviewed profile changes");
   cmd.option("--from <ref>", "base commit or ref");
   cmd.option("--reason <text>", "reason for approval");
