@@ -554,4 +554,14 @@
   (target "packages/core/src/**/*.ts")
   (deny-type "any"))
 
+; --- §2.5 file-policy contracts -----------------------------------------------
+; Targets only the hook ENTRYPOINT scripts (not the shared helper modules
+; `bash-extractors.js` / `path-utils.js` / `shell-utils.js` which are
+; module-side ESM imports and do not need a shebang).
+
+(file-policy hook-scripts-shebang
+  (lang typescript)
+  (target "packages/claude-code-plugin/scripts/{pre-tool-protect,stop-validate,observation-hook,lifecycle-context}.js")
+  (must-contain "#!/usr/bin/env node"))
+
 (import "generated/ddd-typedriven.stele")

@@ -1697,6 +1697,16 @@ def test_no_any_in_core_catches_any_annotation():
     )
 
 
+def test_hook_scripts_shebang_catches_missing_shebang():
+    """Phase 2.5: removing the `#!/usr/bin/env node` shebang from one of
+    the four hook entrypoint scripts must trip the file-policy."""
+    return _mutate_then_check(
+        "packages/claude-code-plugin/scripts/observation-hook.js",
+        lambda text: text.replace("#!/usr/bin/env node\n", "", 1),
+        "hook-scripts-shebang",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1802,6 +1812,7 @@ def main() -> int:
         ("stop_validate_fail_closed_catches_missing_blockStop_call", test_stop_validate_fail_closed_catches_missing_blockStop_call),
         ("write_atomic_has_rename_catches_missing_rename_call", test_write_atomic_has_rename_catches_missing_rename_call),
         ("no_any_in_core_catches_any_annotation", test_no_any_in_core_catches_any_annotation),
+        ("hook_scripts_shebang_catches_missing_shebang", test_hook_scripts_shebang_catches_missing_shebang),
     ]
 
     print("=" * 60)
