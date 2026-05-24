@@ -592,4 +592,20 @@
   (exempt "packages/core/src/manifest/hash-manifest.ts::writeAtomic(2)" (reason "writeAtomic IS the atomic wrapper; the policy exists to force callers into it."))
   (fix-hint "[A] Route the write through `writeAtomic` in `packages/core/src/manifest/hash-manifest.ts`. [B] If the call site legitimately needs a non-atomic write, add an explicit exempt entry here."))
 
+; 3.2 — In check.ts, prepareCheckContextWithContract must be preceded in the
+; same caller body by a call to loadContract. The phase doc's literal
+; (target "runCheck") (must-transit "loadContract") form cannot fire because
+; the call graph has no in-scope callers of runCheck (Commander registers it
+; via property assignment, which the extractor does not model as a call edge).
+; This must-be-preceded-by form expresses the same intent at the body level:
+; the only legitimate path into prepareCheckContextWithContract is to first
+; load the contract.
+(trace-policy CHECK_PREPARE_VIA_LOAD_CONTRACT
+  (description "prepareCheckContextWithContract callers in check.ts must call loadContract first.")
+  (severity "error")
+  (target "packages/cli/src/commands/check.ts::prepareCheckContextWithContract(*)")
+  (must-be-preceded-by "extern:stele-core::loadContract(*)")
+  (scope "packages/cli/src/commands/check.ts")
+  (fix-hint "[A] Call `loadContract(resolve(projectDir, config.entry))` before constructing the context in `packages/cli/src/commands/check.ts:161`. [B] If a different loader is needed, declare an extern-alias and route through it."))
+
 (import "generated/ddd-typedriven.stele")
