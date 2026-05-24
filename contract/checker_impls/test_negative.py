@@ -1877,6 +1877,109 @@ def test_approve_via_resolve_approved_by_catches_bypass():
 
 
 # ---------------------------------------------------------------------------
+# Phase 5 (self-dogfooding plan): type-state lifecycle negative tests.
+#
+# The Phase 5 type-state lifecycles are enforced primarily at TypeScript
+# compile time via state-keyed phantom brands (reviewer V-05). The
+# matching .test-d.ts files pin `@ts-expect-error` comments at sites
+# where the brand discriminator is supposed to fire. The negative test
+# for each lifecycle removes ONE pin, runs `tsc --noEmit`, asserts a
+# TS2345 argument-not-assignable error surfaces, and restores the file.
+#
+# If the brand stops firing (i.e. tsc returns 0 after pin removal),
+# the lifecycle's compile-time guarantee has regressed and the
+# negative test fails.
+# ---------------------------------------------------------------------------
+
+
+def _type_state_brand_negative(
+    test_d_relpath: str,
+    pin_marker: str,
+    typecheck_filter: str,
+) -> bool:
+    """Remove ONE `@ts-expect-error` line in a .test-d.ts file and assert
+    that the immediately-following call no longer compiles.
+
+    `pin_marker` is the EXACT comment text on the line being neutralized.
+    `typecheck_filter` is a pnpm --filter target (e.g. @stele/core).
+    """
+    target = sp._REPO_ROOT / test_d_relpath
+    original = target.read_text(encoding="utf-8")
+    if pin_marker not in original:
+        print(f"  MISS: {test_d_relpath} — pin marker not present in source")
+        return False
+    # Replace the marker line with an inert comment so tsc must surface
+    # the underlying error.
+    mutated = original.replace(
+        f"// {pin_marker}",
+        "// (neutralised by phase-5 negative test)",
+        1,
+    )
+    if mutated == original:
+        print(f"  MISS: {test_d_relpath} — replacement no-op")
+        return False
+    target.write_text(mutated, encoding="utf-8")
+    try:
+        proc = subprocess.run(
+            ["pnpm", "--filter", typecheck_filter, "typecheck"],
+            cwd=str(sp._REPO_ROOT),
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        target.write_text(original, encoding="utf-8")
+    if proc.returncode == 0:
+        print(f"  MISS: {test_d_relpath} — typecheck succeeded after pin removal (brand is broken)")
+        return False
+    if "TS2345" not in (proc.stdout + proc.stderr):
+        print(f"  MISS: {test_d_relpath} — expected TS2345 not in output: {(proc.stdout + proc.stderr)[:300]}")
+        return False
+    print(f"  OK: {test_d_relpath} — brand fires (TS2345 after pin removal)")
+    return True
+
+
+def test_manifest_lifecycle_brand_fires():
+    """Phase 5.1: removing the `@ts-expect-error` pin on the
+    Loaded→Locked illegal transition in manifest-lifecycle.test-d.ts
+    must surface a TS2345 error from `tsc --noEmit`."""
+    return _type_state_brand_negative(
+        "packages/core/tests/manifest-lifecycle.test-d.ts",
+        "@ts-expect-error — Loaded cannot be passed where Locked is required",
+        "@stele/core",
+    )
+
+
+def test_approval_lifecycle_brand_fires():
+    """Phase 5.2: removing the pin on the Drafting→Signed illegal
+    transition in approval-lifecycle.test-d.ts must surface TS2345."""
+    return _type_state_brand_negative(
+        "packages/cli/tests/approval-lifecycle.test-d.ts",
+        "@ts-expect-error — Drafting cannot be passed where IdentityChecked is required",
+        "@stele/cli",
+    )
+
+
+def test_design_profile_lifecycle_brand_fires():
+    """Phase 5.3: removing the pin on the Raw→Hashed illegal transition
+    in design-profile-lifecycle.test-d.ts must surface TS2345."""
+    return _type_state_brand_negative(
+        "packages/cli/tests/design-profile-lifecycle.test-d.ts",
+        "@ts-expect-error — Raw cannot be passed where Validated is required",
+        "@stele/cli",
+    )
+
+
+def test_callgraph_lifecycle_brand_fires():
+    """Phase 5.4: removing the pin on the Empty→Built illegal transition
+    in callgraph-lifecycle.test-d.ts must surface TS2345."""
+    return _type_state_brand_negative(
+        "packages/call-graph-core/tests/callgraph-lifecycle.test-d.ts",
+        "@ts-expect-error — Empty cannot be passed where Building is required",
+        "@stele/call-graph-core",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1992,6 +2095,11 @@ def main() -> int:
         ("hook_no_network_catches_fetch_in_hook_script", test_hook_no_network_catches_fetch_in_hook_script),
         ("generator_no_network_or_child_process_catches_execfile", test_generator_no_network_or_child_process_catches_execfile),
         ("manifest_leaves_are_pinned_catches_extra_effect", test_manifest_leaves_are_pinned_catches_extra_effect),
+        # Phase 5 (self-dogfooding plan): type-state brand discriminator tests.
+        ("manifest_lifecycle_brand_fires", test_manifest_lifecycle_brand_fires),
+        ("approval_lifecycle_brand_fires", test_approval_lifecycle_brand_fires),
+        ("design_profile_lifecycle_brand_fires", test_design_profile_lifecycle_brand_fires),
+        ("callgraph_lifecycle_brand_fires", test_callgraph_lifecycle_brand_fires),
     ]
 
     print("=" * 60)

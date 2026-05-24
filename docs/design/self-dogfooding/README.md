@@ -571,6 +571,104 @@ cache) plus the propagation pass — Round 2 MC-7 bounds propagation at
 `O(|edges| + |nodes|)`, so the projected cost is in the 1–2 s range
 on this 9.3k-node × 41k-edge graph.
 
+### 2026-05-25 — Phase 5 sub-agent
+
+- **All four type-state lifecycles landed compile-time enforcement.**
+  Each lifecycle ships a `lifecycle.ts` module with a state-keyed
+  `StateBrand<S>` (per reviewer V-05) and a paired `.test-d.ts` file
+  that pins three `@ts-expect-error` sites. The proof step (remove a
+  pin, run `pnpm --filter <pkg> typecheck`, see a TS2345
+  argument-not-assignable error) was executed manually for every
+  landed lifecycle; the brand discriminator fires correctly in all
+  four cases. Lifecycles landed:
+  1. MANIFEST_LIFECYCLE — `packages/core/src/manifest/lifecycle.ts` —
+     Unloaded → Loaded → Locked → Verified.
+  2. APPROVAL_LIFECYCLE —
+     `packages/cli/src/commands/design/approval-lifecycle.ts` —
+     Drafting → IdentityChecked → Signed.
+  3. DESIGN_PROFILE_LIFECYCLE —
+     `packages/cli/src/design-profile/lifecycle.ts` — Raw → Validated
+     → Hashed (the Hashed pair carries the profile + Sha256 hash).
+  4. CALLGRAPH_LIFECYCLE —
+     `packages/call-graph-core/src/lifecycle.ts` — Empty → Building →
+     Built → Cached.
+
+- **`@stele/type-state-evaluator` matches zero call sites today.** The
+  evaluator's TS inference extractor only handles
+  `receiver.method(...)` call expressions whose receiver type
+  instantiates one of `decl.target`'s methods (see
+  `packages/backend-typescript/src/extractors/type-state-inference.ts`
+  §`inferInSourceFile`). Production callers continue to use the
+  existing free-function APIs (`writeManifest(...)`,
+  `verifyManifest(...)`, `loadProfile(...)`, etc.); the typed
+  pipelines added in Phase 5 are not yet threaded through them. The
+  consequence: the CDL `(type-state ...)` declarations validate
+  structurally but the evaluator finds nothing to flag. This was
+  accepted per the prompt's instruction to defer >30-LOC refactors
+  to Phase 7. **Compile-time enforcement** is fully active for every
+  lifecycle; **evaluator-time enforcement** is documentation-only
+  until Phase 7 routes production callers through the typed methods.
+
+- **Negative tests use `tsc --noEmit` rather than `stele check`.**
+  The Phase 5 negative tests in
+  `contract/checker_impls/test_negative.py`
+  (`test_{manifest,approval,design_profile,callgraph}_lifecycle_brand_fires`)
+  mutate a single `@ts-expect-error` pin in the matching `.test-d.ts`
+  file, run `pnpm --filter <pkg> typecheck`, and assert that the
+  compiler surfaces a TS2345 argument-not-assignable error.
+  Restoration of the file is guaranteed via `try/finally`. This is
+  the natural shape for compile-time-only contracts; using
+  `stele check` would loop back through the evaluator and (per the
+  point above) find nothing.
+
+- **`packages/call-graph-core/tsconfig.json` widened to include
+  `tests/**`.** Previously the package's `rootDir` was `src` and the
+  include only matched `src/**/*.ts`, so a `.test-d.ts` file under
+  `tests/` would not participate in `typecheck`. Phase 5.4 dropped
+  the `rootDir` constraint (it was redundant — tsup builds
+  `src/index.ts` only, and the existing vitest tests already imported
+  from `../src/` without typecheck coverage) and widened the include
+  glob to `tests/**/*.ts`. No production-build artefact change; the
+  emitted dist/ shape is identical.
+
+- **Three pre-existing `stele check` errors persist throughout
+  Phase 5.** `[error] write-atomic-has-rename`,
+  `[error] trace.FS_WRITES_VIA_WRITE_ATOMIC.path_exceeded_max_depth`,
+  and `[error] trace.CHECK_PREPARE_VIA_LOAD_CONTRACT.missing_predecessor`
+  were already firing before Phase 5 began (the prompt's "48
+  invariants pass" pre-flight refers to the 48 RULE_KIND="rule"
+  checks; the Phase B stages have separate gating that was already
+  red). Phase 5 did NOT touch the underlying issues — they are
+  outside the lifecycle scope and Phase 7 / a follow-up will need to
+  re-land the `writeAtomic` rename call that Phase 4 inadvertently
+  regressed in commit `451a1d0` (see
+  `packages/core/src/manifest/hash-manifest.ts:218`).
+
+### Phase 5 deferred items (re-scope to Phase 7)
+
+- **Routing production call sites through the typed lifecycle
+  methods.** Today `writeManifest`, `verifyManifest`, `loadProfile`,
+  `validateProfile`, `hashFile`, and the call-graph extractor are
+  free-function APIs. Threading them through `asLoaded → lockManifest
+  → verifyLockedManifest` (and the analogous chains for the other
+  three lifecycles) would make the `@stele/type-state-evaluator`
+  catch wrong-state arguments at every real call site. Estimated
+  surface: ~3 sites for MANIFEST (`lock.ts`, `baseline.ts`,
+  `check-stages-protected.ts`), ~1 site for APPROVAL (`approve.ts`),
+  ~10–15 sites for DESIGN_PROFILE (every generate/check entry that
+  loads a profile), ~5–10 sites for CALLGRAPH (every evaluator
+  invocation). Each refactor exceeds the prompt's 30-LOC budget for
+  Phase 5; consolidated Phase 7 follow-up.
+
+- **`type-state-binding` declarations.** The Phase 5.1 phase document
+  proposes `(type-state-binding (target "...::writeManifest") (param 0
+  in-state Locked))` as a way to tell the evaluator "this caller has
+  already been audited; accept Locked here". The bindings are
+  meaningful only once production callers route through the typed
+  pipeline; without the upstream refactor the bindings would target
+  the free-function API and the evaluator would still match zero
+  call sites. Bindings deferred alongside the upstream refactor.
+
 ---
 
 ## Execution model
