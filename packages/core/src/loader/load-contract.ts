@@ -14,6 +14,7 @@ import { validateUniqueness } from "../validator/uniqueness.js";
 
 const MAX_IMPORT_DEPTH = 100;
 
+/** @stele:effects fs.read */
 export async function loadContract(rootPath: string): Promise<Contract> {
   const normalizedRootPath = resolve(rootPath);
   const projectDir = resolve(dirname(normalizedRootPath));

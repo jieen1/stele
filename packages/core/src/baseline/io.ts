@@ -5,10 +5,14 @@ import { writeAtomic } from "../manifest/hash-manifest.js";
 import { isPlainRecord } from "../util/types.js";
 import type { BaselineViolation, HumanState, ViolationBaseline } from "./types.js";
 
+/** @stele:effects fs.read */
 export async function readViolationBaseline(path: string): Promise<ViolationBaseline> {
   return parseViolationBaseline(path, await readFile(resolve(path), "utf8"));
 }
 
+/**
+ * Wraps readViolationBaseline; fs.read inherits via the call edge.
+ */
 export async function tryReadViolationBaseline(path: string): Promise<ViolationBaseline | undefined> {
   try {
     return await readViolationBaseline(path);
@@ -21,6 +25,10 @@ export async function tryReadViolationBaseline(path: string): Promise<ViolationB
   }
 }
 
+/**
+ * Wraps writeAtomic; fs.write / time / random inherit via the call edge
+ * and are audited via effect-suppression.
+ */
 export async function writeViolationBaseline(path: string, baseline: ViolationBaseline): Promise<void> {
   const absolutePath = resolve(path);
   await writeAtomic(absolutePath, `${JSON.stringify(baseline, null, 2)}\n`);

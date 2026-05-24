@@ -11,6 +11,7 @@ type ExistingGeneratedEntry = {
 
 export type { ExistingGeneratedEntry };
 
+/** @stele:effects fs.read */
 export async function collectExistingGeneratedEntries(
   projectRoot: string,
   outputDir: string,
@@ -36,6 +37,7 @@ export async function collectExistingGeneratedEntries(
   return entries;
 }
 
+/** @stele:effects fs.read */
 export async function walkGeneratedDirectory(
   directoryPath: string,
   projectRoot: string,
@@ -71,10 +73,12 @@ export async function walkGeneratedDirectory(
   return results;
 }
 
+/** @stele:effects fs.read */
 export async function readGeneratedFile(projectRoot: string, generatedPath: string): Promise<string> {
   return readFile(resolve(projectRoot, generatedPath), "utf8");
 }
 
+/** @stele:effects fs.read */
 export async function verifyFiles(
   projectRoot: string,
   outputDir: string,
