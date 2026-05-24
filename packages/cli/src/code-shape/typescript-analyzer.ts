@@ -99,8 +99,27 @@ export interface TsFileAnalysis {
   functions: TsFunction[];
 }
 
+function scriptKindFor(filePath: string): ts.ScriptKind {
+  if (filePath.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (filePath.endsWith(".js") || filePath.endsWith(".mjs") || filePath.endsWith(".cjs")) return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
 export function isTypeScriptFilePath(filePath: string): boolean {
-  return filePath.endsWith(".ts") || filePath.endsWith(".tsx");
+  // Phase 2 self-dogfooding: hook scripts under
+  // `packages/claude-code-plugin/scripts/*.js` are native ESM JS but ship as
+  // part of the TypeScript monorepo. Including .js / .mjs / .cjs lets a
+  // `(lang typescript)` code-shape declaration target them — the TS compiler
+  // API parses JS adequately for the shape checks (calls, classes, fields,
+  // imports). Files outside the explicit `(target …)` pattern remain
+  // filtered by minimatch upstream.
+  return (
+    filePath.endsWith(".ts") ||
+    filePath.endsWith(".tsx") ||
+    filePath.endsWith(".js") ||
+    filePath.endsWith(".mjs") ||
+    filePath.endsWith(".cjs")
+  );
 }
 
 export async function analyzeTypeScriptFiles(
@@ -129,7 +148,7 @@ export async function analyzeTypeScriptFiles(
         source,
         ts.ScriptTarget.ES2022,
         /* setParentNodes */ true,
-        relativePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+        scriptKindFor(relativePath),
       );
       fileAnalyses.push(analyzeSourceFile(sourceFile, relativePath));
     } catch (cause) {

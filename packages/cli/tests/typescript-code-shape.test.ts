@@ -37,9 +37,18 @@ describe("isTypeScriptFilePath", () => {
     expect(isTypeScriptFilePath("src/a.ts")).toBe(true);
     expect(isTypeScriptFilePath("src/b.tsx")).toBe(true);
   });
-  it("rejects .py / .js / .d.ts.bak", () => {
+  // Phase 2 self-dogfooding: the TS analyzer also accepts .js / .mjs / .cjs
+  // so `(lang typescript)` code-shape declarations can target ESM hook
+  // scripts under packages/claude-code-plugin/scripts/*.js. The TS compiler
+  // API parses JS adequately for the shape checks.
+  it("accepts .js / .mjs / .cjs as JS source", () => {
+    expect(isTypeScriptFilePath("src/a.js")).toBe(true);
+    expect(isTypeScriptFilePath("src/a.mjs")).toBe(true);
+    expect(isTypeScriptFilePath("src/a.cjs")).toBe(true);
+  });
+  it("rejects .py and other non-JS extensions", () => {
     expect(isTypeScriptFilePath("src/a.py")).toBe(false);
-    expect(isTypeScriptFilePath("src/a.js")).toBe(false);
+    expect(isTypeScriptFilePath("src/a.md")).toBe(false);
   });
 });
 

@@ -70,38 +70,42 @@ const DEFAULT_PROTECTED = [
 // write-hints moved into `bash-extractors.js`. Both extractor consumers
 // (this file and observation-hook.js) now share the same definitions.
 
-try {
-  const stdin = await readStdin();
-  const payload = parseHookInput(stdin);
-  const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
-  const targetPaths = extractTargetPaths(payload);
+await main();
 
-  if (targetPaths.length === 0) {
-    process.exit(0);
+async function main() {
+  try {
+    const stdin = await readStdin();
+    const payload = parseHookInput(stdin);
+    const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
+    const targetPaths = extractTargetPaths(payload);
+
+    if (targetPaths.length === 0) {
+      process.exit(0);
+    }
+
+    const config = await loadConfig(projectDir);
+
+    if (config === null) {
+      process.exit(0);
+    }
+
+    const deniedTargets = targetPaths.filter((targetPath) => shouldDenyTarget(projectDir, config.protected, targetPath));
+
+    if (deniedTargets.length > 0) {
+      const reason = await getProtectedEditReason(projectDir, payload, deniedTargets);
+      process.stdout.write(
+        `${JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "deny",
+            permissionDecisionReason: reason,
+          },
+        })}\n`,
+      );
+    }
+  } catch (error) {
+    failClosed(error instanceof Error ? error.message : String(error));
   }
-
-  const config = await loadConfig(projectDir);
-
-  if (config === null) {
-    process.exit(0);
-  }
-
-  const deniedTargets = targetPaths.filter((targetPath) => shouldDenyTarget(projectDir, config.protected, targetPath));
-
-  if (deniedTargets.length > 0) {
-    const reason = await getProtectedEditReason(projectDir, payload, deniedTargets);
-    process.stdout.write(
-      `${JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "PreToolUse",
-          permissionDecision: "deny",
-          permissionDecisionReason: reason,
-        },
-      })}\n`,
-    );
-  }
-} catch (error) {
-  failClosed(error instanceof Error ? error.message : String(error));
 }
 
 async function readStdin() {

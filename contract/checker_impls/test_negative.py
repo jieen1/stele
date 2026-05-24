@@ -1647,6 +1647,46 @@ def test_cli_command_error_shape_catches_missing_field():
     )
 
 
+def test_hook_fail_closed_v2_catches_missing_failClosed_call():
+    """Phase 2.3: removing the `failClosed(...)` call from pre-tool-protect.js
+    main() must trip the function-shape."""
+    return _mutate_then_check(
+        "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+        lambda text: text.replace(
+            "failClosed(error instanceof Error ? error.message : String(error));",
+            'process.stdout.write("// fail-open bypass\\n");',
+            1,
+        ),
+        "hook-fail-closed-v2",
+    )
+
+
+def test_stop_validate_fail_closed_catches_missing_blockStop_call():
+    """Phase 2.3: removing every `blockStop(` call from stop-validate.js main()
+    must trip the function-shape (the analyzer captures all calls inside
+    main; absent one removed, others remain). To force a miss we substitute
+    every blockStop with a no-op pattern."""
+    return _mutate_then_check(
+        "packages/claude-code-plugin/scripts/stop-validate.js",
+        lambda text: text.replace("blockStop(", "process.stdout.write("),
+        "stop-validate-fail-closed",
+    )
+
+
+def test_write_atomic_has_rename_catches_missing_rename_call():
+    """Phase 2.3: removing the `rename(...)` call from `writeAtomic` must
+    trip the function-shape."""
+    return _mutate_then_check(
+        "packages/core/src/manifest/hash-manifest.ts",
+        lambda text: text.replace(
+            "await rename(tmpPath, targetPath);",
+            "await writeFile(targetPath, content);",
+            1,
+        ),
+        "write-atomic-has-rename",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1748,6 +1788,9 @@ def main() -> int:
         ("cli_commands_no_direct_fs_write_catches_writeFileSync_call", test_cli_commands_no_direct_fs_write_catches_writeFileSync_call),
         ("operator_registry_shape_catches_missing_method", test_operator_registry_shape_catches_missing_method),
         ("cli_command_error_shape_catches_missing_field", test_cli_command_error_shape_catches_missing_field),
+        ("hook_fail_closed_v2_catches_missing_failClosed_call", test_hook_fail_closed_v2_catches_missing_failClosed_call),
+        ("stop_validate_fail_closed_catches_missing_blockStop_call", test_stop_validate_fail_closed_catches_missing_blockStop_call),
+        ("write_atomic_has_rename_catches_missing_rename_call", test_write_atomic_has_rename_catches_missing_rename_call),
     ]
 
     print("=" * 60)

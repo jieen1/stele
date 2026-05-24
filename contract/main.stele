@@ -521,4 +521,24 @@
   (must-extend "Error")
   (must-have-field "exitCode"))
 
+; --- §2.3 function-shape contracts --------------------------------------------
+; Hook scripts are .js but live in a TypeScript monorepo and are parsed
+; adequately by ts.createSourceFile (ScriptKind.JS) — see
+; isTypeScriptFilePath / scriptKindFor in packages/cli/src/code-shape/.
+
+(function-shape hook-fail-closed-v2
+  (lang typescript)
+  (target "packages/claude-code-plugin/scripts/pre-tool-protect.js::main")
+  (must-have-call "failClosed"))
+
+(function-shape stop-validate-fail-closed
+  (lang typescript)
+  (target "packages/claude-code-plugin/scripts/stop-validate.js::main")
+  (must-have-call "blockStop"))
+
+(function-shape write-atomic-has-rename
+  (lang typescript)
+  (target "packages/core/src/manifest/hash-manifest.ts::writeAtomic")
+  (must-have-call "rename"))
+
 (import "generated/ddd-typedriven.stele")
