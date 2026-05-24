@@ -2852,7 +2852,13 @@ _PATH_IMPORT_DEFAULT_RE = re.compile(
     # `import path from "node:path"` — bare identifier with no braces
     # OR a default + named combo where we record the default identifier
     # and let the named-import regex catch the rest of the destructure.
-    r'(?m)^\s*import\s+([A-Za-z_$][\w$]*)(?:\s*,\s*\{[\s\S]*?\})?\s+from\s+["\'](?:node:)?path["\']',
+    # Round 12 S-01: the optional `, { ... }` destructure capture must
+    # NOT contain `;`, `{`, or `}` — otherwise an `import x, { y } from
+    # "node:url"` line above an `import { z } from "node:path"` line
+    # spans across statements and falsely registers `x` as a path
+    # namespace. Same class of bug Round 11 R-03 fixed in
+    # `_PATH_IMPORT_NAMED_RE`; the companion DEFAULT regex was missed.
+    r'(?m)^\s*import\s+([A-Za-z_$][\w$]*)(?:\s*,\s*\{[^;{}]*?\})?\s+from\s+["\'](?:node:)?path["\']',
 )
 _PATH_IMPORT_NAMED_RE = re.compile(
     # `import { ... } from "node:path"` OR `import id, { ... } from ...`

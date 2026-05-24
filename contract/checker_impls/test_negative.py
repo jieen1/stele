@@ -1271,6 +1271,33 @@ def test_cli_io_through_path_utils_template_literal_smuggled_import():
     return _pass_if_false(result, "cli_io_through_path_utils_template_literal_smuggled_import")
 
 
+def test_cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace():
+    """Round 12 S-01: an `import x, { y } from "node:url"` line
+    immediately above an `import { z } from "node:path"` line used to
+    register `x` as a path namespace because the DEFAULT regex's
+    optional `, { ... }` capture was unbounded `[\\s\\S]*?`. The
+    Round 12 fix restricts the capture to `[^;{}]*?` (same defect
+    class as Round 11 R-03 in the sibling NAMED regex)."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_s01_url_default.ts"
+    target.write_text(
+        'import { writeFile } from "node:fs/promises";\n'
+        'import urlPath, { fileURLToPath } from "node:url";\n'
+        'import { junkSymbol } from "node:path";\n'
+        "export async function bad(input: string): Promise<void> {\n"
+        "  const safe = urlPath.dirname(input);\n"
+        '  await writeFile(input, "danger");\n'
+        "  return safe.length > 0 || fileURLToPath(input) === input || junkSymbol === null ? undefined : undefined;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.cli_io_through_path_utils({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace")
+
+
 def test_cli_io_through_path_utils_mixed_default_named_import_accepted():
     """Round 11 R-03 (positive guard): `import path, { resolve as
     pathResolve } from "node:path"` is legal TypeScript. Both the
@@ -1381,6 +1408,8 @@ def main() -> int:
         # Round 11: bypass-coverage tests for R-02 + R-03.
         ("cli_io_through_path_utils_template_literal_smuggled_import", test_cli_io_through_path_utils_template_literal_smuggled_import),
         ("cli_io_through_path_utils_mixed_default_named_import_accepted", test_cli_io_through_path_utils_mixed_default_named_import_accepted),
+        # Round 12: S-01 cross-statement DEFAULT regex defect.
+        ("cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace", test_cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace),
     ]
 
     print("=" * 60)
