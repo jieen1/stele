@@ -548,6 +548,11 @@ type_driven:
       - name: PackageName
         base_type: string
         invariant: "matches /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
+      # Phase 1 self-dogfooding: CommandName completes the 5-of-5 branded
+      # type set already shipped in packages/core/src/util/branded-types.ts.
+      - name: CommandName
+        base_type: string
+        invariant: "matches /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/"
   smart_constructors:
     mode: hard
     value_objects:
@@ -559,6 +564,12 @@ type_driven:
         deny_raw: true
       - name: Sha256
         constructor: "parseSha256(input: string): Sha256"
+        deny_raw: true
+      - name: PackageName
+        constructor: "parsePackageName(input: string): PackageName"
+        deny_raw: true
+      - name: CommandName
+        constructor: "parseCommandName(input: string): CommandName"
         deny_raw: true
   type_state:
     mode: hard

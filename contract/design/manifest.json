@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "e199fd55f414e02ab28c10041f52d8fcbcb25bfb511bace84512e92b07b4678f",
+  "profileHash": "d5d43c6202c068344edd45a0136d061d632c81340a9ace28b4a55e583b53a331",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "557db1dd6659741e3fa7824c157877d2a66ed1f2"
+    "git_sha": "ef4e1e0296202ab19f66664fc984b8d4f718a308"
   },
   "templates": [
     "ddd-typedriven"
@@ -394,17 +394,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-24T11:32:40.213Z",
+  "generatedAt": "2026-05-24T13:00:28.814Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "aa763644acf5453609302a90cfbfb84bbec659e20cd1a894105eda8b6330ab7d"
+      "hash": "f5b1852cacb989229ade529913c2a48c1a68c20e6342899bb7a15047076f870c"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "aa763644acf5453609302a90cfbfb84bbec659e20cd1a894105eda8b6330ab7d",
+      "sha256": "f5b1852cacb989229ade529913c2a48c1a68c20e6342899bb7a15047076f870c",
       "rules": [
         {
           "id": "architecture.ddd-core",

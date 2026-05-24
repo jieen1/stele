@@ -491,6 +491,12 @@
   (pattern "/^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/")
 )
 
+(branded-id "CommandName"
+  (target "packages/core/src/util/branded-types.ts::CommandName")
+  (base-type "string")
+  (pattern "/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/")
+)
+
 (smart-ctor "RuleId"
   (constructor "parseRuleId")
   (deny-raw "true")
@@ -503,5 +509,15 @@
 
 (smart-ctor "Sha256"
   (constructor "parseSha256")
+  (deny-raw "true")
+)
+
+(smart-ctor "PackageName"
+  (constructor "parsePackageName")
+  (deny-raw "true")
+)
+
+(smart-ctor "CommandName"
+  (constructor "parseCommandName")
   (deny-raw "true")
 )
