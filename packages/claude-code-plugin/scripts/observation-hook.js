@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Round 5 J-10: removed unused `writeFile` import — the appendFileSync
 // flow is the only file-writing path here.
 import { mkdir, readFile } from "node:fs/promises";
