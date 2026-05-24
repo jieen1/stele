@@ -547,7 +547,10 @@ type_driven:
         invariant: "matches /^[0-9a-f]{64}$/"
       - name: PackageName
         base_type: string
-        invariant: "matches /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
+        # Phase 1.6 widening: accept scoped (@scope/name) and unscoped npm
+        # package names. The original pattern rejected `@stele/backend-*`
+        # used throughout the repo.
+        invariant: "matches /^(@[a-z][a-z0-9-]*\\/)?[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
       # Phase 1 self-dogfooding: CommandName completes the 5-of-5 branded
       # type set already shipped in packages/core/src/util/branded-types.ts.
       - name: CommandName

@@ -791,7 +791,7 @@
         {
           "name": "PackageName",
           "base_type": "string",
-          "invariant": "matches /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
+          "invariant": "matches /^(@[a-z][a-z0-9-]*\\/)?[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
         },
         {
           "name": "CommandName",

@@ -1,5 +1,5 @@
 import type { LanguageBackend } from "@stele/core";
-import { SteleError } from "@stele/core";
+import { SteleError, packageName as toPackageName } from "@stele/core";
 
 /** Registry entry mapping language + framework to a backend npm package. */
 export interface RegisteredBackend {
@@ -18,31 +18,31 @@ export const REGISTERED_BACKENDS: readonly RegisteredBackend[] = Object.freeze([
   {
     language: "python",
     framework: "pytest",
-    packageName: "@stele/backend-python",
+    packageName: toPackageName("@stele/backend-python"),
     displayName: "Python (pytest)",
   },
   {
     language: "typescript",
     framework: "vitest",
-    packageName: "@stele/backend-typescript",
+    packageName: toPackageName("@stele/backend-typescript"),
     displayName: "TypeScript (vitest)",
   },
   {
     language: "rust",
     framework: "cargo-test",
-    packageName: "@stele/backend-rust",
+    packageName: toPackageName("@stele/backend-rust"),
     displayName: "Rust (cargo test)",
   },
   {
     language: "go",
     framework: "testing",
-    packageName: "@stele/backend-go",
+    packageName: toPackageName("@stele/backend-go"),
     displayName: "Go (testing)",
   },
   {
     language: "java",
     framework: "junit5",
-    packageName: "@stele/backend-java",
+    packageName: toPackageName("@stele/backend-java"),
     displayName: "Java (JUnit 5)",
   },
 ] as RegisteredBackend[]);

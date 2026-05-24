@@ -488,7 +488,7 @@
 (branded-id "PackageName"
   (target "packages/core/src/util/branded-types.ts::PackageName")
   (base-type "string")
-  (pattern "/^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/")
+  (pattern "/^(@[a-z][a-z0-9-]*\\/)?[a-z][a-z0-9-]*(-[a-z0-9]+)*$/")
 )
 
 (branded-id "CommandName"

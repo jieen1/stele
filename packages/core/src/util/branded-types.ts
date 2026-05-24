@@ -114,9 +114,19 @@ function isValidCommandName(value: string): boolean {
   return /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(value);
 }
 
-/** Validate a PackageName string format. */
+/**
+ * Validate a PackageName string format.
+ *
+ * Phase 1 self-dogfooding (Step 1.6 widening): accept BOTH unscoped
+ * npm names (`backend-python`) and scoped names (`@stele/backend-python`).
+ * Original regex rejected `@`/`/`, which made it impossible to wrap
+ * the 5 entries in `packages/cli/src/backend-registry.ts` without a
+ * compile-time failure. The widened pattern admits npm's published
+ * naming rules: a single lowercase scope (`@scope/`), each segment
+ * starting with a lowercase letter, dashes inside segments allowed.
+ */
 function isValidPackageName(value: string): boolean {
-  return /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/.test(value);
+  return /^(@[a-z][a-z0-9-]*\/)?[a-z][a-z0-9-]*(-[a-z0-9]+)*$/.test(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,14 +202,18 @@ export function commandName(value: string): CommandName {
 /**
  * Create a PackageName. Throws on invalid format.
  *
+ * Accepts unscoped (`backend-python`) and scoped (`@stele/backend-python`)
+ * npm package names. See `isValidPackageName` for the exact pattern.
+ *
  * @example
- *   const pkg = packageName("backend-python");   // ok
- *   const bad = packageName("Backend_Python");   // throws TypeError
+ *   const pkg = packageName("backend-python");           // ok
+ *   const scoped = packageName("@stele/backend-python"); // ok
+ *   const bad = packageName("Backend_Python");           // throws TypeError
  */
 export function packageName(value: string): PackageName {
   if (!isValidPackageName(value)) {
     throw new TypeError(
-      `Invalid PackageName: "${value}". Must be lowercase-with-dashes (e.g. "backend-python").`,
+      `Invalid PackageName: "${value}". Must be lowercase-with-dashes, optionally with a single npm scope (e.g. "backend-python", "@stele/backend-python").`,
     );
   }
   return value as PackageName;

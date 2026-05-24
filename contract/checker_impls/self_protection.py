@@ -72,11 +72,18 @@ def _load_backend_registry() -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     # Match { ... } blocks that contain language
     block_pattern = re.compile(r"\{\s*\n(?:[^{}]*\n)*?\s*\}", re.MULTILINE)
+    # Phase 1.6 self-dogfooding: packageName entries are wrapped in a
+    # smart constructor (`toPackageName(packageName(...))`-style). The
+    # match accepts BOTH the raw form (`packageName: "..."`) and the
+    # smart-constructor form (`packageName: toPackageName("...")`).
+    pkg_pattern = re.compile(
+        r"packageName:\s*(?:[A-Za-z_$][\w$]*\s*\(\s*)?\"([^\"]+)\""
+    )
     for block_match in block_pattern.finditer(content):
         block = block_match.group()
         lang_match = re.search(r"language:\s*\"([^\"]+)\"", block)
         fw_match = re.search(r"framework:\s*\"([^\"]+)\"", block)
-        pkg_match = re.search(r"packageName:\s*\"([^\"]+)\"", block)
+        pkg_match = pkg_pattern.search(block)
         if lang_match:
             entries.append({
                 "language": lang_match.group(1),
