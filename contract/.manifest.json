@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-24T06:02:34.342Z",
+  "generated_at": "2026-05-24T06:21:29.121Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -16,12 +16,12 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "6cf2f86c3cf9744541fb9ced28e47d931cf4a56fbd19accf0b7e58979902955c",
-      "size": 123746
+      "sha256": "f18db0f4f4f8cf6cce6e2fc0b2746311213249d03ab59feb025619296e7caedd",
+      "size": 126842
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "3397bbfb289e3dd7d331ef4e2f32a7d626c8e03f322624243aa02237665aa0f5",
-      "size": 58674
+      "sha256": "5c318abac3ec9b1dfabc446a2ec46173b59cb064b3d9a152ce9d17f5e42e6f18",
+      "size": 61894
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",

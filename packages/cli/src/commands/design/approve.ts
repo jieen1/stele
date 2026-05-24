@@ -45,19 +45,25 @@ const _APPROVED_BY_FORBIDDEN_LITERALS = new Set([
   "test", "ci", "unknown", "anonymous", "stele", "approved",
   // Round 10 Q-04: also reject self-attesting placeholders that
   // mechanically satisfy the `:` / `@` requirement but carry no
-  // human attribution. These are tokens an agent would naturally
-  // construct (`dogfood:roundN-XYZ`, `selfprotect:autotest`) when
-  // trying to mint approvals without operator involvement.
+  // human attribution.
   "dogfood", "selfprotect", "self-protect", "autotest",
   "mock", "fake", "fixture", "placeholder", "noreply", "robot",
+  // Round 11 R-01: when the value is split on non-identifier chars,
+  // tokens like `round_10` produce `round` + `10` — both must be
+  // rejected on their own. `round` and `iter` are the canonical
+  // round/iteration token roots; `r` is too generic (real usernames
+  // like `r` exist) so only `round` is banned as a literal.
+  "round", "iter",
 ]);
-// Round 10 Q-04: regex patterns that reject self-referential prefixes
-// across `:` / `@` splits. `dogfood:roundN-XYZ` is rejected because
-// `dogfood` is forbidden as a left token; `round9-p01` matches the
-// `roundN` pattern.
+// Round 10 Q-04 + Round 11 R-01: regex patterns that reject
+// self-referential round/iteration labels after splitting on
+// non-identifier chars. `round\d+` and `iter\d+` are the canonical
+// agent-self-attestation forms. Single-letter prefixes (r1, p1) are
+// NOT matched here — they appear too often in legitimate usernames /
+// employee IDs to ban as a class.
 const _APPROVED_BY_FORBIDDEN_PATTERNS: readonly RegExp[] = [
-  /^round[\s-]?\d+$/i,
-  /^r\d+$/i,
+  /^round\d+$/i,
+  /^iter\d+$/i,
 ];
 
 function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; reason: string } {
@@ -107,18 +113,24 @@ function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; re
           "Pure bare strings are not attributable.",
       };
     }
-    // Round 10 Q-04: also reject self-referential prefixes on either
-    // side of the `:` / `@` split. An attacker that synthesises
-    // `dogfood:roundN-XYZ` only needs the literal denylist to miss the
-    // exact whole-string match — splitting catches that.
-    const tokens = trimmed.split(/[:@]/u).map((t) => t.trim().toLowerCase()).filter((t) => t.length > 0);
+    // Round 10 Q-04 + Round 11 R-01: split on EVERY non-identifier
+    // character (not just `:` / `@`), then for each resulting token
+    // reject it if it equals any forbidden literal OR contains one as
+    // a sub-word boundary OR matches a forbidden round/r pattern.
+    // R-01 verified that splitting on `:` / `@` alone left bypasses
+    // via `.`, `-`, `_`, etc. — e.g. `dogfood.round10:ok` passed.
+    const tokens = trimmed
+      .toLowerCase()
+      .split(/[^a-z0-9]+/u)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
     for (const tok of tokens) {
       if (_APPROVED_BY_FORBIDDEN_LITERALS.has(tok)) {
         return {
           ok: false,
           reason:
             `STELE_APPROVED_BY=${trimmed} contains forbidden token "${tok}". ` +
-            "Use a real human-identifying token (email or service:ci where neither half is a self-attesting placeholder).",
+            "Use a real human-identifying token (email or service:ci where no sub-token is a self-attesting placeholder).",
         };
       }
       if (_APPROVED_BY_FORBIDDEN_PATTERNS.some((re) => re.test(tok))) {

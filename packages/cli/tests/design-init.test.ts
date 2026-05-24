@@ -374,10 +374,9 @@ describe("design init --generate", () => {
     const stdout = captureStdout();
 
     const previousApprover = process.env.STELE_APPROVED_BY;
-    // Round 10 Q-04: the gate now splits on `:`/`@` and rejects
-    // self-attesting tokens like `test`, `fixture`, `round-N`. Use a
-    // realistic email-shaped value.
-    process.env.STELE_APPROVED_BY = "qa-operator@stele.example.com";
+    // Round 10 Q-04 / Round 11 R-01: split on any non-identifier
+    // char + reject `stele`, `round`, etc. as sub-tokens.
+    process.env.STELE_APPROVED_BY = "qa-operator@example.com";
     try {
       await runDesignInit({ preset: "ddd-typedriven", generate: true }, dir);
     } finally {

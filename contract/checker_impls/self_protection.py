@@ -2825,39 +2825,102 @@ _CLI_PATH_SAFETY_SCAN_DIRS = (
     ("claude-code-plugin", "scripts"),
 )
 
-# Round 10 Q-01: parse imports FROM `node:path` / `path`. Both forms:
-#   import path from "node:path"             → namespace = "path"
-#   import * as path from "node:path"        → namespace = "path"
-#   import { resolve, join } from "node:path" → names = {"resolve","join"}
-# String-blanked form keeps the module name visible because we run
-# this against the comments-only-stripped form (strings preserved).
+# Round 10 Q-01 + Round 11 R-02/R-03: parse imports FROM `node:path` /
+# `path`. The parser must:
+#   1. handle the four ES-module import shapes:
+#        import path from "node:path"                    (default)
+#        import * as path from "node:path"               (namespace)
+#        import { resolve, join } from "node:path"       (named)
+#        import path, { resolve } from "node:path"       (mixed)
+#   2. honour `as` aliases (`{ resolve as r }` → local binding `r`,
+#      original `resolve`)
+#   3. be statement-anchored (R-02): only `import` keywords at the
+#      start of a line. Template-literal text that mentions the import
+#      shape must NOT inject fake bindings.
+#   4. distinguish original-name (used to validate it's a real path
+#      helper) from local-binding-name (used to recognise call sites
+#      via `local(` notation).
+#
+# Each regex is anchored on `(?m)^\s*import\b`. The `from "..."`
+# specifier is required to be exactly `"path"` or `"node:path"` (the
+# quotes are matched). Multi-line imports are supported via `[\s\S]*?`.
+
 _PATH_IMPORT_NAMESPACE_RE = re.compile(
-    r'\bimport\s+(?:\*\s+as\s+)?([A-Za-z_$][\w$]*)\s+from\s+["\'](?:node:)?path["\']',
+    r'(?m)^\s*import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+["\'](?:node:)?path["\']',
+)
+_PATH_IMPORT_DEFAULT_RE = re.compile(
+    # `import path from "node:path"` — bare identifier with no braces
+    # OR a default + named combo where we record the default identifier
+    # and let the named-import regex catch the rest of the destructure.
+    r'(?m)^\s*import\s+([A-Za-z_$][\w$]*)(?:\s*,\s*\{[\s\S]*?\})?\s+from\s+["\'](?:node:)?path["\']',
 )
 _PATH_IMPORT_NAMED_RE = re.compile(
-    r'\bimport\s+\{([^}]+)\}\s+from\s+["\'](?:node:)?path["\']',
+    # `import { ... } from "node:path"` OR `import id, { ... } from ...`
+    # The named destructure block can span multiple lines but cannot
+    # contain `;` (statement separator) or another `{`/`}` (Round 11
+    # follow-up: the original `[\s\S]*?` was too permissive — when an
+    # earlier import line for a different module ended with `}`, the
+    # non-greedy match spanned across statements and the captured
+    # content was malformed).
+    r'(?m)^\s*import\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^;{}]*?)\}\s+from\s+["\'](?:node:)?path["\']',
+)
+
+_KNOWN_PATH_HELPERS = frozenset(
+    {"resolve", "join", "dirname", "normalize", "relative", "basename"}
 )
 
 
-def _path_module_bindings(comments_only_source: str) -> dict[str, set[str]]:
-    """Round 10 Q-01: return the local bindings introduced by any
-    `import ... from "(node:)?path"` statements in the file. Helps the
-    CLI_IO_THROUGH_PATH_UTILS check accept the right bare-name calls
-    without false-allowing unrelated `.join` / `.resolve` callers."""
+def _path_module_bindings(comments_only_source: str, blanked_source: str) -> dict[str, set[str]]:
+    """Round 10 Q-01 + Round 11 R-02/R-03: return the local bindings
+    introduced by any `import ... from "(node:)?path"` statements.
+
+    R-02 anti-smuggle: the import regex must scan the
+    comments-only-stripped form (string literals preserved — required
+    so the `"path"` module specifier is visible), BUT each candidate
+    match's start offset is double-checked against the strings-AND-
+    comments-blanked form. If the offset there is BLANK (= the match
+    sat inside a string / template literal), we reject it. That way:
+    - real top-of-file imports survive both checks (their offset in
+      the blanked form is `i` for `import`),
+    - template-literal smuggled fake imports are rejected (their
+      offset in the blanked form is whitespace).
+
+    R-03: handles default (`import x from`), namespace (`import * as
+    p from`), named (`import { x }`), default + named (`import x, { y
+    } from`), and aliased destructures (`{ resolve as r }`).
+    """
     namespaces: set[str] = set()
     names: set[str] = set()
+
+    def _is_real_statement(match_start: int) -> bool:
+        # Reject the candidate if the blanked-source has whitespace at
+        # the match start — that means the match position was inside a
+        # string / template literal in the original source.
+        if match_start >= len(blanked_source):
+            return False
+        return not blanked_source[match_start].isspace()
+
     for m in _PATH_IMPORT_NAMESPACE_RE.finditer(comments_only_source):
+        if not _is_real_statement(m.start()):
+            continue
+        namespaces.add(m.group(1))
+    for m in _PATH_IMPORT_DEFAULT_RE.finditer(comments_only_source):
+        if not _is_real_statement(m.start()):
+            continue
         namespaces.add(m.group(1))
     for m in _PATH_IMPORT_NAMED_RE.finditer(comments_only_source):
+        if not _is_real_statement(m.start()):
+            continue
         for tok in m.group(1).split(","):
             tok = tok.strip()
             if not tok:
                 continue
-            # Honour `as` aliases — `{ resolve as r }` binds `r`.
             parts = re.split(r"\s+as\s+", tok)
-            local = parts[-1].strip()
-            local = re.split(r"\W+", local, maxsplit=1)[0]
-            if local:
+            original = re.split(r"\W+", parts[0].strip(), maxsplit=1)[0]
+            local = re.split(r"\W+", parts[-1].strip(), maxsplit=1)[0]
+            if not original or not local:
+                continue
+            if original in _KNOWN_PATH_HELPERS:
                 names.add(local)
     return {"namespaces": namespaces, "names": names}
 
@@ -2896,23 +2959,19 @@ def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 except OSError:
                     continue
                 scanned += 1
-                # Use the strings-blanked form to LOOK FOR forbidden
-                # calls AND helpers (so a string can't smuggle either
-                # side of the check).
+                # Round 11 R-02: use the strings-blanked form for the
+                # forbidden-call scan AND pass BOTH forms to the
+                # import-binding parser so the parser can see the
+                # module specifier (in comments-only form) AND verify
+                # the import is not template-literal smuggled (in
+                # blanked form).
                 stripped = _strip_ts_comments_and_strings(content)
                 comments_only = _strip_ts_comments(content)
                 if not _CLI_FS_WRITE_RE.search(stripped):
                     continue
-                # Round 10 Q-01: parse what was imported from
-                # `node:path` / `path` and accept ONLY those bindings
-                # as path-safety helpers. Generic `Promise.resolve(x)`
-                # or `chunks.join("")` no longer satisfy the rule
-                # because the bare name has to be a destructure-import
-                # FROM node:path (not from anywhere else).
-                #
-                # Always-accepted explicit helpers (never depend on
-                # local import bindings — these are the project's
-                # own path-safety surface):
+                # Always-accepted explicit helpers (the project's own
+                # path-safety surface — never depend on local import
+                # bindings):
                 always_accepted = (
                     "validateOutputPath(",
                     "collectProtectedPaths(",
@@ -2922,19 +2981,25 @@ def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 )
                 has_path_safety = any(marker in stripped for marker in always_accepted)
                 if not has_path_safety:
-                    bindings = _path_module_bindings(comments_only)
-                    # Namespace import (`import path from "node:path"`)
-                    # → accept `path.resolve(` / `path.join(`.
+                    bindings = _path_module_bindings(comments_only, stripped)
+                    # Namespace / default import bind the whole `path`
+                    # module — accept `<binding>.resolve(` /
+                    # `<binding>.join(` style calls.
                     for ns in bindings["namespaces"]:
-                        if f"{ns}.resolve(" in stripped or f"{ns}.join(" in stripped:
+                        if any(
+                            f"{ns}.{helper}(" in stripped
+                            for helper in _KNOWN_PATH_HELPERS
+                        ):
                             has_path_safety = True
                             break
-                    # Destructure import (`import { resolve, join, ... }
-                    # from "node:path"`) → accept the imported name as
-                    # a call.
+                    # Destructure import (possibly aliased) — accept
+                    # the local binding as a bare call. The parser
+                    # already filtered to bindings whose original
+                    # symbol is in _KNOWN_PATH_HELPERS, so any LOCAL
+                    # name here is a legitimate path helper.
                     if not has_path_safety:
                         for name in bindings["names"]:
-                            if name in {"resolve", "join", "dirname", "normalize", "relative"} and f"{name}(" in stripped:
+                            if f"{name}(" in stripped:
                                 has_path_safety = True
                                 break
                 if not has_path_safety:

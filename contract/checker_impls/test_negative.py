@@ -1193,20 +1193,23 @@ def test_strip_block_comment_does_not_mis_terminate_on_slash_star_slash():
 
 
 def test_cli_io_through_path_utils_array_join_with_path_import_bypassed():
-    """Round 10 Q-01: a file that imports `path` (for whatever reason)
-    and then calls `Array#join("")` on a chunk array used to satisfy
-    the Round 9 bare-helper fallback. The Round 10 fix removes the
-    fallback — `chunks.join("")` is NOT a path-safety helper even if
-    `path` is imported."""
+    """Round 10 Q-01 + Round 11 R-03: a file that imports the `path`
+    module but uses it ONLY for the import (no path-helper call site)
+    and writes via writeFile + Array.join — the Round 9 bare-helper
+    fallback would accept `chunks.join("")` as path-safety. The
+    Round 10/11 fix recognises that `chunks.join` is NOT a call to
+    the imported `path` binding (no `path.<helper>` or imported-name
+    call exists in the file), so the rule flags the violation."""
     _reset_caches()
     target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_q01_arrjoin.ts"
     target.write_text(
-        'import path from "node:path";\n'
+        # Note: NO call to a path-helper. The import is dead — yet the
+        # Round 9 substring check would have accepted `chunks.join("")`.
+        'import "node:path";\n'
         'import { writeFile } from "node:fs/promises";\n'
         "export async function bad(input: string, chunks: string[]): Promise<void> {\n"
         '  const data = chunks.join("");\n'
         "  await writeFile(input, data);\n"
-        "  return path.basename(input).length > 0 ? undefined : undefined;\n"
         "}\n",
         encoding="utf-8",
     )
@@ -1237,6 +1240,64 @@ def test_core_engine_purity_multi_line_crypto_import():
     finally:
         target.unlink(missing_ok=True)
     return _pass_if_false(result, "core_engine_purity_multi_line_crypto_import")
+
+
+# ---------------------------------------------------------------------------
+# Round 11 — bypass-coverage tests for R-01..R-03 reviewer findings
+# ---------------------------------------------------------------------------
+
+
+def test_cli_io_through_path_utils_template_literal_smuggled_import():
+    """Round 11 R-02: an agent embeds a fake `import { resolve, join }
+    from "node:path"` inside a template literal (docstring) to inject
+    bindings the path-safety check would accept. The Round 11 fix
+    uses the strings-blanked form to detect imports — template-literal
+    interiors are blank, so no fake bindings can be injected."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_r02_smuggle.ts"
+    target.write_text(
+        'import { writeFile } from "node:fs/promises";\n'
+        "export async function bad(input: string, chunks: string[]): Promise<void> {\n"
+        '  const docstring = `import { resolve, join } from "node:path"`;\n'
+        '  const data = chunks.join("/");\n'
+        "  await writeFile(input, data + docstring);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.cli_io_through_path_utils({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "cli_io_through_path_utils_template_literal_smuggled_import")
+
+
+def test_cli_io_through_path_utils_mixed_default_named_import_accepted():
+    """Round 11 R-03 (positive guard): `import path, { resolve as
+    pathResolve } from "node:path"` is legal TypeScript. Both the
+    default binding `path` and the aliased local binding `pathResolve`
+    must be recognised as path-safety helpers — the file should PASS
+    even though its fs-write site uses the aliased name."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_r03_mixed.ts"
+    target.write_text(
+        'import { writeFile } from "node:fs/promises";\n'
+        'import path, { resolve as pathResolve } from "node:path";\n'
+        "export async function ok(input: string): Promise<void> {\n"
+        "  const data = pathResolve(input);\n"
+        "  const dir = path.dirname(data);\n"
+        "  await writeFile(dir, data);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.cli_io_through_path_utils({})
+    finally:
+        target.unlink(missing_ok=True)
+    if result.get("passed") is True:
+        print("  OK: cli_io_through_path_utils_mixed_default_named_import_accepted — mixed import recognised")
+        return True
+    print(f"  MISS: false-positive on legitimate mixed import (result={result})")
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -1317,6 +1378,9 @@ def main() -> int:
         # Round 10: bypass-coverage tests for Q-01..Q-04.
         ("cli_io_through_path_utils_array_join_with_path_import_bypassed", test_cli_io_through_path_utils_array_join_with_path_import_bypassed),
         ("core_engine_purity_multi_line_crypto_import", test_core_engine_purity_multi_line_crypto_import),
+        # Round 11: bypass-coverage tests for R-02 + R-03.
+        ("cli_io_through_path_utils_template_literal_smuggled_import", test_cli_io_through_path_utils_template_literal_smuggled_import),
+        ("cli_io_through_path_utils_mixed_default_named_import_accepted", test_cli_io_through_path_utils_mixed_default_named_import_accepted),
     ]
 
     print("=" * 60)
