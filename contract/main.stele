@@ -733,6 +733,19 @@
 ; (deferred follow-up work, not blocking).
 ; ============================================================================
 
+(type-state DESIGN_PROFILE_LIFECYCLE
+  (description "A DesignProfile starts Raw (just parsed from YAML), advances to Validated after validateProfile accepts it, and reaches Hashed once its SHA-256 has been computed. Generators must only consume Hashed profiles — feeding a Raw or Validated profile bypasses the integrity gate.")
+  (target "packages/cli/src/design-profile/lifecycle.ts::TypedDesignProfile")
+  (severity "error")
+  (states Raw Validated Hashed)
+  (initial Raw)
+  (terminal Hashed)
+  (transition (from Raw) (via markProfileValidated) (to Validated))
+  (transition (from Validated) (via hashValidatedProfile) (to Hashed))
+  (allowed-ops Raw markProfileValidated)
+  (allowed-ops Validated hashValidatedProfile)
+  (fix-hint "Route the profile through `asRawProfile` → `markProfileValidated` → `hashValidatedProfile` in `packages/cli/src/design-profile/lifecycle.ts`. Generators must accept `HashedDesignProfile` only. If the lifecycle is wrong, propose an update via `stele design propose --type-state DESIGN_PROFILE_LIFECYCLE`."))
+
 (type-state APPROVAL_LIFECYCLE
   (description "An Approval record cannot be written to disk before the human-identity gate has run. Lifecycle: Drafting (created from raw payload) → IdentityChecked (resolveApprovedBy passed) → Signed (writeFileSync persisted). The on-disk path must only ever see a Signed approval.")
   (target "packages/cli/src/commands/design/approval-lifecycle.ts::Approval")
