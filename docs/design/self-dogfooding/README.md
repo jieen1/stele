@@ -373,6 +373,87 @@ All three are tracked here as Phase 7 follow-ups; no source change
 to `Violation` / `ContractManifest` / `ViolationReport` was applied
 in Phase 2.
 
+### 2026-05-24 — Phase 3 sub-agent
+
+- **Re-grounded trace-policy semantics against the @stele/trace-evaluator
+  implementation** before writing the contracts. `target` is the
+  destination of a call path; `must-transit` checks intermediates (not
+  endpoints) on caller→target paths; `must-be-preceded-by` checks the
+  order of edges WITHIN a single caller's body. The phase-3 doc's
+  prose semantics align with the design doc, but the literal contract
+  forms it lists assume `target` describes "caller frames that the
+  policy applies to" (which is the spec wording, not the evaluator
+  behaviour). All four landed contracts were rewritten to match the
+  shipped evaluator.
+- **External-package functions appear as `extern:<package>::…` NodeIds,
+  not `node:<module>::…`.** The phase doc's `node:fs/promises::*`,
+  `@stele/backend-python`, and similar pattern shapes match nothing in
+  the live call graph. The TS extractor emits `extern:node-fs::*`,
+  `extern:stele-backend-python::*` (when actually imported with a
+  type-resolvable specifier), etc. Patterns rewritten accordingly.
+- **Commander's `.action(fn)` registration is a property assignment, not
+  a call edge.** Top-level CLI entry points like `runCheck`,
+  `runGenerate`, and `runDesignApprove` have NO in-scope callers in the
+  extracted graph. Trace policies that anchor `target` at these
+  entry-points (3.2 / 3.3 / 3.5 literal forms in the phase doc) are
+  vacuous: `allTargets` matches the node but `callerNodes` never
+  produces a caller that reaches it. Rewrote 3.2 / 3.3 / 3.5 as
+  `must-be-preceded-by` over the BODY of the entry-point caller, which
+  the evaluator can check via `getOrderedOutgoingEdges`.
+
+### Phase 3 deferred items (re-scope to Phase 7)
+
+Two of the six phase-doc contracts could not land because the call
+graph the TS extractor produces does not model the necessary edges:
+
+1. **`EVALUATOR_VIA_EXTERN_REGISTRY` (3.4)** — phase doc targets
+   `buildTraceStage` and must-transit `buildExternAliasRegistry`. The
+   evaluator-invocation line in `check-stages-trace.ts` is
+   `const result = evaluate({ ... })` where `evaluate` is a LOCAL
+   variable holding either `deps.evaluate` or the imported
+   `evaluateTracePolicies`. The TS extractor does not track calls
+   through local-variable holders of imported functions, so no edge
+   `buildTraceStage → evaluateTracePolicies` exists in the graph and
+   no anchor downstream of `buildExternAliasRegistry` is available to
+   pin a must-be-preceded-by constraint to. Phase 7 options: (a)
+   refactor `check-stages-trace.ts` to call `evaluateTracePolicies`
+   directly (no DI seam) — sacrifices test injectability; or (b)
+   teach the TS extractor to track calls through local-variable
+   bindings of imported functions (broader, would also unblock other
+   policies).
+2. **`BACKEND_LOAD_VIA_REGISTRY` (3.6)** — phase doc's deny-direct
+   patterns (`@stele/backend-python`, …) describe IMPORT specifiers,
+   not call-graph NodeIds. `compilePattern` interprets them as file
+   globs that never match any extracted node. Backends are loaded via
+   `await import(...)` dynamic imports through the backend registry;
+   the extractor does not currently model `await import` as call
+   edges either. The intent — "do not import backend packages outside
+   the registry module" — is naturally an IMPORT-level boundary, not
+   a call-graph trace. Phase 7 should re-land this as a code-shape
+   `(boundary …)` contract with `(deny-import "@stele/backend-*")`
+   alongside the existing `core-no-fs-write-from-non-manifest`
+   pattern; the boundary stage already handles deny-import correctly.
+
+Both are tracked here as Phase 7 follow-ups.
+
+### Phase 3 perf baseline
+
+Wall-clock for `time node packages/cli/dist/index.js check` (warm
+caches, 3 successive runs averaged):
+
+| | seconds |
+| --- | --- |
+| Before Phase 3 (48 invariants, 0 trace-policies) | 11.0 |
+| After Phase 3 (48 invariants, 4 trace-policies) | 13.8 |
+| Delta | +2.8 |
+
+Well within reviewer V-10's 30s budget. The TS call graph is cached
+within a single `stele check` invocation (see
+`check-stages-call-graph-cache.ts`), so all four trace-policy
+contracts share one extraction. Phase 4 (effect-policy) and Phase 5
+(type-state) will reuse that cache through `getCachedCallGraph`, so
+cumulative Phase-B cost on the 9.3k-node graph should remain bounded.
+
 ---
 
 ## Execution model

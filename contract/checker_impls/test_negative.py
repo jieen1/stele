@@ -1708,6 +1708,87 @@ def test_hook_scripts_shebang_catches_missing_shebang():
 
 
 # ---------------------------------------------------------------------------
+# Phase 3 (self-dogfooding plan): trace-policy negative tests.
+#
+# Trace-policy violations carry rule_ids of the form
+# `trace.<POLICY_ID>.<kind>` where `<kind>` is one of
+# `missing_transit` / `missing_predecessor` / `direct_call_denied` /
+# `forbidden_transit` (see packages/trace-evaluator/src/types.ts).
+#
+# Each test mutates source so that a single trace-policy fires, runs
+# `stele check`, and asserts the specific rule_id is present.
+# ---------------------------------------------------------------------------
+
+
+def test_fs_writes_via_write_atomic_catches_direct_writeFile():
+    """Phase 3.1: adding a file in @stele/core that calls
+    node:fs/promises::writeFile directly (without transiting writeAtomic)
+    must trip the trace-policy with a `missing_transit` violation."""
+    content = (
+        'import { writeFile } from "node:fs/promises";\n'
+        "export async function __phase3_leak(p: string): Promise<void> {\n"
+        '  await writeFile(p, "leak", "utf8");\n'
+        "}\n"
+    )
+    return _code_shape_negative_with_temp_file(
+        "packages/core/src/__phase3_negative_fs_leak.ts",
+        content,
+        "trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit",
+    )
+
+
+def test_check_prepare_via_load_contract_catches_bypass():
+    """Phase 3.2: appending a function to check.ts that calls
+    prepareCheckContextWithContract without first calling loadContract
+    must trip the trace-policy with a `missing_predecessor` violation."""
+    return _mutate_then_check(
+        "packages/cli/src/commands/check.ts",
+        lambda text: text + (
+            "\n"
+            "export async function __phase3_bypass(\n"
+            "  projectDir: string,\n"
+            "  contract: Contract,\n"
+            "): Promise<PreparedCheckContext> {\n"
+            "  return prepareCheckContextWithContract(projectDir, contract);\n"
+            "}\n"
+        ),
+        "trace.CHECK_PREPARE_VIA_LOAD_CONTRACT.missing_predecessor",
+    )
+
+
+def test_generate_via_coordinator_catches_bypass():
+    """Phase 3.3: appending a function to generate.ts that calls
+    writeAtomic without first calling coordinateGeneration must trip
+    the trace-policy with a `missing_predecessor` violation."""
+    return _mutate_then_check(
+        "packages/cli/src/commands/generate.ts",
+        lambda text: text + (
+            "\n"
+            "export async function __phase3_bypass_coord(p: string): Promise<void> {\n"
+            '  await writeAtomic(p, "leak");\n'
+            "}\n"
+        ),
+        "trace.GENERATE_VIA_COORDINATOR.missing_predecessor",
+    )
+
+
+def test_approve_via_resolve_approved_by_catches_bypass():
+    """Phase 3.5: appending a function to approve.ts that calls
+    writeFileSync without first calling resolveApprovedBy must trip
+    the trace-policy with a `missing_predecessor` violation."""
+    return _mutate_then_check(
+        "packages/cli/src/commands/design/approve.ts",
+        lambda text: text + (
+            "\n"
+            "export function __phase3_bypass_identity(p: string): void {\n"
+            '  writeFileSync(p, "forged-approval", "utf8");\n'
+            "}\n"
+        ),
+        "trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1813,6 +1894,11 @@ def main() -> int:
         ("write_atomic_has_rename_catches_missing_rename_call", test_write_atomic_has_rename_catches_missing_rename_call),
         ("no_any_in_core_catches_any_annotation", test_no_any_in_core_catches_any_annotation),
         ("hook_scripts_shebang_catches_missing_shebang", test_hook_scripts_shebang_catches_missing_shebang),
+        # Phase 3 (self-dogfooding plan): trace-policy contracts.
+        ("fs_writes_via_write_atomic_catches_direct_writeFile", test_fs_writes_via_write_atomic_catches_direct_writeFile),
+        ("check_prepare_via_load_contract_catches_bypass", test_check_prepare_via_load_contract_catches_bypass),
+        ("generate_via_coordinator_catches_bypass", test_generate_via_coordinator_catches_bypass),
+        ("approve_via_resolve_approved_by_catches_bypass", test_approve_via_resolve_approved_by_catches_bypass),
     ]
 
     print("=" * 60)
