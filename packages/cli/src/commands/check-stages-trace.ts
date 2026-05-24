@@ -18,6 +18,7 @@ import {
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
+import { pickPhaseLanguage } from "../config/phase-language.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
 import {
   _clearCallGraphCacheForTests as _clearSharedCallGraphCacheForTests,
@@ -73,7 +74,7 @@ export async function buildTraceStage(
     });
   }
 
-  const language = context.config.targetLanguage;
+  const language = pickPhaseLanguage(context.config, "trace");
   const extractor = pickCallGraphExtractor(language);
   if (extractor === null) {
     // Round 4 F-A-02 / Round 14 P0: fail loud only when NO extractor
@@ -234,7 +235,14 @@ function buildContractExternAliasRegistry(
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {
-  let tsconfigPath = resolve(context.projectDir, "tsconfig.json");
+  // Phase 0 (self-dogfooding plan): honour the optional config-level
+  // `tsconfig` field first — this lets a project that lives under a
+  // non-default tsconfig (e.g. tsconfig.base.json in a monorepo) wire
+  // it once in stele.config.json instead of relying on the design
+  // profile.
+  let tsconfigPath = context.config.tsconfig
+    ? resolve(context.projectDir, context.config.tsconfig)
+    : resolve(context.projectDir, "tsconfig.json");
   if (profilePathExists(context.projectDir)) {
     try {
       const profile = loadProfile(context.projectDir);

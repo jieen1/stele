@@ -5,6 +5,7 @@ import {
   type ArchitectureContractOptions,
   type ArchitectureRuntimeResult,
 } from "../architecture-runtime.js";
+import { pickPhaseLanguage } from "../config/phase-language.js";
 import type { PreparedCheckContext, ProtectedCheckState } from "./types.js";
 
 // ----------------------------------------------------------------
@@ -38,8 +39,20 @@ export async function buildArchitectureStageReport(
 
   const allViolations: Violation[] = [];
 
+  // Phase 0 (self-dogfooding plan): when a declaration omits its own
+  // `(lang …)` field, fall back to `phaseLanguages.architecture` from
+  // stele.config.json (else `targetLanguage`). Today every architecture
+  // declaration sets `(lang …)` explicitly, so this is forward-compat
+  // plumbing — it keeps the dispatch deterministic the moment we relax
+  // that requirement.
+  const phaseArchLang = pickPhaseLanguage(context.config, "architecture");
+  const fallbackLang: "typescript" | "python" | undefined =
+    phaseArchLang === "typescript" || phaseArchLang === "python"
+      ? phaseArchLang
+      : undefined;
+
   for (const arch of architectures) {
-    const runtimeArch = convertToRuntimeArch(arch);
+    const runtimeArch = convertToRuntimeArch(arch, fallbackLang);
 
     // Single evaluation pass: dependency, cycle, layer, public entry, unowned
     const result = await evaluateArchitectureRuntime({
@@ -194,21 +207,26 @@ function buildUnownedFileViolations(
 /**
  * Convert a parsed ArchitectureDeclaration to the runtime options shape.
  */
-function convertToRuntimeArch(arch: {
-  id: string;
-  lang?: "typescript" | "python";
-  modules: { id: string; paths: string[] }[];
-  layers?: { id: string; modules: string[] }[];
-  allowDependencies: Array<{ from: string; to: string[] }>;
-  denyCycles: boolean;
-  tsconfig?: string;
-  description?: string;
-}): ArchitectureContractOptions["architecture"] {
+function convertToRuntimeArch(
+  arch: {
+    id: string;
+    lang?: "typescript" | "python";
+    modules: { id: string; paths: string[] }[];
+    layers?: { id: string; modules: string[] }[];
+    allowDependencies: Array<{ from: string; to: string[] }>;
+    denyCycles: boolean;
+    tsconfig?: string;
+    description?: string;
+  },
+  fallbackLang?: "typescript" | "python",
+): ArchitectureContractOptions["architecture"] {
   return {
     id: arch.id,
     // Round 14 P2: thread the declared language through so the
     // runtime picks the matching extractor (TypeScript vs. Python).
-    lang: arch.lang,
+    // Phase 0 (self-dogfooding plan): when the declaration omits
+    // `(lang …)`, fall back to the per-phase config override.
+    lang: arch.lang ?? fallbackLang,
     modules: arch.modules.map((m) => ({
       id: m.id,
       paths: m.paths,

@@ -28,6 +28,7 @@ import {
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
+import { pickPhaseLanguage } from "../config/phase-language.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
 import {
   getCachedCallGraph,
@@ -107,7 +108,7 @@ export async function buildEffectStage(
     });
   }
 
-  const language = context.config.targetLanguage;
+  const language = pickPhaseLanguage(context.config, "effect");
   const callGraphExtractor = pickEffectCallGraphExtractor(language);
   const effectAnnotationExtractor = pickEffectAnnotationExtractor(language);
   if (callGraphExtractor === null || effectAnnotationExtractor === null) {
@@ -285,7 +286,11 @@ export async function buildEffectStage(
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {
-  let tsconfigPath = resolve(context.projectDir, "tsconfig.json");
+  // Phase 0 (self-dogfooding plan): honour the optional config-level
+  // `tsconfig` field first; see trace stage for the full rationale.
+  let tsconfigPath = context.config.tsconfig
+    ? resolve(context.projectDir, context.config.tsconfig)
+    : resolve(context.projectDir, "tsconfig.json");
   if (profilePathExists(context.projectDir)) {
     try {
       const profile = loadProfile(context.projectDir);

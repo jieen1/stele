@@ -23,6 +23,7 @@ import {
 } from "@stele/call-graph-core";
 import type { TypeStateInferenceExtractor } from "@stele/type-state-evaluator";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
+import { pickPhaseLanguage } from "../config/phase-language.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
 import {
   getCachedCallGraph,
@@ -102,7 +103,7 @@ export async function buildTypeStateStage(
     });
   }
 
-  const language = context.config.targetLanguage;
+  const language = pickPhaseLanguage(context.config, "type-state");
   if (language !== "typescript") {
     // Round 4 F-A-02: fail loud (error+ok:false) instead of silent
     // warning. See trace stage for the full rationale.
@@ -275,7 +276,11 @@ export async function buildTypeStateStage(
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {
-  let tsconfigPath = resolve(context.projectDir, "tsconfig.json");
+  // Phase 0 (self-dogfooding plan): honour the optional config-level
+  // `tsconfig` field first; see trace stage for the full rationale.
+  let tsconfigPath = context.config.tsconfig
+    ? resolve(context.projectDir, context.config.tsconfig)
+    : resolve(context.projectDir, "tsconfig.json");
   if (profilePathExists(context.projectDir)) {
     try {
       const profile = loadProfile(context.projectDir);

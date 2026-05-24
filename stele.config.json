@@ -8,6 +8,13 @@
   "targetLanguage": "python",
   "testFramework": "pytest",
   "pathMode": "auto",
+  "tsconfig": "tsconfig.base.json",
+  "phaseLanguages": {
+    "trace": "typescript",
+    "type-state": "typescript",
+    "effect": "typescript",
+    "architecture": "typescript"
+  },
   "protected": [
     "contract/**/*.stele",
     "contract/checker_impls/**/*",

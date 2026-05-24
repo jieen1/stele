@@ -10,6 +10,42 @@ export const MAX_EVENT_LOG_SIZE = 10 * 1024 * 1024;
 /** Maximum size for single file read (1 MB). */
 export const MAX_FILE_READ_SIZE = 1024 * 1024;
 
+/**
+ * Languages accepted by the Phase B / architecture / code-shape stages.
+ * Mirrors `SupportedLanguage` from `@stele/call-graph-core` — duplicated
+ * here so `packages/cli/src/config/**` (the cli-infrastructure DDD
+ * module) does not import the call-graph-core context directly, which
+ * the generated ddd-context-map architecture forbids.
+ */
+export type PhaseSupportedLanguage =
+  | "typescript"
+  | "python"
+  | "go"
+  | "java"
+  | "rust";
+
+/**
+ * Per-phase target-language overrides for stages that dispatch on a single
+ * language. Phase 0 (self-dogfooding plan) — lets a project keep
+ * `targetLanguage = "python"` for Phase A test generation while declaring
+ * the Phase B / architecture / code-shape evaluators run against
+ * TypeScript source (or vice versa). Kebab-case keys match the CDL
+ * mechanism names (`(type-state …)`, `(class-shape …)`).
+ */
+export interface PhaseLanguages {
+  /** Phase B trace-policy evaluator language. Defaults to targetLanguage. */
+  trace?: PhaseSupportedLanguage;
+  /** Phase B type-state evaluator language. Defaults to targetLanguage. */
+  "type-state"?: PhaseSupportedLanguage;
+  /** Phase B effect evaluator language. Defaults to targetLanguage. */
+  effect?: PhaseSupportedLanguage;
+  /** Code-shape default language. Each (boundary)/(class-shape)/... declaration
+   *  may still override via its own `(lang …)` field. */
+  "code-shape"?: PhaseSupportedLanguage;
+  /** Architecture import-extractor language. Defaults to targetLanguage. */
+  architecture?: PhaseSupportedLanguage;
+}
+
 export type SteleConfig = {
   version: string;
   contractDir: string;
@@ -21,6 +57,10 @@ export type SteleConfig = {
   testFramework: string;
   pathMode: string;
   protected: string[];
+  phaseLanguages?: PhaseLanguages;
+  /** Path to tsconfig.json, relative to project root. Defaults to "tsconfig.json".
+   *  Required when any phaseLanguages.* is "typescript" and the default doesn't exist. */
+  tsconfig?: string;
 };
 
 export const DEFAULT_CONFIG: SteleConfig = {

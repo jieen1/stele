@@ -3357,3 +3357,60 @@ def inline_version_sync(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                     }
 
     return {"passed": True}
+
+
+# ---------------------------------------------------------------------------
+# Phase 0 (self-dogfooding plan) — per-phase language config consistency
+# ---------------------------------------------------------------------------
+
+
+_PHASE_LANGUAGE_VALID_KEYS = frozenset(
+    {"trace", "type-state", "effect", "code-shape", "architecture"}
+)
+_PHASE_LANGUAGE_VALID_VALUES = frozenset(
+    {"typescript", "python", "go", "rust", "java"}
+)
+
+
+def phase_language_config_valid(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Verify stele.config.json `phaseLanguages` is well-typed when present.
+
+    Phase 0 (self-dogfooding plan): the per-phase language override field
+    drives Phase B / architecture stage dispatch. Tolerating a typo there
+    silently disables an entire stage at check-time. This checker mirrors
+    the validation in `packages/cli/src/config/loadConfig.ts` so that
+    `stele check` + pytest both surface the mistake.
+
+    A missing `phaseLanguages` field is allowed (the project is using the
+    targetLanguage everywhere).
+    """
+    config_path = _REPO_ROOT / "stele.config.json"
+    if not config_path.exists():
+        return {"passed": True, "message": "no config (acceptable for non-adopter mode)"}
+    try:
+        raw = json.loads(config_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return {"passed": False, "message": f"stele.config.json unreadable: {exc}"}
+    pl = raw.get("phaseLanguages")
+    if pl is None:
+        return {"passed": True, "message": None}
+    if not isinstance(pl, dict):
+        return {"passed": False, "message": "phaseLanguages must be an object"}
+    for k, v in pl.items():
+        if k not in _PHASE_LANGUAGE_VALID_KEYS:
+            return {
+                "passed": False,
+                "message": (
+                    f"phaseLanguages key `{k}` not in "
+                    f"{sorted(_PHASE_LANGUAGE_VALID_KEYS)}"
+                ),
+            }
+        if v not in _PHASE_LANGUAGE_VALID_VALUES:
+            return {
+                "passed": False,
+                "message": (
+                    f"phaseLanguages.{k} = `{v}` not in "
+                    f"{sorted(_PHASE_LANGUAGE_VALID_VALUES)}"
+                ),
+            }
+    return {"passed": True, "message": None}

@@ -400,4 +400,16 @@
   (description "Round 13 L-05/P-04: the audit hook (observation-hook.js) and the deny gate (pre-tool-protect.js) must see the same set of bash write targets. Earlier rounds found observation-hook missing 8 bypass classes — git-checkout / interpreter -c / wrapper-flag peeling / ln / rsync / truncate / chmod / chown — that pre-tool-protect blocked, so the maintenance summary was blind to those vectors. Sharing a single extractor module prevents the drift permanently.")
   (uses-checker bash-extractors-shared))
 
+; ============================================================================
+; Phase 0 (self-dogfooding plan) — per-phase language config consistency
+; ============================================================================
+
+(checker phase-language-config-valid
+  (description "stele.config.json `phaseLanguages` field must be an object with keys in {trace, type-state, effect, code-shape, architecture} and values in {typescript, python, go, rust, java}; absent / empty is also valid."))
+
+(invariant PHASE_LANGUAGE_CONFIG_VALID
+  (severity error)
+  (description "Phase 0 (self-dogfooding plan): the per-phase language override field, when set, must be type-correct so that downstream check-stages dispatch deterministically.")
+  (uses-checker phase-language-config-valid))
+
 (import "generated/ddd-typedriven.stele")

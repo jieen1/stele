@@ -1,18 +1,40 @@
 import { readFile } from "node:fs/promises";
 import { posix, resolve, win32 } from "node:path";
 import { isAbsoluteLikePath } from "../utils/shared-utils.js";
-import { DEFAULT_CONFIG, STELE_CONFIG_FILE, type SteleConfig } from "./defaults.js";
+import {
+  DEFAULT_CONFIG,
+  STELE_CONFIG_FILE,
+  type PhaseLanguages,
+  type PhaseSupportedLanguage,
+  type SteleConfig,
+} from "./defaults.js";
 
 type PartialConfig = Partial<Omit<SteleConfig, "protected">> & {
   protected?: unknown;
 };
+
+const VALID_PHASE_LANGUAGE_KEYS: ReadonlySet<keyof PhaseLanguages> = new Set([
+  "trace",
+  "type-state",
+  "effect",
+  "code-shape",
+  "architecture",
+]);
+
+const VALID_PHASE_LANGUAGE_VALUES: ReadonlySet<PhaseSupportedLanguage> = new Set([
+  "typescript",
+  "python",
+  "go",
+  "java",
+  "rust",
+]);
 
 export async function loadConfig(projectDir: string): Promise<SteleConfig> {
   const normalizedProjectDir = resolve(projectDir);
   const configFile = await readFile(resolve(projectDir, STELE_CONFIG_FILE), "utf8");
   const parsed = JSON.parse(configFile) as PartialConfig;
 
-  return {
+  const config: SteleConfig = {
     version: readString(parsed.version, DEFAULT_CONFIG.version),
     contractDir: validateProjectRelativePath(normalizedProjectDir, readString(parsed.contractDir, DEFAULT_CONFIG.contractDir), "contractDir", "directory"),
     entry: validateProjectRelativePath(normalizedProjectDir, readString(parsed.entry, DEFAULT_CONFIG.entry), "entry", "file"),
@@ -47,6 +69,41 @@ export async function loadConfig(projectDir: string): Promise<SteleConfig> {
     // shrink, via user config.
     protected: mergeProtected(parsed),
   };
+
+  const phaseLanguages = readPhaseLanguages(parsed.phaseLanguages);
+  if (phaseLanguages !== undefined) {
+    config.phaseLanguages = phaseLanguages;
+  }
+  if (parsed.tsconfig !== undefined) {
+    if (typeof parsed.tsconfig !== "string" || parsed.tsconfig.length === 0) {
+      throw new Error('Config field "tsconfig" must be a non-empty string when present.');
+    }
+    config.tsconfig = parsed.tsconfig;
+  }
+
+  return config;
+}
+
+function readPhaseLanguages(value: unknown): PhaseLanguages | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error('Config field "phaseLanguages" must be an object.');
+  }
+  const result: PhaseLanguages = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!VALID_PHASE_LANGUAGE_KEYS.has(key as keyof PhaseLanguages)) {
+      throw new Error(
+        `Config field "phaseLanguages.${key}" is not a recognized phase. Use one of ${[...VALID_PHASE_LANGUAGE_KEYS].sort().join(", ")}.`,
+      );
+    }
+    if (typeof raw !== "string" || !VALID_PHASE_LANGUAGE_VALUES.has(raw as PhaseSupportedLanguage)) {
+      throw new Error(
+        `Config field "phaseLanguages.${key}" must be one of ${[...VALID_PHASE_LANGUAGE_VALUES].sort().join(", ")}.`,
+      );
+    }
+    result[key as keyof PhaseLanguages] = raw as PhaseSupportedLanguage;
+  }
+  return result;
 }
 
 function mergeProtected(parsed: PartialConfig): string[] {

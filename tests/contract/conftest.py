@@ -81,6 +81,8 @@ def _lazy_load_checkers():
             "no_bare_locale_compare",
             # Round 13 L-05/P-04 — shared bash extractor module
             "bash_extractors_shared",
+            # Phase 0 (self-dogfooding plan) — per-phase language config
+            "phase_language_config_valid",
         ):
             _checkers[name] = getattr(mod, name, None)
 
@@ -139,6 +141,8 @@ _CHECKER_NAME_MAP = {
     "no-bare-locale-compare": "no_bare_locale_compare",
     # Round 13 L-05/P-04 — shared bash extractor module
     "bash-extractors-shared": "bash_extractors_shared",
+    # Phase 0 (self-dogfooding plan) — per-phase language config
+    "phase-language-config-valid": "phase_language_config_valid",
 }
 
 

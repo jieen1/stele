@@ -1373,6 +1373,46 @@ def test_cli_io_through_path_utils_mixed_default_named_import_accepted():
 
 
 # ---------------------------------------------------------------------------
+# Phase 0 (self-dogfooding plan) — phase_language_config_valid
+# ---------------------------------------------------------------------------
+
+
+def test_phase_language_config_valid_rejects_bad_key():
+    """Phase 0: an unknown phaseLanguages key (typo, future field, etc.)
+    must trip the checker. Otherwise a renamed phase silently disables
+    its dispatch override at check-time."""
+    _reset_caches()
+    config_path = sp._REPO_ROOT / "stele.config.json"
+    original = config_path.read_text(encoding="utf-8")
+    config = json.loads(original)
+    config["phaseLanguages"] = {"invalid_key": "typescript"}
+    config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    try:
+        result = sp.phase_language_config_valid({})
+    finally:
+        config_path.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "phase_language_config_valid_rejects_bad_key")
+
+
+def test_phase_language_config_valid_rejects_bad_lang():
+    """Phase 0: an unsupported phaseLanguages value (e.g. "elixir") must
+    trip the checker — otherwise the stage's `pickPhaseLanguage` returns
+    a language no extractor knows about and the violation surfaces only
+    via the harder-to-debug "no extractor" path."""
+    _reset_caches()
+    config_path = sp._REPO_ROOT / "stele.config.json"
+    original = config_path.read_text(encoding="utf-8")
+    config = json.loads(original)
+    config["phaseLanguages"] = {"trace": "elixir"}
+    config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    try:
+        result = sp.phase_language_config_valid({})
+    finally:
+        config_path.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "phase_language_config_valid_rejects_bad_lang")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1459,6 +1499,9 @@ def main() -> int:
         ("blank_string_interiors_recognises_regex_literal_with_quote_char_class", test_blank_string_interiors_recognises_regex_literal_with_quote_char_class),
         # Round 13: L-05/P-04 shared bash-extractor module.
         ("bash_extractors_shared_rejects_local_redefinition", test_bash_extractors_shared_rejects_local_redefinition),
+        # Phase 0 (self-dogfooding plan): phaseLanguages config validity.
+        ("phase_language_config_valid_rejects_bad_key", test_phase_language_config_valid_rejects_bad_key),
+        ("phase_language_config_valid_rejects_bad_lang", test_phase_language_config_valid_rejects_bad_lang),
     ]
 
     print("=" * 60)
