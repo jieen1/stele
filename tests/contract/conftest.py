@@ -71,6 +71,12 @@ def _lazy_load_checkers():
             "esm_relative_imports_keep_js",
             "hook_entrypoints_fail_closed",
             "core_has_no_stele_deps",
+            # Round 7 — Round 5 deferred dogfood opportunities
+            "no_cjs_require_in_ts_source",
+            "tsconfig_base_strict_mode",
+            "no_backward_compat_shims",
+            "core_engine_purity",
+            "cli_io_through_path_utils",
         ):
             _checkers[name] = getattr(mod, name, None)
 
@@ -119,6 +125,12 @@ _CHECKER_NAME_MAP = {
     "esm-relative-imports-keep-js": "esm_relative_imports_keep_js",
     "hook-entrypoints-fail-closed": "hook_entrypoints_fail_closed",
     "core-has-no-stele-deps": "core_has_no_stele_deps",
+    # Round 7 — Round 5 deferred dogfood opportunities
+    "no-cjs-require-in-ts-source": "no_cjs_require_in_ts_source",
+    "tsconfig-base-strict-mode": "tsconfig_base_strict_mode",
+    "no-backward-compat-shims": "no_backward_compat_shims",
+    "core-engine-purity": "core_engine_purity",
+    "cli-io-through-path-utils": "cli_io_through_path_utils",
 }
 
 

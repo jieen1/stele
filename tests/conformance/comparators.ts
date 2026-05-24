@@ -101,8 +101,11 @@ function compareViolation(
   // free-text sentences. Empty-string expected.cause.summary is rejected
   // — `"".includes("")` is always true, so an empty expected value would
   // silently accept any actual text.
-  if (expected.cause.summary.length === 0) {
-    expect(actual.cause.summary, `${label}.cause.summary (expected must not be empty)`).toBe(
+  // Round 7 L-08: also reject whitespace-only `expected.cause.summary`
+  // — without trimming, `expected = " "` would make
+  // `actual.includes(" ")` always true and silently accept anything.
+  if (expected.cause.summary.trim().length === 0) {
+    expect(actual.cause.summary, `${label}.cause.summary (expected must not be empty/whitespace)`).toBe(
       expected.cause.summary,
     );
   } else if (

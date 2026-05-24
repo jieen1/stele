@@ -549,14 +549,20 @@ const _PROTECTED_WALK_SKIP_DIRS = new Set([
   ".cache",
   "dist",
   "coverage",
-  // Round 6 M-04: skip ephemeral pytest + Python compile caches. The
-  // protected glob `contract/checker_impls/**/*` would otherwise hash
-  // every byte under `.pytest_cache/` and `__pycache__/`, and any
-  // pytest run that mutates nodeids (add/remove/skip a test) would
-  // immediately produce manifest drift on the next `stele check`.
+  // Round 6 M-04: skip ephemeral pytest cache. `.pytest_cache/` only
+  // ever contains pytest-managed state (nodeids cache, run history),
+  // never user source — wholesale skip is safe.
   ".pytest_cache",
-  "__pycache__",
 ]);
+
+// Round 7 M-04 follow-up: `__pycache__/` USUALLY holds only `.pyc`/`.pyo`
+// bytecode, but a malicious or naive user could place a real `.py` file
+// inside it (and the test `generate does not ignore protected source
+// files just because they live in __pycache__ directories` confirms we
+// must track such files). So instead of skipping the whole directory,
+// descend into it and only filter out the ephemeral compiled extensions
+// on the file-suffix level below.
+const _PROTECTED_FILE_SKIP_SUFFIXES = new Set([".pyc", ".pyo"]);
 
 async function walkProtectedRoot(directory: string, projectDir: string): Promise<string[]> {
   try {
@@ -599,6 +605,13 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
         }
 
         if (entry.isFile()) {
+          // Round 7: filter ephemeral `.pyc`/`.pyo` regardless of
+          // directory — they are always rewritten by the interpreter
+          // and would churn the manifest on every test run.
+          const dot = entry.name.lastIndexOf(".");
+          if (dot >= 0 && _PROTECTED_FILE_SKIP_SUFFIXES.has(entry.name.slice(dot))) {
+            return [];
+          }
           return [relativePath];
         }
 

@@ -116,8 +116,13 @@ ddd:
       architecture_style: hexagonal
       root: "packages/cli/src"
       layers:
-        presentation: "packages/cli/src/{commands,index}/**"
-        application: "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**"
+        presentation:
+          - "packages/cli/src/commands/**"
+          - "packages/cli/src/index.ts"
+        application:
+          - "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**"
+          - "packages/cli/src/architecture-runtime.ts"
+          - "packages/cli/src/recursive-discovery.ts"
         design-domain: "packages/cli/src/{design-profile,design-generator}/**"
         toolchain: "packages/cli/src/toolchain/**"
         infrastructure: "packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**"

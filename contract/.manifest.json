@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-23T17:21:48.745Z",
+  "generated_at": "2026-05-24T04:14:50.286Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -16,36 +16,40 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "faa673083db999aa6ad9b2db81271a59743e9f42be6c4582eee7e8458431374e",
-      "size": 84313
+      "sha256": "f043f7f93b2fe607815e60d7d7516b123223777219013f3517fca6f47d83f76d",
+      "size": 101656
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "c9b55a0ed57c00ae10a3cbc52ae9e7d85c93e216cc5971b476ed28e18c316f8c",
-      "size": 38179
+      "sha256": "a1a373f2ab815ef11d8bce02473af9c070d4f64f09cacc5e73afd2ae558ed912",
+      "size": 43703
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
       "size": 897
     },
+    "contract/design/approvals/2026-05-24T04-05-18-69-daba22ed.json": {
+      "sha256": "4876017d1654d4def1333bda5b995d7d10f5d13fe94932d45de1d6c81b5b58a6",
+      "size": 1673
+    },
     "contract/design/manifest.json": {
-      "sha256": "58ccf50a8ec98fd5afc68f3bdd74d73f7aee90a8e63d50574a3ff63d09cec427",
-      "size": 43948
+      "sha256": "50cc1d526a59b4d3868fa0770ae6836ef541d1b7c958874a2db4b9d86fe58499",
+      "size": 44103
     },
     "contract/design/profile.yaml": {
-      "sha256": "67037669397e03ef323418615268d516cc818788af71da48149a5665aee60671",
-      "size": 17642
+      "sha256": "daba22ede1694fdc379a96152ac249768ccde0ded772ab6244aab81242dfd470",
+      "size": 17807
     },
     "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml": {
       "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601",
       "size": 2615
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "5d28bafd67407e84139de18a19e33062a3e430ba0a9190069883f36722d06a91",
-      "size": 19809
+      "sha256": "1f7af6e6d861092b4e2862c5bedfa95ea0b33fadafb84aeccee0bb207d41dac9",
+      "size": 19953
     },
     "contract/main.stele": {
-      "sha256": "02aba4bb4a9f4f8e87239d5d30f033a772bab8f41278ae79f608d75df7b2074c",
-      "size": 14885
+      "sha256": "f4ff9afcc917055eef76c2d8e8aad1ff14bd64f48d56f5c4d2349c3457da22fb",
+      "size": 17827
     },
     "package.json": {
       "sha256": "4cd157c4a07307f29229c884d4d3c6a1ac08104eaf2f37cc9758ee543eeb46e6",
@@ -204,13 +208,13 @@
       "size": 30931
     },
     "tests/contract/conftest.py": {
-      "sha256": "237f5535033e05992f6952b49391ae5d95ad6afd889c65a253e8bb98e0741ea8",
-      "size": 5193
+      "sha256": "db2aecdb010e6978895ac579343588e8801d98fa6120e30400bdb0b50868f6cd",
+      "size": 5812
     },
     "tests/contract/test_contract.py": {
-      "sha256": "d45140137d9f913cfa1816536ad3a8094c8e962956075d6b902de155d8aec59d",
-      "size": 7952
+      "sha256": "cb43d78199a436c9e91ae1189b7a1f7f944b9ecb883c9911f165df001da4494b",
+      "size": 9089
     }
   },
-  "contract_hash": "3153d2405f3c0c842b64a635fa62dec296f0591313ee3951cf841adfbadd121a"
+  "contract_hash": "1a70e101f41919e40af8c0c7f56c64f80a32be223efff629a586b34721ee3de7"
 }

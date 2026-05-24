@@ -37,9 +37,14 @@
   (description "Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.")
 
   (module cli-presentation
-    (path "packages/cli/src/{commands,index}/**"))
+    (path "packages/cli/src/commands/**")
+    (path "packages/cli/src/index.ts")
+  )
   (module cli-application
-    (path "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**"))
+    (path "packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**")
+    (path "packages/cli/src/architecture-runtime.ts")
+    (path "packages/cli/src/recursive-discovery.ts")
+  )
   (module cli-design-domain
     (path "packages/cli/src/{design-profile,design-generator}/**"))
   (module cli-toolchain

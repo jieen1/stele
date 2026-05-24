@@ -11,6 +11,7 @@ import json
 import os
 import pathlib
 import re
+import subprocess
 from typing import Any
 
 # Resolve monorepo root relative to this file.
@@ -128,6 +129,38 @@ def _normalize_version(ver: str) -> tuple[str, ...]:
     return tuple(result)
 
 
+def _git_show_head_field(rel_path: str, field: str) -> str | None:
+    """Round 7 M-13: read a top-level JSON field from `git show HEAD:<rel_path>`.
+
+    Returns None if git is unavailable, the path is not in HEAD, the
+    blob is not valid JSON, or the field is absent. Failures are silent
+    by design — this helper is only ever used as a *strengthening* check
+    on top of the in-tree comparison, so a missing git context must not
+    block contract validation.
+    """
+    try:
+        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell.
+            ["git", "show", f"HEAD:{rel_path}"],
+            cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    value = data.get(field)
+    if not isinstance(value, str):
+        return None
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Checker implementations
 # ---------------------------------------------------------------------------
@@ -223,7 +256,27 @@ def config_schema_valid(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 
 
 def manifest_version_stable(ctx: dict, **kwargs: Any) -> dict[str, Any]:
-    """Verify manifest format is consistent with config version."""
+    """Verify manifest format is consistent with config version, and that
+    the on-disk manifest version field hasn't silently moved since the
+    last committed HEAD.
+
+    Round 7 M-13: the original checker compared the manifest's
+    `stele_version` field against the project config. That left a gap —
+    a regenerator (or a hand edit) could rewrite `stele_version` to a
+    new value AND update the config in the same uncommitted change,
+    making both sides match while still drifting from the canonical
+    HEAD version. We now additionally diff against `git show
+    HEAD:contract/.manifest.json` so the protected file's version cannot
+    move without a commit + lockstep package bump.
+
+    Behavior:
+      - Outside a git checkout / when HEAD does not yet have the
+        manifest: only the in-tree config<->manifest equality is
+        enforced (backward compatible).
+      - Inside a git checkout with a HEAD manifest: a version diff
+        between HEAD and working tree fails unless the project config
+        version was also bumped to match (intentional release).
+    """
     config = _read_config()
     manifest_path = _REPO_ROOT / "contract" / ".manifest.json"
     if not manifest_path.exists():
@@ -253,6 +306,27 @@ def manifest_version_stable(ctx: dict, **kwargs: Any) -> dict[str, Any]:
             "passed": False,
             "message": f"Config version {config_ver} != manifest stele_version {manifest_ver}",
         }
+
+    # Round 7 M-13: compare against committed HEAD.
+    head_manifest_ver = _git_show_head_field("contract/.manifest.json", "stele_version")
+    if head_manifest_ver is not None:
+        head_parts = _normalize_version(head_manifest_ver)
+        if head_parts[:2] != manifest_parts[:2]:
+            head_config_ver = _git_show_head_field("stele.config.json", "version") or "0.1"
+            head_config_parts = _normalize_version(head_config_ver)
+            # Allowed if the working-tree config was also bumped, i.e.
+            # this is a deliberate version-bump commit-in-progress.
+            if head_config_parts[:2] == config_parts[:2]:
+                return {
+                    "passed": False,
+                    "message": (
+                        f"Manifest stele_version moved from {head_manifest_ver} (HEAD) "
+                        f"to {manifest_ver} (working tree) without a matching config "
+                        f"bump (config still at {config_ver}). "
+                        "Bump packages/*/package.json + stele.config.json first, "
+                        "then regenerate the manifest in the same commit."
+                    ),
+                }
     return {"passed": True}
 
 
@@ -940,22 +1014,47 @@ def error_code_families_present(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 
 
 def cli_exit_code_enum_complete(ctx: dict, **kwargs: Any) -> dict[str, Any]:
-    """Verify ExitCode enum has all expected values."""
+    """Round 6/7 M-07: previously this checker only asserted the three
+    error class names (CliCommandError / GenerationError / ConfigError)
+    existed. The invariant *description* claimed it also enforced the
+    eight named code values — but `exit_codes_valid` was the only place
+    that checked them. The two invariants now share an enumeration
+    pass over `errors.ts` so a renamed or dropped code is flagged here
+    too, matching the description."""
     errors_ts = _PACKAGES_DIR / "cli" / "src" / "errors.ts"
     if not errors_ts.exists():
         return {"passed": False, "message": "errors.ts not found"}
 
     content = errors_ts.read_text(encoding="utf-8")
 
-    # Check for CliCommandError class
     if "class CliCommandError" not in content:
         return {"passed": False, "message": "CliCommandError class not found"}
-
-    # Check for GenerationError and ConfigError subclasses
     if "class GenerationError" not in content:
         return {"passed": False, "message": "GenerationError class not found"}
     if "class ConfigError" not in content:
         return {"passed": False, "message": "ConfigError class not found"}
+
+    # Round 6/7 M-07: enumerate the eight named codes (mirror of the
+    # `exit_codes_valid` expected_codes set, post Round 5 K-07).
+    expected_names = (
+        "SUCCESS",
+        "USER_ERROR",
+        "CONTRACT_FAIL",
+        "TAMPER_DETECTED",
+        "GENERATION_FAIL",
+        "CONFIG_ERROR",
+        "SCORE_BELOW_THRESHOLD",
+        "INTERNAL_ERROR",
+    )
+    missing = [n for n in expected_names if not re.search(rf"\b{n}\s*[:=]\s*\d", content)]
+    if missing:
+        return {
+            "passed": False,
+            "message": (
+                f"ExitCode enum missing named codes: {', '.join(missing)}. "
+                f"Each must appear as `<NAME>: <number>` or `<NAME> = <number>`."
+            ),
+        }
 
     return {"passed": True}
 
@@ -1011,6 +1110,11 @@ _PHASE_B_EVALUATOR_PACKAGES = [
     "@stele/type-state-evaluator",
     "@stele/effect-evaluator",
     "@stele/type-driven-evaluator",
+    # Round 7 M-08: architecture-core ships `evaluate.ts` and is
+    # consumed by the CLI's architecture/import evaluator pipeline.
+    # It was missing from the Phase B compile gate, so a broken
+    # build there would not fail the self-protection contract.
+    "@stele/architecture-core",
 ]
 
 
@@ -1905,10 +2009,13 @@ _HOOK_SCRIPTS_DOGFOOD = [
 
 
 def _extract_catch_bodies(source: str) -> list[str]:
-    """Round 5 K-02: extract every `catch (...) { ... }` block body via
-    brace counting. Returns a list of body strings; ordering matches
-    source order. Used by hook_entrypoints_fail_closed to assert at
-    least one catch handler ends with a fail-closed exit.
+    """Round 5 K-02 + Round 7 L-03: extract every `catch (...) { ... }`
+    block body via QUOTE-AWARE brace counting. L-03 noted that the
+    pre-Round-7 helper treated every `{`/`}` literally, so a catch
+    body whose first statement was `const msg = "}";` would terminate
+    at the brace inside the string and the trailing `failClosed(...)`
+    would fall outside the extracted body. Now skips past `"..."`,
+    `'...'`, and `` `...` `` segments while counting braces.
     """
     bodies: list[str] = []
     catch_re = re.compile(r"\}\s*catch\s*(?:\([^)]*\))?\s*\{")
@@ -1916,8 +2023,32 @@ def _extract_catch_bodies(source: str) -> list[str]:
         lb = match.end() - 1  # the `{`
         depth = 1
         i = lb + 1
-        while i < len(source) and depth > 0:
+        in_string: str | None = None  # quote char or None
+        n = len(source)
+        while i < n and depth > 0:
             ch = source[i]
+            if in_string is not None:
+                if ch == "\\":
+                    # Escape — skip next char.
+                    i += 2
+                    continue
+                if ch == in_string:
+                    in_string = None
+                i += 1
+                continue
+            if ch == '"' or ch == "'" or ch == "`":
+                in_string = ch
+                i += 1
+                continue
+            if ch == "/" and i + 1 < n and source[i + 1] == "/":
+                # Line comment — skip to newline.
+                nl = source.find("\n", i)
+                i = n if nl == -1 else nl
+                continue
+            if ch == "/" and i + 1 < n and source[i + 1] == "*":
+                end = source.find("*/", i + 2)
+                i = n if end == -1 else end + 2
+                continue
             if ch == "{":
                 depth += 1
             elif ch == "}":
@@ -2070,12 +2201,16 @@ def core_has_no_stele_deps(ctx: dict, **kwargs: Any) -> dict[str, Any]:
             content = ts_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        for m in _STELE_PACKAGE_PREFIX_RE.finditer(content):
+        # Round 7 L-07: strip comments + string literals before scanning
+        # so `// import { x } from "@stele/cli"` (a comment) and string
+        # references like JSDoc `` `@stele/cli` `` don't false-positive.
+        scanned = _strip_ts_comments(content)
+        for m in _STELE_PACKAGE_PREFIX_RE.finditer(scanned):
             # The regex has three alternation groups; exactly one matches.
             pkg = m.group(1) or m.group(2) or m.group(3)
             if pkg is None or pkg in _CORE_ALLOWED_DEPS:
                 continue
-            line_no = content.count("\n", 0, m.start()) + 1
+            line_no = scanned.count("\n", 0, m.start()) + 1
             violations.append({
                 "file": str(ts_file.relative_to(_REPO_ROOT)),
                 "line": line_no,
@@ -2094,6 +2229,296 @@ def core_has_no_stele_deps(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 + "; ".join(
                     f"{v['file']}:{v['line']} ({v['message']})" for v in violations[:5]
                 )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+# ---------------------------------------------------------------------------
+# Round 7 — additional dogfood checkers for CLAUDE.md rules that previously
+# had zero mechanical enforcement.
+# ---------------------------------------------------------------------------
+
+
+def _strip_ts_comments(source: str) -> str:
+    return _strip_js_comments_quote_aware(source)
+
+
+_CJS_REQUIRE_RE = re.compile(r"\brequire\s*\(\s*[\"'][^\"']+[\"']\s*\)")
+_VERSION_TS_ALLOWLIST = {
+    "packages/cli/src/version.ts",
+}
+
+
+def no_cjs_require_in_ts_source(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 7 (Round 5 deferred dogfood #1): CLAUDE.md 'ESM only'.
+    Refuse CJS `require()` calls in TS source. The single allowed site
+    (`packages/cli/src/version.ts`) reads `package.json` via
+    `createRequire(import.meta.url)` and is explicitly allow-listed."""
+    violations: list[dict[str, Any]] = []
+    for pkg_dir in sorted(_PACKAGES_DIR.glob("*")):
+        if not pkg_dir.is_dir():
+            continue
+        src_dir = pkg_dir / "src"
+        if not src_dir.is_dir():
+            continue
+        for ts_file in src_dir.rglob("*.ts"):
+            if "node_modules" in ts_file.parts or "dist" in ts_file.parts:
+                continue
+            if str(ts_file).endswith(".d.ts"):
+                continue
+            rel = str(ts_file.relative_to(_REPO_ROOT))
+            if rel in _VERSION_TS_ALLOWLIST:
+                continue
+            try:
+                content = ts_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            stripped = _strip_ts_comments(content)
+            for m in _CJS_REQUIRE_RE.finditer(stripped):
+                line_no = stripped.count("\n", 0, m.start()) + 1
+                violations.append({
+                    "file": rel,
+                    "line": line_no,
+                    "column": None,
+                    "message": (
+                        f"`{m.group(0)}` — CJS require() in TS source "
+                        f"(CLAUDE.md 'ESM only')."
+                    ),
+                })
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} CJS require() call(s) in TS source: "
+                + "; ".join(f"{v['file']}:{v['line']}" for v in violations[:5])
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+def tsconfig_base_strict_mode(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 7 (Round 5 deferred dogfood #2): tsconfig.base.json
+    compilerOptions.strict must be true; per-option strict flags must
+    not be individually disabled."""
+    tsconfig = _REPO_ROOT / "tsconfig.base.json"
+    if not tsconfig.is_file():
+        return {"passed": False, "message": "tsconfig.base.json missing"}
+    try:
+        raw = tsconfig.read_text(encoding="utf-8", errors="replace")
+        cleaned = re.sub(r"//[^\n]*", "", raw)
+        cleaned = re.sub(r"/\*[\s\S]*?\*/", "", cleaned)
+        data = json.loads(cleaned)
+    except (OSError, json.JSONDecodeError) as e:
+        return {"passed": False, "message": f"tsconfig.base.json parse failed: {e}"}
+    compiler = data.get("compilerOptions") or {}
+    if compiler.get("strict") is not True:
+        return {
+            "passed": False,
+            "message": (
+                "tsconfig.base.json compilerOptions.strict must be `true`; "
+                "found " + repr(compiler.get("strict"))
+            ),
+        }
+    forbidden_overrides = {
+        "noImplicitAny": False,
+        "strictNullChecks": False,
+        "strictFunctionTypes": False,
+        "strictBindCallApply": False,
+        "alwaysStrict": False,
+    }
+    violations: list[str] = []
+    for opt, forbidden_val in forbidden_overrides.items():
+        if compiler.get(opt) is forbidden_val:
+            violations.append(f"{opt}={forbidden_val}")
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                "tsconfig.base.json weakens strict mode via per-option override: "
+                + ", ".join(violations)
+            ),
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+_SHIM_MARKER_RE = re.compile(
+    # Anchor each marker tightly so the regex doesn't false-positive on
+    # legitimate diff text like `// Removed contexts` (section header in
+    # design diff output). `// removed:` and `// removed —` are the
+    # canonical shim-marker shapes; we also catch the explicit
+    # compat / legacy variants.
+    r"//\s*(?:"
+    r"removed[:—]|"                  # `// removed:` or `// removed —`
+    r"TODO\(compat\)|"
+    r"for\s+backwards?[\s-]+compat\b|"
+    r"@deprecated\s+temporary\b|"
+    r"legacy\s+shim\b|"
+    r"compat\s+shim\b"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def no_backward_compat_shims(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 7 (Round 5 deferred dogfood #3): CLAUDE.md 'Don't add
+    backward-compat shims, dead-flag toggles, or `// removed:` markers.'"""
+    violations: list[dict[str, Any]] = []
+    for pkg_dir in sorted(_PACKAGES_DIR.glob("*")):
+        if not pkg_dir.is_dir():
+            continue
+        src_dir = pkg_dir / "src"
+        if not src_dir.is_dir():
+            continue
+        for ts_file in src_dir.rglob("*.ts"):
+            if "node_modules" in ts_file.parts or "dist" in ts_file.parts:
+                continue
+            if str(ts_file).endswith(".d.ts"):
+                continue
+            try:
+                content = ts_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for m in _SHIM_MARKER_RE.finditer(content):
+                line_no = content.count("\n", 0, m.start()) + 1
+                line = content.splitlines()[line_no - 1] if line_no - 1 < len(content.splitlines()) else ""
+                violations.append({
+                    "file": str(ts_file.relative_to(_REPO_ROOT)),
+                    "line": line_no,
+                    "column": None,
+                    "message": f"backward-compat marker: {line.strip()[:120]}",
+                })
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} backward-compat shim marker(s) in TS source: "
+                + "; ".join(f"{v['file']}:{v['line']}" for v in violations[:5])
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+_CORE_PURITY_FORBIDDEN = [
+    ("Date.now()", r"\bDate\.now\s*\("),
+    ("Math.random()", r"\bMath\.random\s*\("),
+    ("process.env access", r"\bprocess\.env\b"),
+    ("crypto.randomBytes()", r"\bcrypto\.randomBytes\s*\("),
+    ("crypto.randomUUID()", r"\bcrypto\.randomUUID\s*\("),
+]
+_CORE_PURITY_ALLOWLIST = {
+    "packages/core/src/manifest/hash-manifest.ts": {"Date.now()"},
+}
+
+
+def core_engine_purity(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 7 (Round 5 deferred dogfood #4): CLAUDE.md 'Core engine is
+    pure. Same input must produce the same output.' Scan
+    `packages/core/src` for nondeterminism sources."""
+    core_src = _PACKAGES_DIR / "core" / "src"
+    if not core_src.is_dir():
+        return {"passed": True, "message": "no @stele/core/src present", "violations": []}
+    violations: list[dict[str, Any]] = []
+    for ts_file in core_src.rglob("*.ts"):
+        if not ts_file.is_file() or str(ts_file).endswith(".d.ts"):
+            continue
+        rel = str(ts_file.relative_to(_REPO_ROOT))
+        allow = _CORE_PURITY_ALLOWLIST.get(rel, set())
+        try:
+            content = ts_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        stripped = _strip_ts_comments(content)
+        for label, pattern in _CORE_PURITY_FORBIDDEN:
+            if label in allow:
+                continue
+            for m in re.finditer(pattern, stripped):
+                line_no = stripped.count("\n", 0, m.start()) + 1
+                violations.append({
+                    "file": rel,
+                    "line": line_no,
+                    "column": None,
+                    "message": f"`{label}` violates @stele/core purity",
+                })
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} non-pure call(s) in @stele/core: "
+                + "; ".join(
+                    f"{v['file']}:{v['line']} ({v['message'][:50]})"
+                    for v in violations[:5]
+                )
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+_CLI_FS_WRITE_RE = re.compile(
+    r"\b(?:writeFile|writeFileSync|appendFile|appendFileSync|"
+    r"mkdir|mkdirSync|rm|rmSync|unlink|unlinkSync|"
+    r"createWriteStream|copyFile|copyFileSync|rename|renameSync)\s*\(",
+)
+_CLI_PATH_SAFETY_ALLOWLIST = {
+    "packages/cli/src/utils/output-path.ts",
+    "packages/cli/src/last-report.ts",
+}
+
+
+def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 7 (Round 5 deferred dogfood #5): CLAUDE.md 'Path safety is
+    the hot path.' Every CLI command file under `packages/cli/src/
+    commands/` that calls a node:fs write function must also reference
+    one of the path-safety primitives in the same file."""
+    commands_dir = _PACKAGES_DIR / "cli" / "src" / "commands"
+    if not commands_dir.is_dir():
+        return {"passed": True, "message": "no cli commands dir", "violations": []}
+    violations: list[dict[str, Any]] = []
+    for ts_file in commands_dir.rglob("*.ts"):
+        if not ts_file.is_file() or str(ts_file).endswith(".d.ts"):
+            continue
+        rel = str(ts_file.relative_to(_REPO_ROOT))
+        if rel in _CLI_PATH_SAFETY_ALLOWLIST:
+            continue
+        try:
+            content = ts_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        stripped = _strip_ts_comments(content)
+        if not _CLI_FS_WRITE_RE.search(stripped):
+            continue
+        has_path_safety = any(
+            marker in stripped
+            for marker in (
+                "resolve(",
+                "path.resolve(",
+                "join(",                       # node:path join is the
+                "path.join(",                  # other accepted helper
+                "validateOutputPath(",
+                "collectProtectedPaths(",
+                "normalizeProjectRelativePath(",
+                "isWithinProject(",
+            )
+        )
+        if not has_path_safety:
+            violations.append({
+                "file": rel,
+                "line": None,
+                "column": None,
+                "message": (
+                    "fs-write call site has no path-safety helper reference"
+                ),
+            })
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} CLI command file(s) write to fs without going through path-safety helpers: "
+                + "; ".join(v['file'] for v in violations[:5])
             ),
             "violations": violations,
         }

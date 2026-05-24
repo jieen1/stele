@@ -142,7 +142,7 @@
 
 (invariant MANIFEST_VERSION_STABLE
   (severity error)
-  (description "The manifest format version must not change without a version bump.")
+  (description "The manifest format version must not change without a matching config bump — verified against both stele.config.json and the committed HEAD copy of contract/.manifest.json (Round 7 M-13).")
   (uses-checker manifest-version-stable))
 
 (invariant MANIFEST_HASH_ALGORITHM
@@ -343,5 +343,45 @@
   (severity error)
   (description "Round 4 E-08 / CLAUDE.md: @stele/core is the leaf of the dependency direction `core ← backend-* ← cli`. An agent that imports from @stele/cli or @stele/backend-* inside packages/core/src would silently invert the layering.")
   (uses-checker core-has-no-stele-deps))
+
+(checker no-cjs-require-in-ts-source
+  (description "TS source under packages/*/src must not use CJS require() (CLAUDE.md 'ESM only')."))
+
+(invariant NO_CJS_REQUIRE_IN_TS_SOURCE
+  (severity error)
+  (description "Round 7 (Round 5 deferred dogfood #1) / CLAUDE.md: 'ESM only'. Round 4 E-02 enforces the `.js` import suffix; this complement refuses CJS require() in TS source. The single allowed site (packages/cli/src/version.ts) reads package.json via createRequire(import.meta.url) and is explicitly allow-listed.")
+  (uses-checker no-cjs-require-in-ts-source))
+
+(checker tsconfig-base-strict-mode
+  (description "tsconfig.base.json compilerOptions.strict must be true and no per-option strict flag may be individually disabled."))
+
+(invariant TSCONFIG_BASE_STRICT_MODE
+  (severity error)
+  (description "Round 7 (Round 5 deferred dogfood #2) / CLAUDE.md 'Strict TypeScript'. An agent silently flipping strict to false (or disabling noImplicitAny / strictNullChecks etc.) would weaken type safety across every package. This check locks strict mode at the base config.")
+  (uses-checker tsconfig-base-strict-mode))
+
+(checker no-backward-compat-shims
+  (description "TS source must not contain backward-compat shim markers like `// removed:`, `// TODO(compat)`, `// for backwards compat`, `// legacy shim`."))
+
+(invariant NO_BACKWARD_COMPAT_SHIMS
+  (severity error)
+  (description "Round 7 (Round 5 deferred dogfood #3) / CLAUDE.md 'Don't add backward-compat shims, dead-flag toggles, or `// removed:` markers. When you remove code, remove it.'")
+  (uses-checker no-backward-compat-shims))
+
+(checker core-engine-purity
+  (description "@stele/core source must not call Date.now / Math.random / process.env / crypto.randomBytes / crypto.randomUUID (one documented Date.now allowlist entry in hash-manifest.ts)."))
+
+(invariant CORE_ENGINE_PURITY
+  (severity error)
+  (description "Round 7 (Round 5 deferred dogfood #4) / CLAUDE.md 'Core engine is pure. Same input must produce the same output.' Nondeterminism sources (clock / random / env / crypto) inside @stele/core silently break the byte-stable manifest hash and the generator's determinism contract.")
+  (uses-checker core-engine-purity))
+
+(checker cli-io-through-path-utils
+  (description "Every packages/cli/src/commands/*.ts file that calls a node:fs write function must reference at least one path-safety helper (resolve / join / validateOutputPath / collectProtectedPaths / etc.)."))
+
+(invariant CLI_IO_THROUGH_PATH_UTILS
+  (severity error)
+  (description "Round 7 (Round 5 deferred dogfood #5) / CLAUDE.md 'Path safety is the hot path. Any new file IO in packages/cli or packages/claude-code-plugin/scripts must resolve through the existing path-safety helpers — never construct paths from raw user/agent input.'")
+  (uses-checker cli-io-through-path-utils))
 
 (import "generated/ddd-typedriven.stele")

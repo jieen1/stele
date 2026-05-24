@@ -812,6 +812,121 @@ def test_cdl_utf8_valid_invalid_bytes():
 
 
 # ---------------------------------------------------------------------------
+# Round 7 — negative tests for the five new dogfood checkers + strengthened M-07
+# ---------------------------------------------------------------------------
+
+
+def test_no_cjs_require_in_ts_source_catches_require():
+    """Round 7: write a .ts file with a CJS `require(...)` call inside
+    `packages/core/src/`; the checker must flag it (allowlist only
+    excludes `packages/cli/src/version.ts`)."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_cjs.ts"
+    target.write_text(
+        "const fs = require(\"node:fs\");\nexport const a = fs;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_cjs_require_in_ts_source({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "no_cjs_require_in_ts_source_catches_require")
+
+
+def test_tsconfig_base_strict_mode_weakened():
+    """Round 7: rewrite tsconfig.base.json so `strict: true` is preserved
+    BUT a per-option weakening (`strictNullChecks: false`) is layered
+    on top — checker must refuse."""
+    _reset_caches()
+    tsconfig_path = sp._REPO_ROOT / "tsconfig.base.json"
+    if not tsconfig_path.is_file():
+        print("  SKIP: tsconfig.base.json not present")
+        return True
+    original = tsconfig_path.read_text(encoding="utf-8")
+    data = json.loads(original)
+    data.setdefault("compilerOptions", {})["strictNullChecks"] = False
+    tsconfig_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    try:
+        result = sp.tsconfig_base_strict_mode({})
+    finally:
+        tsconfig_path.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "tsconfig_base_strict_mode_weakened")
+
+
+def test_no_backward_compat_shims_catches_marker():
+    """Round 7: introduce a `// removed: X` marker in a TS file. The
+    canonical-shim regex must catch it (the marker is the very thing
+    the CLAUDE.md rule bans)."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_shim.ts"
+    target.write_text(
+        "// removed: legacy V0 helper, retained for backwards compat\n"
+        "export const placeholder = 1;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_backward_compat_shims({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "no_backward_compat_shims_catches_marker")
+
+
+def test_core_engine_purity_catches_date_now():
+    """Round 7: drop a `Date.now()` call into a core source file outside
+    the manifest-hash allowlist. Determinism guard must catch it."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_purity.ts"
+    target.write_text(
+        "export const stamp = Date.now();\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.core_engine_purity({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "core_engine_purity_catches_date_now")
+
+
+def test_cli_io_through_path_utils_catches_unsafe_write():
+    """Round 7: write a CLI command file that calls `writeFile(...)` on
+    a raw user-input path without any path-safety helper reference.
+    The checker must flag it."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_io.ts"
+    target.write_text(
+        "import { writeFile } from \"node:fs/promises\";\n"
+        "export async function unsafe(input: string): Promise<void> {\n"
+        "  await writeFile(input, \"data\");\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.cli_io_through_path_utils({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "cli_io_through_path_utils_catches_unsafe_write")
+
+
+def test_cli_exit_code_enum_complete_missing_code_value():
+    """Round 7 M-07: rewrite errors.ts so the class names are still
+    present BUT one named code value (SCORE_BELOW_THRESHOLD) is
+    renamed. The strengthened checker must catch the missing code."""
+    _reset_caches()
+    errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
+    if not errors_ts.is_file():
+        print("  SKIP: errors.ts not present")
+        return True
+    original = errors_ts.read_text(encoding="utf-8")
+    tampered = re.sub(r"\bSCORE_BELOW_THRESHOLD\b", "SCORE_BELOW_LIMIT", original)
+    errors_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.cli_exit_code_enum_complete({})
+    finally:
+        errors_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "cli_exit_code_enum_complete_missing_code_value")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -861,6 +976,17 @@ def main() -> int:
         ("esm_relative_imports_keep_js_missing_suffix", test_esm_relative_imports_keep_js_missing_suffix),
         ("hook_entrypoints_fail_closed_catch_swallows_error", test_hook_entrypoints_fail_closed_catch_swallows_error),
         ("core_has_no_stele_deps_dynamic_import", test_core_has_no_stele_deps_dynamic_import),
+        # Round 7: negative tests for the five new dogfood checkers
+        # (NO_CJS_REQUIRE_IN_TS_SOURCE, TSCONFIG_BASE_STRICT_MODE,
+        # NO_BACKWARD_COMPAT_SHIMS, CORE_ENGINE_PURITY,
+        # CLI_IO_THROUGH_PATH_UTILS) plus the M-07 strengthened
+        # CLI_EXIT_CODE_ENUM_COMPLETE.
+        ("no_cjs_require_in_ts_source_catches_require", test_no_cjs_require_in_ts_source_catches_require),
+        ("tsconfig_base_strict_mode_weakened", test_tsconfig_base_strict_mode_weakened),
+        ("no_backward_compat_shims_catches_marker", test_no_backward_compat_shims_catches_marker),
+        ("core_engine_purity_catches_date_now", test_core_engine_purity_catches_date_now),
+        ("cli_io_through_path_utils_catches_unsafe_write", test_cli_io_through_path_utils_catches_unsafe_write),
+        ("cli_exit_code_enum_complete_missing_code_value", test_cli_exit_code_enum_complete_missing_code_value),
     ]
 
     print("=" * 60)

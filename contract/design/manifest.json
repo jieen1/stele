@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "67037669397e03ef323418615268d516cc818788af71da48149a5665aee60671",
+  "profileHash": "daba22ede1694fdc379a96152ac249768ccde0ded772ab6244aab81242dfd470",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "8b895498fe0438c010b6422cec643d3b3ffa3fb9"
+    "git_sha": "081fe6f14b204864d99e52d78f5de316175b7336"
   },
   "templates": [
     "ddd-typedriven"
@@ -37,8 +37,8 @@
           "context_name": "Cli"
         }
       ],
-      "fileHash": "7d57fa490ef9fdf40e549114d4807bf3e199ec12e6a0a726670c80c817a4cc4d",
-      "cdl": "(architecture \"ddd-cli\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.\")\n\n  (module cli-presentation\n    (path \"packages/cli/src/{commands,index}/**\"))\n  (module cli-application\n    (path \"packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**\"))\n  (module cli-design-domain\n    (path \"packages/cli/src/{design-profile,design-generator}/**\"))\n  (module cli-toolchain\n    (path \"packages/cli/src/toolchain/**\"))\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n\n  (layer presentation cli-presentation)\n  (layer application cli-application)\n  (layer design-domain cli-design-domain)\n  (layer toolchain cli-toolchain)\n  (layer infrastructure cli-infrastructure)\n\n  (allow-dependency cli-presentation cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-design-domain cli-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "198d2387aa50f5dea9729dc1908868c0ea828e8ed1f5ab38ca6968550328d6ce",
+      "cdl": "(architecture \"ddd-cli\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.\")\n\n  (module cli-presentation\n    (path \"packages/cli/src/commands/**\")\n    (path \"packages/cli/src/index.ts\")\n  )\n  (module cli-application\n    (path \"packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**\")\n    (path \"packages/cli/src/architecture-runtime.ts\")\n    (path \"packages/cli/src/recursive-discovery.ts\")\n  )\n  (module cli-design-domain\n    (path \"packages/cli/src/{design-profile,design-generator}/**\"))\n  (module cli-toolchain\n    (path \"packages/cli/src/toolchain/**\"))\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n\n  (layer presentation cli-presentation)\n  (layer application cli-application)\n  (layer design-domain cli-design-domain)\n  (layer toolchain cli-toolchain)\n  (layer infrastructure cli-infrastructure)\n\n  (allow-dependency cli-presentation cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-design-domain cli-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-architecture",
@@ -394,17 +394,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-23T09:26:01.134Z",
+  "generatedAt": "2026-05-24T04:05:22.455Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "5d28bafd67407e84139de18a19e33062a3e430ba0a9190069883f36722d06a91"
+      "hash": "1f7af6e6d861092b4e2862c5bedfa95ea0b33fadafb84aeccee0bb207d41dac9"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "5d28bafd67407e84139de18a19e33062a3e430ba0a9190069883f36722d06a91",
+      "sha256": "1f7af6e6d861092b4e2862c5bedfa95ea0b33fadafb84aeccee0bb207d41dac9",
       "rules": [
         {
           "id": "architecture.ddd-core",
