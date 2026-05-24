@@ -44,6 +44,13 @@ export type VerificationResult = {
   changed: string[];
 };
 
+/**
+ * Reads each protected file to hash it, then writes the manifest via
+ * writeAtomic. fs.write / time / random are inherited via propagation
+ * from the writeAtomic edge and audited via effect-suppression.
+ *
+ * @stele:effects fs.read, crypto.hash
+ */
 export async function writeManifest(paths: string[], manifestPath: string, contractHash: string): Promise<void> {
   const absoluteManifestPath = resolve(manifestPath);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -91,6 +98,7 @@ export async function writeManifest(paths: string[], manifestPath: string, contr
   await writeAtomic(absoluteManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
+/** @stele:effects fs.read, crypto.hash */
 export async function verifyManifest(manifestPath: string): Promise<VerificationResult> {
   const absoluteManifestPath = resolve(manifestPath);
   const manifestBaseDirectory = getManifestBaseDirectory(absoluteManifestPath);

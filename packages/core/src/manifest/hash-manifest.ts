@@ -62,6 +62,7 @@ export type ParsedFileLike = {
   deps: string[];
 };
 
+/** @stele:effects fs.read */
 export async function readHashManifest(projectRoot: string): Promise<HashManifest | null> {
   const cachePath = join(resolve(projectRoot), HASH_MANIFEST_RELATIVE_PATH);
 
@@ -91,12 +92,22 @@ export async function readHashManifest(projectRoot: string): Promise<HashManifes
   return parsed;
 }
 
+/**
+ * Wraps writeAtomic — fs.write / time / random are inherited via propagation
+ * from the writeAtomic call edge and audited via effect-suppression.
+ */
 export async function writeHashManifest(projectRoot: string, manifest: HashManifest): Promise<void> {
   const absoluteRoot = resolve(projectRoot);
   const cachePath = join(absoluteRoot, HASH_MANIFEST_RELATIVE_PATH);
   await writeAtomic(cachePath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
+/**
+ * Removes the hash-manifest cache file. The `unlink` call is a non-atomic
+ * write effect; deliberately not annotated as a leaf `fs.write` source —
+ * deleting an internal cache is not the dangerous "produce a generated
+ * output without going through writeAtomic" pattern the policy targets.
+ */
 export async function deleteHashManifest(projectRoot: string): Promise<boolean> {
   const cachePath = join(resolve(projectRoot), HASH_MANIFEST_RELATIVE_PATH);
   try {
@@ -183,11 +194,19 @@ export { buildTransitiveHash as hashManifest };
  *
  * Previously named `sha256`; renamed to disambiguate from the smart
  * constructor exported by `util/branded-types.ts`.
+ *
+ * @stele:effects crypto.hash
  */
 export function computeSha256(value: string): Sha256 {
   return sha256SmartCtor(createHash("sha256").update(value).digest("hex"));
 }
 
+/**
+ * Atomic temp-file-and-rename writer. The sole legitimate fs.write site
+ * inside @stele/core; every manifest write must route through this.
+ *
+ * @stele:effects fs.write, time, random
+ */
 export async function writeAtomic(targetPath: string, content: string): Promise<void> {
   const directory = dirname(targetPath);
   await mkdir(directory, { recursive: true });
@@ -214,6 +233,7 @@ export async function writeAtomic(targetPath: string, content: string): Promise<
   }
 }
 
+/** @stele:effects fs.read, crypto.hash */
 export async function sha256OfFileOrNull(filePath: string): Promise<Sha256 | null> {
   try {
     const buffer = await readFile(filePath);
