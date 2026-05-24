@@ -94,14 +94,19 @@ per-phase language override:
   "testFramework": "pytest",
   "phaseLanguages": {
     "trace": "typescript",
-    "typeState": "typescript",
+    "type-state": "typescript",
     "effect": "typescript",
-    "codeShape": "both",         // 注意：code-shape 已经按 declaration.lang dispatch；这字段只控制 default
-    "architecture": "typescript" // (already implicit today via design profile)
+    "code-shape": "typescript",
+    "architecture": "typescript"
   },
   "tsconfig": "tsconfig.base.json"
 }
 ```
+
+**Reviewer V-12 fix:** kebab-case keys match the CDL mechanism
+names. Code-shape per-declaration `(lang …)` still overrides the
+default, so this field is essentially advisory unless a future
+release supports omitting `(lang …)`.
 
 Without Phase 0, Phases 3 / 4 / 5 cannot land — they're literally
 blocked by the dispatch logic. So Phase 0 is non-optional.
@@ -167,13 +172,19 @@ pass.
 
 ### CC-3 Stele check + pytest must stay green
 
+**Reviewer V-11 fix:** `test_negative.py` defines 88+ pytest-style
+`def test_…` functions. Running it as `python file.py` only executes
+the `if __name__ == "__main__":` block (the legacy ad-hoc runner) and
+SKIPS the function set. Use the pytest invocation as the authoritative
+command.
+
 After every step in a phase, the following must all return exit 0:
 
 ```
 pnpm build
 node packages/cli/dist/index.js check
 .venv/bin/python -m pytest tests/contract -q
-.venv/bin/python contract/checker_impls/test_negative.py
+.venv/bin/python -m pytest contract/checker_impls/test_negative.py -q
 ```
 
 If any goes red, the step is incomplete.
@@ -227,6 +238,29 @@ independent reviewer round (Round 15+) returns 0 substantive
 findings. Reviewer findings get fixed in additional commits, not
 silenced.
 
+### CC-11 NodeId / arity convention for Phase B targets
+
+**Reviewer V-09 fix:** trace/effect/type-state `(target …)` and
+`(target-scope …)` values reference call-graph NodeIds. The pattern
+matcher in `@stele/call-graph-core` accepts BOTH:
+
+- Arity-less form: `"packages/foo/bar.ts::baz"` (matches any arity)
+- Arity-specified form: `"packages/foo/bar.ts::baz(2)"` (matches
+  only the 2-arg variant)
+
+**Convention for this plan:** prefer arity-less unless there's
+known overloading. The 3 cases where arity matters and MUST be
+specified are:
+
+- `effect-suppression` targets — to disambiguate the exact function
+  being exempted (Phase 4 §4.4 already follows this)
+- `type-state-binding` targets that bind to a specific overload
+- Trace-policy `must-transit` where two methods with the same name
+  exist on different overloads
+
+When writing a contract, READ the source first and confirm the
+arity. Document the choice in the surrounding comment.
+
 ## Risk register
 
 | Risk | Mitigation | Phase |
@@ -234,6 +268,7 @@ silenced.
 | `phaseLanguages` introduces breaking change for adopters | Make the field optional with safe defaults; document migration | 0 |
 | branded-id mass adoption triggers 100+ TS errors | Land branded types one type at a time (5 sub-commits) | 1 |
 | Trace-policy on this repo is slow (call-graph extraction) | Add cache; benchmark before/after | 3 |
+| **Cumulative Phase B (trace+type-state+effect) on the 9.3k-node × 41k-edge graph** may breach the Stop-hook latency budget | Pre-bake a benchmark step before Phase 3 starts; gate Phases 4/5 on it; if cumulative cost exceeds 30s, add aggressive scoping (`(scope …)` narrower targets) or graph caching | 3, 4, 5 |
 | Effect-policy too aggressive — flags hash-manifest.ts | Pre-write the `effect-suppression` declarations | 4 |
 | Type-state requires core-type refactor (Manifest / Approval) | Land Phase 5 BEHIND Phase 1 (branded types already done) so the refactor surface is well-typed | 5 |
 | Reviewer rounds find HIGH bypass that requires re-doing a Phase | Plan the reviewer turn-around explicitly in Phase 7 — budget 2 review rounds | 7 |

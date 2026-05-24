@@ -75,25 +75,53 @@ Then: `stele design propose ...` (or direct edit) → approve → generate.
 
 **Target type:** `RuleId` — `"stele:*"` or `"custom:*"` formatted IDs.
 
-**Likely call sites** (run grep before starting):
+**Verified call-site count at planning time:**
 
 ```
 grep -rn "rule_id:\|ruleId:" packages/core/src packages/cli/src packages/agent-hooks/src | grep -v ".test.\|dist/" | wc -l
-# expected: ~50–80 sites
+# 58 matches (43 of those in packages/cli/src)
 ```
 
-**Strategy per site:**
-- If the value is a string literal: replace with `ruleId("stele:foo")`
-- If the value comes from a parameter: change the parameter type from
-  `string` to `RuleId`. Propagate upward (callers must call `ruleId(...)` too)
-- If the value is read from a CDL-parsed structure: at the parser
-  boundary, wrap with `ruleId(...)` once
+**Reviewer V-07 fix — TEMPLATE LITERAL cases:**
+A non-trivial fraction of sites assign a TEMPLATE LITERAL (backtick
+string), not a plain string. E.g. `packages/cli/src/architecture/stage.ts`
+has `` rule_id: `architecture.${arch.id}.${v.fromModule}` ``. These
+MUST be wrapped — `` rule_id: ruleId(`architecture.${arch.id}.${v.fromModule}`) `` —
+or the smart-constructor guarantee is bypassed silently.
 
-**Tooling:** Use `pnpm typecheck` after each batch (5–10 sites at a time)
-to catch cascading type errors.
+The pattern-validation regex inside `ruleId(...)` must accept the
+output format of these template literals (e.g. `architecture.<id>.<name>`).
+Either:
+- Widen the `isValidRuleId` regex to accept `^[a-z][a-z0-9.-]*:[A-Za-z0-9._-]+$|^architecture\..+$`
+- OR introduce a dedicated `architectureRuleId(...)` smart constructor
+  for the architecture stage
+
+Decision: widen the regex (single-helper preferred over per-domain helpers).
+
+**Strategy per site:**
+- Plain string literal: `rule_id: "stele:foo"` → `rule_id: ruleId("stele:foo")`
+- Template literal: `` rule_id: `prefix.${x}` `` → `` rule_id: ruleId(`prefix.${x}`) ``
+- Parameter-typed value: change the parameter type from `string` to `RuleId`;
+  callers must call `ruleId(...)` at their construction point
+- CDL-parser-returned value: wrap with `ruleId(...)` at the parser boundary
+  (`packages/core/src/validator/structure-invariant.ts` etc.)
+
+**Tooling:** Use `pnpm typecheck` after each batch (5–10 sites at a
+time) to catch cascading type errors.
 
 **Acceptance after Step 1.2:**
-- `grep -n 'rule_id:.*"' packages/core/src packages/cli/src | grep -v 'ruleId(' | grep -v 'as RuleId' | grep -v '\.test\.' | wc -l` returns 0
+
+Run BOTH grep forms — the original (plain) AND the template-literal form:
+
+```bash
+# Plain string assignments not wrapped:
+grep -n 'rule_id:.*"' packages/core/src packages/cli/src | grep -v 'ruleId(' | grep -v 'as RuleId' | grep -v '\.test\.' | wc -l
+# Template-literal assignments not wrapped:
+grep -nE 'rule_id:\s*`' packages/core/src packages/cli/src | grep -v 'ruleId(' | grep -v '\.test\.' | wc -l
+```
+
+Both counts must be 0.
+
 - All vitest suites pass
 - `pnpm typecheck` clean
 

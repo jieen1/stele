@@ -26,6 +26,13 @@ Write 6 trace-policy contracts. Each one locks down a "must transit"
 or "deny direct" relationship that's currently enforced by convention
 or by Python checker only.
 
+**Reviewer V-09 reminder:** target NodeIds may be arity-less (the
+pattern matcher treats arity-less as wildcard). For Phase 3 the
+arity-less form is acceptable unless the source has overloaded methods.
+Confirm by reading source for each target before locking the contract
+— if two methods named `foo` exist, the contract MUST disambiguate
+with arity. See CC-11 in README.md.
+
 ## The 6 contracts
 
 ### 3.1 — `FS_WRITES_VIA_WRITE_ATOMIC`

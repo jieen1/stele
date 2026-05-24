@@ -38,18 +38,27 @@ graph. This Phase upgrades the proxy to the real thing.
 
 ### Step 4.1 — `effect-declarations`
 
+**Reviewer V-03 / V-04 fix:**
+- Dotted effect names (`fs.read`, `crypto.hash`) MUST be string
+  literals — CDL identifier alphabet is `[A-Za-z_]` start +
+  `[A-Za-z0-9_-]` part (`packages/core/src/lexer/lexer.ts:297–303`).
+  Bare `pure` / `time` / `random` / `env` / `network` / `process`
+  are fine. `child-process` is fine (`-` is in alphabet).
+- `pure` is NOT declared. Per the effect-system spec, "pure" is
+  the *absence* of any declared effect; a node with `effects: []`
+  is pure by construction.
+
 ```lisp
 (effect-declarations
-  (effect pure)
-  (effect fs.read)
-  (effect fs.write)
-  (effect time)         ; Date.now, performance.now, setTimeout
-  (effect random)       ; Math.random, crypto.random*
-  (effect env)          ; process.env access
-  (effect network)      ; http / fetch / dns
-  (effect crypto.hash)  ; deterministic hashing (createHash is pure given input)
-  (effect process)      ; process.exit, process.cwd, process.argv
-  (effect child-process)) ; execFile, spawn
+  (effect "fs.read")        ; readFile, readdirSync, stat
+  (effect "fs.write")       ; writeFile, rename, unlink, mkdir
+  (effect time)             ; Date.now, performance.now, setTimeout
+  (effect random)           ; Math.random, crypto.random*
+  (effect env)              ; process.env access
+  (effect network)          ; http / fetch / dns
+  (effect "crypto.hash")    ; deterministic hashing (createHash is pure given input)
+  (effect process)          ; process.exit, process.cwd, process.argv
+  (effect child-process))   ; execFile, spawn
 ```
 
 ### Step 4.2 — `effect-annotation` (per public API)
@@ -77,16 +86,27 @@ Most will be `@stele:effects pure`. Exceptions:
 
 ### Step 4.3 — Write 4 `effect-policy` contracts
 
+**Reviewer V-02 fix:** `effect-policy` uses `(target-scope …)`, NOT
+`(target …)`. The valid fields per `structure-effect.ts:82–89` are:
+`description`, `severity`, `target-scope`, `forbid`, `allow-only`,
+`fix-hint`. Anything else returns E0359. Also `exempt` is NOT a valid
+field of `effect-policy`; the exemption mechanism is the separate
+`effect-suppression` form (Step 4.4).
+
 #### `CORE_IS_PURE_OR_FS_READ`
 
 ```lisp
 (effect-policy CORE_IS_PURE_OR_FS_READ
   (description "@stele/core/src is the pure-ish layer. fs.read is allowed (for loadContract). fs.write, time, random, network, env, process, child-process are all forbidden — they belong in the cli or backends, not in core.")
   (severity error)
-  (target "packages/core/src/**::*")
-  (allow-only "pure" "fs.read" "crypto.hash")
+  (target-scope "packages/core/src/**::*")
+  (allow-only "fs.read" "crypto.hash")
   (fix-hint "[A] If your function needs a side effect, move it out of @stele/core into @stele/cli. [B] If you believe core legitimately needs a new effect, propose adding it to the allow-only set via design propose."))
 ```
+
+(Note: `allow-only` lists the WHITELISTED effects. The absence of
+`pure` is intentional — a pure node already has `effects: []` and
+doesn't need to clear a whitelist.)
 
 #### `MANIFEST_WRITES_ARE_ATOMIC`
 
@@ -94,13 +114,14 @@ Most will be `@stele:effects pure`. Exceptions:
 (effect-policy MANIFEST_WRITES_ARE_ATOMIC
   (description "Only writeAtomic may have effect=fs.write inside @stele/core. Any other function with fs.write is a violation — manifests must be atomic.")
   (severity error)
-  (target "packages/core/src/manifest/**::*")
+  (target-scope "packages/core/src/manifest/**::*")
   (forbid "fs.write")
-  (exempt "packages/core/src/manifest/hash-manifest.ts::writeAtomic" (reason "the canonical atomic writer"))
-  (exempt "packages/core/src/manifest/manifest.ts::writeManifest" (reason "wraps writeAtomic"))
-  (exempt "packages/core/src/manifest/hash-manifest.ts::writeHashManifest" (reason "wraps writeAtomic"))
-  (fix-hint "[A] Route the write through writeAtomic. [B] If you legitimately need a non-atomic write inside core/manifest, file an exemption with a security review note."))
+  (fix-hint "[A] Route the write through writeAtomic. [B] If you legitimately need a non-atomic write inside core/manifest, file an effect-suppression with a security review note."))
 ```
+
+(Note: `writeAtomic`/`writeManifest`/`writeHashManifest` are
+suppressed via 3 separate `effect-suppression` entries in Step 4.4 —
+NOT inline in the policy.)
 
 #### `HOOK_NO_NETWORK`
 
@@ -108,7 +129,7 @@ Most will be `@stele:effects pure`. Exceptions:
 (effect-policy HOOK_NO_NETWORK
   (description "Hook scripts must not have network effects — a hook that contacts the internet is an exfiltration risk.")
   (severity error)
-  (target "packages/claude-code-plugin/scripts/*.js::*")
+  (target-scope "packages/claude-code-plugin/scripts/*.js::*")
   (forbid "network")
   (fix-hint "[A] Remove the network call. [B] If telemetry is needed, it must be opt-in and gated behind a STELE_TELEMETRY env var documented in claude-code-plugin.md."))
 ```
@@ -119,19 +140,47 @@ Most will be `@stele:effects pure`. Exceptions:
 (effect-policy GENERATOR_NO_NETWORK_OR_CHILD_PROCESS
   (description "stele generate must be self-contained — no network, no shelling out. Determinism requires that generation is hermetic.")
   (severity error)
-  (target "packages/cli/src/commands/generate.ts::*")
+  (target-scope "packages/cli/src/commands/generate.ts::*")
   (forbid "network" "child-process")
   (fix-hint "[A] Move the shell-out / network call out of generate. The CLI orchestrator may do this; the generator may not."))
 ```
 
-### Step 4.4 — `effect-suppression` for hash-manifest.ts
+### Step 4.4 — `effect-suppression` for the 3 legitimate fs.write sites in @stele/core/manifest
+
+**Reviewer V-03 / V-09 fix:**
+- Field name is `suppresses`, not `suppress` (`structure-effect.ts:92`).
+- Suppression targets should include arity to disambiguate (e.g.
+  `writeAtomic(2)`); arity is optional in the pattern matcher but
+  recommended for unambiguous targeting.
+
+We need 3 separate `effect-suppression` blocks (one per legitimate
+caller) — `effect-suppression` targets a single NodeId, not a glob:
 
 ```lisp
 (effect-suppression
-  (target "packages/core/src/manifest/hash-manifest.ts::writeAtomic")
-  (suppress "fs.write" "time" "random")
-  (reason "The single canonical writer for the manifest. Uses Date.now() + randomBytes(8) to build an atomic temp-file name; the fs.write is the actual atomic rename. This is the lone exemption in @stele/core; documented since Round 7 CORE_ENGINE_PURITY allowlist."))
+  (target "packages/core/src/manifest/hash-manifest.ts::writeAtomic(2)")
+  (suppresses "fs.write" "time" "random")
+  (severity info)
+  (reason "Canonical atomic writer for the manifest. Uses Date.now() + randomBytes(8) to build an atomic temp-file name; the fs.write is the actual atomic rename. Lone exemption in @stele/core; documented since Round 7 CORE_ENGINE_PURITY allowlist."))
+
+(effect-suppression
+  (target "packages/core/src/manifest/manifest.ts::writeManifest(3)")
+  (suppresses "fs.write")
+  (severity info)
+  (reason "Wraps writeAtomic. The fs.write effect is inherited; this suppression marks it as expected and audited."))
+
+(effect-suppression
+  (target "packages/core/src/manifest/hash-manifest.ts::writeHashManifest(2)")
+  (suppresses "fs.write")
+  (severity info)
+  (reason "Wraps writeAtomic. Same rationale as writeManifest above."))
 ```
+
+**Note on arity:** confirm each function's parameter count by reading
+the source before locking the contract. If `writeAtomic` takes 2 args,
+the NodeId is `writeAtomic(2)`. Wrong arity → suppression doesn't bind
+→ policy fires on a function we meant to exempt. If unsure, omit the
+arity suffix — the pattern matcher treats it as a wildcard.
 
 ### Step 4.5 — Negative tests
 

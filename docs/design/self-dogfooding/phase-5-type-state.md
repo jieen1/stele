@@ -36,17 +36,43 @@ it on our own core data structures is the worst kind of self-betrayal.
 
 **Type-state design (in `packages/core/src/manifest/lifecycle.ts`):**
 
+**Reviewer V-05 fix:** the naive `unique symbol` brand keyed on a
+single property does NOT make `Manifest<"Loaded">` and
+`Manifest<"Locked">` incompatible — TS structural typing accepts
+either where the other is required because the property NAME is
+identical. The brand MUST be **discriminated by state name**:
+
 ```ts
-declare const __ManifestState: unique symbol;
 export type ManifestState = "Unloaded" | "Loaded" | "Locked" | "Verified";
-export type Manifest<S extends ManifestState = "Loaded"> = HashManifest & {
-  readonly [__ManifestState]: S;
+
+// State-keyed brand: `Manifest<"Loaded">` has `__state_Loaded: true`
+// and `__state_{Unloaded,Locked,Verified}: never`. Passing
+// `Manifest<"Loaded">` where `Manifest<"Locked">` is expected fails
+// because `__state_Locked` would have to be `true` but is `never`.
+type StateBrand<S extends ManifestState> = {
+  readonly [K in ManifestState as `__state_${K}`]: K extends S ? true : never;
 };
+
+export type Manifest<S extends ManifestState = "Loaded"> = HashManifest & StateBrand<S>;
 
 export function readManifestAsLoaded(...): Promise<Manifest<"Loaded">>;
 export function lockManifest(m: Manifest<"Loaded">): Manifest<"Locked">;
 export function verifyManifest(m: Manifest<"Locked">): Manifest<"Verified">;
 ```
+
+**Compile-time test obligation:** Phase 5 must include a
+`packages/core/tests/manifest-lifecycle.test-d.ts` (or `.test.ts`
+with `@ts-expect-error`) file asserting that:
+
+```ts
+const loaded: Manifest<"Loaded"> = readManifestAsLoaded(…) as any;
+// @ts-expect-error — Loaded cannot be passed where Locked is required
+verifyManifest(loaded);
+```
+
+If this test file compiles without the expected error, the brand
+design is broken and Phase 5 must NOT land. Run `tsc --noEmit` and
+verify the expected error fires.
 
 **CDL declaration:**
 

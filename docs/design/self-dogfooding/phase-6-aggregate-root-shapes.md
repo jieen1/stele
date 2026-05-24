@@ -69,12 +69,21 @@ Apply to all 10 aggregates:
 
 ### Step 6.2 — Update the design generator
 
-**File:** `packages/cli/src/design-generator/render/aggregates.ts`
-(find / create)
+**Reviewer V-08 fix:** there is NO `aggregates.ts` in
+`packages/cli/src/design-generator/render/`. The directory contains
+`architecture.ts`, `context-map.ts`, `core-node.ts`, `shared.ts`,
+`trace.ts`, `type-driven.ts`. Aggregate-root emission happens in
+`core-node.ts`.
 
-Emit a `(class-shape …)` for every aggregate that has either
-`required_methods` or `required_fields`. Existing `core-node`
-emission unchanged.
+**File to edit:** `packages/cli/src/design-generator/render/core-node.ts`
+
+Extend the existing core-node renderer to ALSO emit a
+`(class-shape …)` declaration after the `(core-node …)` for any
+aggregate that has `required_methods` or `required_fields` populated.
+
+Do NOT create a new `aggregates.ts`. Inline the new emission inside
+the existing `core-node.ts` (add a `renderAggregateClassShape` helper
+function in the same file).
 
 ### Step 6.3 — Approve + regenerate
 

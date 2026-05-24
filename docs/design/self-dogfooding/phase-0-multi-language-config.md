@@ -21,45 +21,60 @@ overall.
 ## Scope summary
 
 Add an optional `phaseLanguages` field to `stele.config.json` and to
-the `Config` type in `@stele/core`. The three Phase B check-stages
-and the architecture stage read this field first, falling back to the
-existing `targetLanguage` when the field is absent.
+the `SteleConfig` type in `@stele/cli`. The three Phase B
+check-stages and the architecture stage read this field first,
+falling back to the existing `targetLanguage` when the field is
+absent.
 
 ## Required architectural changes
 
-### Step 0.1 — Extend the Config type
+### Step 0.1 — Extend the SteleConfig type
 
-**File:** `packages/core/src/config/types.ts` (find or create)
+**Reviewer V-06 fix:** there is NO `Config` type in `@stele/core`.
+The real config type is `SteleConfig` at
+`packages/cli/src/config/defaults.ts:13`. Keep the type in
+`@stele/cli` (it's the CLI's config) — pulling it into core would
+violate the existing DDD layer direction.
 
-Add to the `Config` type:
+**File to edit:** `packages/cli/src/config/defaults.ts`
+
+Add to the `SteleConfig` type:
 
 ```ts
+import type { SupportedLanguage } from "@stele/call-graph-core";
+
 export interface PhaseLanguages {
   /** Phase B trace-policy evaluator language. Defaults to targetLanguage. */
   trace?: SupportedLanguage;
   /** Phase B type-state evaluator language. Defaults to targetLanguage. */
-  typeState?: SupportedLanguage;
+  "type-state"?: SupportedLanguage;
   /** Phase B effect evaluator language. Defaults to targetLanguage. */
   effect?: SupportedLanguage;
   /** Code-shape default language. Each (boundary)/(class-shape)/... declaration
    *  may still override via its own `(lang …)` field. */
-  codeShape?: SupportedLanguage;
+  "code-shape"?: SupportedLanguage;
   /** Architecture import-extractor language. Defaults to targetLanguage. */
   architecture?: SupportedLanguage;
 }
 
-export interface Config {
+export type SteleConfig = {
   // ... existing fields ...
   phaseLanguages?: PhaseLanguages;
   /** Path to tsconfig.json, relative to project root. Defaults to "tsconfig.json".
    *  Required when any phaseLanguages.* is "typescript" and the default doesn't exist. */
   tsconfig?: string;
-}
+};
 ```
 
-`SupportedLanguage` already exists in `@stele/call-graph-core/src/types.ts`.
+**Reviewer V-12 fix:** kebab-case keys (`type-state`, `code-shape`)
+match the CDL mechanism names (`(type-state …)`, `(class-shape …)`).
+This keeps the JSON config searchable by users who already know CDL
+syntax.
 
-**Acceptance:** `tsc --noEmit` on `@stele/core` clean.
+`SupportedLanguage` already exists in
+`@stele/call-graph-core/src/types.ts`.
+
+**Acceptance:** `pnpm --filter @stele/cli typecheck` clean.
 
 ### Step 0.2 — Update Config schema validator
 
@@ -77,35 +92,47 @@ Update `contract/checker_impls/self_protection.py::config_schema_valid` to recog
 
 ### Step 0.3 — Helper: `pickPhaseLanguage(config, phase)`
 
-**File:** `packages/core/src/config/phase-language.ts` (new)
+**Reviewer V-06 fix:** helper lives in `@stele/cli` next to its
+sole consumer set (the check-stages files).
+
+**File:** `packages/cli/src/config/phase-language.ts` (new)
 
 ```ts
-import type { Config } from "./types.js";
+import type { SteleConfig } from "./defaults.js";
 import type { SupportedLanguage } from "@stele/call-graph-core";
 
-export type PhaseName = "trace" | "typeState" | "effect" | "codeShape" | "architecture";
+export type PhaseName = "trace" | "type-state" | "effect" | "code-shape" | "architecture";
 
 /**
  * Resolve the target language for a given phase. Returns the
  * per-phase override when set, else the config-wide targetLanguage.
  */
-export function pickPhaseLanguage(config: Config, phase: PhaseName): SupportedLanguage {
+export function pickPhaseLanguage(config: SteleConfig, phase: PhaseName): SupportedLanguage {
   const override = config.phaseLanguages?.[phase];
   if (override !== undefined) return override;
   return config.targetLanguage as SupportedLanguage;
 }
 ```
 
-Export it from `@stele/core/src/index.ts`.
+Export from `packages/cli/src/index.ts` (or directly re-export via
+the check-stages files that consume it; no need to surface in the
+public CLI API).
 
-**Acceptance:** unit test in `packages/core/tests/phase-language.test.ts`:
+**Acceptance:** unit test in
+`packages/cli/tests/phase-language.test.ts`:
 
 ```ts
 it("returns per-phase override when set", () => {
-  expect(pickPhaseLanguage({ targetLanguage: "python", phaseLanguages: { trace: "typescript" } }, "trace")).toBe("typescript");
+  expect(pickPhaseLanguage(
+    { targetLanguage: "python", phaseLanguages: { trace: "typescript" } } as SteleConfig,
+    "trace",
+  )).toBe("typescript");
 });
 it("falls back to targetLanguage when override absent", () => {
-  expect(pickPhaseLanguage({ targetLanguage: "python" }, "trace")).toBe("python");
+  expect(pickPhaseLanguage(
+    { targetLanguage: "python" } as SteleConfig,
+    "trace",
+  )).toBe("python");
 });
 ```
 
@@ -125,9 +152,11 @@ const language = context.config.targetLanguage;
 to:
 
 ```ts
-import { pickPhaseLanguage } from "@stele/core";
-const language = pickPhaseLanguage(context.config, /* "trace" | "typeState" | "effect" */);
+import { pickPhaseLanguage } from "../config/phase-language.js";
+const language = pickPhaseLanguage(context.config, "trace" /* | "type-state" | "effect" */);
 ```
+
+Use kebab-case literal matching the `PhaseName` type defined in 0.3.
 
 Also: when `language === "typescript"`, the tsconfig path resolution
 (`resolveTsconfigPath`) should honour `context.config.tsconfig` BEFORE
@@ -167,20 +196,21 @@ For Phase 0: no change needed — the field is declared for forward-compat.
 
 **File:** `stele.config.json`
 
-Add:
+Add (use **kebab-case** keys to match the new `PhaseName` type):
 
 ```jsonc
 {
-  // ... existing fields (DO NOT REMOVE targetLanguage) ...
   "tsconfig": "tsconfig.base.json",
   "phaseLanguages": {
     "trace": "typescript",
-    "typeState": "typescript",
+    "type-state": "typescript",
     "effect": "typescript",
     "architecture": "typescript"
   }
 }
 ```
+
+Do NOT remove `targetLanguage` (CC-9). Keep it as `"python"`.
 
 This is the config that lets later phases write TS Phase B contracts
 for this repo. `targetLanguage` stays `"python"` (CC-9).
@@ -216,7 +246,7 @@ def phase_language_config_valid(ctx, **_):
         return {"passed": True, "message": None}
     if not isinstance(pl, dict):
         return {"passed": False, "message": "phaseLanguages must be an object"}
-    valid_keys = {"trace", "typeState", "effect", "codeShape", "architecture"}
+    valid_keys = {"trace", "type-state", "effect", "code-shape", "architecture"}
     valid_langs = {"typescript", "python", "go", "rust", "java"}
     for k, v in pl.items():
         if k not in valid_keys:
@@ -252,14 +282,17 @@ Add 2 negative tests:
 pnpm build
 node packages/cli/dist/index.js generate --force
 node packages/cli/dist/index.js lock --reason "Phase 0: multi-language config infrastructure"
-node packages/cli/dist/index.js check     # must exit 0
-.venv/bin/python -m pytest tests/contract -q   # 43/43 (was 42)
-.venv/bin/python contract/checker_impls/test_negative.py  # 61/61 (was 59)
+node packages/cli/dist/index.js check                                           # exit 0; 43 invariants (was 42)
+.venv/bin/python -m pytest tests/contract -q                                    # 43/43 (was 42)
+.venv/bin/python -m pytest contract/checker_impls/test_negative.py -q           # +2 new tests pass alongside the existing pytest suite
 ```
+
+(Reviewer V-11 fix: pytest invocation — do NOT call the file as a
+script.)
 
 ## Acceptance criteria summary
 
-- [ ] `Config` type has `phaseLanguages?` + `tsconfig?` fields
+- [ ] `SteleConfig` type has `phaseLanguages?` + `tsconfig?` fields (in `@stele/cli`)
 - [ ] `pickPhaseLanguage(config, phase)` helper exists + exported + unit-tested
 - [ ] 3 Phase B stages + architecture stage call `pickPhaseLanguage`
 - [ ] `stele.config.json` declares `phaseLanguages` for trace/typeState/effect/architecture = typescript
