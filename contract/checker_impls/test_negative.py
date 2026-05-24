@@ -1271,6 +1271,51 @@ def test_cli_io_through_path_utils_template_literal_smuggled_import():
     return _pass_if_false(result, "cli_io_through_path_utils_template_literal_smuggled_import")
 
 
+def test_bash_extractors_shared_rejects_local_redefinition():
+    """Round 13 L-05/P-04: re-introducing a local `function
+    extractRedirectTargets(...)` in observation-hook.js must be
+    caught — the divergence is exactly the bug the shared module
+    closed. Temporarily inject a local redefinition and confirm the
+    checker reports the violation."""
+    _reset_caches()
+    target = sp._REPO_ROOT / "packages" / "claude-code-plugin" / "scripts" / "observation-hook.js"
+    original = target.read_text(encoding="utf-8")
+    tampered = original + "\nfunction extractRedirectTargets(tokens) { return []; }\n"
+    target.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.bash_extractors_shared({})
+    finally:
+        target.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "bash_extractors_shared_rejects_local_redefinition")
+
+
+def test_blank_string_interiors_recognises_regex_literal_with_quote_char_class():
+    """Round 13 O-04: a JS regex literal `/[\"']/` contains a `\"`
+    and `'` inside its character class. Without regex-literal
+    awareness, the helper would enter string mode on the `\"` and
+    swallow / corrupt downstream content. With Round 13's
+    `_scan_regex_literal` + `_is_regex_context`, the regex body is
+    preserved verbatim and the trailing `// removed: ...` comment is
+    correctly recognised as a real shim marker."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_o04_regex.ts"
+    target.write_text(
+        # NOTE: this file embeds a regex with quote chars in its
+        # character class, then a real shim marker on a separate
+        # statement. The shim checker must catch the marker; the
+        # purity checker must not false-positive on the regex content.
+        "const QUOTE_RE = /[\"']/g;\n"
+        "// removed: legacy regex compatibility helper\n"
+        "export const re = QUOTE_RE;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_backward_compat_shims({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "blank_string_interiors_recognises_regex_literal_with_quote_char_class")
+
+
 def test_cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace():
     """Round 12 S-01: an `import x, { y } from "node:url"` line
     immediately above an `import { z } from "node:path"` line used to
@@ -1410,6 +1455,10 @@ def main() -> int:
         ("cli_io_through_path_utils_mixed_default_named_import_accepted", test_cli_io_through_path_utils_mixed_default_named_import_accepted),
         # Round 12: S-01 cross-statement DEFAULT regex defect.
         ("cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace", test_cli_io_through_path_utils_url_default_followed_by_path_named_does_not_register_url_as_namespace),
+        # Round 13: O-04 regex literal tracking in string blanker.
+        ("blank_string_interiors_recognises_regex_literal_with_quote_char_class", test_blank_string_interiors_recognises_regex_literal_with_quote_char_class),
+        # Round 13: L-05/P-04 shared bash-extractor module.
+        ("bash_extractors_shared_rejects_local_redefinition", test_bash_extractors_shared_rejects_local_redefinition),
     ]
 
     print("=" * 60)

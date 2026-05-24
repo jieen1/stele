@@ -2,6 +2,7 @@ import { loadProfile, profilePathExists } from "../../design-profile/load.js";
 import { validateProfile } from "../../design-profile/validate.js";
 import { verifyManifestIntegrity } from "../../design-generator/manifest.js";
 import { validateOwnership, validateSourceOwnership } from "../../design-generator/ownership.js";
+import { ExitCode } from "../../errors.js";
 
 export type DesignCheckOptions = {
   profileOnly?: boolean;
@@ -24,7 +25,7 @@ export async function runDesignCheck(opts: DesignCheckOptions, projectDir: strin
   process.stdout.write(out + "\n");
 
   if (result.status === "fail") {
-    process.exitCode = 2;
+    process.exitCode = ExitCode.CONTRACT_FAIL;
   }
 }
 

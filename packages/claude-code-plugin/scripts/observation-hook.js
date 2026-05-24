@@ -6,14 +6,13 @@ import { lstatSync, appendFileSync } from "node:fs";
 import path from "node:path";
 import { minimatch } from "minimatch";
 import { extractPathsFromValue } from "./path-utils.js";
-import {
-  joinContinuationLines,
-  parseLiteralShellPath,
-  stripShellComment,
-  tokenizeShellLine,
-} from "./shell-utils.js";
+// Round 13 L-05/P-04: shared bash-extractor module. Replaces this
+// file's earlier weaker extractor copies (which were missing
+// git-checkout, interpreter `-c`, wrapper-flag peeling, `ln`,
+// `rsync`, `truncate`, `chmod`, `chown` — observation audit was
+// blind to those 8 vectors even though pre-tool-protect blocked them).
+import { extractBashWriteTargets } from "./bash-extractors.js";
 const BASH_COMMAND_KEYS = ["command"];
-const COMMAND_SEPARATOR_TOKENS = new Set(["|", "||", "&&", "&", ";"]);
 const MAX_PATTERN_LENGTH = 4096;
 const MAX_BRACKET_DEPTH = 5;
 // Round 5 J-02: keep byte-equal with packages/core/src/config/defaults.ts,
@@ -34,6 +33,9 @@ const DEFAULT_PROTECTED = [
   "packages/claude-code-plugin/scripts/stop-validate.js",
   "packages/claude-code-plugin/scripts/observation-hook.js",
   "packages/claude-code-plugin/scripts/lifecycle-context.js",
+  // Round 13 L-05/P-04: shared bash extractor + shell helpers.
+  "packages/claude-code-plugin/scripts/bash-extractors.js",
+  "packages/claude-code-plugin/scripts/shell-utils.js",
   "packages/claude-code-plugin/hooks/hooks.json",
   "stele.config.json",
   ".stele/stop-state.json",
@@ -244,252 +246,9 @@ function extractCommandFromValue(value, seen) {
   return null;
 }
 
-function extractBashWriteTargets(command) {
-  const targets = [];
-  const pendingHeredocs = [];
-  const lines = joinContinuationLines(command.split(/\r?\n/u));
+// Round 13 L-05/P-04: extractBashWriteTargets + supporting extractors
+// imported from  (shared with pre-tool-protect).
 
-  for (const line of lines) {
-    const activeLine = stripShellComment(line);
-
-    if (pendingHeredocs.length > 0) {
-      if (line.trim() === pendingHeredocs[0]) {
-        pendingHeredocs.shift();
-      }
-
-      continue;
-    }
-
-    targets.push(...extractWriteTargetsFromLine(activeLine));
-    pendingHeredocs.push(...extractHeredocDelimiters(activeLine));
-  }
-
-  return [...new Set(targets)];
-}
-
-function extractWriteTargetsFromLine(line) {
-  if (line.trim().length === 0) {
-    return [];
-  }
-
-  const tokens = tokenizeShellLine(line);
-  return [
-    ...extractRedirectTargets(tokens),
-    ...extractTeeTargets(tokens),
-    ...extractFileOperationTargets(tokens),
-    ...extractDdTargets(tokens),
-  ];
-}
-
-function extractRedirectTargets(tokens) {
-  const targets = [];
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-
-    if (token.type !== "operator" || (token.value !== ">" && token.value !== ">>")) {
-      continue;
-    }
-
-    const nextToken = tokens[index + 1];
-    const literalPath = nextToken?.type === "word" ? parseLiteralShellPath(nextToken.value) : null;
-
-    if (literalPath !== null) {
-      targets.push(literalPath);
-    }
-  }
-
-  return targets;
-}
-
-function extractTeeTargets(tokens) {
-  const targets = [];
-  let segmentStart = 0;
-
-  for (let index = 0; index <= tokens.length; index += 1) {
-    const token = tokens[index];
-
-    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
-      targets.push(...extractTeeTargetsFromSegment(tokens.slice(segmentStart, index)));
-      segmentStart = index + 1;
-    }
-  }
-
-  return targets;
-}
-
-function extractTeeTargetsFromSegment(tokens) {
-  const commandToken = tokens.find((token) => token.type === "word");
-
-  if (!commandToken || path.posix.basename(commandToken.value) !== "tee") {
-    return [];
-  }
-
-  const targets = [];
-  let sawDoubleDash = false;
-
-  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
-    if (token.type !== "word") {
-      continue;
-    }
-
-    if (!sawDoubleDash && token.value === "--") {
-      sawDoubleDash = true;
-      continue;
-    }
-
-    if (!sawDoubleDash && token.value.startsWith("-")) {
-      continue;
-    }
-
-    const literalPath = parseLiteralShellPath(token.value);
-
-    if (literalPath !== null) {
-      targets.push(literalPath);
-    }
-  }
-
-  return targets;
-}
-
-function extractFileOperationTargets(tokens) {
-  const targets = [];
-  let segmentStart = 0;
-
-  for (let index = 0; index <= tokens.length; index += 1) {
-    const token = tokens[index];
-
-    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
-      targets.push(...extractFileOperationTargetsFromSegment(tokens.slice(segmentStart, index)));
-      segmentStart = index + 1;
-    }
-  }
-
-  return targets;
-}
-
-function extractFileOperationTargetsFromSegment(tokens) {
-  const wordTokens = [];
-
-  for (const token of tokens) {
-    if (token.type === "word") {
-      wordTokens.push(token);
-    }
-  }
-
-  if (wordTokens.length === 0) {
-    return [];
-  }
-
-  const commandToken = wordTokens[0];
-  const basename = path.posix.basename(commandToken.value);
-
-  if (basename !== "cp" && basename !== "mv" && basename !== "install") {
-    return [];
-  }
-
-  // Find the last non-flag word token (destination)
-  let lastWord = null;
-  let sawDoubleDash = false;
-
-  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
-    if (token.type !== "word") {
-      continue;
-    }
-
-    if (!sawDoubleDash && token.value === "--") {
-      sawDoubleDash = true;
-      continue;
-    }
-
-    if (!sawDoubleDash && token.value.startsWith("-")) {
-      continue;
-    }
-
-    lastWord = token;
-  }
-
-  if (lastWord !== null) {
-    const literalPath = parseLiteralShellPath(lastWord.value);
-
-    if (literalPath !== null) {
-      return [literalPath];
-    }
-  }
-
-  return [];
-}
-
-function extractDdTargets(tokens) {
-  const targets = [];
-  let segmentStart = 0;
-
-  for (let index = 0; index <= tokens.length; index += 1) {
-    const token = tokens[index];
-
-    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
-      targets.push(...extractDdTargetsFromSegment(tokens.slice(segmentStart, index)));
-      segmentStart = index + 1;
-    }
-  }
-
-  return targets;
-}
-
-function extractDdTargetsFromSegment(tokens) {
-  const wordTokens = [];
-
-  for (const token of tokens) {
-    if (token.type === "word") {
-      wordTokens.push(token);
-    }
-  }
-
-  if (wordTokens.length === 0) {
-    return [];
-  }
-
-  const commandToken = wordTokens[0];
-
-  if (path.posix.basename(commandToken.value) !== "dd") {
-    return [];
-  }
-
-  const targets = [];
-
-  for (const token of tokens.slice(tokens.indexOf(commandToken) + 1)) {
-    if (token.type !== "word") {
-      continue;
-    }
-
-    const ofMatch = token.value.match(/^of=(.+)$/u);
-
-    if (ofMatch) {
-      const literalPath = parseLiteralShellPath(ofMatch[1]);
-
-      if (literalPath !== null) {
-        targets.push(literalPath);
-      }
-    }
-  }
-
-  return targets;
-}
-
-function extractHeredocDelimiters(line) {
-  const delimiters = [];
-  const regex = /<<-?\s*(?:'([^']+)'|"([^"]+)"|([^\s"'`<>|&;()]+))/gu;
-
-  for (const match of line.matchAll(regex)) {
-    const delimiter = match[1] ?? match[2] ?? match[3] ?? "";
-
-    if (delimiter.length > 0) {
-      delimiters.push(delimiter);
-    }
-  }
-
-  return delimiters;
-}
 
 function isMaterialChange(projectDir, protectedPatterns, targetPath) {
   const relativePath = normalizeTargetPath(projectDir, targetPath);

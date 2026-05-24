@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-24T06:29:35.499Z",
+  "generated_at": "2026-05-24T07:25:01.075Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -16,12 +16,12 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "bc06e20654a4728db364e24f524dc13117925e41bc5e6274678ec90a75807e67",
-      "size": 127251
+      "sha256": "4b30fb13cd921efb16ce9977a0386b8ca6bbd4ec1e2c8c8d915e22b0ca97a248",
+      "size": 136145
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "69c2b56fae7d325455e0a5c13b66decc19037444976199ff546213ba01fbfc6b",
-      "size": 63554
+      "sha256": "65f7b50a7840bed868f47c0423537cf5a7646ff4831c51e9dec96a77299f410f",
+      "size": 66130
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
@@ -52,8 +52,8 @@
       "size": 20009
     },
     "contract/main.stele": {
-      "sha256": "08e4b3c47fc820b1faab38be16b2c617491a13ed629e19ac257c76dfb52f620f",
-      "size": 18626
+      "sha256": "2660a9038ed2466d3d69ed19dcc72bde149fdf0a4e52471cd4b081ce372250dd",
+      "size": 19530
     },
     "package.json": {
       "sha256": "4cd157c4a07307f29229c884d4d3c6a1ac08104eaf2f37cc9758ee543eeb46e6",
@@ -111,21 +111,25 @@
       "sha256": "89cb2e10efe409759dbc1af65ae13b4e9702c804233552681a37fccc37037056",
       "size": 1113
     },
+    "packages/claude-code-plugin/scripts/bash-extractors.js": {
+      "sha256": "115dd43caa6b18999adeb4ed2db66517c4d1c73231751011e18f32c3b16bfee7",
+      "size": 12700
+    },
     "packages/claude-code-plugin/scripts/lifecycle-context.js": {
       "sha256": "671955c70843eeb62c3cfe3e04cff5fb6e34ca1aac92610db0c2ba726b2176c3",
       "size": 6317
     },
     "packages/claude-code-plugin/scripts/observation-hook.js": {
-      "sha256": "04dada4eb3958b5f092601199d9000580ad41a7912a4cc7fc41c6846076d2b0a",
-      "size": 15591
+      "sha256": "e938797cd27fab50fa5212d08b6e900d6da490cf84f25b9a339663e0b909a6e2",
+      "size": 10490
     },
     "packages/claude-code-plugin/scripts/path-utils.js": {
       "sha256": "92b294611fe9424b07d1ebfb0c5a782be4d07463fbc41253d7f3808127d7a687",
       "size": 1124
     },
     "packages/claude-code-plugin/scripts/pre-tool-protect.js": {
-      "sha256": "7da99adc7247f553acd4bc8775340fff9d088df271db689ab6d66072fb787a10",
-      "size": 28313
+      "sha256": "2541e513356ba9065e5f8855546b42000ff63638e14892fe42d1f0ba09a7cb66",
+      "size": 12048
     },
     "packages/claude-code-plugin/scripts/shell-utils.js": {
       "sha256": "f306212dae5fb55427a0db34f949368f3687f6236467cfd5e648230c83f50768",
@@ -216,17 +220,17 @@
       "size": 30931
     },
     "tests/contract/conftest.py": {
-      "sha256": "a88154816b282b1bbacf97e69dc09c2faad80a82cf051bb889c9cf31616a326a",
-      "size": 6028
+      "sha256": "f57e14ca3e4c45958f2d34a783a674f0ec11720aba4e331961c53e69487048f0",
+      "size": 6246
     },
     "tests/contract/test_contract.py": {
-      "sha256": "0eab8170d28ff075fbf587b4cb18fee53cb6bf36ffad3bb10d23f34aa86a431d",
-      "size": 9311
+      "sha256": "d704203c7735fd673d47f4d9a492ea9f74aed1b49542b59f243b2b33f96ca199",
+      "size": 9533
     },
     "tsconfig.base.json": {
       "sha256": "14e86fc4216dd21efaadba41d3e644d1417b53209eb0faa76a4f082f0aa2bb02",
       "size": 381
     }
   },
-  "contract_hash": "ba53aa4dfb9ceaaa3e600eeaadde68e82d9fa7316a36644f5549e62d52604b68"
+  "contract_hash": "1c910957c6580a0ad52eff51c59d88a278f049a8bf5e5d9d63739a08fb534385"
 }

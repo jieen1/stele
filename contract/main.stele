@@ -392,4 +392,12 @@
   (description "Round 9 P-01 / CLAUDE.md 'Core engine is pure. Same input must produce the same output.' `.localeCompare(` is locale-dependent — LANG=de_DE sorts `ä` between `a` and `z`, LANG=sv_SE sorts it after `z`. That breaks generator byte-stability AND manifest hash stability across machines. Use `stableStringCompare` from @stele/core instead.")
   (uses-checker no-bare-locale-compare))
 
+(checker bash-extractors-shared
+  (description "Both packages/claude-code-plugin/scripts/pre-tool-protect.js and observation-hook.js must import the bash-write-target extractors from the shared packages/claude-code-plugin/scripts/bash-extractors.js module. Neither file may re-implement any canonical extractor function locally."))
+
+(invariant BASH_EXTRACTORS_SHARED
+  (severity error)
+  (description "Round 13 L-05/P-04: the audit hook (observation-hook.js) and the deny gate (pre-tool-protect.js) must see the same set of bash write targets. Earlier rounds found observation-hook missing 8 bypass classes — git-checkout / interpreter -c / wrapper-flag peeling / ln / rsync / truncate / chmod / chown — that pre-tool-protect blocked, so the maintenance summary was blind to those vectors. Sharing a single extractor module prevents the drift permanently.")
+  (uses-checker bash-extractors-shared))
+
 (import "generated/ddd-typedriven.stele")

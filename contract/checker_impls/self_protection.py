@@ -1606,6 +1606,85 @@ _STRING_LITERAL_RE = re.compile(
 )
 
 
+# Round 13 O-04: a `/` is a JavaScript regex-literal opener when the
+# previous non-whitespace, non-comment character is one of these
+# (or the file starts). After any of these, `/` cannot mean division
+# because there is no left operand; it MUST be a regex literal.
+# This is the well-known "regex-or-division" heuristic used by every
+# real JS tokenizer; it errs on the side of "regex" which is the safe
+# direction for our string-blanker (a regex body containing `"`/`'`/
+# `` ` `` characters must not switch us into string mode).
+_REGEX_CONTEXT_PREV_CHARS = frozenset(
+    "([{,;:?=!&|<>+-*/%~^\n"
+)
+_REGEX_CONTEXT_PREV_KEYWORDS = frozenset({
+    "return", "typeof", "delete", "void", "throw", "new", "in",
+    "of", "instanceof", "case", "do", "else", "yield", "await",
+})
+
+
+def _is_regex_context(source: str, slash_idx: int) -> bool:
+    """Return True if `source[slash_idx]` (which must be `/`) is the
+    opener of a regex literal rather than a division operator. Look
+    backward past whitespace; classify based on the preceding token.
+    """
+    j = slash_idx - 1
+    while j >= 0 and source[j] in " \t":
+        j -= 1
+    if j < 0:
+        return True
+    ch = source[j]
+    if ch in _REGEX_CONTEXT_PREV_CHARS:
+        return True
+    # Identifier or number → division (not regex). EXCEPT for the
+    # keyword set above (`return /x/.test(y)` is legal regex).
+    if ch.isalnum() or ch == "_" or ch == "$":
+        k = j
+        while k >= 0 and (source[k].isalnum() or source[k] in "_$"):
+            k -= 1
+        token = source[k + 1 : j + 1]
+        return token in _REGEX_CONTEXT_PREV_KEYWORDS
+    return False
+
+
+def _scan_regex_literal(source: str, start_idx: int) -> int | None:
+    """Round 13 O-04: starting at `source[start_idx] == "/"`, scan
+    forward past the regex body + flags. Returns the index just past
+    the closing `/` and any flags, or None if the candidate is not a
+    well-formed regex literal (in which case the caller should treat
+    the `/` as something else — usually a comment opener or division).
+
+    Handles `\\` escapes and `[...]` character classes (where `/` is
+    literal and `[`/`]` are mode markers).
+    """
+    n = len(source)
+    if start_idx >= n or source[start_idx] != "/":
+        return None
+    i = start_idx + 1
+    in_class = False
+    while i < n:
+        ch = source[i]
+        if ch == "\n":
+            # Regex literals cannot span newlines.
+            return None
+        if ch == "\\":
+            # Skip the escaped char.
+            i += 2
+            continue
+        if ch == "[":
+            in_class = True
+        elif ch == "]" and in_class:
+            in_class = False
+        elif ch == "/" and not in_class:
+            # End of body. Consume flags (`g`, `i`, `m`, `s`, `u`, `y`, `d`).
+            i += 1
+            while i < n and source[i] in "gimsuyd":
+                i += 1
+            return i
+        i += 1
+    return None
+
+
 def _strip_js_comments_quote_aware(source: str) -> str:
     """Round 6 L-02: strip JS line + block comments WITHOUT touching
     characters that fall inside a quoted string literal. Tracks `"`,
@@ -1634,6 +1713,17 @@ def _strip_js_comments_quote_aware(source: str) -> str:
                 state = "block_comment"
                 i += 2
                 continue
+            # Round 13 O-04: detect regex literal before treating `/` as
+            # division. A regex body can contain `"`, `'`, `` ` `` —
+            # without this branch, the helper would enter string mode
+            # on a quote inside `/["']/` and corrupt downstream output.
+            if ch == "/" and _is_regex_context(source, i):
+                end = _scan_regex_literal(source, i)
+                if end is not None:
+                    # Emit the regex literal verbatim — it's code.
+                    out.append(source[i:end])
+                    i = end
+                    continue
             if ch == '"' or ch == "'" or ch == "`":
                 state = "string"
                 string_quote = ch
@@ -2308,6 +2398,14 @@ def _blank_string_interiors(source: str) -> str:
                 out.append(nxt)
                 i += 2
                 continue
+            # Round 13 O-04: regex literal recognition (same rationale
+            # as in `_strip_js_comments_quote_aware`).
+            if ch == "/" and _is_regex_context(source, i):
+                end = _scan_regex_literal(source, i)
+                if end is not None:
+                    out.append(source[i:end])
+                    i = end
+                    continue
             if ch == '"' or ch == "'":
                 state = "string"
                 string_quote = ch
@@ -2442,6 +2540,16 @@ def _strip_ts_comments_and_strings(source: str) -> str:
                 state = "block_comment"
                 i += 2
                 continue
+            # Round 13 O-04: regex literal recognition. In the
+            # strings-blanked helper we preserve the regex body
+            # verbatim (it IS code), so the downstream regex
+            # searches see it as-is.
+            if ch == "/" and _is_regex_context(source, i):
+                end = _scan_regex_literal(source, i)
+                if end is not None:
+                    out.append(source[i:end])
+                    i = end
+                    continue
             if ch == '"' or ch == "'":
                 state = "string"
                 string_quote = ch
@@ -3098,6 +3206,113 @@ def no_bare_locale_compare(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 f"{len(violations)} `.localeCompare(` call(s) — locale-dependent ordering "
                 f"leaks into manifest hash + generated output: "
                 + "; ".join(f"{v['file']}:{v['line']}" for v in violations[:5])
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+# Round 13 L-05/P-04: extractor function names that MUST come from the
+# shared `bash-extractors.js` module. If either consumer re-defines
+# any of these locally, the two hook scripts can drift again.
+_BASH_EXTRACTOR_NAMES = (
+    "extractBashWriteTargets",
+    "extractWriteTargetsFromLine",
+    "extractRedirectTargets",
+    "extractTeeTargets",
+    "extractFileOperationTargets",
+    "extractDdTargets",
+    "extractGitCheckoutTargets",
+    "extractInterpreterScriptTargets",
+    "extractHeredocDelimiters",
+    "_firstRealCommandIndex",
+)
+_BASH_EXTRACTOR_CONSUMERS = (
+    "packages/claude-code-plugin/scripts/pre-tool-protect.js",
+    "packages/claude-code-plugin/scripts/observation-hook.js",
+)
+_BASH_EXTRACTOR_MODULE = "packages/claude-code-plugin/scripts/bash-extractors.js"
+
+
+def bash_extractors_shared(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 13 L-05/P-04: assert that both hook scripts use the SHARED
+    `bash-extractors.js` module — not their own copies. Earlier rounds
+    found that `observation-hook.js` had a weaker extractor set than
+    `pre-tool-protect.js` (missing git-checkout, interpreter `-c`,
+    wrapper-flag peeling, `ln`, and 4 file-op commands — 8 vectors),
+    which meant the audit log was blind to writes the deny gate was
+    actively blocking. This checker enforces three rules:
+
+      1. The shared `bash-extractors.js` module exists.
+      2. Both consumers `import` from it.
+      3. Neither consumer re-defines any of the canonical extractor
+         function names (`function extractRedirectTargets(...)` etc.).
+
+    Together these prevent the two scripts from drifting again.
+    """
+    module_path = _REPO_ROOT / _BASH_EXTRACTOR_MODULE
+    if not module_path.is_file():
+        return {
+            "passed": False,
+            "message": f"Shared bash-extractors module missing: {_BASH_EXTRACTOR_MODULE}",
+        }
+    module_src = module_path.read_text(encoding="utf-8")
+    # The module itself must EXPORT the canonical names.
+    for name in _BASH_EXTRACTOR_NAMES:
+        # `export function X(` or `export { X, ...` shape.
+        if (
+            f"export function {name}(" not in module_src
+            and f"export const {name}" not in module_src
+        ):
+            return {
+                "passed": False,
+                "message": (
+                    f"`{name}` missing from {_BASH_EXTRACTOR_MODULE} — the "
+                    "shared module must export every canonical extractor "
+                    "name so consumers can not re-implement them locally."
+                ),
+            }
+    violations: list[dict[str, Any]] = []
+    import_re = re.compile(
+        r'import\s*\{[^}]*\bextractBashWriteTargets\b[^}]*\}\s*from\s*["\']\./bash-extractors\.js["\']'
+    )
+    for rel in _BASH_EXTRACTOR_CONSUMERS:
+        consumer_path = _REPO_ROOT / rel
+        if not consumer_path.is_file():
+            violations.append({
+                "file": rel, "line": None, "column": None,
+                "message": "consumer file missing",
+            })
+            continue
+        src = consumer_path.read_text(encoding="utf-8")
+        if not import_re.search(src):
+            violations.append({
+                "file": rel, "line": None, "column": None,
+                "message": (
+                    "does not import `extractBashWriteTargets` from "
+                    "`./bash-extractors.js` — the shared module is the "
+                    "single source of truth."
+                ),
+            })
+            continue
+        # Re-implementing any canonical extractor locally is forbidden.
+        for name in _BASH_EXTRACTOR_NAMES:
+            local_def_re = re.compile(rf"^function\s+{re.escape(name)}\s*\(", re.MULTILINE)
+            if local_def_re.search(src):
+                violations.append({
+                    "file": rel, "line": None, "column": None,
+                    "message": (
+                        f"locally re-defines `function {name}(...)` — "
+                        "delete the local copy and import from the shared "
+                        "module instead."
+                    ),
+                })
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} bash-extractor sharing violation(s): "
+                + "; ".join(f"{v['file']}: {v['message']}" for v in violations[:5])
             ),
             "violations": violations,
         }

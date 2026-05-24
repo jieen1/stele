@@ -6,6 +6,7 @@ import { profilePathExists } from "../../design-profile/load.js";
 import { validateProfile } from "../../design-profile/validate.js";
 import { runDesignGenerate } from "./generate.js";
 import { runDesignApprove } from "./approve.js";
+import { ExitCode } from "../../errors.js";
 
 const DEFAULT_PROFILE_PATH = "contract/design/profile.yaml";
 
@@ -34,7 +35,7 @@ function buildTemplate(preset: string): DesignProfile {
     process.stderr.write(
       `[design:init] Unsupported preset "${preset}". Supported: ddd-typedriven\n`,
     );
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     // Return a dummy profile so the caller can exit gracefully.
     // The non-zero exitCode signals failure.
   }
@@ -238,7 +239,7 @@ export async function runDesignInit(
     process.stderr.write(
       "[design:init] --preset is required. Supported: ddd-typedriven\n",
     );
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     return;
   }
 
@@ -257,7 +258,7 @@ export async function runDesignInit(
       process.stderr.write(
         `[design:init] Profile already exists at ${DEFAULT_PROFILE_PATH}. Use --replace to overwrite.\n`,
       );
-      process.exitCode = 1;
+      process.exitCode = ExitCode.USER_ERROR;
       return;
     }
   }
@@ -272,7 +273,7 @@ export async function runDesignInit(
       process.stderr.write(
         `[design:init] Answers file not found: ${opts.answers}\n`,
       );
-      process.exitCode = 1;
+      process.exitCode = ExitCode.USER_ERROR;
       return;
     }
     const answers = loadAnswers(opts.answers, projectDir);
@@ -286,7 +287,7 @@ export async function runDesignInit(
     for (const err of errors) {
       process.stderr.write(`  ${err.field}: ${err.message}\n`);
     }
-    process.exitCode = 1;
+    process.exitCode = ExitCode.CONFIG_ERROR;
     return;
   }
 
@@ -337,7 +338,8 @@ export async function runDesignInit(
           "[design:init] Run it interactively, or set STELE_APPROVED_BY=<human-or-service-account-id> before invoking.\n" +
           "[design:init] Without one of these, the approval record gating stele design generate would be unattributable.\n",
       );
-      process.exitCode = 1;
+      // No human identity = contract failure (approval gate).
+      process.exitCode = ExitCode.CONTRACT_FAIL;
       return;
     }
     // Mint the bootstrap approval first so generate sees it.

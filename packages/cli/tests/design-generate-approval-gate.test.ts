@@ -114,7 +114,9 @@ describe("runDesignGenerate — approval gate (Round 3 P0-4)", () => {
     const exit = process.exitCode;
     process.exitCode = previousExitCode;
 
-    expect(exit).toBe(1);
+    // P-06: refusing without approval is a contract-gate failure
+    // (ExitCode.CONTRACT_FAIL = 2), not a generic user error.
+    expect(exit).toBe(2);
     expect(captured).toContain("No approval record matches");
     expect(captured).toContain("stele design approve");
     // The protected outputs must NOT have been written.

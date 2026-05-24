@@ -8,6 +8,7 @@ import { loadProfile, profilePathExists } from "../../design-profile/load.js";
 import { readManifest } from "../../design-generator/manifest.js";
 import { computeDesignDiff } from "./diff.js";
 import type { DesignProfile } from "../../design-profile/types.js";
+import { ExitCode } from "../../errors.js";
 
 export type DesignApproveOptions = {
   from?: string;        // Path to previous profile for field-level diff
@@ -162,7 +163,7 @@ export async function runDesignApprove(
 ): Promise<void> {
   if (!opts.reason) {
     process.stderr.write("[design] --reason is required\n");
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     return;
   }
 
@@ -172,14 +173,14 @@ export async function runDesignApprove(
   // is actually in shape to be approved.
   if (!profilePathExists(projectDir)) {
     process.stderr.write("[design] No profile found\n");
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     return;
   }
 
   const approverResult = resolveApprovedBy();
   if (!approverResult.ok) {
     process.stderr.write(`[design] ${approverResult.reason}\n`);
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     return;
   }
 
@@ -230,10 +231,21 @@ export async function runDesignApprove(
   const shortHash = profileHash.slice(0, 8);
   const approvalPath = resolve(approvalsDir, `${ts}-${shortHash}.json`);
 
+  // Round 13 M-10: bind the approval to the proposal SHA-256s present
+  // in contract/design/proposals/ at the time of approval. Together
+  // with `approved_profile_sha256` this lets `stele design generate`
+  // detect a class of stealth attack: an agent that creates a new
+  // proposal AFTER approval (or mutates an existing one) is now visible
+  // because the proposal-hash list won't match. Generate enforces that
+  // every recorded proposal either still exists with the same hash OR
+  // has been deleted (i.e. merged into the approved profile).
+  const approvedProposals = readProposalsAtApproval(projectDir);
+
   const approval = {
     schema_version: 1,
     base_profile_sha256: baseHash,
     approved_profile_sha256: profileHash,
+    approved_proposals: approvedProposals,
     diff_classification: diffClassification,
     affected_generated_rules: manifest?.generatedRules.map((r) => r.ruleId) ?? [],
     affected_source_scope: affectedSourceScope,
@@ -286,6 +298,40 @@ function loadPreviousApprovedProfile(projectDir: string): DesignProfile | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Round 13 M-10: snapshot the proposal YAML files in
+ * `contract/design/proposals/` at the time of approval. Each entry is
+ * `{ path: string; sha256: string }`. The list is sorted by path for
+ * byte-stable approval records. The generate flow re-reads these and
+ * refuses to write if a recorded proposal has been mutated (new
+ * content) or a NEW proposal has appeared without a fresh approval.
+ *
+ * Proposals that have been deleted (i.e. merged into the profile) are
+ * accepted as long as the corresponding profile change is reflected
+ * in the approved profile hash.
+ */
+function readProposalsAtApproval(projectDir: string): Array<{ path: string; sha256: string }> {
+  const proposalsDir = resolve(projectDir, "contract/design/proposals");
+  let entries: string[];
+  try {
+    entries = readdirSync(proposalsDir).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
+  } catch {
+    // No proposals directory = no proposals to bind to.
+    return [];
+  }
+  entries.sort();
+  const out: Array<{ path: string; sha256: string }> = [];
+  for (const entry of entries) {
+    try {
+      const sha = hashFile(resolve(proposalsDir, entry));
+      out.push({ path: `contract/design/proposals/${entry}`, sha256: sha });
+    } catch {
+      // Skip unreadable entries — they won't be approved.
+    }
+  }
+  return out;
 }
 
 /**

@@ -425,7 +425,9 @@ describe("design init --generate", () => {
     const captured = stderr.lines.join("");
     const exit = process.exitCode;
     process.exitCode = previousExit;
-    expect(exit).toBe(1);
+    // P-06: refusing without human-identity gate is a contract-gate
+    // failure (ExitCode.CONTRACT_FAIL = 2), not a generic user error.
+    expect(exit).toBe(2);
     expect(captured).toContain("STELE_APPROVED_BY");
   });
 });

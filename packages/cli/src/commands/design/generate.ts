@@ -10,6 +10,7 @@ import { generateFromProfile } from "../../design-generator/ddd.js";
 import type { ProvenanceOutput, ProvenanceRule } from "../../design-generator/manifest.js";
 import { getGitInfo } from "../../events/git.js";
 import { STELE_VERSION } from "../../version.js";
+import { ExitCode } from "../../errors.js";
 
 export type DesignGenerateOptions = {
   dryRun?: boolean;
@@ -21,7 +22,7 @@ export async function runDesignGenerate(opts: DesignGenerateOptions, projectDir:
   // 1. Check profile exists
   if (!profilePathExists(projectDir)) {
     process.stderr.write("[design] No profile found at contract/design/profile.yaml\n");
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     return;
   }
 
@@ -33,7 +34,8 @@ export async function runDesignGenerate(opts: DesignGenerateOptions, projectDir:
     for (const err of validationErrors) {
       process.stderr.write(`  ${err.field}: ${err.message}\n`);
     }
-    process.exitCode = 1;
+    // Schema errors are configuration problems.
+    process.exitCode = ExitCode.CONFIG_ERROR;
     return;
   }
 
@@ -70,14 +72,16 @@ export async function runDesignGenerate(opts: DesignGenerateOptions, projectDir:
         `[design] If you are absolutely sure (and willing to record it in the event log):\n` +
         `[design]   stele design generate --force --reason "<why bypassing review>"\n`,
       );
-      process.exitCode = 1;
+      // No approval = contract failure (tamper-adjacent — generate
+      // writes to protected paths).
+      process.exitCode = ExitCode.CONTRACT_FAIL;
       return;
     }
     if (!opts.reason || opts.reason.trim().length === 0) {
       process.stderr.write(
         `[design] --force requires --reason "<rationale>" — the override is recorded in the event log.\n`,
       );
-      process.exitCode = 1;
+      process.exitCode = ExitCode.USER_ERROR;
       return;
     }
     process.stderr.write(
@@ -138,9 +142,18 @@ export async function runDesignGenerate(opts: DesignGenerateOptions, projectDir:
 }
 
 /**
- * Round 3 P0-4: scan contract/design/approvals/ for a record whose
- * approved_profile_sha256 equals the current profile hash. Returns true on
- * the first match (order-insensitive — we only need existence).
+ * Round 3 P0-4 + Round 13 M-10: scan contract/design/approvals/ for a
+ * record whose `approved_profile_sha256` equals the current profile
+ * hash AND whose `approved_proposals` snapshot still matches the
+ * current state of `contract/design/proposals/` (each recorded
+ * proposal must either still exist with the same sha256 OR have been
+ * deleted — the latter is the "proposal got merged into the profile"
+ * case which is exactly what the additive flow expects).
+ *
+ * The proposal-binding check closes a stealth-attack class: without
+ * it, an agent could create a NEW proposal YAML after an approval was
+ * minted, then run `stele design generate` — the new proposal would
+ * be invisible to the gate because only the profile hash was bound.
  */
 function hasMatchingApproval(projectDir: string, profileHash: string): boolean {
   const approvalsDir = resolve(projectDir, "contract/design/approvals");
@@ -156,18 +169,93 @@ function hasMatchingApproval(projectDir: string, profileHash: string): boolean {
   for (const entry of entries) {
     try {
       const raw = readFileSync(resolve(approvalsDir, entry), "utf8");
-      const parsed = JSON.parse(raw) as { approved_profile_sha256?: unknown };
+      const parsed = JSON.parse(raw) as {
+        approved_profile_sha256?: unknown;
+        approved_proposals?: unknown;
+      };
       if (
-        typeof parsed.approved_profile_sha256 === "string" &&
-        parsed.approved_profile_sha256 === profileHash
+        typeof parsed.approved_profile_sha256 !== "string" ||
+        parsed.approved_profile_sha256 !== profileHash
       ) {
-        return true;
+        continue;
       }
+      // Round 13 M-10: proposal-binding check. Records minted before
+      // this round don't have `approved_proposals`; treat that as
+      // backward-compatible (skip the check) — the field is required
+      // only on records this code writes itself. Use `Array.isArray`
+      // to distinguish "field absent" from "field present + array".
+      if (parsed.approved_proposals !== undefined) {
+        if (!Array.isArray(parsed.approved_proposals)) {
+          continue;
+        }
+        if (!proposalsStillMatch(projectDir, parsed.approved_proposals)) {
+          continue;
+        }
+      }
+      return true;
     } catch {
       // Skip unparseable approval entries — they don't grant approval.
     }
   }
   return false;
+}
+
+/**
+ * Round 13 M-10: verify that every approved proposal still exists
+ * with the same sha256, OR has been deleted (= merged). Reject if a
+ * proposal listed in the approval has been mutated (different sha),
+ * OR if a NEW proposal YAML has appeared since the approval was minted.
+ */
+function proposalsStillMatch(
+  projectDir: string,
+  approvedProposals: ReadonlyArray<unknown>,
+): boolean {
+  const proposalsDir = resolve(projectDir, "contract/design/proposals");
+  const onDisk = new Map<string, string>();
+  if (existsSync(proposalsDir)) {
+    let entries: string[];
+    try {
+      entries = readdirSync(proposalsDir).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"));
+    } catch {
+      return false;
+    }
+    for (const entry of entries) {
+      try {
+        const sha = hashFile(resolve(proposalsDir, entry));
+        onDisk.set(`contract/design/proposals/${entry}`, sha);
+      } catch {
+        return false;
+      }
+    }
+  }
+  const approvedSet = new Set<string>();
+  for (const item of approvedProposals) {
+    if (
+      typeof item !== "object" ||
+      item === null ||
+      typeof (item as { path?: unknown }).path !== "string" ||
+      typeof (item as { sha256?: unknown }).sha256 !== "string"
+    ) {
+      return false;
+    }
+    const path = (item as { path: string }).path;
+    const sha = (item as { sha256: string }).sha256;
+    approvedSet.add(path);
+    const currentSha = onDisk.get(path);
+    if (currentSha !== undefined && currentSha !== sha) {
+      // Mutated proposal — reject.
+      return false;
+    }
+    // If currentSha === undefined, the file was deleted (merged).
+    // Accept — the merge is captured by the profile-hash binding.
+  }
+  // A new proposal that wasn't approved is also a reject.
+  for (const path of onDisk.keys()) {
+    if (!approvedSet.has(path)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**

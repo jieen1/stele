@@ -56,6 +56,9 @@ export const DEFAULT_CONFIG: SteleConfig = {
     "packages/claude-code-plugin/scripts/stop-validate.js",
     "packages/claude-code-plugin/scripts/observation-hook.js",
     "packages/claude-code-plugin/scripts/lifecycle-context.js",
+    // Round 13 L-05/P-04: shared bash extractor + shell helpers.
+    "packages/claude-code-plugin/scripts/bash-extractors.js",
+    "packages/claude-code-plugin/scripts/shell-utils.js",
     "packages/claude-code-plugin/hooks/hooks.json",
     "stele.config.json",
     ".stele/stop-state.json",

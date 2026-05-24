@@ -79,6 +79,8 @@ def _lazy_load_checkers():
             "cli_io_through_path_utils",
             # Round 9 P-01 — locale-independent string compare
             "no_bare_locale_compare",
+            # Round 13 L-05/P-04 — shared bash extractor module
+            "bash_extractors_shared",
         ):
             _checkers[name] = getattr(mod, name, None)
 
@@ -135,6 +137,8 @@ _CHECKER_NAME_MAP = {
     "cli-io-through-path-utils": "cli_io_through_path_utils",
     # Round 9 P-01 — locale-independent string compare
     "no-bare-locale-compare": "no_bare_locale_compare",
+    # Round 13 L-05/P-04 — shared bash extractor module
+    "bash-extractors-shared": "bash_extractors_shared",
 }
 
 

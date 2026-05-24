@@ -38,6 +38,11 @@ export const DEFAULT_PROTECTED_PATTERNS: readonly string[] = [
   "packages/claude-code-plugin/scripts/stop-validate.js",
   "packages/claude-code-plugin/scripts/observation-hook.js",
   "packages/claude-code-plugin/scripts/lifecycle-context.js",
+  // Round 13 L-05/P-04: shared bash extractor module — protecting it
+  // closes the divergence bypass where one of the two hook scripts
+  // could be edited independently.
+  "packages/claude-code-plugin/scripts/bash-extractors.js",
+  "packages/claude-code-plugin/scripts/shell-utils.js",
   "packages/claude-code-plugin/hooks/hooks.json",
   // Project config — tampering changes which files are protected
   "stele.config.json",

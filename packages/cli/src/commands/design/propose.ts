@@ -5,6 +5,8 @@ import * as yaml from "js-yaml";
 import { computeDesignDiff } from "./diff.js";
 import type { AggregateRoot, BrandedId, Context, CoreInvariant, DesignProfile } from "../../design-profile/types.js";
 import { loadProfile } from "../../design-profile/load.js";
+import { ExitCode } from "../../errors.js";
+import { validateProposalSchema, PHASE_A_KINDS, PHASE_B_KINDS } from "./proposal-schema.js";
 
 export type DesignProposeOptions = {
   id?: string;
@@ -21,7 +23,7 @@ export async function runDesignPropose(
 ): Promise<void> {
   if (!opts.id) {
     process.stderr.write("[design] --id is required\n");
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     return;
   }
 
@@ -33,7 +35,7 @@ export async function runDesignPropose(
     const existing = profile.ddd?.core_invariants?.find((inv) => inv.id === opts.id);
     if (existing) {
       process.stderr.write(`[design] Invariant "${opts.id}" already exists in profile\n`);
-      process.exitCode = 1;
+      process.exitCode = ExitCode.USER_ERROR;
       return;
     }
   }
@@ -42,7 +44,7 @@ export async function runDesignPropose(
     const existing = profile.type_driven?.branded_ids?.declarations?.find((d) => d.id === opts.id);
     if (existing) {
       process.stderr.write(`[design] Branded ID "${opts.id}" already exists in profile\n`);
-      process.exitCode = 1;
+      process.exitCode = ExitCode.USER_ERROR;
       return;
     }
   }
@@ -52,7 +54,7 @@ export async function runDesignPropose(
       const existing = ctx.aggregate_roots?.find((agg) => agg.id === opts.id);
       if (existing) {
         process.stderr.write(`[design] Aggregate "${opts.id}" already exists in profile\n`);
-        process.exitCode = 1;
+        process.exitCode = ExitCode.USER_ERROR;
         return;
       }
     }
@@ -70,7 +72,7 @@ export async function runDesignPropose(
       const parsed = yaml.load(raw, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>;
       if (String(parsed.id) === opts.id && String(parsed.kind) === proposalType) {
         process.stderr.write(`[design] Proposal "${opts.id}" (kind: ${proposalType}) already exists in proposals/\n`);
-        process.exitCode = 1;
+        process.exitCode = ExitCode.USER_ERROR;
         return;
       }
     }
@@ -100,26 +102,18 @@ export async function runDesignPropose(
     content.target = opts.target ?? "";
   }
 
-  // Round 4 F-A-07: Phase B proposal kinds (trace-policy, type-state,
-  // effect-policy, effect-suppression) carry their declaration in
-  // contract/main.stele rather than in the design profile, so the
-  // diff-against-profile additive check below does not apply.
-  // Validate the kind is in the supported set up front, then write the
-  // YAML and exit — human review of the YAML + the approve flow is the
-  // gate for these kinds.
-  const PHASE_B_KINDS = new Set([
-    "trace-policy",
-    "type-state",
-    "effect-policy",
-    "effect-suppression",
-  ]);
-  const PHASE_A_KINDS = new Set(["invariant", "branded-id", "aggregate"]);
+  // Round 4 F-A-07 + Round 13 M-11: kind whitelist and per-kind field
+  // sets now live in `./proposal-schema.ts`. The schema validator
+  // (`validateProposalSchema`) runs against the content body
+  // immediately before writeFileSync, so a missing or mistyped field
+  // is caught at the propose step rather than surfacing later in
+  // approve or generate.
   if (!PHASE_A_KINDS.has(proposalType) && !PHASE_B_KINDS.has(proposalType)) {
     process.stderr.write(
       `[design] Unknown proposal type "${proposalType}". ` +
       `Allowed: ${[...PHASE_A_KINDS, ...PHASE_B_KINDS].sort().join(", ")}.\n`,
     );
-    process.exitCode = 1;
+    process.exitCode = ExitCode.USER_ERROR;
     return;
   }
 
@@ -130,6 +124,17 @@ export async function runDesignPropose(
     if (opts.target !== undefined) {
       content.target = opts.target;
     }
+    const phaseBErrors = validateProposalSchema(content);
+    if (phaseBErrors.length > 0) {
+      process.stderr.write(
+        `[design] Proposal "${opts.id}" (${proposalType}) failed schema validation:\n`,
+      );
+      for (const e of phaseBErrors) {
+        process.stderr.write(`  ${e.field}: ${e.message}\n`);
+      }
+      process.exitCode = ExitCode.CONFIG_ERROR;
+      return;
+    }
     writeFileSync(filePath, yaml.dump(content), "utf8");
     process.stdout.write(
       `[design] Phase B proposal "${opts.id}" (${proposalType}) written to ${filePath}. ` +
@@ -138,6 +143,18 @@ export async function runDesignPropose(
     return;
   }
 
+  // Round 13 M-11: validate Phase A schema before writing.
+  const schemaErrors = validateProposalSchema(content);
+  if (schemaErrors.length > 0) {
+    process.stderr.write(
+      `[design] Proposal "${opts.id}" (${proposalType}) failed schema validation:\n`,
+    );
+    for (const e of schemaErrors) {
+      process.stderr.write(`  ${e.field}: ${e.message}\n`);
+    }
+    process.exitCode = ExitCode.CONFIG_ERROR;
+    return;
+  }
   writeFileSync(filePath, yaml.dump(content), "utf8");
 
   // Validate: run diff to prove the proposal is additive (no weakening or restructuring)
@@ -155,7 +172,9 @@ export async function runDesignPropose(
     for (const c of badChanges) {
       process.stderr.write(`  [${c.changeClass}] ${c.description}\n`);
     }
-    process.exitCode = 1;
+    // Non-additive proposal = contract violation (the propose
+    // gate is meant to refuse weakening / restructuring).
+    process.exitCode = ExitCode.CONTRACT_FAIL;
     return;
   }
 
