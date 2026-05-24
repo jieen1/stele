@@ -573,6 +573,18 @@
         "decision_ref": "d1"
       },
       {
+        "from": "backends-py",
+        "to": "effect-evaluator",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
+        "from": "backends-py",
+        "to": "call-graph-core",
+        "pattern": "published_language",
+        "decision_ref": "d1"
+      },
+      {
         "from": "architecture",
         "to": "core",
         "pattern": "published_language",

@@ -10,6 +10,7 @@ import type { SourceSpan } from "@stele/core";
 import { isAbsoluteLikePath, toProjectRelativePath } from "./utils/shared-utils.js";
 import { safeGlob } from "./utils/glob.js";
 import { createExtractor } from "./architecture/typescript-extractor.js";
+import { createPyExtractor } from "./architecture/python-extractor.js";
 import { buildModuleMap } from "./architecture/module-map.js";
 
 // ----------------------------------------------------------------
@@ -30,6 +31,10 @@ export type ArchitectureContractOptions = {
   projectRoot: string;
   architecture: {
     id: string;
+    // Round 14 P2: pick the per-language extractor. Defaults to
+    // "typescript" for back-compat with older callers that didn't
+    // pass `lang`.
+    lang?: "typescript" | "python";
     modules: MinimalModuleDeclaration[];
     layers?: MinimalLayerDeclaration[];
     allowDependencies: Array<{ from: string; to: string[] }>;
@@ -124,11 +129,16 @@ export async function evaluateArchitectureRuntime(
   const fullModules = toFullModules(architecture.modules);
   const moduleMap = buildModuleMap(uniqueFiles, fullModules);
 
-  // Create extractor once (outside the loop) — avoids O(n * compilerInit)
+  // Round 14 P2: dispatch on `architecture.lang`. Default "typescript"
+  // keeps existing callers (and the design-generator) working unchanged.
+  const lang = architecture.lang ?? "typescript";
   const tsconfigPath = architecture.tsconfig
     ? resolve(projectRoot, architecture.tsconfig)
     : undefined;
-  const extractor = await createExtractor({ projectDir: projectRoot, tsconfigPath });
+  const extractor =
+    lang === "python"
+      ? createPyExtractor({ projectDir: projectRoot })
+      : await createExtractor({ projectDir: projectRoot, tsconfigPath });
   const allEdges: DependencyEdge[] = [];
   const unresolvedSpecifiers: Array<{ fromFile: string; specifier: string; line: number; column: number }> = [];
 
@@ -200,7 +210,7 @@ export async function evaluateArchitectureRuntime(
   const declaration: ArchitectureDeclaration = {
     kind: "architecture",
     id: architecture.id,
-    lang: "typescript",
+    lang,
     modules: fullModules,
     layers,
     allowDependencies: architecture.allowDependencies.map((d) => ({

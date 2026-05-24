@@ -416,19 +416,19 @@ describe("loadContract validation", () => {
     });
   });
 
-  it("rejects non-Python code-shape languages", async () => {
+  it("rejects unsupported code-shape languages (Round 14 P1: python + typescript both supported now)", async () => {
     const project = await createTempProject({
       "main.stele": [
         "(function-shape handler_fn",
-        "  (lang typescript)",
-        '  (target "src/handlers.ts::handle")',
+        "  (lang rust)",
+        '  (target "src/handlers.rs::handle")',
         "  (must-have-parameter request))",
       ].join("\n"),
     });
 
     await expectSteleError(getLoadContract()(project.rootPath), {
       code: "E0318",
-      messageIncludes: 'Function shape "handler_fn" lang "typescript" is not supported',
+      messageIncludes: 'Function shape "handler_fn" lang "rust" is not supported',
     });
   });
 

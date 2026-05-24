@@ -313,6 +313,10 @@
   )
   (module mcp-internal
     (path "packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}"))
+  (module effect-evaluator-internal
+    (path "packages/effect-evaluator/src/**"))
+  (module call-graph-core-internal
+    (path "packages/call-graph-core/src/**"))
   (module hooks-infrastructure
     (path "packages/agent-hooks/src/{install,util}/**"))
   (module mcp-infrastructure
@@ -321,12 +325,8 @@
     (path "packages/trace-evaluator/src/**"))
   (module type-state-evaluator-internal
     (path "packages/type-state-evaluator/src/**"))
-  (module effect-evaluator-internal
-    (path "packages/effect-evaluator/src/**"))
   (module type-driven-evaluator-internal
     (path "packages/type-driven-evaluator/src/**"))
-  (module call-graph-core-internal
-    (path "packages/call-graph-core/src/**"))
 
   (allow-dependency hooks-internal hooks-infrastructure)
   (allow-dependency hooks-infrastructure hooks-internal)
@@ -340,6 +340,8 @@
   (allow-dependency cli-infrastructure mcp-internal)
   (allow-dependency backends-ts-internal core-internal)
   (allow-dependency backends-py-internal core-internal)
+  (allow-dependency backends-py-internal effect-evaluator-internal)
+  (allow-dependency backends-py-internal call-graph-core-internal)
   (allow-dependency architecture-internal core-internal)
   (allow-dependency hooks-infrastructure core-internal)
   (allow-dependency mcp-infrastructure core-internal)

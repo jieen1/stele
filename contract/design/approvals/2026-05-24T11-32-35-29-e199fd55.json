@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "base_profile_sha256": "ddb9d520ffdd5c8fd467061ea807b358fc81b682f1cb95ebd99ff1662c1250cc",
+  "approved_profile_sha256": "e199fd55f414e02ab28c10041f52d8fcbcb25bfb511bace84512e92b07b4678f",
+  "approved_proposals": [
+    {
+      "path": "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml",
+      "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601"
+    }
+  ],
+  "diff_classification": "additive",
+  "affected_generated_rules": [
+    "architecture.ddd-core",
+    "architecture.ddd-cli",
+    "architecture.ddd-architecture",
+    "architecture.ddd-backends-ts",
+    "architecture.ddd-backends-py",
+    "architecture.ddd-hooks",
+    "architecture.ddd-mcp",
+    "architecture.ddd-backends-go",
+    "architecture.ddd-backends-java",
+    "architecture.ddd-backends-rust",
+    "architecture.ddd-github-action",
+    "architecture.ddd-plugin",
+    "architecture.ddd-call-graph-core",
+    "architecture.ddd-trace-evaluator",
+    "architecture.ddd-type-state-evaluator",
+    "architecture.ddd-effect-evaluator",
+    "architecture.ddd-type-driven-evaluator",
+    "architecture.ddd-context-map",
+    "core-node.core-operator-registry-aggregate",
+    "core-node.core-invariant-validator-aggregate",
+    "core-node.core-contract-loader-aggregate",
+    "core-node.core-manifest-engine-aggregate",
+    "core-node.cli-check-orchestrator-aggregate",
+    "core-node.cli-code-shape-evaluator-aggregate",
+    "core-node.cli-design-diff-engine-aggregate",
+    "core-node.cli-cli-program-factory-aggregate",
+    "core-node.cli-design-profile-validator-aggregate",
+    "core-node.architecture-architecture-evaluator-aggregate"
+  ],
+  "affected_source_scope": [],
+  "reason": "Round 14 P0: backends-py needs effect-evaluator + call-graph-core for Python Phase B extractor implementations",
+  "approved_by": "qa-operator@example.com",
+  "approved_at": "2026-05-24T11:32:35.298Z"
+}

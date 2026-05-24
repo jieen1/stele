@@ -196,6 +196,7 @@ function buildUnownedFileViolations(
  */
 function convertToRuntimeArch(arch: {
   id: string;
+  lang?: "typescript" | "python";
   modules: { id: string; paths: string[] }[];
   layers?: { id: string; modules: string[] }[];
   allowDependencies: Array<{ from: string; to: string[] }>;
@@ -205,6 +206,9 @@ function convertToRuntimeArch(arch: {
 }): ArchitectureContractOptions["architecture"] {
   return {
     id: arch.id,
+    // Round 14 P2: thread the declared language through so the
+    // runtime picks the matching extractor (TypeScript vs. Python).
+    lang: arch.lang,
     modules: arch.modules.map((m) => ({
       id: m.id,
       paths: m.paths,

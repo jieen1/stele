@@ -51,13 +51,16 @@ export function parseArchitectureDeclaration(filePath: string, node: ListNode): 
       case "lang": {
         ensureFieldUnset(lang, "lang", `Architecture "${id}" lang`, CODE, item.span);
         lang = readSingleString(item, `Architecture "${id}" lang`, CODE);
-        if (lang !== "typescript") {
+        // Round 14 P2: architecture supports python in addition to
+        // typescript. The CLI's architecture-runtime dispatches on
+        // this field to pick the per-language import extractor.
+        if (lang !== "typescript" && lang !== "python") {
           throw validationError(
             CODE,
             `Architecture "${id}" has an unsupported language "${lang}".`,
             item.span,
-            'Only "typescript" is supported for architecture declarations.',
-            'Use (lang typescript).',
+            'Only "typescript" and "python" are supported for architecture declarations.',
+            'Use (lang typescript) or (lang python).',
           );
         }
         break;
@@ -243,7 +246,7 @@ export function parseArchitectureDeclaration(filePath: string, node: ListNode): 
     node,
     span: node.span,
     id,
-    lang: lang as "typescript",
+    lang: lang as "typescript" | "python",
     tsconfig,
     description,
     modules,

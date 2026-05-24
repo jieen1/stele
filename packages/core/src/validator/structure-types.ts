@@ -222,7 +222,10 @@ export type ScenarioDeclaration = {
   steps: ScenarioOperation[];
 };
 
-export type CodeShapeLang = "python";
+// Round 14 P1: code-shape declarations support typescript in addition
+// to python. The CLI's code-shape evaluator dispatches on this field
+// when picking the per-language analyzer.
+export type CodeShapeLang = "python" | "typescript";
 
 export type BoundaryDeclaration = {
   kind: "boundary";
@@ -302,7 +305,8 @@ export type CodeShapeDeclaration =
 
 // -- Architecture declarations --
 
-export type ArchitectureLang = "typescript";
+// Round 14 P2: architecture supports python in addition to typescript.
+export type ArchitectureLang = "typescript" | "python";
 
 export type ArchitectureModuleDeclaration = {
   id: string;

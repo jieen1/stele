@@ -1,6 +1,9 @@
 import type { SourceSpan } from "@stele/core";
 
-export type ArchitectureLang = "typescript";
+// Round 14 P2: architecture declarations support python in addition
+// to typescript. The CLI's architecture-runtime picks the per-language
+// extractor based on this field.
+export type ArchitectureLang = "typescript" | "python";
 
 export type ArchitectureModuleDeclaration = {
   id: string;

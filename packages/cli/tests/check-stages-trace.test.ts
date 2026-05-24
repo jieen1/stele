@@ -169,7 +169,11 @@ describe("buildTraceStage — empty contract", () => {
 });
 
 describe("buildTraceStage — non-typescript target language (Round 4 F-A-02 fail-loud)", () => {
-  it("fails loud with an error violation for python", async () => {
+  it("routes python projects through the Python CallGraph extractor (Round 14 P0)", async () => {
+    // Round 14 P0: Python is now a supported Phase B target. The
+    // trace stage SHOULD call the injected extractor (which the test
+    // stubs with `mkCallGraph({})`) and produce a normal report
+    // rather than fail-loud.
     const policy = mkPolicy({ id: "P1", target: [DB], denyDirect: [CTRL] });
     const context = mkContext({
       contract: mkContract([policy]),
@@ -181,12 +185,11 @@ describe("buildTraceStage — non-typescript target language (Round 4 F-A-02 fai
       extractCallGraph: extract,
     });
 
-    expect(report.ok).toBe(false);
-    expect(report.violations).toHaveLength(1);
-    expect(report.violations[0]!.rule_id).toBe("trace.not-yet-supported.python");
-    expect(report.violations[0]!.severity).toBe("error");
-    expect(report.summary.violation_count).toBe(1);
-    expect(extract).not.toHaveBeenCalled();
+    // Extractor was actually invoked (no fail-loud short-circuit).
+    expect(extract).toHaveBeenCalledTimes(1);
+    // No fail-loud rule fired.
+    const ruleIds = report.violations.map((v) => v.rule_id);
+    expect(ruleIds).not.toContain("trace.not-yet-supported.python");
   });
 
   it("fails loud with an error violation for go", async () => {

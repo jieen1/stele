@@ -7,6 +7,10 @@ Welcome. This is the index for everything outside the [project README](../README
 | Doc | What you get |
 | --- | --- |
 | [guides/python-integration.md](guides/python-integration.md) | Adopt Stele in an existing Python + pytest application. The full workflow: install, scaffold, wire `stele_context`, generate, lock, check, custom checkers, temporal helpers, CI. |
+| [guides/typescript-integration.md](guides/typescript-integration.md) | Adopt Stele in a TypeScript + vitest project. Includes Phase B (trace-policy / type-state / effect-policy / branded-id / smart-ctor) — TypeScript is the only language with full Phase B coverage. |
+| [guides/go-integration.md](guides/go-integration.md) | Adopt Stele in a Go + `go test` project. Phase A only (Phase B fails loud per F-A-02). |
+| [guides/rust-integration.md](guides/rust-integration.md) | Adopt Stele in a Rust + `cargo test` project. Phase A only. |
+| [guides/java-integration.md](guides/java-integration.md) | Adopt Stele in a Java + JUnit 5 project. Phase A only. |
 | [guides/claude-code-plugin.md](guides/claude-code-plugin.md) | Install and use the Claude Code plugin. Hook lifecycle, slash commands, protected paths, the controlled contract-change flow. |
 | [spec/cdl.md](spec/cdl.md) | Complete reference for CDL: grammar, top-level forms, invariant fields, scenario syntax, all 51 operators, error codes (E0001–E0606), exit codes. The narrow spec, grounded in the shipped implementation. |
 | [spec/cli-output.md](spec/cli-output.md) | JSON output schemas for CLI commands (`stele check --json`, `stele why --json`, `stele impact --json`). Used by CI integrations, VS Code extension, agent-hooks SDK. |

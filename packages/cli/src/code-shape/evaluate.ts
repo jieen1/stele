@@ -19,6 +19,7 @@ import {
   type Violation,
 } from "@stele/core";
 import { stableStringCompare, uniqueSortedStrings } from "@stele/core";
+import { analyzeTypeScriptFiles, isTypeScriptFilePath } from "./typescript-analyzer.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -131,6 +132,9 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
   const targetMap = new Map<string, string[]>();
   const targetErrorIds = new Set<string>();
   const pythonFiles = new Set<string>();
+  // Round 14 P1: typescript files matched + queued for the in-process
+  // ts.createSourceFile analyzer.
+  const typescriptFiles = new Set<string>();
   const violations: Violation[] = [];
 
   for (const declaration of contract.codeShapes) {
@@ -145,19 +149,37 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
       continue;
     }
 
-    const matchedFiles = (await expandTargetPattern(projectDir, parsedTarget.pathPattern)).filter(isPythonFilePath);
+    // Round 14 P1: dispatch the file-matching filter on the
+    // declaration's `lang`. A python declaration only matches .py;
+    // a typescript declaration only matches .ts/.tsx.
+    const expanded = await expandTargetPattern(projectDir, parsedTarget.pathPattern);
+    const langFilter = declaration.lang === "typescript" ? isTypeScriptFilePath : isPythonFilePath;
+    const matchedFiles = expanded.filter(langFilter);
     targetMap.set(declaration.id, matchedFiles);
 
-    if (requiresPythonAnalysis(declaration)) {
+    if (requiresSourceAnalysis(declaration)) {
+      const targetSet = declaration.lang === "typescript" ? typescriptFiles : pythonFiles;
       for (const filePath of matchedFiles) {
-        pythonFiles.add(filePath);
+        targetSet.add(filePath);
       }
     }
   }
 
   const analysis = await analyzePythonFiles(projectDir, [...pythonFiles], command, relativeContractPaths);
-  const fileAnalyses = new Map(analysis.files.map((file) => [file.path, file] as const));
+  // Round 14 P1: merge TypeScript analyzer results into the same
+  // fileAnalyses map so downstream evaluators consume both
+  // languages uniformly.
+  const tsAnalysis = await analyzeTypeScriptFiles(projectDir, [...typescriptFiles]);
+  const fileAnalyses = new Map<string, PythonFileAnalysis>(
+    analysis.files.map((file) => [file.path, file] as const),
+  );
+  for (const tsFile of tsAnalysis.files) {
+    fileAnalyses.set(tsFile.path, tsFile as unknown as PythonFileAnalysis);
+  }
   violations.push(...analysis.errors.map((error) => createExecutionErrorViolation(projectDir, error, command)));
+  for (const error of tsAnalysis.errors) {
+    violations.push(createExecutionErrorViolation(projectDir, error, command));
+  }
 
   for (const declaration of contract.codeShapes) {
     if (targetErrorIds.has(declaration.id)) {
@@ -189,7 +211,9 @@ export async function evaluateCodeShapes(projectDir: string, contract: Contract,
   return violations;
 }
 
-function requiresPythonAnalysis(declaration: CodeShapeDeclaration): boolean {
+function requiresSourceAnalysis(declaration: CodeShapeDeclaration): boolean {
+  // file-policy only inspects file contents on disk; it doesn't need
+  // an AST analyzer for either language.
   return declaration.kind !== "file-policy";
 }
 

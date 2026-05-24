@@ -224,7 +224,10 @@ describe("buildEffectStage — empty contract", () => {
 });
 
 describe("buildEffectStage — non-typescript target language", () => {
-  it("returns ok with a warning notice for python", async () => {
+  it("routes python projects through the Python CallGraph + effect extractors (Round 14 P0)", async () => {
+    // Round 14 P0: Python is now a supported Phase B target for the
+    // effect stage. The extractor + evaluator should actually run
+    // (test stubs them out) instead of fail-louding.
     const policy = mkEffectPolicy({ id: "NO_IO" });
     const context = mkContext({
       contract: mkContract([policy]),
@@ -239,15 +242,10 @@ describe("buildEffectStage — non-typescript target language", () => {
       extractor: STUB_EXTRACTOR,
     });
 
-    // Round 4 F-A-02: non-TS targets fail loud now.
-    expect(report.ok).toBe(false);
-    expect(report.violations).toHaveLength(1);
-    expect(report.violations[0]!.rule_id).toBe(
-      "effect.not-yet-supported.python",
-    );
-    expect(report.violations[0]!.severity).toBe("error");
-    expect(extract).not.toHaveBeenCalled();
-    expect(evaluate).not.toHaveBeenCalled();
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    const ruleIds = report.violations.map((v) => v.rule_id);
+    expect(ruleIds).not.toContain("effect.not-yet-supported.python");
   });
 
   it("fails loud for rust (Round 4 F-A-02)", async () => {

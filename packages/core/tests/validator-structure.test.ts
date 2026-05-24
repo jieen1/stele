@@ -478,18 +478,18 @@ describe("code-shape declarations", () => {
     });
   });
 
-  it("rejects non-Python language", async () => {
+  it("rejects unsupported language (Round 14 P1: python + typescript both supported now)", async () => {
     const project = await createTempProject({
       "main.stele": [
-        "(function-shape ts_fn",
-        "  (lang typescript)",
-        '  (target "src/handlers.ts"))',
+        "(function-shape rust_fn",
+        "  (lang rust)",
+        '  (target "src/handlers.rs"))',
       ].join("\n"),
     });
 
     await expectSteleError(getLoadContract()(project.rootPath), {
       code: "E0318",
-      messageIncludes: 'lang "typescript" is not supported',
+      messageIncludes: 'lang "rust" is not supported',
     });
   });
 

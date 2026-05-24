@@ -9,9 +9,11 @@ import {
 } from "@stele/core";
 import { evaluateTracePolicies } from "@stele/trace-evaluator";
 import { tsCallGraphExtractor } from "@stele/backend-typescript";
+import { pyCallGraphExtractor } from "@stele/backend-python";
 import {
   buildExternAliasRegistry,
   type CallGraph,
+  type CallGraphExtractor,
   type ExternAlias,
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
@@ -72,13 +74,12 @@ export async function buildTraceStage(
   }
 
   const language = context.config.targetLanguage;
-  if (language !== "typescript") {
-    // Round 4 F-A-02: fail loud, not silent. Before this change the stage
-    // returned ok:true with a warning-severity advisory — meaning a
-    // Python/Go/Rust/Java project that declared (trace-policy …) would
-    // silently pass `stele check` even though the mechanism was unenforced.
-    // Now we emit an error-severity violation + ok:false so the contract
-    // surface and the enforcement surface stay in sync.
+  const extractor = pickCallGraphExtractor(language);
+  if (extractor === null) {
+    // Round 4 F-A-02 / Round 14 P0: fail loud only when NO extractor
+    // exists for the language. TypeScript (B.1) and Python (B.2 —
+    // Round 14) are supported; Go / Rust / Java still surface as
+    // unsupported until their extractors land.
     return createViolationReport({
       tool: "stele",
       command,
@@ -103,15 +104,17 @@ export async function buildTraceStage(
           status: "active",
           fix: {
             summary:
-              "Stele Phase B.1 supports TypeScript only. Either remove the (trace-policy …) declarations from this contract, or wait for the Python/Go/Java/Rust backend to land (B.2/B.3).",
+              "Stele Phase B supports TypeScript + Python today. Either remove the (trace-policy …) declarations from this contract, or wait for the Go / Java / Rust backend to land.",
           },
         }),
       ],
     });
   }
 
-  const tsconfigPath = resolveTsconfigPath(context);
-  if (tsconfigPath === null) {
+  // TypeScript still needs a tsconfig.json to bootstrap the compiler
+  // program; Python does not.
+  const tsconfigPath = language === "typescript" ? resolveTsconfigPath(context) : null;
+  if (language === "typescript" && tsconfigPath === null) {
     return createViolationReport({
       tool: "stele",
       command,
@@ -146,7 +149,7 @@ export async function buildTraceStage(
 
   let callGraph: CallGraph;
   try {
-    callGraph = await extractOrCacheCallGraph(context, tsconfigPath, deps);
+    callGraph = await extractOrCacheCallGraph(context, tsconfigPath, deps, extractor);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -251,33 +254,40 @@ function resolveTsconfigPath(context: PreparedCheckContext): string | null {
 
 async function extractOrCacheCallGraph(
   context: PreparedCheckContext,
-  tsconfigPath: string,
+  tsconfigPath: string | null,
   deps: TraceStageDeps,
+  extractor: CallGraphExtractor,
 ): Promise<CallGraph> {
   const cached = getCachedCallGraph(context);
   if (cached !== undefined) {
     return cached;
   }
-  const extract = deps.extractCallGraph ?? defaultExtract;
+  // Tests can inject `deps.extractCallGraph` to bypass the real
+  // extractor; production routes through whichever extractor matched
+  // the target language.
+  const extract = deps.extractCallGraph ?? ((options) => extractor.extract({
+    projectRoot: options.projectRoot,
+    tsconfigPath: options.tsconfigPath || undefined,
+    cacheDir: options.cacheDir,
+  }));
   const callGraph = await extract({
     projectRoot: context.projectDir,
-    tsconfigPath,
+    tsconfigPath: tsconfigPath ?? "",
     cacheDir: resolve(context.projectDir, "contract/.cache"),
   });
   setCachedCallGraph(context, callGraph);
   return callGraph;
 }
 
-async function defaultExtract(options: {
-  projectRoot: string;
-  tsconfigPath: string;
-  cacheDir: string;
-}): Promise<CallGraph> {
-  return tsCallGraphExtractor.extract({
-    projectRoot: options.projectRoot,
-    tsconfigPath: options.tsconfigPath,
-    cacheDir: options.cacheDir,
-  });
+/**
+ * Round 14 P0: pick the CallGraph extractor for a target language.
+ * Returns null when no extractor is registered — the caller then
+ * fail-louds the stage per F-A-02.
+ */
+function pickCallGraphExtractor(language: string): CallGraphExtractor | null {
+  if (language === "typescript") return tsCallGraphExtractor;
+  if (language === "python") return pyCallGraphExtractor;
+  return null;
 }
 
 /**

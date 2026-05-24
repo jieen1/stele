@@ -284,21 +284,23 @@ function parseLang(node: ListNode, label: string, id: string): CodeShapeLang {
       `${label} "${id}" lang must be an identifier.`,
       langNode.span,
       `Found ${describeNode(langNode)} instead.`,
-      "Use (lang python).",
+      "Use (lang python) or (lang typescript).",
     );
   }
 
-  if (langNode.value !== "python") {
+  // Round 14 P1: code-shape now supports typescript in addition to
+  // python. The CLI's evaluator dispatches on `declaration.lang`.
+  if (langNode.value !== "python" && langNode.value !== "typescript") {
     throw validationError(
       "E0318",
       `${label} "${id}" lang "${langNode.value}" is not supported.`,
       langNode.span,
-      "Code-shape declarations are Python-only in this version.",
-      "Change the declaration to (lang python).",
+      "Code-shape declarations are python or typescript in this version.",
+      "Change the declaration to (lang python) or (lang typescript).",
     );
   }
 
-  return "python";
+  return langNode.value as CodeShapeLang;
 }
 
 function parseTarget(node: ListNode, label: string, id: string): string {

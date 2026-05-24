@@ -17,8 +17,13 @@ import {
   tsEffectAnnotationExtractor,
 } from "@stele/backend-typescript";
 import {
+  pyCallGraphExtractor,
+  pyEffectAnnotationExtractor,
+} from "@stele/backend-python";
+import {
   buildExternAliasRegistry,
   type CallGraph,
+  type CallGraphExtractor,
   type ExternAlias,
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
@@ -103,9 +108,12 @@ export async function buildEffectStage(
   }
 
   const language = context.config.targetLanguage;
-  if (language !== "typescript") {
-    // Round 4 F-A-02: fail loud (error+ok:false) instead of silent
-    // warning. See trace stage for the full rationale.
+  const callGraphExtractor = pickEffectCallGraphExtractor(language);
+  const effectAnnotationExtractor = pickEffectAnnotationExtractor(language);
+  if (callGraphExtractor === null || effectAnnotationExtractor === null) {
+    // Round 4 F-A-02 / Round 14 P0: fail loud when no Phase B extractor
+    // pair exists for the target language. TypeScript + Python are
+    // supported today; Go / Rust / Java still on the roadmap.
     return createViolationReport({
       tool: "stele",
       command,
@@ -130,15 +138,15 @@ export async function buildEffectStage(
           status: "active",
           fix: {
             summary:
-              "Stele Phase B.1 supports TypeScript only. Either remove the (effect-policy …) declarations or wait for B.2/B.3 backend coverage.",
+              "Stele Phase B supports TypeScript + Python today. Either remove the (effect-policy …) declarations or wait for Go / Rust / Java backend coverage.",
           },
         }),
       ],
     });
   }
 
-  const tsconfigPath = resolveTsconfigPath(context);
-  if (tsconfigPath === null) {
+  const tsconfigPath = language === "typescript" ? resolveTsconfigPath(context) : null;
+  if (language === "typescript" && tsconfigPath === null) {
     return createViolationReport({
       tool: "stele",
       command,
@@ -173,7 +181,7 @@ export async function buildEffectStage(
 
   let callGraph: CallGraph;
   try {
-    callGraph = await extractOrCacheCallGraph(context, tsconfigPath, deps);
+    callGraph = await extractOrCacheCallGraph(context, tsconfigPath, deps, callGraphExtractor);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -207,7 +215,7 @@ export async function buildEffectStage(
   }
 
   const evaluate = deps.evaluate ?? evaluateEffects;
-  const extractor = deps.extractor ?? tsEffectAnnotationExtractor;
+  const extractor = deps.extractor ?? effectAnnotationExtractor;
   const strictMode = deps.strictMode ?? true;
   // Round 4 D-07: build the cross-language alias registry from the
   // contract's (extern-alias ...) declarations and pass it to the
@@ -297,31 +305,41 @@ function resolveTsconfigPath(context: PreparedCheckContext): string | null {
 
 async function extractOrCacheCallGraph(
   context: PreparedCheckContext,
-  tsconfigPath: string,
+  tsconfigPath: string | null,
   deps: EffectStageDeps,
+  extractor: CallGraphExtractor,
 ): Promise<CallGraph> {
   const cached = getCachedCallGraph(context);
   if (cached !== undefined) {
     return cached;
   }
-  const extract = deps.extractCallGraph ?? defaultExtract;
+  const extract = deps.extractCallGraph ?? ((options) => extractor.extract({
+    projectRoot: options.projectRoot,
+    tsconfigPath: options.tsconfigPath || undefined,
+    cacheDir: options.cacheDir,
+  }));
   const callGraph = await extract({
     projectRoot: context.projectDir,
-    tsconfigPath,
+    tsconfigPath: tsconfigPath ?? "",
     cacheDir: resolve(context.projectDir, "contract/.cache"),
   });
   setCachedCallGraph(context, callGraph);
   return callGraph;
 }
 
-async function defaultExtract(options: {
-  projectRoot: string;
-  tsconfigPath: string;
-  cacheDir: string;
-}): Promise<CallGraph> {
-  return tsCallGraphExtractor.extract({
-    projectRoot: options.projectRoot,
-    tsconfigPath: options.tsconfigPath,
-    cacheDir: options.cacheDir,
-  });
+/**
+ * Round 14 P0: pick the per-language CallGraph extractor for the
+ * effect stage. Returns null when the target language has no Phase B
+ * coverage yet.
+ */
+function pickEffectCallGraphExtractor(language: string): CallGraphExtractor | null {
+  if (language === "typescript") return tsCallGraphExtractor;
+  if (language === "python") return pyCallGraphExtractor;
+  return null;
+}
+
+function pickEffectAnnotationExtractor(language: string): EffectAnnotationExtractor | null {
+  if (language === "typescript") return tsEffectAnnotationExtractor;
+  if (language === "python") return pyEffectAnnotationExtractor;
+  return null;
 }

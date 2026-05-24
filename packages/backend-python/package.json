@@ -19,14 +19,16 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean && node -e \"import('fs').then(f=>f.default.cpSync('src/runtime','dist/runtime',{recursive:true}))\"",
+    "build": "tsup src/index.ts --format esm --dts --clean && node -e \"import('fs').then(f=>{f.default.cpSync('src/runtime','dist/runtime',{recursive:true}); f.default.mkdirSync('dist/extractors',{recursive:true}); f.default.copyFileSync('src/extractors/python_call_graph_extractor.py','dist/extractors/python_call_graph_extractor.py');})\"",
     "prepack": "npm run build",
     "test": "vitest run --dir tests",
     "typecheck": "tsc --project tsconfig.json --noEmit --pretty false",
     "lint": "tsc --project tsconfig.json --noEmit --pretty false"
   },
   "dependencies": {
-    "@stele/core": "workspace:*"
+    "@stele/call-graph-core": "workspace:*",
+    "@stele/core": "workspace:*",
+    "@stele/effect-evaluator": "workspace:*"
   },
   "license": "MIT",
   "repository": "github:stelehq/stele",

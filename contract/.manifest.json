@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-24T07:25:01.075Z",
+  "generated_at": "2026-05-24T11:32:59.256Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -35,21 +35,25 @@
       "sha256": "c3e3d693a811ee2b16f2f752385067354e9b84f3a7ca21e17e72e2ad1826aae8",
       "size": 1746
     },
+    "contract/design/approvals/2026-05-24T11-32-35-29-e199fd55.json": {
+      "sha256": "0210e0f346a5cf22e4e1497231a402ea4ab47d0be296e439d143fa0181144187",
+      "size": 1919
+    },
     "contract/design/manifest.json": {
-      "sha256": "6d844c81a30ee285f9c41816954ef6f5c9b484276f000b26d77ea653bdb0698c",
-      "size": 44160
+      "sha256": "5e6db4a57451953ddbc274c5e1fe0b0a8e2467fe2cae645e701d6f19c80ea3d3",
+      "size": 44297
     },
     "contract/design/profile.yaml": {
-      "sha256": "ddb9d520ffdd5c8fd467061ea807b358fc81b682f1cb95ebd99ff1662c1250cc",
-      "size": 18086
+      "sha256": "e199fd55f414e02ab28c10041f52d8fcbcb25bfb511bace84512e92b07b4678f",
+      "size": 18512
     },
     "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml": {
       "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601",
       "size": 2615
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "6203d6bc4812524b36f2d1d4d559b9ae0107d0eb651496817c13146da0acd8f0",
-      "size": 20009
+      "sha256": "aa763644acf5453609302a90cfbfb84bbec659e20cd1a894105eda8b6330ab7d",
+      "size": 20144
     },
     "contract/main.stele": {
       "sha256": "2660a9038ed2466d3d69ed19dcc72bde149fdf0a4e52471cd4b081ce372250dd",
@@ -80,8 +84,8 @@
       "size": 1073
     },
     "packages/backend-python/package.json": {
-      "sha256": "1b6be2aed07b50a00d9295805b7b9b6aa6c4b18981536af6091a175a6c9f211a",
-      "size": 1076
+      "sha256": "43141820efbf4d001ee223b54673d19ecb852bbd8d0037499a0a100bcbc05541",
+      "size": 1349
     },
     "packages/backend-rust/package.json": {
       "sha256": "2c83af0b9c4f3621208e5d83aff9692e2e3ed898f0e1ad74635bfd51c4ad7367",
@@ -192,8 +196,8 @@
       "size": 220
     },
     "pnpm-lock.yaml": {
-      "sha256": "23df7532df4a019956a2d05a9e7da792d37020e92faf7ee34e2dc3d23d9adf03",
-      "size": 112513
+      "sha256": "44d4a29a28154cc0b37158779db2905c377c66657edaadd768d94453c42b5f98",
+      "size": 112723
     },
     "pnpm-workspace.yaml": {
       "sha256": "0e316502859ceee6cd5180c9cdef463274c2531f518d2a9d73e31b4af12c1acf",
@@ -232,5 +236,5 @@
       "size": 381
     }
   },
-  "contract_hash": "1c910957c6580a0ad52eff51c59d88a278f049a8bf5e5d9d63739a08fb534385"
+  "contract_hash": "0b744368bcca10fe97875dda4874d0359d8c21298520f5bf2a0356d659edbd7c"
 }

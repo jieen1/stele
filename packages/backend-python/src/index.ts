@@ -8,3 +8,6 @@ export {
 } from "./translator.js";
 export type { TranslationContext } from "./translator.js";
 export { default, default as backend } from "./backend.js";
+// Round 14 P0: Phase B Python CallGraph + EffectAnnotation extractors.
+export { pyCallGraphExtractor } from "./extractors/call-graph.js";
+export { pyEffectAnnotationExtractor } from "./extractors/effect-annotations.js";

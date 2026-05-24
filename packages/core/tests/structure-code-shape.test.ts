@@ -198,10 +198,12 @@ describe("parseBoundaryDeclaration", () => {
   });
 
   it("rejects unsupported language", () => {
-    const node = parseTopList('(boundary api_b (lang typescript) (target "src/x.ts"))');
+    // Round 14 P1: code-shape now supports python + typescript. Use
+    // a still-unsupported language to test the rejection path.
+    const node = parseTopList('(boundary api_b (lang rust) (target "src/x.rs"))');
     expectSteleError(() => parseBoundaryDeclaration(FILE_PATH, node), {
       code: "E0318",
-      messageIncludes: 'lang "typescript" is not supported',
+      messageIncludes: 'lang "rust" is not supported',
     });
   });
 
