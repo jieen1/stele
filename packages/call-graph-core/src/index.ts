@@ -31,3 +31,15 @@ export {
   type ExternAlias,
   type ExternAliasRegistry,
 } from "./extern-alias.js";
+
+export type {
+  CallGraphState,
+  CallGraphStateBrand,
+  TypedCallGraph,
+} from "./lifecycle.js";
+export {
+  cacheCallGraph,
+  emptyCallGraph,
+  finalizeCallGraph,
+  startBuilding,
+} from "./lifecycle.js";

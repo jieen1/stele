@@ -733,6 +733,21 @@
 ; (deferred follow-up work, not blocking).
 ; ============================================================================
 
+(type-state CALLGRAPH_LIFECYCLE
+  (description "Phase B evaluators (trace / type-state / effect) must only consume a CallGraph that is Built or Cached. Calling an evaluator on a graph still Building is undefined behaviour — edges and unresolvedCalls may be incomplete.")
+  (target "packages/call-graph-core/src/lifecycle.ts::TypedCallGraph")
+  (severity "error")
+  (states Empty Building Built Cached)
+  (initial Empty)
+  (terminal Cached)
+  (transition (from Empty) (via startBuilding) (to Building))
+  (transition (from Building) (via finalizeCallGraph) (to Built))
+  (transition (from Built) (via cacheCallGraph) (to Cached))
+  (allowed-ops Empty startBuilding)
+  (allowed-ops Building finalizeCallGraph)
+  (allowed-ops Built cacheCallGraph)
+  (fix-hint "Route the graph through `emptyCallGraph` → `startBuilding` → `finalizeCallGraph` (→ `cacheCallGraph`) in `packages/call-graph-core/src/lifecycle.ts`. Evaluators must accept `TypedCallGraph<\"Built\">` or `TypedCallGraph<\"Cached\">` only. If the lifecycle is wrong, propose an update via `stele design propose --type-state CALLGRAPH_LIFECYCLE`."))
+
 (type-state DESIGN_PROFILE_LIFECYCLE
   (description "A DesignProfile starts Raw (just parsed from YAML), advances to Validated after validateProfile accepts it, and reaches Hashed once its SHA-256 has been computed. Generators must only consume Hashed profiles — feeding a Raw or Validated profile bypasses the integrity gate.")
   (target "packages/cli/src/design-profile/lifecycle.ts::TypedDesignProfile")
