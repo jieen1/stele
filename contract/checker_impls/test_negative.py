@@ -1601,6 +1601,52 @@ def test_cli_commands_no_direct_fs_write_catches_writeFileSync_call():
     )
 
 
+def _mutate_then_check(file_relpath: str, mutator, rule_id: str) -> bool:
+    """Apply `mutator(original_text) -> new_text` to a real source file,
+    run stele check, expect the matching rule_id, restore the file."""
+    target = sp._REPO_ROOT / file_relpath
+    original = target.read_text(encoding="utf-8")
+    mutated = mutator(original)
+    if mutated == original:
+        print(f"  ERROR: mutator produced no change to {file_relpath}")
+        return False
+    target.write_text(mutated, encoding="utf-8")
+    try:
+        return _run_stele_check_expect_violation(rule_id)
+    finally:
+        target.write_text(original, encoding="utf-8")
+
+
+def test_operator_registry_shape_catches_missing_method():
+    """Phase 2.2: removing the `register` method from InMemoryOperatorRegistry
+    must trip the class-shape."""
+    return _mutate_then_check(
+        "packages/core/src/registry/operators.ts",
+        # Drop the `register` method body — a brittle but exact mutation.
+        lambda text: re.sub(
+            r"\n  register\(spec: OperatorSpec\): void \{[\s\S]*?\n  \}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "operator-registry-shape",
+    )
+
+
+def test_cli_command_error_shape_catches_missing_field():
+    """Phase 2.2: removing the `exitCode` field declaration from
+    CliCommandError must trip the class-shape."""
+    return _mutate_then_check(
+        "packages/cli/src/errors.ts",
+        lambda text: text.replace(
+            "  readonly exitCode: ExitCode;\n",
+            "",
+            1,
+        ),
+        "cli-command-error-shape",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1700,6 +1746,8 @@ def main() -> int:
         # Phase 2 (self-dogfooding plan): code-shape contracts.
         ("core_no_fs_write_from_non_manifest_catches_writeFile_import", test_core_no_fs_write_from_non_manifest_catches_writeFile_import),
         ("cli_commands_no_direct_fs_write_catches_writeFileSync_call", test_cli_commands_no_direct_fs_write_catches_writeFileSync_call),
+        ("operator_registry_shape_catches_missing_method", test_operator_registry_shape_catches_missing_method),
+        ("cli_command_error_shape_catches_missing_field", test_cli_command_error_shape_catches_missing_field),
     ]
 
     print("=" * 60)

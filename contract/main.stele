@@ -500,4 +500,25 @@
   (allow-target "packages/cli/src/commands/init.ts")
   (allow-target "packages/cli/src/commands/design/**"))
 
+; --- §2.2 class-shape contracts -----------------------------------------------
+; The TS analyzer only recognises real `class` declarations (not `interface` or
+; type aliases), so each class-shape targets a concrete class. The phase doc's
+; `OperatorRegistry`/`Manifest`/`ViolationReport` types are interfaces or type
+; aliases; `MANIFEST_ENGINE_SHAPE` and `VIOLATION_REPORT_SHAPE` are deferred to
+; Phase 7 (see decision log).
+
+(class-shape operator-registry-shape
+  (lang typescript)
+  (target "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry")
+  (must-have-method "register")
+  (must-have-method "get")
+  (must-have-method "has")
+  (must-have-method "list"))
+
+(class-shape cli-command-error-shape
+  (lang typescript)
+  (target "packages/cli/src/errors.ts::CliCommandError")
+  (must-extend "Error")
+  (must-have-field "exitCode"))
+
 (import "generated/ddd-typedriven.stele")

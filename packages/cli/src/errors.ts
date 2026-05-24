@@ -20,13 +20,13 @@ export const ExitCode = {
 export type ExitCode = (typeof ExitCode)[keyof typeof ExitCode];
 
 export class CliCommandError extends Error {
-  constructor(
-    message: string,
-    readonly exitCode: ExitCode,
-    override readonly cause?: unknown,
-  ) {
+  readonly exitCode: ExitCode;
+  override readonly cause?: unknown;
+  constructor(message: string, exitCode: ExitCode, cause?: unknown) {
     super(message);
     this.name = "CliCommandError";
+    this.exitCode = exitCode;
+    this.cause = cause;
   }
 }
 
