@@ -26,7 +26,7 @@ import { writeLastReport } from "../last-report.js";
 import {
   assertProtectedContractFilesReachable,
   collectProtectedPaths,
-  sha256,
+  computeSha256,
   toManifestPaths,
   verifyManagedGeneratedFiles,
 } from "./generate.js";
@@ -188,7 +188,7 @@ export async function collectProtectedCheckState(
 
   return {
     protectedPaths,
-    contractHash: sha256(normalizeContract(contract)),
+    contractHash: computeSha256(normalizeContract(contract)),
     summary: {
       invariantCount: contract.invariants.length,
       generatedFileCount: generated.files.length,

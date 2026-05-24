@@ -11,6 +11,7 @@ import {
   normalizeFile,
   posixNormalize,
   readHashManifest,
+  sha256Branded,
   sha256OfFileOrNull,
   stableStringCompare,
   stableStringify,
@@ -24,6 +25,7 @@ import {
   type HashManifest,
   type LanguageBackend,
   type ParsedFileLike,
+  type Sha256,
 } from "@stele/core";
 import globParent from "glob-parent";
 import { minimatch } from "minimatch";
@@ -458,8 +460,18 @@ export async function verifyManagedGeneratedFiles(
   };
 }
 
-export function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+/**
+ * Compute SHA-256 of `value` and return the branded `Sha256` type.
+ *
+ * Phase 1 self-dogfooding: thin re-export of the core
+ * `hashManifestSha256` helper so CLI command files can route raw
+ * `createHash("sha256").update(...).digest("hex")` sites through a
+ * single factory. Previously named `sha256` (clashed with the smart
+ * constructor); renamed to `computeSha256` to align with
+ * `@stele/core`.
+ */
+export function computeSha256(value: string): Sha256 {
+  return sha256Branded(createHash("sha256").update(value).digest("hex"));
 }
 
 export function toManifestPaths(projectDir: string, protectedPaths: string[]): string[] {

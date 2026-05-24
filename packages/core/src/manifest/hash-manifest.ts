@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
 import { isPlainRecord } from "../util/types.js";
+import { sha256 as sha256SmartCtor, type Sha256 } from "../util/branded-types.js";
 
 /**
  * EP05: Incremental generation hash manifest.
@@ -123,7 +124,7 @@ export function buildTransitiveHash(
 ): Map<string, string> {
   const ownHashes = new Map<string, string>();
   for (const [path, file] of files.entries()) {
-    ownHashes.set(path, sha256(file.normalized));
+    ownHashes.set(path, computeSha256(file.normalized));
   }
 
   const order = topologicalSort(files, dag);
@@ -160,7 +161,7 @@ export function buildTransitiveHash(
     }
 
     depHashes.sort();
-    const transitive = sha256(`${own}|${depHashes.join("|")}`);
+    const transitive = computeSha256(`${own}|${depHashes.join("|")}`);
     result.set(path, transitive);
   }
 
@@ -170,8 +171,21 @@ export function buildTransitiveHash(
 /** Alias for complexity contract targeting. */
 export { buildTransitiveHash as hashManifest };
 
-export function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+/**
+ * Compute SHA-256 of `value` and return the branded `Sha256` type.
+ *
+ * Phase 1 self-dogfooding: this helper is the single canonical
+ * factory for "string → 64-char lowercase hex" in @stele/core. The
+ * output is guaranteed by `createHash("sha256").update(...).digest("hex")`
+ * to match the smart-constructor's shape check, but routing through
+ * the smart constructor preserves the brand at the call site so the
+ * branded-id evaluator can verify call patterns statically.
+ *
+ * Previously named `sha256`; renamed to disambiguate from the smart
+ * constructor exported by `util/branded-types.ts`.
+ */
+export function computeSha256(value: string): Sha256 {
+  return sha256SmartCtor(createHash("sha256").update(value).digest("hex"));
 }
 
 export async function writeAtomic(targetPath: string, content: string): Promise<void> {
@@ -200,10 +214,10 @@ export async function writeAtomic(targetPath: string, content: string): Promise<
   }
 }
 
-export async function sha256OfFileOrNull(filePath: string): Promise<string | null> {
+export async function sha256OfFileOrNull(filePath: string): Promise<Sha256 | null> {
   try {
     const buffer = await readFile(filePath);
-    return createHash("sha256").update(buffer).digest("hex");
+    return sha256SmartCtor(createHash("sha256").update(buffer).digest("hex"));
   } catch (error) {
     if (isMissingFileError(error)) {
       return null;

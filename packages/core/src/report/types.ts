@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { stableStringCompare } from "../util/array.js";
+import { sha256 as sha256SmartCtor } from "../util/branded-types.js";
 
 function uniqueSortedStrings(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => stableStringCompare(left, right));
@@ -304,7 +305,7 @@ export function buildViolationFingerprint(violation: Omit<Violation, "fingerprin
     scope_paths: uniqueSortedStrings(violation.scope_paths),
   };
 
-  return createHash("sha256").update(stableStringify(payload)).digest("hex");
+  return sha256SmartCtor(createHash("sha256").update(stableStringify(payload)).digest("hex"));
 }
 
 /**

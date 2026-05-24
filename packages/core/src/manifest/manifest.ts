@@ -6,6 +6,7 @@ import { stableStringCompare } from "../util/array.js";
 import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
 import { isPlainRecord } from "../util/types.js";
+import { sha256 as sha256SmartCtor } from "../util/branded-types.js";
 import { writeAtomic } from "./hash-manifest.js";
 
 const MANIFEST_VERSION = "1";
@@ -227,7 +228,7 @@ async function readProtectedFile(filePath: string): Promise<ManifestProtectedFil
   const buffer = await readFile(filePath);
 
   return {
-    sha256: createHash("sha256").update(buffer).digest("hex"),
+    sha256: sha256SmartCtor(createHash("sha256").update(buffer).digest("hex")),
     size: buffer.byteLength,
   };
 }

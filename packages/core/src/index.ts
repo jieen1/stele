@@ -50,7 +50,7 @@ export {
   HASH_MANIFEST_VERSION,
   posixNormalize,
   readHashManifest,
-  sha256 as hashManifestSha256,
+  computeSha256 as hashManifestSha256,
   sha256OfFileOrNull,
   stripVolatileConfigFields,
   writeAtomic,

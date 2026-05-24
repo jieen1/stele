@@ -8,7 +8,7 @@ import { discoverProjects } from "../recursive-discovery.js";
 import {
   assertProtectedContractFilesReachable,
   collectProtectedPaths,
-  sha256,
+  computeSha256,
   verifyManagedGeneratedFiles,
 } from "./generate.js";
 import { aggregateExitCode, formatRecursiveHeader, formatRecursiveSummary, type SubReport } from "./recursive.js";
@@ -51,7 +51,7 @@ export async function lockProject(projectDir: string, _options: LockOptions): Pr
   const protectedPaths = await collectProtectedPaths(projectDir, config);
   await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
-  await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), sha256(normalizeContract(contract)));
+  await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), computeSha256(normalizeContract(contract)));
 
   await writeEvent(
     projectDir,

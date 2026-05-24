@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { sha256Branded } from "@stele/core";
 
 import { loadProfile, profilePathExists } from "../../design-profile/load.js";
 import { validateProfile } from "../../design-profile/validate.js";
@@ -266,7 +267,7 @@ function buildProvenanceOutputs(
   result: ReturnType<typeof generateFromProfile>,
   content: string,
 ): ProvenanceOutput[] {
-  const fileHash = createHash("sha256").update(content).digest("hex");
+  const fileHash = sha256Branded(createHash("sha256").update(content).digest("hex"));
   const rules: ProvenanceRule[] = [];
 
   // Architecture rules

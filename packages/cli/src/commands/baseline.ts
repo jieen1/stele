@@ -3,6 +3,7 @@ import { lstat, readdir, readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import {
   createViolationBaseline,
+  sha256Branded,
   stableStringCompare,
   tryReadViolationBaseline,
   writeManifest,
@@ -106,7 +107,7 @@ async function walkHumanDir(
 
     const relativePath = normalizePath(relative(projectDir, fullPath));
     const buffer = await readFile(fullPath);
-    files[relativePath] = createHash("sha256").update(buffer).digest("hex");
+    files[relativePath] = sha256Branded(createHash("sha256").update(buffer).digest("hex"));
   }
 }
 
