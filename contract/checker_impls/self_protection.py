@@ -1025,7 +1025,13 @@ def cli_exit_code_enum_complete(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     if not errors_ts.exists():
         return {"passed": False, "message": "errors.ts not found"}
 
-    content = errors_ts.read_text(encoding="utf-8")
+    raw_content = errors_ts.read_text(encoding="utf-8")
+    # Round 8 N-03: strip BOTH comments and string-literal interiors
+    # before searching, otherwise a stale comment like
+    # `// SCORE_BELOW_THRESHOLD: 99 was the old value` would satisfy
+    # the regex even if the actual enum entry has been deleted, and
+    # an enumerated value name hiding in a string would equally count.
+    content = _strip_ts_comments_and_strings(raw_content)
 
     if "class CliCommandError" not in content:
         return {"passed": False, "message": "CliCommandError class not found"}
@@ -1651,6 +1657,11 @@ def _strip_js_comments_quote_aware(source: str) -> str:
                 out.append(" ")  # preserve token boundary
                 i += 2
                 continue
+            # Round 8 N-05: preserve newlines inside block comments so
+            # downstream line-number computations (count("\n", 0, m.start()))
+            # don't shift when violations sit below a multi-line `/* ... */`.
+            if ch == "\n":
+                out.append("\n")
             i += 1
             continue
         if state == "string":
@@ -2245,6 +2256,169 @@ def _strip_ts_comments(source: str) -> str:
     return _strip_js_comments_quote_aware(source)
 
 
+def _blank_string_interiors(source: str) -> str:
+    """Round 8 N-02 (no_backward_compat_shims companion): blank the
+    *interiors* of string / template literals (replace with spaces;
+    preserve newlines) but keep comments intact. Length-preserving so
+    that match offsets in the returned string equal offsets in the
+    original — that's what the shim-marker checker needs in order to
+    keep an accurate line number while rejecting smuggled markers.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(source)
+    state = "code"  # code | line_comment | block_comment | string
+    string_quote = ""
+    while i < n:
+        ch = source[i]
+        nxt = source[i + 1] if i + 1 < n else ""
+        if state == "code":
+            if ch == "/" and nxt == "/":
+                state = "line_comment"
+                out.append(ch)
+                i += 1
+                continue
+            if ch == "/" and nxt == "*":
+                state = "block_comment"
+                out.append(ch)
+                i += 1
+                continue
+            if ch == '"' or ch == "'" or ch == "`":
+                state = "string"
+                string_quote = ch
+                out.append(ch)
+                i += 1
+                continue
+            out.append(ch)
+            i += 1
+            continue
+        if state == "line_comment":
+            out.append(ch)
+            if ch == "\n":
+                state = "code"
+            i += 1
+            continue
+        if state == "block_comment":
+            out.append(ch)
+            if ch == "/" and source[i - 1 : i] == "*":
+                state = "code"
+            i += 1
+            continue
+        if state == "string":
+            if ch == "\\":
+                # Escape — blank both chars but preserve newlines.
+                out.append(" ")
+                if i + 1 < n:
+                    out.append("\n" if source[i + 1] == "\n" else " ")
+                    i += 2
+                else:
+                    i += 1
+                continue
+            if ch == string_quote:
+                out.append(ch)
+                state = "code"
+                string_quote = ""
+                i += 1
+                continue
+            out.append("\n" if ch == "\n" else " ")
+            i += 1
+            continue
+    return "".join(out)
+
+
+def _strip_ts_comments_and_strings(source: str) -> str:
+    """Round 8 N-02: like `_strip_ts_comments`, but additionally replaces
+    every character INSIDE a string / template literal with a space
+    (newlines preserved so line numbers remain stable).
+
+    Why: the Round 7 dogfood checkers (NO_CJS_REQUIRE_IN_TS_SOURCE,
+    NO_BACKWARD_COMPAT_SHIMS, CORE_ENGINE_PURITY, CLI_IO_THROUGH_PATH_UTILS)
+    scan for forbidden tokens — but a token hidden inside a string
+    literal (`const msg = "use require(...)"`) is not actually a
+    semantic call; it's text. Without this helper, an agent could
+    smuggle the forbidden pattern through, or — worse for
+    CLI_IO_THROUGH_PATH_UTILS — could ship code that calls writeFile on
+    raw user input AND mention the string `"resolve("` to satisfy the
+    safety-helper check. This helper removes that bypass class.
+
+    The quote characters themselves are preserved (so `"x".length`
+    style parses still work for any downstream consumer), but the
+    interior is blanked.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(source)
+    state = "code"
+    string_quote = ""
+    while i < n:
+        ch = source[i]
+        nxt = source[i + 1] if i + 1 < n else ""
+        if state == "code":
+            if ch == "/" and nxt == "/":
+                state = "line_comment"
+                i += 2
+                continue
+            if ch == "/" and nxt == "*":
+                state = "block_comment"
+                i += 2
+                continue
+            if ch == '"' or ch == "'" or ch == "`":
+                state = "string"
+                string_quote = ch
+                out.append(ch)
+                i += 1
+                continue
+            out.append(ch)
+            i += 1
+            continue
+        if state == "line_comment":
+            if ch == "\n":
+                state = "code"
+                out.append("\n")
+                i += 1
+                continue
+            i += 1
+            continue
+        if state == "block_comment":
+            if ch == "*" and nxt == "/":
+                state = "code"
+                out.append(" ")
+                i += 2
+                continue
+            if ch == "\n":
+                out.append("\n")
+            i += 1
+            continue
+        if state == "string":
+            if ch == "\\":
+                # Honour the escape — `\"` doesn't close the string;
+                # blank out both chars (preserve count via spaces).
+                out.append(" ")
+                if i + 1 < n:
+                    if source[i + 1] == "\n":
+                        out.append("\n")
+                    else:
+                        out.append(" ")
+                    i += 2
+                else:
+                    i += 1
+                continue
+            if ch == string_quote:
+                out.append(ch)
+                state = "code"
+                string_quote = ""
+                i += 1
+                continue
+            # Inside a string — preserve newlines, blank everything else.
+            if ch == "\n":
+                out.append("\n")
+            else:
+                out.append(" ")
+            i += 1
+            continue
+    return "".join(out)
+
+
 _CJS_REQUIRE_RE = re.compile(r"\brequire\s*\(\s*[\"'][^\"']+[\"']\s*\)")
 _VERSION_TS_ALLOWLIST = {
     "packages/cli/src/version.ts",
@@ -2275,7 +2449,9 @@ def no_cjs_require_in_ts_source(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 content = ts_file.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            stripped = _strip_ts_comments(content)
+            # Round 8 N-02: blank string-literal contents too — otherwise a
+            # `const msg = "use require(...)"` string would false-positive.
+            stripped = _strip_ts_comments_and_strings(content)
             for m in _CJS_REQUIRE_RE.finditer(stripped):
                 line_no = stripped.count("\n", 0, m.start()) + 1
                 violations.append({
@@ -2345,18 +2521,19 @@ def tsconfig_base_strict_mode(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 
 
 _SHIM_MARKER_RE = re.compile(
-    # Anchor each marker tightly so the regex doesn't false-positive on
-    # legitimate diff text like `// Removed contexts` (section header in
-    # design diff output). `// removed:` and `// removed —` are the
-    # canonical shim-marker shapes; we also catch the explicit
-    # compat / legacy variants.
-    r"//\s*(?:"
-    r"removed[:—]|"                  # `// removed:` or `// removed —`
-    r"TODO\(compat\)|"
-    r"for\s+backwards?[\s-]+compat\b|"
+    # Round 8 N-04: anchor on EITHER comment opener (`//` line comment
+    # or `/*` block comment opener); accept optional whitespace before
+    # the punctuation after `removed`; allow `-` as a third punctuation
+    # variant; accept `compatibility` as a synonym of `compat`; require
+    # punctuation after `removed` so the diff.ts section header
+    # `// Removed contexts` still does NOT match.
+    r"(?://|/\*)\s*(?:"
+    r"removed\s*[:—-]|"                       # `// removed:`, `// removed —`, `// removed -`
+    r"TODO\(compat(?:ibility)?\)|"
+    r"for\s+backwards?[\s-]+compat(?:ibility)?\b|"
     r"@deprecated\s+temporary\b|"
     r"legacy\s+shim\b|"
-    r"compat\s+shim\b"
+    r"compat(?:ibility)?\s+shim\b"
     r")",
     re.IGNORECASE,
 )
@@ -2364,7 +2541,16 @@ _SHIM_MARKER_RE = re.compile(
 
 def no_backward_compat_shims(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Round 7 (Round 5 deferred dogfood #3): CLAUDE.md 'Don't add
-    backward-compat shims, dead-flag toggles, or `// removed:` markers.'"""
+    backward-compat shims, dead-flag toggles, or `// removed:` markers.'
+
+    Round 8 N-02 follow-up: this checker MUST keep comments visible
+    (the markers ARE comments — stripping them would defeat the check).
+    But it must also resist a string-literal smuggling attempt where
+    the marker is embedded in a string. Use `_blank_string_interiors`
+    which is length-preserving and keeps comments untouched, so the
+    regex sees real comment text only and reported line numbers stay
+    accurate.
+    """
     violations: list[dict[str, Any]] = []
     for pkg_dir in sorted(_PACKAGES_DIR.glob("*")):
         if not pkg_dir.is_dir():
@@ -2381,8 +2567,9 @@ def no_backward_compat_shims(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 content = ts_file.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            for m in _SHIM_MARKER_RE.finditer(content):
-                line_no = content.count("\n", 0, m.start()) + 1
+            search_form = _blank_string_interiors(content)
+            for m in _SHIM_MARKER_RE.finditer(search_form):
+                line_no = search_form.count("\n", 0, m.start()) + 1
                 line = content.splitlines()[line_no - 1] if line_no - 1 < len(content.splitlines()) else ""
                 violations.append({
                     "file": str(ts_file.relative_to(_REPO_ROOT)),
@@ -2403,21 +2590,50 @@ def no_backward_compat_shims(ctx: dict, **kwargs: Any) -> dict[str, Any]:
 
 
 _CORE_PURITY_FORBIDDEN = [
+    # Dotted forms — the obvious surface.
     ("Date.now()", r"\bDate\.now\s*\("),
     ("Math.random()", r"\bMath\.random\s*\("),
     ("process.env access", r"\bprocess\.env\b"),
+    ("process.hrtime()", r"\bprocess\.hrtime\b"),
     ("crypto.randomBytes()", r"\bcrypto\.randomBytes\s*\("),
     ("crypto.randomUUID()", r"\bcrypto\.randomUUID\s*\("),
+    # Round 8 N-01: bare imported-name forms (`import { randomBytes }
+    # from "node:crypto"`). The original checker only saw the dotted
+    # form and was therefore silently allowing the most concise way to
+    # introduce nondeterminism. We now also flag the bare callees.
+    # Gating on the matching import is intentional: a parameter named
+    # `randomBytes` doesn't get flagged unless the file actually
+    # imports `randomBytes` from a crypto-like module.
+    ("randomBytes (bare)", r"\brandomBytes\s*\(", "import_crypto"),
+    ("randomUUID (bare)",  r"\brandomUUID\s*\(",  "import_crypto"),
+    ("randomInt (bare)",   r"\brandomInt\s*\(",   "import_crypto"),
 ]
+_CORE_PURITY_IMPORT_GATES = {
+    "import_crypto": re.compile(
+        r'\bfrom\s+["\'](?:node:)?crypto["\']',
+    ),
+}
 _CORE_PURITY_ALLOWLIST = {
-    "packages/core/src/manifest/hash-manifest.ts": {"Date.now()"},
+    # hash-manifest.ts uses Date.now() + process.pid + randomBytes(8)
+    # to build a unique temp-file name during atomic rename. That is
+    # the ONLY non-pure call site allowed in the core engine.
+    "packages/core/src/manifest/hash-manifest.ts": {
+        "Date.now()",
+        "randomBytes (bare)",
+    },
 }
 
 
 def core_engine_purity(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Round 7 (Round 5 deferred dogfood #4): CLAUDE.md 'Core engine is
     pure. Same input must produce the same output.' Scan
-    `packages/core/src` for nondeterminism sources."""
+    `packages/core/src` for nondeterminism sources.
+
+    Round 8 N-01: also flags the bare imported-name forms
+    (`randomBytes` from `node:crypto`) — not just the `crypto.X()`
+    dotted form. Round 8 N-02: blanks string-literal interiors before
+    scanning so a `const msg = "Date.now()"` does not false-positive.
+    """
     core_src = _PACKAGES_DIR / "core" / "src"
     if not core_src.is_dir():
         return {"passed": True, "message": "no @stele/core/src present", "violations": []}
@@ -2431,10 +2647,22 @@ def core_engine_purity(ctx: dict, **kwargs: Any) -> dict[str, Any]:
             content = ts_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        stripped = _strip_ts_comments(content)
-        for label, pattern in _CORE_PURITY_FORBIDDEN:
+        # Use the strings-blanked form for FORBIDDEN-CALL detection
+        # (so a `"Date.now()"` string literal doesn't false-positive)
+        # but use the strings-preserved form for IMPORT GATE detection
+        # (so `from "node:crypto"` is still visible — blanking would
+        # erase the package name inside the string literal).
+        stripped = _strip_ts_comments_and_strings(content)
+        comments_only_stripped = _strip_ts_comments(content)
+        for entry in _CORE_PURITY_FORBIDDEN:
+            label, pattern = entry[0], entry[1]
+            gate_key = entry[2] if len(entry) > 2 else None
             if label in allow:
                 continue
+            if gate_key is not None:
+                gate = _CORE_PURITY_IMPORT_GATES[gate_key]
+                if gate.search(comments_only_stripped) is None:
+                    continue
             for m in re.finditer(pattern, stripped):
                 line_no = stripped.count("\n", 0, m.start()) + 1
                 violations.append({
@@ -2463,61 +2691,91 @@ _CLI_FS_WRITE_RE = re.compile(
     r"mkdir|mkdirSync|rm|rmSync|unlink|unlinkSync|"
     r"createWriteStream|copyFile|copyFileSync|rename|renameSync)\s*\(",
 )
+# Round 8 N-06: the original scope was `cli/src/commands/` only, which
+# left the allowlist (`utils/output-path.ts`, `last-report.ts`) as dead
+# code and contradicted the invariant description ("any new file IO in
+# packages/cli or packages/claude-code-plugin/scripts/"). The scope now
+# matches the description; the allowlist becomes meaningful and pins
+# the two files that legitimately own raw-path IO inside the CLI.
 _CLI_PATH_SAFETY_ALLOWLIST = {
     "packages/cli/src/utils/output-path.ts",
     "packages/cli/src/last-report.ts",
+    # version.ts has no fs writes today; listed defensively if it
+    # gains one in the future.
+    "packages/cli/src/version.ts",
 }
+_CLI_PATH_SAFETY_SCAN_DIRS = (
+    ("cli", "src"),
+    ("claude-code-plugin", "scripts"),
+)
 
 
 def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
     """Round 7 (Round 5 deferred dogfood #5): CLAUDE.md 'Path safety is
-    the hot path.' Every CLI command file under `packages/cli/src/
-    commands/` that calls a node:fs write function must also reference
-    one of the path-safety primitives in the same file."""
-    commands_dir = _PACKAGES_DIR / "cli" / "src" / "commands"
-    if not commands_dir.is_dir():
-        return {"passed": True, "message": "no cli commands dir", "violations": []}
+    the hot path.' Every file in `packages/cli/src` and
+    `packages/claude-code-plugin/scripts` that calls a node:fs write
+    function must also reference one of the path-safety primitives in
+    the same file.
+
+    Round 8 N-02/N-06: scope now covers the full `cli/src/**` tree and
+    the plugin scripts (matching the invariant description, not just
+    the `commands/` subdir). String-literal interiors are blanked
+    before the safety-helper substring check, so an agent can no
+    longer satisfy the rule by mentioning the helper inside a string.
+    """
     violations: list[dict[str, Any]] = []
-    for ts_file in commands_dir.rglob("*.ts"):
-        if not ts_file.is_file() or str(ts_file).endswith(".d.ts"):
+    scanned = 0
+    for parts in _CLI_PATH_SAFETY_SCAN_DIRS:
+        scan_root = _PACKAGES_DIR
+        for part in parts:
+            scan_root = scan_root / part
+        if not scan_root.is_dir():
             continue
-        rel = str(ts_file.relative_to(_REPO_ROOT))
-        if rel in _CLI_PATH_SAFETY_ALLOWLIST:
-            continue
-        try:
-            content = ts_file.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        stripped = _strip_ts_comments(content)
-        if not _CLI_FS_WRITE_RE.search(stripped):
-            continue
-        has_path_safety = any(
-            marker in stripped
-            for marker in (
-                "resolve(",
-                "path.resolve(",
-                "join(",                       # node:path join is the
-                "path.join(",                  # other accepted helper
-                "validateOutputPath(",
-                "collectProtectedPaths(",
-                "normalizeProjectRelativePath(",
-                "isWithinProject(",
-            )
-        )
-        if not has_path_safety:
-            violations.append({
-                "file": rel,
-                "line": None,
-                "column": None,
-                "message": (
-                    "fs-write call site has no path-safety helper reference"
-                ),
-            })
+        # Scan .ts AND .js (the plugin scripts are ESM JS).
+        for pattern in ("*.ts", "*.js", "*.mjs", "*.cjs"):
+            for src_file in scan_root.rglob(pattern):
+                if not src_file.is_file() or str(src_file).endswith(".d.ts"):
+                    continue
+                rel = str(src_file.relative_to(_REPO_ROOT))
+                if rel in _CLI_PATH_SAFETY_ALLOWLIST:
+                    continue
+                try:
+                    content = src_file.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                scanned += 1
+                stripped = _strip_ts_comments_and_strings(content)
+                if not _CLI_FS_WRITE_RE.search(stripped):
+                    continue
+                has_path_safety = any(
+                    marker in stripped
+                    for marker in (
+                        "resolve(",
+                        "path.resolve(",
+                        "join(",
+                        "path.join(",
+                        "validateOutputPath(",
+                        "collectProtectedPaths(",
+                        "normalizeProjectRelativePath(",
+                        "isWithinProject(",
+                        "matchProtectedPath(",
+                    )
+                )
+                if not has_path_safety:
+                    violations.append({
+                        "file": rel,
+                        "line": None,
+                        "column": None,
+                        "message": (
+                            "fs-write call site has no path-safety helper reference"
+                        ),
+                    })
     if violations:
         return {
             "passed": False,
             "message": (
-                f"{len(violations)} CLI command file(s) write to fs without going through path-safety helpers: "
+                f"{len(violations)} file(s) write to fs without going through path-safety helpers "
+                f"(scanned {scanned}): "
                 + "; ".join(v['file'] for v in violations[:5])
             ),
             "violations": violations,

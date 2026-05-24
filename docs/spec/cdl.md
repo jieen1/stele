@@ -389,14 +389,15 @@ Form:
 (class-shape "OrderService"
   (lang python)
   (target "app/order/service.py::OrderService")
-  (must-have-field "repository" (type "OrderRepository"))
+  (must-have-field repository "OrderRepository")
+  (must-have-field active)
   (must-have-method "place" "cancel")
   (must-extend "ServiceBase"))
 ```
 
 Fields:
 
-- `must-have-field`: one or more `(must-have-field "name" (type "T"))` entries; the `type` form is optional.
+- `must-have-field`: zero or more entries. Each entry is `(must-have-field <name>)` or `(must-have-field <name> "<Type>")`. The name is an identifier or string; the type literal (string) is optional. Note: multiple field requirements use multiple `(must-have-field ...)` forms — each form declares exactly one field.
 - `must-have-method`: zero or more method names the class must declare.
 - `must-extend`: zero or more base classes the class must extend.
 

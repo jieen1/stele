@@ -608,8 +608,15 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
           // Round 7: filter ephemeral `.pyc`/`.pyo` regardless of
           // directory — they are always rewritten by the interpreter
           // and would churn the manifest on every test run.
+          // Round 8 N-08: require dot > 0 (a literal `.pyc` filename
+          // with no stem should still be tracked, not silently dropped),
+          // and compare case-insensitively for case-preserving
+          // filesystems like macOS HFS+ or Windows NTFS.
           const dot = entry.name.lastIndexOf(".");
-          if (dot >= 0 && _PROTECTED_FILE_SKIP_SUFFIXES.has(entry.name.slice(dot))) {
+          if (
+            dot > 0 &&
+            _PROTECTED_FILE_SKIP_SUFFIXES.has(entry.name.slice(dot).toLowerCase())
+          ) {
             return [];
           }
           return [relativePath];

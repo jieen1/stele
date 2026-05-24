@@ -927,6 +927,157 @@ def test_cli_exit_code_enum_complete_missing_code_value():
 
 
 # ---------------------------------------------------------------------------
+# Round 8 — negative tests for the bypass fixes (N-01..N-08)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_exit_code_enum_complete_stale_comment_fallback():
+    """Round 8 N-03: delete the active SCORE_BELOW_THRESHOLD enum entry
+    but leave a stale comment that mentions the name. Without the
+    comment-stripping fix the regex would happily find the name in the
+    comment and PASS — masking a real config drift."""
+    _reset_caches()
+    errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
+    if not errors_ts.is_file():
+        print("  SKIP: errors.ts not present")
+        return True
+    original = errors_ts.read_text(encoding="utf-8")
+    tampered = original.replace(
+        "SCORE_BELOW_THRESHOLD: 6,",
+        "// SCORE_BELOW_THRESHOLD: 6 (legacy, dropped)",
+    )
+    errors_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.cli_exit_code_enum_complete({})
+    finally:
+        errors_ts.write_text(original, encoding="utf-8")
+    return _pass_if_false(result, "cli_exit_code_enum_complete_stale_comment_fallback")
+
+
+def test_core_engine_purity_bare_imported_random():
+    """Round 8 N-01: introduce `import { randomUUID } from "node:crypto"`
+    + a call to bare `randomUUID()` in a core file. The original Round 7
+    checker only saw the dotted `crypto.randomUUID()` form and missed
+    this. The N-01 strengthening adds gated bare-name patterns."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_n01_bare_uuid.ts"
+    target.write_text(
+        'import { randomUUID } from "node:crypto";\n'
+        'export const id = randomUUID();\n',
+        encoding="utf-8",
+    )
+    try:
+        result = sp.core_engine_purity({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "core_engine_purity_bare_imported_random")
+
+
+def test_no_backward_compat_shims_compatibility_synonym():
+    """Round 8 N-04: the Round 7 regex required the literal word
+    `compat` but agents naturally write `compatibility`. The N-04
+    strengthening accepts both."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_n04_compat.ts"
+    target.write_text(
+        "// for backwards compatibility with v1\n"
+        "export const x = 1;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_backward_compat_shims({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "no_backward_compat_shims_compatibility_synonym")
+
+
+def test_no_backward_compat_shims_block_comment_marker():
+    """Round 8 N-04: `/* removed: ... */` block comments were not
+    matched by the Round 7 line-anchored regex. The N-04 strengthening
+    accepts EITHER comment opener (`//` or `/*`)."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_n04_block.ts"
+    target.write_text(
+        "/* removed: legacy helper */\n"
+        "export const x = 1;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_backward_compat_shims({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "no_backward_compat_shims_block_comment_marker")
+
+
+def test_no_backward_compat_shims_string_smuggle_does_not_false_positive():
+    """Round 8 N-02 (positive guard): a comment-marker hiding INSIDE a
+    string literal must NOT trip the checker. The N-02 strengthening
+    blanks string interiors before scanning, so this returns
+    passed=True (no real shim present)."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_n02_smuggle.ts"
+    target.write_text(
+        'const msg = "// removed: but this is just a string";\n'
+        'export const x = msg;\n',
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_backward_compat_shims({})
+    finally:
+        target.unlink(missing_ok=True)
+    # Inverted assertion: success means passed=True.
+    if result.get("passed") is True:
+        print(f"  OK: no_backward_compat_shims_string_smuggle_does_not_false_positive — string-literal marker correctly ignored")
+        return True
+    print(f"  MISS: false-positive on smuggled marker (result={result})")
+    return False
+
+
+def test_cli_io_through_path_utils_string_smuggle_does_not_satisfy():
+    """Round 8 N-02 + N-06: a CLI command file that writes to fs without
+    a real safety helper, but mentions `resolve(` inside a string
+    literal, must still be flagged. The Round 7 substring check would
+    have been satisfied by the string content."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_n02_smuggle.ts"
+    target.write_text(
+        'import { writeFile } from "node:fs/promises";\n'
+        'export async function bad(input: string): Promise<void> {\n'
+        '  const note = "always use resolve() in real code";\n'
+        '  await writeFile(input, note);\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    try:
+        result = sp.cli_io_through_path_utils({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "cli_io_through_path_utils_string_smuggle_does_not_satisfy")
+
+
+def test_no_cjs_require_string_literal_does_not_false_positive():
+    """Round 8 N-02 (positive guard): `require("x")` inside a string
+    literal is NOT a CJS call, just text. The N-02 strengthening
+    blanks string interiors so this stays passed=True."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_n02_cjs_str.ts"
+    target.write_text(
+        'const help = "to use CJS, write require(\\"foo\\")";\n'
+        'export const x = help;\n',
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_cjs_require_in_ts_source({})
+    finally:
+        target.unlink(missing_ok=True)
+    if result.get("passed") is True:
+        print(f"  OK: no_cjs_require_string_literal_does_not_false_positive — string-literal require correctly ignored")
+        return True
+    print(f"  MISS: false-positive on smuggled require (result={result})")
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -987,6 +1138,14 @@ def main() -> int:
         ("core_engine_purity_catches_date_now", test_core_engine_purity_catches_date_now),
         ("cli_io_through_path_utils_catches_unsafe_write", test_cli_io_through_path_utils_catches_unsafe_write),
         ("cli_exit_code_enum_complete_missing_code_value", test_cli_exit_code_enum_complete_missing_code_value),
+        # Round 8: bypass-coverage tests for N-01..N-04 reviewer findings.
+        ("cli_exit_code_enum_complete_stale_comment_fallback", test_cli_exit_code_enum_complete_stale_comment_fallback),
+        ("core_engine_purity_bare_imported_random", test_core_engine_purity_bare_imported_random),
+        ("no_backward_compat_shims_compatibility_synonym", test_no_backward_compat_shims_compatibility_synonym),
+        ("no_backward_compat_shims_block_comment_marker", test_no_backward_compat_shims_block_comment_marker),
+        ("no_backward_compat_shims_string_smuggle_does_not_false_positive", test_no_backward_compat_shims_string_smuggle_does_not_false_positive),
+        ("cli_io_through_path_utils_string_smuggle_does_not_satisfy", test_cli_io_through_path_utils_string_smuggle_does_not_satisfy),
+        ("no_cjs_require_string_literal_does_not_false_positive", test_no_cjs_require_string_literal_does_not_false_positive),
     ]
 
     print("=" * 60)
