@@ -218,7 +218,12 @@ export async function buildEffectStage(
 
   const evaluate = deps.evaluate ?? evaluateEffects;
   const extractor = deps.extractor ?? effectAnnotationExtractor;
-  const strictMode = deps.strictMode ?? true;
+  // Phase 4 self-dogfooding: `effectStrictMode` in stele.config.json
+  // can downgrade unresolved-call errors to advisory notices. Default
+  // true preserves Round 2 D-CG-1 behavior for adopters; Stele's own
+  // repo sets false because dynamic dispatch produces ~344 legitimate
+  // unresolved sites the extractor cannot model.
+  const strictMode = deps.strictMode ?? context.config.effectStrictMode ?? true;
   // Round 4 D-07: build the cross-language alias registry from the
   // contract's (extern-alias ...) declarations and pass it to the
   // evaluator alongside the call graph + extractor.

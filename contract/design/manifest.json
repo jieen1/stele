@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "fb9c7d6d221b37d8f4e886caa3e057485d9ee23d0895eb7fb9fb0d070b64544a",
+  "profileHash": "748cc4fff71796bc494b70c33b850c9fa2f7fbcc93e41c18098d5aef15f2e075",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "168038d05e14214076ea98e7a36ecdd68274e683"
+    "git_sha": "3f4ef4105047a192888d8ae0900dcf546a2bf9c4"
   },
   "templates": [
     "ddd-typedriven"
@@ -23,8 +23,8 @@
           "context_name": "Core"
         }
       ],
-      "fileHash": "846e17a445125a50a11072bb3bbedab9a6ec4d00fd621d2b90f7111048fed6f0",
-      "cdl": "(architecture \"ddd-core\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: core context must preserve DDD layer direction.\")\n\n  (module core-domain-primitives\n    (path \"packages/core/src/{ast,errors,config,util}/**\"))\n  (module core-domain-services\n    (path \"packages/core/src/{validator,registry,evaluator}/**\"))\n  (module core-application\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module core-parsing\n    (path \"packages/core/src/{lexer,parser}/**\"))\n  (module core-generation\n    (path \"packages/core/src/generator/**\"))\n  (module core-report\n    (path \"packages/core/src/report/**\"))\n\n  (layer domain-primitives core-domain-primitives)\n  (layer domain-services core-domain-services)\n  (layer application core-application)\n  (layer parsing core-parsing)\n  (layer generation core-generation)\n  (layer report core-report)\n\n  (allow-dependency core-domain-services core-domain-primitives core-report)\n  (allow-dependency core-application core-domain-primitives core-domain-services core-parsing core-generation core-report)\n  (allow-dependency core-generation core-domain-services core-domain-primitives core-parsing core-report)\n  (allow-dependency core-parsing core-domain-primitives)\n  (allow-dependency core-report core-domain-primitives)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "9030dc57e9e2098a8d5c205c5900fb206a0d8262d7f72956b1bf7b033398ea5d",
+      "cdl": "(architecture \"ddd-core\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: core context must preserve DDD layer direction.\")\n\n  (module core-domain-primitives\n    (path \"packages/core/src/{ast,errors,config,util}/**\"))\n  (module core-domain-services\n    (path \"packages/core/src/{validator,registry,evaluator}/**\"))\n  (module core-application\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module core-parsing\n    (path \"packages/core/src/{lexer,parser}/**\"))\n  (module core-generation\n    (path \"packages/core/src/generator/**\"))\n  (module core-report\n    (path \"packages/core/src/report/**\"))\n\n  (layer domain-primitives core-domain-primitives)\n  (layer domain-services core-domain-services)\n  (layer application core-application)\n  (layer parsing core-parsing)\n  (layer generation core-generation)\n  (layer report core-report)\n\n  (allow-dependency core-domain-services core-domain-primitives core-report)\n  (allow-dependency core-application core-domain-primitives core-domain-services core-parsing core-generation core-report)\n  (allow-dependency core-generation core-domain-services core-domain-primitives core-parsing core-report)\n  (allow-dependency core-parsing core-domain-primitives)\n  (allow-dependency core-report core-domain-primitives)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-cli",
@@ -37,8 +37,8 @@
           "context_name": "Cli"
         }
       ],
-      "fileHash": "198d2387aa50f5dea9729dc1908868c0ea828e8ed1f5ab38ca6968550328d6ce",
-      "cdl": "(architecture \"ddd-cli\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.\")\n\n  (module cli-presentation\n    (path \"packages/cli/src/commands/**\")\n    (path \"packages/cli/src/index.ts\")\n  )\n  (module cli-application\n    (path \"packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**\")\n    (path \"packages/cli/src/architecture-runtime.ts\")\n    (path \"packages/cli/src/recursive-discovery.ts\")\n  )\n  (module cli-design-domain\n    (path \"packages/cli/src/{design-profile,design-generator}/**\"))\n  (module cli-toolchain\n    (path \"packages/cli/src/toolchain/**\"))\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n\n  (layer presentation cli-presentation)\n  (layer application cli-application)\n  (layer design-domain cli-design-domain)\n  (layer toolchain cli-toolchain)\n  (layer infrastructure cli-infrastructure)\n\n  (allow-dependency cli-presentation cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-design-domain cli-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "d710a7d3d35687f3974933d945dd1da0d34bab398592e9dc585aa7b5a0158b13",
+      "cdl": "(architecture \"ddd-cli\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.\")\n\n  (module cli-presentation\n    (path \"packages/cli/src/commands/**\")\n    (path \"packages/cli/src/index.ts\")\n  )\n  (module cli-application\n    (path \"packages/cli/src/{code-shape,architecture,complexity,report,recursion*}/**\")\n    (path \"packages/cli/src/architecture-runtime.ts\")\n    (path \"packages/cli/src/recursive-discovery.ts\")\n  )\n  (module cli-design-domain\n    (path \"packages/cli/src/{design-profile,design-generator}/**\"))\n  (module cli-toolchain\n    (path \"packages/cli/src/toolchain/**\"))\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n\n  (layer presentation cli-presentation)\n  (layer application cli-application)\n  (layer design-domain cli-design-domain)\n  (layer toolchain cli-toolchain)\n  (layer infrastructure cli-infrastructure)\n\n  (allow-dependency cli-presentation cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-application cli-design-domain cli-toolchain cli-infrastructure)\n  (allow-dependency cli-design-domain cli-infrastructure)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-architecture",
@@ -51,8 +51,8 @@
           "context_name": "Architecture"
         }
       ],
-      "fileHash": "611c124a97e49ac6a5eb34063f639f8830608562bace38e82e53eab104ae4200",
-      "cdl": "(architecture \"ddd-architecture\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: architecture context must preserve DDD layer direction.\")\n\n  (module architecture-domain\n    (path \"packages/architecture-core/src/**\"))\n\n  (layer domain architecture-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "38964acc32931f087d5c15930e39d1a4fc81a950fdf10bb7ab268a8859f5e380",
+      "cdl": "(architecture \"ddd-architecture\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: architecture context must preserve DDD layer direction.\")\n\n  (module architecture-domain\n    (path \"packages/architecture-core/src/**\"))\n\n  (layer domain architecture-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-backends-ts",
@@ -65,8 +65,8 @@
           "context_name": "Backends-ts"
         }
       ],
-      "fileHash": "cd7c57d9c8f3834c377ba54bf5d0914f8a9da58e18eb194f403fa11350cffdd1",
-      "cdl": "(architecture \"ddd-backends-ts\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.\")\n\n  (module backends-ts-domain\n    (path \"packages/backend-typescript/src/**\"))\n\n  (layer domain backends-ts-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "99be72282630a6d544b5e692e670385404c7ae09d30370ee94ffcd36407ff1b6",
+      "cdl": "(architecture \"ddd-backends-ts\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.\")\n\n  (module backends-ts-domain\n    (path \"packages/backend-typescript/src/**\"))\n\n  (layer domain backends-ts-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-backends-py",
@@ -79,8 +79,8 @@
           "context_name": "Backends-py"
         }
       ],
-      "fileHash": "d4bc431017d9aafbda10dc2a38a129662756f55d00479dbf3d338584caf022d6",
-      "cdl": "(architecture \"ddd-backends-py\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.\")\n\n  (module backends-py-domain\n    (path \"packages/backend-python/src/**\"))\n\n  (layer domain backends-py-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "3bd1e6b2843a938e6c60b9e01124ca9f23132afccf3414c33e9564b8143ab47e",
+      "cdl": "(architecture \"ddd-backends-py\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.\")\n\n  (module backends-py-domain\n    (path \"packages/backend-python/src/**\"))\n\n  (layer domain backends-py-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-hooks",
@@ -93,8 +93,8 @@
           "context_name": "Hooks"
         }
       ],
-      "fileHash": "373e8061eadc52789c2d02f64649b09e72577409e2bd8c786582a0b9a7f31750",
-      "cdl": "(architecture \"ddd-hooks\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: hooks context must preserve DDD layer direction.\")\n\n  (module hooks-protocol\n    (path \"packages/agent-hooks/src/{protocol.ts,protocol/**}\"))\n  (module hooks-domain\n    (path \"packages/agent-hooks/src/handlers/**\"))\n  (module hooks-application\n    (path \"packages/agent-hooks/src/adapters/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n\n  (layer protocol hooks-protocol)\n  (layer domain hooks-domain)\n  (layer application hooks-application)\n  (layer infrastructure hooks-infrastructure)\n\n  (allow-dependency hooks-domain hooks-protocol hooks-infrastructure)\n  (allow-dependency hooks-application hooks-protocol hooks-domain hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-protocol)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "544804cb8bf17380086efc7e78c305ac1e9030a650d7f9fdbc9ecd1e38fc5285",
+      "cdl": "(architecture \"ddd-hooks\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: hooks context must preserve DDD layer direction.\")\n\n  (module hooks-protocol\n    (path \"packages/agent-hooks/src/{protocol.ts,protocol/**}\"))\n  (module hooks-domain\n    (path \"packages/agent-hooks/src/handlers/**\"))\n  (module hooks-application\n    (path \"packages/agent-hooks/src/adapters/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n\n  (layer protocol hooks-protocol)\n  (layer domain hooks-domain)\n  (layer application hooks-application)\n  (layer infrastructure hooks-infrastructure)\n\n  (allow-dependency hooks-domain hooks-protocol hooks-infrastructure)\n  (allow-dependency hooks-application hooks-protocol hooks-domain hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-protocol)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-mcp",
@@ -107,8 +107,8 @@
           "context_name": "Mcp"
         }
       ],
-      "fileHash": "3be2630d2065e881ddb5910d09e1549fae22289e870eec0db403688a3c19d48a",
-      "cdl": "(architecture \"ddd-mcp\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: mcp context must preserve DDD layer direction.\")\n\n  (module mcp-application\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n\n  (layer application mcp-application)\n  (layer infrastructure mcp-infrastructure)\n\n  (allow-dependency mcp-infrastructure mcp-application)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "537500754afcabaece8d5029ba83f097b7a0f78562dbff8821bd10fb860d5d52",
+      "cdl": "(architecture \"ddd-mcp\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: mcp context must preserve DDD layer direction.\")\n\n  (module mcp-application\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n\n  (layer application mcp-application)\n  (layer infrastructure mcp-infrastructure)\n\n  (allow-dependency mcp-infrastructure mcp-application)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-backends-go",
@@ -121,8 +121,8 @@
           "context_name": "Backends-go"
         }
       ],
-      "fileHash": "934f23af2feadd55bddfb4f6ad98733933ab3b473d079f61137f2f787964f71f",
-      "cdl": "(architecture \"ddd-backends-go\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-go context must preserve DDD layer direction.\")\n\n  (module backends-go-domain\n    (path \"packages/backend-go/src/**\"))\n\n  (layer domain backends-go-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "0f46a64f9bb543bd2bc6ce8cd2c80ecf7d1b145456ea139103b8f1dd89c07004",
+      "cdl": "(architecture \"ddd-backends-go\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-go context must preserve DDD layer direction.\")\n\n  (module backends-go-domain\n    (path \"packages/backend-go/src/**\"))\n\n  (layer domain backends-go-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-backends-java",
@@ -135,8 +135,8 @@
           "context_name": "Backends-java"
         }
       ],
-      "fileHash": "754924aad52c3ad9394d25990cbf3c4e2496a027f1549c9d03379a9ac5da4797",
-      "cdl": "(architecture \"ddd-backends-java\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-java context must preserve DDD layer direction.\")\n\n  (module backends-java-domain\n    (path \"packages/backend-java/src/**\"))\n\n  (layer domain backends-java-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "435ef2ffe49ed9808ce467d9ef2fb88309656814d6db69a1da6443810cd104b8",
+      "cdl": "(architecture \"ddd-backends-java\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-java context must preserve DDD layer direction.\")\n\n  (module backends-java-domain\n    (path \"packages/backend-java/src/**\"))\n\n  (layer domain backends-java-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-backends-rust",
@@ -149,8 +149,8 @@
           "context_name": "Backends-rust"
         }
       ],
-      "fileHash": "1592fada425c3676c42401618955946d6679931f38a94d7d71d1f088fd7094d9",
-      "cdl": "(architecture \"ddd-backends-rust\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-rust context must preserve DDD layer direction.\")\n\n  (module backends-rust-domain\n    (path \"packages/backend-rust/src/**\"))\n\n  (layer domain backends-rust-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "a557120ceaf6f98278992dc0f3b15a247ef2ed6e0583e81b63fb3057b0e4db4d",
+      "cdl": "(architecture \"ddd-backends-rust\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: backends-rust context must preserve DDD layer direction.\")\n\n  (module backends-rust-domain\n    (path \"packages/backend-rust/src/**\"))\n\n  (layer domain backends-rust-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-github-action",
@@ -163,8 +163,8 @@
           "context_name": "Github-action"
         }
       ],
-      "fileHash": "8ff17a0f89dfd521b00ec80b2e1d91db6e3f15847473f21ec5380aec767b2553",
-      "cdl": "(architecture \"ddd-github-action\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: github-action context must preserve DDD layer direction.\")\n\n  (module github-action-domain\n    (path \"packages/github-action/src/**\"))\n\n  (layer domain github-action-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "4e4c972f091bf3d1a3da12794fbc6c196f8e2a67eb699547218843d223461939",
+      "cdl": "(architecture \"ddd-github-action\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: github-action context must preserve DDD layer direction.\")\n\n  (module github-action-domain\n    (path \"packages/github-action/src/**\"))\n\n  (layer domain github-action-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-plugin",
@@ -177,8 +177,8 @@
           "context_name": "Plugin"
         }
       ],
-      "fileHash": "d68c2127e890c87ee003e748ad245dc4a1222ed1abd510124b214103ff9a3872",
-      "cdl": "(architecture \"ddd-plugin\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: plugin context must preserve DDD layer direction.\")\n\n  (module plugin-domain\n    (path \"packages/claude-code-plugin/src/**\"))\n\n  (layer domain plugin-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "50b22aaf45affe94b8f2777dc757ab20ba9a442d03bd824b687f398acc9d4cb2",
+      "cdl": "(architecture \"ddd-plugin\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: plugin context must preserve DDD layer direction.\")\n\n  (module plugin-domain\n    (path \"packages/claude-code-plugin/src/**\"))\n\n  (layer domain plugin-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-call-graph-core",
@@ -191,8 +191,8 @@
           "context_name": "Call-graph-core"
         }
       ],
-      "fileHash": "f68c48ce379dbca5ee663e40994e8623d714b80e9b95effb4a43bd726b307c23",
-      "cdl": "(architecture \"ddd-call-graph-core\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: call-graph-core context must preserve DDD layer direction.\")\n\n  (module call-graph-core-domain\n    (path \"packages/call-graph-core/src/**\"))\n\n  (layer domain call-graph-core-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "259904198a8b98b6802bcdff928c68f1f5a2c7134635bfcc60944bac20061a2c",
+      "cdl": "(architecture \"ddd-call-graph-core\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: call-graph-core context must preserve DDD layer direction.\")\n\n  (module call-graph-core-domain\n    (path \"packages/call-graph-core/src/**\"))\n\n  (layer domain call-graph-core-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-trace-evaluator",
@@ -205,8 +205,8 @@
           "context_name": "Trace-evaluator"
         }
       ],
-      "fileHash": "29478c68ce78f29437f8e1548a84c3841c19428ee2ecbd0f8420fecf2539917c",
-      "cdl": "(architecture \"ddd-trace-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: trace-evaluator context must preserve DDD layer direction.\")\n\n  (module trace-evaluator-domain\n    (path \"packages/trace-evaluator/src/**\"))\n\n  (layer domain trace-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "56925cd4f26caf2197f1f76a79ad600c9c43de686ce2069babf8ba652f1d0aba",
+      "cdl": "(architecture \"ddd-trace-evaluator\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: trace-evaluator context must preserve DDD layer direction.\")\n\n  (module trace-evaluator-domain\n    (path \"packages/trace-evaluator/src/**\"))\n\n  (layer domain trace-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-type-state-evaluator",
@@ -219,8 +219,8 @@
           "context_name": "Type-state-evaluator"
         }
       ],
-      "fileHash": "e5250d780fea5bd2d578af5e3a431ece3ad1af49b74183586fd554d2a7c60e93",
-      "cdl": "(architecture \"ddd-type-state-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: type-state-evaluator context must preserve DDD layer direction.\")\n\n  (module type-state-evaluator-domain\n    (path \"packages/type-state-evaluator/src/**\"))\n\n  (layer domain type-state-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "cf5ea544a4541072e3659cbc0985f4fcec4149e83ea0d47df66bcd07799391a9",
+      "cdl": "(architecture \"ddd-type-state-evaluator\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: type-state-evaluator context must preserve DDD layer direction.\")\n\n  (module type-state-evaluator-domain\n    (path \"packages/type-state-evaluator/src/**\"))\n\n  (layer domain type-state-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-effect-evaluator",
@@ -233,8 +233,8 @@
           "context_name": "Effect-evaluator"
         }
       ],
-      "fileHash": "4e73cad6f7fdc46f0ca678a8903b3d13c87177d757f9b2e213fa3a2dff014e75",
-      "cdl": "(architecture \"ddd-effect-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: effect-evaluator context must preserve DDD layer direction.\")\n\n  (module effect-evaluator-domain\n    (path \"packages/effect-evaluator/src/**\"))\n\n  (layer domain effect-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "fbf08c62fde8853059e2d7cfd18d43dfe96c632fb9a5104ac409e04f8d4d76d0",
+      "cdl": "(architecture \"ddd-effect-evaluator\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: effect-evaluator context must preserve DDD layer direction.\")\n\n  (module effect-evaluator-domain\n    (path \"packages/effect-evaluator/src/**\"))\n\n  (layer domain effect-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-type-driven-evaluator",
@@ -247,8 +247,8 @@
           "context_name": "Type-driven-evaluator"
         }
       ],
-      "fileHash": "bda41a35f91c18a64cc1b39e010f7aca9a4432a0234a347f21c27137440fd5d4",
-      "cdl": "(architecture \"ddd-type-driven-evaluator\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: type-driven-evaluator context must preserve DDD layer direction.\")\n\n  (module type-driven-evaluator-domain\n    (path \"packages/type-driven-evaluator/src/**\"))\n\n  (layer domain type-driven-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "93dc4e8721093491ccf7676320514553020441d12bd61ff963b8246a2369c523",
+      "cdl": "(architecture \"ddd-type-driven-evaluator\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated from contract/design/profile.yaml: type-driven-evaluator context must preserve DDD layer direction.\")\n\n  (module type-driven-evaluator-domain\n    (path \"packages/type-driven-evaluator/src/**\"))\n\n  (layer domain type-driven-evaluator-domain)\n\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-context-map",
@@ -260,8 +260,8 @@
           "decision_id": "q1-bounded-contexts"
         }
       ],
-      "fileHash": "f1e1a7997639c655ba7192060364f79ca7f62dcd96fb96dfe3374d7b9d91746e",
-      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src/**\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src/**\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module effect-evaluator-internal\n    (path \"packages/effect-evaluator/src/**\"))\n  (module call-graph-core-internal\n    (path \"packages/call-graph-core/src/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n  (module trace-evaluator-internal\n    (path \"packages/trace-evaluator/src/**\"))\n  (module type-state-evaluator-internal\n    (path \"packages/type-state-evaluator/src/**\"))\n  (module type-driven-evaluator-internal\n    (path \"packages/type-driven-evaluator/src/**\"))\n\n  (allow-dependency hooks-internal hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-internal)\n  (allow-dependency mcp-internal mcp-infrastructure)\n  (allow-dependency mcp-infrastructure mcp-internal)\n  (allow-dependency cli-infrastructure core-internal)\n  (allow-dependency cli-infrastructure architecture-internal)\n  (allow-dependency cli-infrastructure backends-ts-internal)\n  (allow-dependency cli-infrastructure backends-py-internal)\n  (allow-dependency cli-infrastructure hooks-internal)\n  (allow-dependency cli-infrastructure mcp-internal)\n  (allow-dependency backends-ts-internal core-internal)\n  (allow-dependency backends-py-internal core-internal)\n  (allow-dependency backends-py-internal effect-evaluator-internal)\n  (allow-dependency backends-py-internal call-graph-core-internal)\n  (allow-dependency architecture-internal core-internal)\n  (allow-dependency hooks-infrastructure core-internal)\n  (allow-dependency mcp-infrastructure core-internal)\n  (allow-dependency mcp-infrastructure hooks-internal)\n  (allow-dependency cli-infrastructure trace-evaluator-internal)\n  (allow-dependency cli-infrastructure type-state-evaluator-internal)\n  (allow-dependency cli-infrastructure effect-evaluator-internal)\n  (allow-dependency cli-infrastructure type-driven-evaluator-internal)\n  (allow-dependency trace-evaluator-internal core-internal)\n  (allow-dependency trace-evaluator-internal call-graph-core-internal)\n  (allow-dependency type-state-evaluator-internal core-internal)\n  (allow-dependency type-state-evaluator-internal call-graph-core-internal)\n  (allow-dependency effect-evaluator-internal core-internal)\n  (allow-dependency effect-evaluator-internal call-graph-core-internal)\n  (allow-dependency backends-ts-internal call-graph-core-internal)\n  (allow-dependency backends-ts-internal effect-evaluator-internal)\n  (allow-dependency backends-ts-internal type-state-evaluator-internal)\n  (allow-dependency call-graph-core-internal core-internal)\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
+      "fileHash": "eaa1b329885570bb9f86fd14b4f459331f9e14cc2bf93fd157c796422f5f208e",
+      "cdl": "(architecture \"ddd-context-map\"\n  (lang typescript)\n  (tsconfig \"tsconfig.base.json\")\n  (description \"Generated context map: cross-context dependencies must follow declared integration patterns.\")\n\n  (module cli-infrastructure\n    (path \"packages/cli/src/{events,config,utils,errors,version,last-report,backend-registry}/**\"))\n  (module core-internal\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module architecture-internal\n    (path \"packages/architecture-core/src/**\"))\n  (module backends-ts-internal\n    (path \"packages/backend-typescript/src/**\"))\n  (module backends-py-internal\n    (path \"packages/backend-python/src/**\"))\n  (module hooks-internal\n    (path \"packages/agent-hooks/src/handlers/**\")\n    (path \"packages/agent-hooks/src/adapters/**\")\n  )\n  (module mcp-internal\n    (path \"packages/mcp-server/src/{sessions/**,types.ts,session-state.ts}\"))\n  (module effect-evaluator-internal\n    (path \"packages/effect-evaluator/src/**\"))\n  (module call-graph-core-internal\n    (path \"packages/call-graph-core/src/**\"))\n  (module hooks-infrastructure\n    (path \"packages/agent-hooks/src/{install,util}/**\"))\n  (module mcp-infrastructure\n    (path \"packages/mcp-server/src/{bin/**,tools/**,server.ts,error-sanitizer.ts,stele-binary.ts}\"))\n  (module trace-evaluator-internal\n    (path \"packages/trace-evaluator/src/**\"))\n  (module type-state-evaluator-internal\n    (path \"packages/type-state-evaluator/src/**\"))\n  (module type-driven-evaluator-internal\n    (path \"packages/type-driven-evaluator/src/**\"))\n\n  (allow-dependency hooks-internal hooks-infrastructure)\n  (allow-dependency hooks-infrastructure hooks-internal)\n  (allow-dependency mcp-internal mcp-infrastructure)\n  (allow-dependency mcp-infrastructure mcp-internal)\n  (allow-dependency cli-infrastructure core-internal)\n  (allow-dependency cli-infrastructure architecture-internal)\n  (allow-dependency cli-infrastructure backends-ts-internal)\n  (allow-dependency cli-infrastructure backends-py-internal)\n  (allow-dependency cli-infrastructure hooks-internal)\n  (allow-dependency cli-infrastructure mcp-internal)\n  (allow-dependency backends-ts-internal core-internal)\n  (allow-dependency backends-py-internal core-internal)\n  (allow-dependency backends-py-internal effect-evaluator-internal)\n  (allow-dependency backends-py-internal call-graph-core-internal)\n  (allow-dependency architecture-internal core-internal)\n  (allow-dependency hooks-infrastructure core-internal)\n  (allow-dependency mcp-infrastructure core-internal)\n  (allow-dependency mcp-infrastructure hooks-internal)\n  (allow-dependency cli-infrastructure trace-evaluator-internal)\n  (allow-dependency cli-infrastructure type-state-evaluator-internal)\n  (allow-dependency cli-infrastructure effect-evaluator-internal)\n  (allow-dependency cli-infrastructure type-driven-evaluator-internal)\n  (allow-dependency trace-evaluator-internal core-internal)\n  (allow-dependency trace-evaluator-internal call-graph-core-internal)\n  (allow-dependency type-state-evaluator-internal core-internal)\n  (allow-dependency type-state-evaluator-internal call-graph-core-internal)\n  (allow-dependency effect-evaluator-internal core-internal)\n  (allow-dependency effect-evaluator-internal call-graph-core-internal)\n  (allow-dependency backends-ts-internal call-graph-core-internal)\n  (allow-dependency backends-ts-internal effect-evaluator-internal)\n  (allow-dependency backends-ts-internal type-state-evaluator-internal)\n  (allow-dependency call-graph-core-internal core-internal)\n\n  (deny-cycles)\n  (fix \"Use the declared ACL module instead of importing the target context directly.\"))"
     },
     {
       "ruleId": "core-node.core-operator-registry-aggregate",
@@ -394,17 +394,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-24T13:27:05.420Z",
+  "generatedAt": "2026-05-24T16:28:11.728Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "4d5767af66436c3bcd89176dd1be568767b565084c92f7cc7178f01d8926732e"
+      "hash": "9569230e443f20c78c594325d4cda818185f9131f38ac46d6765f6144393f34d"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "4d5767af66436c3bcd89176dd1be568767b565084c92f7cc7178f01d8926732e",
+      "sha256": "9569230e443f20c78c594325d4cda818185f9131f38ac46d6765f6144393f34d",
       "rules": [
         {
           "id": "architecture.ddd-core",

@@ -80,6 +80,17 @@ export async function loadConfig(projectDir: string): Promise<SteleConfig> {
     }
     config.tsconfig = parsed.tsconfig;
   }
+  // Phase 4 self-dogfooding: optional `effectStrictMode` controls
+  // whether unresolved-call sites in the call graph are treated as
+  // error (default true, Round 2 D-CG-1) or as advisory notices
+  // (false — needed for projects with dynamic dispatch the static
+  // extractor can't model).
+  if (parsed.effectStrictMode !== undefined) {
+    if (typeof parsed.effectStrictMode !== "boolean") {
+      throw new Error('Config field "effectStrictMode" must be a boolean when present.');
+    }
+    config.effectStrictMode = parsed.effectStrictMode;
+  }
 
   return config;
 }

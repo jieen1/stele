@@ -15,6 +15,7 @@
     "effect": "typescript",
     "architecture": "typescript"
   },
+  "effectStrictMode": false,
   "protected": [
     "contract/**/*.stele",
     "contract/checker_impls/**/*",

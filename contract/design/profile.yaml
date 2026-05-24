@@ -36,7 +36,12 @@ project:
     - "**/fixtures/**"
     - "packages/backend-python/src/runtime/**"
     - "packages/cli/src/commands/design/fixtures/**"
-  tsconfig: "packages/cli/tsconfig.json"
+  # Phase 4 self-dogfooding: trace + effect evaluators need a tsconfig
+  # whose `include` covers ALL workspace packages (not just cli) so the
+  # call graph includes @stele/core, @stele/agent-hooks, etc. — the
+  # targets of CORE_IS_PURE_OR_FS_READ + MANIFEST_LEAVES_ARE_PINNED +
+  # the 3 effect-suppression entries.
+  tsconfig: "tsconfig.base.json"
 
 ddd:
   bounded_context_strategy: by_business_function

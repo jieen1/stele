@@ -658,4 +658,62 @@
   (effect process)
   (effect child-process))
 
+; ============================================================================
+; §4.3 — Effect policies on Stele's own source.
+;
+; `effectStrictMode: false` in stele.config.json downgrades the
+; (~344) unresolved-call sites (Commander dispatch, dynamic
+; `await import()`, etc.) to advisory notices rather than errors.
+; That's the only way to land real effect-policies on this repo
+; without first refactoring all the dynamic-dispatch surface.
+; ============================================================================
+
+(effect-policy CORE_IS_PURE_OR_FS_READ
+  (description "@stele/core/src is the pure-ish layer. fs.read is allowed (loadContract, baseline IO). fs.write is allowed for the 3 atomic-writer leaves under manifest/. Everything else (time, random, env, network, process, child-process) is forbidden — those belong to the cli or backends, not core.")
+  (severity "error")
+  (target-scope "packages/core/src/**::*")
+  (allow-only "fs.read" "fs.write" "crypto.hash"))
+
+(effect-policy HOOK_NO_NETWORK
+  (description "Hook scripts must not have network effects — a hook that contacts the internet is an exfiltration risk.")
+  (severity "error")
+  (target-scope "packages/claude-code-plugin/scripts/*.js::*")
+  (forbid "network"))
+
+(effect-policy GENERATOR_NO_NETWORK_OR_CHILD_PROCESS
+  (description "stele generate must be self-contained — no network, no shelling out. Determinism requires that generation is hermetic.")
+  (severity "error")
+  (target-scope "packages/cli/src/commands/generate.ts::*")
+  (forbid "network" "child-process"))
+
+(effect-policy MANIFEST_LEAVES_ARE_PINNED
+  (severity "error")
+  (description "The fs.write effect in @stele/core must only originate at the 3 atomic-writer leaves (writeAtomic, writeManifest, writeHashManifest). Any other fs.write inside @stele/core is a violation. CORE_IS_PURE_OR_FS_READ already allows fs.write globally in core; this is the tighter constraint that pins it to the 3 audited sites.")
+  (target-scope "packages/core/src/manifest/hash-manifest.ts::*")
+  (allow-only "fs.read" "fs.write" "crypto.hash" time random))
+
+; ============================================================================
+; §4.4 — Effect suppressions: 3 legitimate fs.write leaves in @stele/core.
+; Each is the canonical atomic writer or a thin wrapper around it. Round 7
+; CORE_ENGINE_PURITY already documented this lone exemption.
+; ============================================================================
+
+(effect-suppression
+  (target "packages/core/src/manifest/hash-manifest.ts::writeAtomic(2)")
+  (suppresses "fs.write" time random)
+  (severity "warning")
+  (reason "Canonical atomic writer. Uses Date.now() + randomBytes(8) to build a unique temp-file name; the fs.write is the actual atomic rename. Lone Stele/core exemption documented since Round 7."))
+
+(effect-suppression
+  (target "packages/core/src/manifest/manifest.ts::writeManifest(3)")
+  (suppresses "fs.write")
+  (severity "warning")
+  (reason "Wraps writeAtomic. The fs.write effect is inherited; this suppression marks it as expected and audited."))
+
+(effect-suppression
+  (target "packages/core/src/manifest/hash-manifest.ts::writeHashManifest(2)")
+  (suppresses "fs.write")
+  (severity "warning")
+  (reason "Wraps writeAtomic. Same rationale as writeManifest above."))
+
 (import "generated/ddd-typedriven.stele")
