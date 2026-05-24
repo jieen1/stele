@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
+import { stableStringCompare } from "@stele/core";
 import * as ts from "typescript";
 import type {
   AmbiguousCall,
@@ -158,23 +159,23 @@ async function runExtract(options: ExtractOptions, incremental: IncrementalInput
   }
 
   // Stable ordering — guarantee byte-stable output for caching.
-  nodes.sort((a, b) => a.id.localeCompare(b.id));
+  nodes.sort((a, b) => stableStringCompare(a.id, b.id));
   edges.sort(
     (a, b) =>
-      a.fromId.localeCompare(b.fromId) ||
-      a.toId.localeCompare(b.toId) ||
+      stableStringCompare(a.fromId, b.fromId) ||
+      stableStringCompare(a.toId, b.toId) ||
       a.callSite.line - b.callSite.line ||
       a.callSite.column - b.callSite.column,
   );
   unresolvedCalls.sort(
     (a, b) =>
-      a.fromId.localeCompare(b.fromId) ||
+      stableStringCompare(a.fromId, b.fromId) ||
       a.callSite.line - b.callSite.line ||
       a.callSite.column - b.callSite.column,
   );
   ambiguousCalls.sort(
     (a, b) =>
-      a.fromId.localeCompare(b.fromId) ||
+      stableStringCompare(a.fromId, b.fromId) ||
       a.callSite.line - b.callSite.line ||
       a.callSite.column - b.callSite.column,
   );

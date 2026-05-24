@@ -12,6 +12,7 @@ import {
   posixNormalize,
   readHashManifest,
   sha256OfFileOrNull,
+  stableStringCompare,
   stableStringify,
   stripVolatileConfigFields,
   writeAtomic,
@@ -209,7 +210,7 @@ async function buildHashManifestFileEntries(
     const relativePath = posixNormalize(relative(absoluteProjectDir, file.path));
     const importDeps = file.imports
       .map((declaration) => posixNormalize(relative(absoluteProjectDir, declaration.resolvedPath)))
-      .sort((left, right) => left.localeCompare(right));
+      .sort((left, right) => stableStringCompare(left, right));
 
     filesByRelativePath.set(relativePath, {
       relativePath,
@@ -466,7 +467,7 @@ export function toManifestPaths(projectDir: string, protectedPaths: string[]): s
 
   return protectedPaths
     .map((path) => normalizeProjectRelativePath(normalizedProjectRoot, path))
-    .sort((left, right) => left.localeCompare(right));
+    .sort((left, right) => stableStringCompare(left, right));
 }
 
 export async function assertProtectedContractFilesReachable(
@@ -561,8 +562,7 @@ const _PROTECTED_WALK_SKIP_DIRS = new Set([
 // files just because they live in __pycache__ directories` confirms we
 // must track such files). So instead of skipping the whole directory,
 // descend into it and only filter out the ephemeral compiled extensions
-// on the file-suffix level below.
-const _PROTECTED_FILE_SKIP_SUFFIXES = new Set([".pyc", ".pyo"]);
+// on the file-suffix level below — via `isPythonCacheBasename`.
 
 async function walkProtectedRoot(directory: string, projectDir: string): Promise<string[]> {
   try {
@@ -583,7 +583,7 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
   const results = await Promise.all(
     entries
       .slice()
-      .sort((left, right) => left.name.localeCompare(right.name))
+      .sort((left, right) => stableStringCompare(left.name, right.name))
       .map(async (entry) => {
         // Round 4 E-09: skip build / vendor / cache trees up front. The
         // glob matcher in the caller already filters against the requested
@@ -608,15 +608,11 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
           // Round 7: filter ephemeral `.pyc`/`.pyo` regardless of
           // directory — they are always rewritten by the interpreter
           // and would churn the manifest on every test run.
-          // Round 8 N-08: require dot > 0 (a literal `.pyc` filename
-          // with no stem should still be tracked, not silently dropped),
-          // and compare case-insensitively for case-preserving
-          // filesystems like macOS HFS+ or Windows NTFS.
-          const dot = entry.name.lastIndexOf(".");
-          if (
-            dot > 0 &&
-            _PROTECTED_FILE_SKIP_SUFFIXES.has(entry.name.slice(dot).toLowerCase())
-          ) {
+          // Round 9 O-05: route through the single `isPythonCacheBasename`
+          // helper so this code path and the generated-drift-comparison
+          // ignore-list cannot disagree on what counts as a cache
+          // artifact.
+          if (isPythonCacheBasename(entry.name)) {
             return [];
           }
           return [relativePath];
@@ -630,7 +626,9 @@ async function walkProtectedRoot(directory: string, projectDir: string): Promise
 }
 
 function uniqueSortedPaths(paths: string[]): string[] {
-  return [...new Set(paths.map((path) => resolve(path)))].sort((left, right) => normalizeForSort(left).localeCompare(normalizeForSort(right)));
+  return [...new Set(paths.map((path) => resolve(path)))].sort(
+    (left, right) => stableStringCompare(normalizeForSort(left), normalizeForSort(right)),
+  );
 }
 
 function normalizeForSort(path: string): string {
@@ -700,8 +698,22 @@ function isIgnoredPythonCacheArtifact(path: string): boolean {
   const normalizedPath = path.replaceAll("\\", "/");
   const segments = normalizedPath.split("/").filter((segment) => segment.length > 0);
   const basename = segments[segments.length - 1] ?? "";
+  return isPythonCacheBasename(basename);
+}
 
-  return basename.endsWith(".pyc") || basename.endsWith(".pyo");
+// Round 9 O-05: single source of truth for "is this a Python cache
+// artifact filename?". The protected-walk filter and the
+// drift-comparison ignore-list previously had divergent case
+// sensitivity (one lowercased, one did not). Both now route through
+// this helper so a `foo.PYC` on a case-preserving filesystem is
+// treated consistently across the two code paths.
+export function isPythonCacheBasename(basename: string): boolean {
+  const dot = basename.lastIndexOf(".");
+  if (dot <= 0) {
+    return false;
+  }
+  const ext = basename.slice(dot).toLowerCase();
+  return ext === ".pyc" || ext === ".pyo";
 }
 
 function formatGeneratedDriftMessage(verification: GeneratedVerificationResult): string {

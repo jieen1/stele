@@ -91,6 +91,9 @@
           ],
           "parsing": [
             "domain-primitives"
+          ],
+          "report": [
+            "domain-primitives"
           ]
         },
         "aggregate_roots": [

@@ -1,4 +1,4 @@
-import { type CodeShapeDeclaration } from "@stele/core";
+import { stableStringCompare, type CodeShapeDeclaration } from "@stele/core";
 import { CODE_SHAPE_RUNTIME_HELPERS } from "./types.js";
 import { codeShapeTestPrefix } from "./code-shape-target.js";
 import { renderCodeShapeTest } from "./code-shape-renderers.js";
@@ -38,10 +38,10 @@ export function generatePytestCodeShapeSource(contract: {
 
 function compareCodeShapes(left: CodeShapeDeclaration, right: CodeShapeDeclaration): number {
   return (
-    left.filePath.localeCompare(right.filePath) ||
+    stableStringCompare(left.filePath, right.filePath) ||
     left.span.line - right.span.line ||
     left.span.column - right.span.column ||
-    left.id.localeCompare(right.id)
+    stableStringCompare(left.id, right.id)
   );
 }
 

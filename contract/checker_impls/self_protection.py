@@ -2263,16 +2263,40 @@ def _blank_string_interiors(source: str) -> str:
     that match offsets in the returned string equal offsets in the
     original — that's what the shim-marker checker needs in order to
     keep an accurate line number while rejecting smuggled markers.
+
+    Round 9 O-01: template-literal `${...}` interpolations are real
+    code (a `${require(...)}` invocation IS a CJS call, not a string).
+    On entering a backtick string, scan for unescaped `${` and switch
+    back to a nested "code" state until the matching `}` (tracking
+    nested `{`/`}` depth). Re-enter template state after.
+
+    Round 9 O-03: the block-comment exit condition is now the standard
+    two-char `*/` look-ahead, so `/*/ "x" */` is correctly treated as
+    one big block comment (the prior `prev == '*'` form mis-closed
+    after the opener's own `*`).
     """
     out: list[str] = []
     i = 0
     n = len(source)
-    state = "code"  # code | line_comment | block_comment | string
+    state = "code"  # code | line_comment | block_comment | string | template
     string_quote = ""
+    template_stack: list[int] = []  # entries: brace depth at the `${` entry
     while i < n:
         ch = source[i]
         nxt = source[i + 1] if i + 1 < n else ""
         if state == "code":
+            # Round 9 O-01: if we're inside a `${...}` of a template
+            # literal, a matching `}` pops back to template state.
+            if template_stack and ch == "}":
+                if template_stack[-1] == 0:
+                    template_stack.pop()
+                    state = "template"
+                    out.append(ch)
+                    i += 1
+                    continue
+                template_stack[-1] -= 1
+            elif template_stack and ch == "{":
+                template_stack[-1] += 1
             if ch == "/" and nxt == "/":
                 state = "line_comment"
                 out.append(ch)
@@ -2281,11 +2305,17 @@ def _blank_string_interiors(source: str) -> str:
             if ch == "/" and nxt == "*":
                 state = "block_comment"
                 out.append(ch)
-                i += 1
+                out.append(nxt)
+                i += 2
                 continue
-            if ch == '"' or ch == "'" or ch == "`":
+            if ch == '"' or ch == "'":
                 state = "string"
                 string_quote = ch
+                out.append(ch)
+                i += 1
+                continue
+            if ch == "`":
+                state = "template"
                 out.append(ch)
                 i += 1
                 continue
@@ -2299,9 +2329,14 @@ def _blank_string_interiors(source: str) -> str:
             i += 1
             continue
         if state == "block_comment":
-            out.append(ch)
-            if ch == "/" and source[i - 1 : i] == "*":
+            # Round 9 O-03: standard two-char `*/` look-ahead.
+            if ch == "*" and nxt == "/":
+                out.append(ch)
+                out.append(nxt)
                 state = "code"
+                i += 2
+                continue
+            out.append(ch)
             i += 1
             continue
         if state == "string":
@@ -2312,6 +2347,9 @@ def _blank_string_interiors(source: str) -> str:
                     out.append("\n" if source[i + 1] == "\n" else " ")
                     i += 2
                 else:
+                    # Round 9 O-06: emit a space for the trailing `\`
+                    # so the output stays length-preserving.
+                    out.append(" ")
                     i += 1
                 continue
             if ch == string_quote:
@@ -2319,6 +2357,33 @@ def _blank_string_interiors(source: str) -> str:
                 state = "code"
                 string_quote = ""
                 i += 1
+                continue
+            out.append("\n" if ch == "\n" else " ")
+            i += 1
+            continue
+        if state == "template":
+            if ch == "\\":
+                out.append(" ")
+                if i + 1 < n:
+                    out.append("\n" if source[i + 1] == "\n" else " ")
+                    i += 2
+                else:
+                    out.append(" ")
+                    i += 1
+                continue
+            if ch == "`":
+                out.append(ch)
+                state = "code"
+                i += 1
+                continue
+            # Round 9 O-01: `${` opens a code-level expression. Switch
+            # to code state with a fresh brace-depth counter.
+            if ch == "$" and nxt == "{":
+                out.append(ch)
+                out.append(nxt)
+                template_stack.append(0)
+                state = "code"
+                i += 2
                 continue
             out.append("\n" if ch == "\n" else " ")
             i += 1
@@ -2339,21 +2404,36 @@ def _strip_ts_comments_and_strings(source: str) -> str:
     smuggle the forbidden pattern through, or — worse for
     CLI_IO_THROUGH_PATH_UTILS — could ship code that calls writeFile on
     raw user input AND mention the string `"resolve("` to satisfy the
-    safety-helper check. This helper removes that bypass class.
+    safety-helper check.
 
-    The quote characters themselves are preserved (so `"x".length`
-    style parses still work for any downstream consumer), but the
-    interior is blanked.
+    The quote characters themselves are preserved, but the interior is
+    blanked.
+
+    Round 9 O-01: template-literal `${...}` interpolations are real
+    code (a `${require(...)}` invocation IS a CJS call). Recognise
+    backtick strings separately, switch back to code state on `${`,
+    and pop back to template state on the matching `}`.
     """
     out: list[str] = []
     i = 0
     n = len(source)
     state = "code"
     string_quote = ""
+    template_stack: list[int] = []  # brace depth per active `${` frame
     while i < n:
         ch = source[i]
         nxt = source[i + 1] if i + 1 < n else ""
         if state == "code":
+            if template_stack and ch == "}":
+                if template_stack[-1] == 0:
+                    template_stack.pop()
+                    state = "template"
+                    out.append(ch)  # `}` is code — preserve it
+                    i += 1
+                    continue
+                template_stack[-1] -= 1
+            elif template_stack and ch == "{":
+                template_stack[-1] += 1
             if ch == "/" and nxt == "/":
                 state = "line_comment"
                 i += 2
@@ -2362,9 +2442,14 @@ def _strip_ts_comments_and_strings(source: str) -> str:
                 state = "block_comment"
                 i += 2
                 continue
-            if ch == '"' or ch == "'" or ch == "`":
+            if ch == '"' or ch == "'":
                 state = "string"
                 string_quote = ch
+                out.append(ch)
+                i += 1
+                continue
+            if ch == "`":
+                state = "template"
                 out.append(ch)
                 i += 1
                 continue
@@ -2391,16 +2476,13 @@ def _strip_ts_comments_and_strings(source: str) -> str:
             continue
         if state == "string":
             if ch == "\\":
-                # Honour the escape — `\"` doesn't close the string;
-                # blank out both chars (preserve count via spaces).
                 out.append(" ")
                 if i + 1 < n:
-                    if source[i + 1] == "\n":
-                        out.append("\n")
-                    else:
-                        out.append(" ")
+                    out.append("\n" if source[i + 1] == "\n" else " ")
                     i += 2
                 else:
+                    # Round 9 O-06: keep length stable on trailing `\` EOF.
+                    out.append(" ")
                     i += 1
                 continue
             if ch == string_quote:
@@ -2409,11 +2491,36 @@ def _strip_ts_comments_and_strings(source: str) -> str:
                 string_quote = ""
                 i += 1
                 continue
-            # Inside a string — preserve newlines, blank everything else.
-            if ch == "\n":
-                out.append("\n")
-            else:
+            out.append("\n" if ch == "\n" else " ")
+            i += 1
+            continue
+        if state == "template":
+            if ch == "\\":
                 out.append(" ")
+                if i + 1 < n:
+                    out.append("\n" if source[i + 1] == "\n" else " ")
+                    i += 2
+                else:
+                    out.append(" ")
+                    i += 1
+                continue
+            if ch == "`":
+                out.append(ch)
+                state = "code"
+                i += 1
+                continue
+            # Round 9 O-01: `${...}` — switch to code state, track depth.
+            if ch == "$" and nxt == "{":
+                # Preserve the `${` opener so a downstream regex anchored
+                # on real punctuation still sees it; the inner expression
+                # bytes will be processed as code (and re-emitted as-is).
+                out.append(ch)
+                out.append(nxt)
+                template_stack.append(0)
+                state = "code"
+                i += 2
+                continue
+            out.append("\n" if ch == "\n" else " ")
             i += 1
             continue
     return "".join(out)
@@ -2609,8 +2716,20 @@ _CORE_PURITY_FORBIDDEN = [
     ("randomInt (bare)",   r"\brandomInt\s*\(",   "import_crypto"),
 ]
 _CORE_PURITY_IMPORT_GATES = {
+    # Round 9 O-02: anchor on start-of-line + `import` keyword + the
+    # `from "...crypto"` clause. Run against the strings-blanked form
+    # so a string literal that merely *contains* the substring `from
+    # "node:crypto"` cannot trigger the gate. With the new helper, a
+    # real `import { x } from "node:crypto"` survives intact in the
+    # blanked form (the `from ""` quote pair stays, but the interior
+    # is blanked) — so we match the *shape* `import ... from "..."`
+    # plus the literal `crypto` token following the closing quote.
+    # We instead test for the bare keyword pair directly in the
+    # strings-preserved-and-comments-stripped form, but require the
+    # `import` token at the start of a line — real top-level ES module
+    # imports are always statement-level.
     "import_crypto": re.compile(
-        r'\bfrom\s+["\'](?:node:)?crypto["\']',
+        r'(?m)^\s*import\b[^;\n]*\bfrom\s+["\'](?:node:)?crypto["\']',
     ),
 }
 _CORE_PURITY_ALLOWLIST = {
@@ -2698,15 +2817,26 @@ _CLI_FS_WRITE_RE = re.compile(
 # matches the description; the allowlist becomes meaningful and pins
 # the two files that legitimately own raw-path IO inside the CLI.
 _CLI_PATH_SAFETY_ALLOWLIST = {
+    # Round 9 O-07: only files that actually own raw-path IO today
+    # appear here. version.ts has no fs write and was removed from the
+    # list — keep it dead-config-free.
     "packages/cli/src/utils/output-path.ts",
     "packages/cli/src/last-report.ts",
-    # version.ts has no fs writes today; listed defensively if it
-    # gains one in the future.
-    "packages/cli/src/version.ts",
 }
 _CLI_PATH_SAFETY_SCAN_DIRS = (
     ("cli", "src"),
     ("claude-code-plugin", "scripts"),
+)
+# Round 9 O-08: matches both ES module + CJS forms of node:path /
+# path imports. Anchored on `from "..."` / `require("...")` so a
+# string literal merely containing the substring `"node:path"` is
+# rejected (it would need the literal `import ... from`/`require(`
+# prefix to match).
+_PATH_MODULE_IMPORT_RE = re.compile(
+    r'(?:'
+    r'\bfrom\s+["\'](?:node:)?path["\']|'
+    r'\brequire\s*\(\s*["\'](?:node:)?path["\']\s*\)'
+    r')'
 )
 
 
@@ -2744,15 +2874,27 @@ def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 except OSError:
                     continue
                 scanned += 1
+                # Use the strings-blanked form to LOOK FOR forbidden
+                # calls + qualified helpers (so a string can't smuggle
+                # either side of the check); use the comments-only-
+                # stripped form to detect IMPORT statements (the
+                # module name is itself a string literal — blanking it
+                # would hide the import).
                 stripped = _strip_ts_comments_and_strings(content)
+                comments_only = _strip_ts_comments(content)
                 if not _CLI_FS_WRITE_RE.search(stripped):
                     continue
-                has_path_safety = any(
+                # Round 9 O-08: require qualified `path.X` forms (so
+                # `Array#join("")` / `Promise.resolve(x)` no longer
+                # satisfy the safety-helper check) OR a named helper
+                # that always belongs to the path-safety surface OR an
+                # explicit `from "node:path"` / `require("path")` import
+                # (in which case bare `resolve(` / `join(` are likely
+                # the imported path helpers).
+                explicit_helper = any(
                     marker in stripped
                     for marker in (
-                        "resolve(",
                         "path.resolve(",
-                        "join(",
                         "path.join(",
                         "validateOutputPath(",
                         "collectProtectedPaths(",
@@ -2761,6 +2903,13 @@ def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                         "matchProtectedPath(",
                     )
                 )
+                # Bare `resolve(` / `join(` only count when a `path`
+                # module import is present in the same file.
+                bare_path_import = _PATH_MODULE_IMPORT_RE.search(comments_only) is not None
+                bare_helper = bare_path_import and (
+                    "resolve(" in stripped or "join(" in stripped
+                )
+                has_path_safety = explicit_helper or bare_helper
                 if not has_path_safety:
                     violations.append({
                         "file": rel,
@@ -2777,6 +2926,79 @@ def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                 f"{len(violations)} file(s) write to fs without going through path-safety helpers "
                 f"(scanned {scanned}): "
                 + "; ".join(v['file'] for v in violations[:5])
+            ),
+            "violations": violations,
+        }
+    return {"passed": True, "message": None, "violations": []}
+
+
+_LOCALECOMPARE_RE = re.compile(r"\.localeCompare\s*\(")
+_LOCALECOMPARE_ALLOWLIST = {
+    # Round 9 P-01: the single source of truth for the wrapper.
+    # `stableStringCompare` mentions localeCompare only in its comment;
+    # the helper itself uses pure code-point comparison. We allow this
+    # file because the dogfood ban is about ENFORCING the helper's
+    # existence + use, not its definition.
+    "packages/core/src/util/array.ts",
+}
+
+
+def no_bare_locale_compare(ctx: dict, **kwargs: Any) -> dict[str, Any]:
+    """Round 9 P-01: `String.prototype.localeCompare()` reads ICU/host
+    locale and produces different orderings across machines (LANG=de_DE
+    vs LANG=sv_SE sort `ä` differently). That cracks determinism in the
+    generator output AND the manifest hash — same input → different
+    bytes → spurious tamper-detection alerts on CI vs. dev laptop.
+
+    CORE_ENGINE_PURITY covers Date.now / Math.random / process.env /
+    crypto.random*; locale dependence is just as much "the same input
+    must produce the same output." Use `stableStringCompare(left, right)`
+    from `@stele/core` everywhere instead.
+
+    Scope: all `.ts` source files under `packages/*/src`, excluding
+    `.d.ts` and the canonical `util/array.ts` allow-listed above.
+    """
+    violations: list[dict[str, Any]] = []
+    for pkg_dir in sorted(_PACKAGES_DIR.glob("*")):
+        if not pkg_dir.is_dir():
+            continue
+        src_dir = pkg_dir / "src"
+        if not src_dir.is_dir():
+            continue
+        for ts_file in src_dir.rglob("*.ts"):
+            if "node_modules" in ts_file.parts or "dist" in ts_file.parts:
+                continue
+            if str(ts_file).endswith(".d.ts"):
+                continue
+            rel = str(ts_file.relative_to(_REPO_ROOT))
+            if rel in _LOCALECOMPARE_ALLOWLIST:
+                continue
+            try:
+                content = ts_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            # Blank strings + comments so a docstring example does not
+            # false-positive (this checker is the "find a forbidden
+            # call" pattern; same lesson as N-02).
+            stripped = _strip_ts_comments_and_strings(content)
+            for m in _LOCALECOMPARE_RE.finditer(stripped):
+                line_no = stripped.count("\n", 0, m.start()) + 1
+                violations.append({
+                    "file": rel,
+                    "line": line_no,
+                    "column": None,
+                    "message": (
+                        "`.localeCompare(` is locale-dependent — use "
+                        "`stableStringCompare(left, right)` from @stele/core"
+                    ),
+                })
+    if violations:
+        return {
+            "passed": False,
+            "message": (
+                f"{len(violations)} `.localeCompare(` call(s) — locale-dependent ordering "
+                f"leaks into manifest hash + generated output: "
+                + "; ".join(f"{v['file']}:{v['line']}" for v in violations[:5])
             ),
             "violations": violations,
         }

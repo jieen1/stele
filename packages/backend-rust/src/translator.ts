@@ -1,4 +1,4 @@
-import { SteleError } from "@stele/core";
+import { SteleError, stableStringCompare } from "@stele/core";
 import type { AstNode, ListNode, Contract, InvariantDeclaration, ScenarioDeclaration } from "@stele/core";
 import { COMPARISON_OPERATORS, renderComparison } from "./templates/comparison.js";
 import {
@@ -878,10 +878,10 @@ function invariantToRustFnName(id: string): string {
 
 function compareInvariants(left: InvariantDeclaration, right: InvariantDeclaration): number {
     return (
-        left.filePath.localeCompare(right.filePath) ||
+        stableStringCompare(left.filePath, right.filePath) ||
         left.span.line - right.span.line ||
         left.span.column - right.span.column ||
-        left.id.localeCompare(right.id)
+        stableStringCompare(left.id, right.id)
     );
 }
 

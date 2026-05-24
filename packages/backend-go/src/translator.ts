@@ -1,5 +1,6 @@
 import {
   SteleError,
+  stableStringCompare,
   type AstNode,
   type Contract,
   type InvariantDeclaration,
@@ -776,10 +777,10 @@ function wrapBool(expr: string): string {
 
 function compareInvariants(left: InvariantDeclaration, right: InvariantDeclaration): number {
   return (
-    left.filePath.localeCompare(right.filePath) ||
+    stableStringCompare(left.filePath, right.filePath) ||
     left.span.line - right.span.line ||
     left.span.column - right.span.column ||
-    left.id.localeCompare(right.id)
+    stableStringCompare(left.id, right.id)
   );
 }
 

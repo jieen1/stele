@@ -7,6 +7,7 @@ import {
   invariantExplanation,
   loadContract,
   sanitizeIdentifier,
+  stableStringCompare,
   type ArchitectureDeclaration,
   type Contract,
   type InvariantDeclaration,
@@ -731,7 +732,7 @@ function collectSuppressions(
 }
 
 function sortedArray(set: ReadonlySet<string>): readonly string[] {
-  return Object.freeze([...set].sort((a, b) => a.localeCompare(b)));
+  return Object.freeze([...set].sort((a, b) => stableStringCompare(a, b)));
 }
 
 function suggestNearbyNodes(callGraph: CallGraph, nodeId: string): readonly string[] {
@@ -754,7 +755,7 @@ function suggestNearbyNodes(callGraph: CallGraph, nodeId: string): readonly stri
       scored.push({ id: n.id, score });
     }
   }
-  scored.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  scored.sort((a, b) => b.score - a.score || stableStringCompare(a.id, b.id));
   return scored.slice(0, 5).map((s) => s.id);
 }
 
@@ -813,7 +814,7 @@ function formatEffectExplainHuman(inspection: EffectInspection): string {
   if (inspection.propagationChains.size === 0) {
     lines.push("  (none — node has no effects)");
   } else {
-    const effects = [...inspection.propagationChains.keys()].sort((a, b) => a.localeCompare(b));
+    const effects = [...inspection.propagationChains.keys()].sort((a, b) => stableStringCompare(a, b));
     for (const effect of effects) {
       const steps = inspection.propagationChains.get(effect) ?? [];
       lines.push(`  ${effect}:`);

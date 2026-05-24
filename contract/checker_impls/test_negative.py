@@ -1078,6 +1078,116 @@ def test_no_cjs_require_string_literal_does_not_false_positive():
 
 
 # ---------------------------------------------------------------------------
+# Round 9 — bypass-coverage tests for O-01..O-08 reviewer findings
+# ---------------------------------------------------------------------------
+
+
+def test_no_cjs_require_template_literal_expression():
+    """Round 9 O-01: `` `${require("x")}` `` is a real CJS call inside
+    a template-literal interpolation. The Round 8 string-blanker
+    blanked the whole template interior; the Round 9 fix recognises
+    `${...}` as code and must catch the call."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_o01_tpl.ts"
+    target.write_text(
+        "export const cb = `${require(\"x\")}`;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.no_cjs_require_in_ts_source({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "no_cjs_require_template_literal_expression")
+
+
+def test_core_engine_purity_template_literal_random():
+    """Round 9 O-01 + N-01: `${randomUUID()}` inside a backtick string
+    is a real nondeterminism source. The Round 9 fix recognises the
+    expression as code and the N-01 gated bare-name pattern catches
+    it (requires the `node:crypto` import to also be present)."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_o01_purity.ts"
+    target.write_text(
+        'import { randomUUID } from "node:crypto";\n'
+        "export const cb = `${randomUUID()}`;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.core_engine_purity({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "core_engine_purity_template_literal_random")
+
+
+def test_core_engine_purity_string_mention_of_crypto_does_not_false_positive():
+    """Round 9 O-02 (positive guard): a string literal that merely
+    *contains* the substring `from "node:crypto"` must NOT trip the
+    import gate, otherwise any legitimate user-defined `randomBytes`/
+    `randomUUID` function (no relation to node:crypto) in the same
+    file would be flagged. The Round 9 fix anchors the gate at
+    start-of-line `import` syntax instead."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_o02_str.ts"
+    target.write_text(
+        'const example = \'from "node:crypto"\';\n'
+        "export function randomBytes(x: number): number { return x; }\n"
+        "export const v = randomBytes(5);\n"
+        "export const e = example;\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.core_engine_purity({})
+    finally:
+        target.unlink(missing_ok=True)
+    if result.get("passed") is True:
+        print("  OK: core_engine_purity_string_mention_of_crypto_does_not_false_positive — gate correctly ignored string mention")
+        return True
+    print(f"  MISS: false-positive (result={result})")
+    return False
+
+
+def test_cli_io_through_path_utils_array_join_no_longer_satisfies():
+    """Round 9 O-08: a file that calls `writeFile(input, ...)` and
+    only references `.join("")` (an Array#join, not path.join) must
+    still be flagged. The Round 8 substring check accepted bare
+    `join(` as a path-safety helper, which made `chunks.join("")`
+    satisfy the rule."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_o08_arrjoin.ts"
+    target.write_text(
+        'import { writeFile } from "node:fs/promises";\n'
+        "export async function bad(input: string, chunks: string[]): Promise<void> {\n"
+        '  const data = chunks.join("");\n'
+        "  await writeFile(input, data);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.cli_io_through_path_utils({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "cli_io_through_path_utils_array_join_no_longer_satisfies")
+
+
+def test_strip_block_comment_does_not_mis_terminate_on_slash_star_slash():
+    """Round 9 O-03: `/*/ "smuggled" */` is a single block comment in
+    real JS. The Round 8 `_blank_string_interiors` mis-terminated at
+    the third `/` and then entered string mode at the `"`. The Round
+    9 fix uses the standard two-char `*/` look-ahead so the entire
+    region is preserved as a block comment."""
+    _reset_caches()
+    src = '/*/ "smuggled" */ const x = 1;\n'
+    out = sp._blank_string_interiors(src)
+    # The output must equal the input (no string blanking happened
+    # because nothing was actually a string).
+    if out == src:
+        print("  OK: strip_block_comment_does_not_mis_terminate_on_slash_star_slash — comment preserved as-is")
+        return True
+    print(f"  MISS: blank_string_interiors mishandled `/*/ \"x\" */` (got={out!r}, want={src!r})")
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1146,6 +1256,12 @@ def main() -> int:
         ("no_backward_compat_shims_string_smuggle_does_not_false_positive", test_no_backward_compat_shims_string_smuggle_does_not_false_positive),
         ("cli_io_through_path_utils_string_smuggle_does_not_satisfy", test_cli_io_through_path_utils_string_smuggle_does_not_satisfy),
         ("no_cjs_require_string_literal_does_not_false_positive", test_no_cjs_require_string_literal_does_not_false_positive),
+        # Round 9: bypass-coverage tests for O-01..O-08.
+        ("no_cjs_require_template_literal_expression", test_no_cjs_require_template_literal_expression),
+        ("core_engine_purity_template_literal_random", test_core_engine_purity_template_literal_random),
+        ("core_engine_purity_string_mention_of_crypto_does_not_false_positive", test_core_engine_purity_string_mention_of_crypto_does_not_false_positive),
+        ("cli_io_through_path_utils_array_join_no_longer_satisfies", test_cli_io_through_path_utils_array_join_no_longer_satisfies),
+        ("strip_block_comment_does_not_mis_terminate_on_slash_star_slash", test_strip_block_comment_does_not_mis_terminate_on_slash_star_slash),
     ]
 
     print("=" * 60)

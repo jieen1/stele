@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
+import { stableStringCompare } from "../util/array.js";
 
 function uniqueSortedStrings(values: string[]): string[] {
-  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].sort((left, right) => stableStringCompare(left, right));
 }
 
 export type ViolationSeverity = "error" | "warning" | "info";
@@ -512,7 +513,7 @@ function sortValue(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value)
       .filter(([, entry]) => entry !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => stableStringCompare(left, right))
       .map(([key, entry]) => [key, sortValue(entry)]),
   );
 }

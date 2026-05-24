@@ -384,4 +384,12 @@
   (description "Round 7 (Round 5 deferred dogfood #5) / CLAUDE.md 'Path safety is the hot path. Any new file IO in packages/cli or packages/claude-code-plugin/scripts must resolve through the existing path-safety helpers — never construct paths from raw user/agent input.'")
   (uses-checker cli-io-through-path-utils))
 
+(checker no-bare-locale-compare
+  (description "Every .ts source file under packages/*/src must use `stableStringCompare(left, right)` from @stele/core instead of `String.prototype.localeCompare`. localeCompare reads ICU/host locale and produces different orderings across machines, which leaks into manifest hashes and generated test output."))
+
+(invariant NO_BARE_LOCALE_COMPARE
+  (severity error)
+  (description "Round 9 P-01 / CLAUDE.md 'Core engine is pure. Same input must produce the same output.' `.localeCompare(` is locale-dependent — LANG=de_DE sorts `ä` between `a` and `z`, LANG=sv_SE sorts it after `z`. That breaks generator byte-stability AND manifest hash stability across machines. Use `stableStringCompare` from @stele/core instead.")
+  (uses-checker no-bare-locale-compare))
+
 (import "generated/ddd-typedriven.stele")

@@ -61,4 +61,12 @@ export const DEFAULT_PROTECTED_PATTERNS: readonly string[] = [
   ".github/workflows/**",
   "scripts/publish-npm.mjs",
   "scripts/verify-packed-adoption.mjs",
+  // Round 9 P-02: workspace topology + base TS config are part of the
+  // supply-chain shape. `pnpm-workspace.yaml` controls which packages
+  // pnpm links; an unprotected edit could introduce a malicious linked
+  // package. `tsconfig.base.json` defines `strict: true` and module
+  // resolution for the whole monorepo; flipping it elsewhere defeats
+  // the strict-mode invariant.
+  "pnpm-workspace.yaml",
+  "tsconfig.base.json",
 ];

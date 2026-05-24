@@ -1,5 +1,5 @@
 import type { Violation, ViolationLocation, ViolationReport, ViolationSource } from "../report/types.js";
-import { uniqueSortedStrings } from "../util/array.js";
+import { stableStringCompare, uniqueSortedStrings } from "../util/array.js";
 
 export type BaselineVersion = "1";
 
@@ -59,7 +59,7 @@ export function createViolationBaseline(options: CreateViolationBaselineOptions)
   const entries = Object.fromEntries(
     options.violations
       .slice()
-      .sort((left, right) => left.fingerprint.localeCompare(right.fingerprint))
+      .sort((left, right) => stableStringCompare(left.fingerprint, right.fingerprint))
       .map((violation) => {
         const existing = options.existing?.violations[violation.fingerprint];
 

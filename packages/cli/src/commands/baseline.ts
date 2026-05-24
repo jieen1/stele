@@ -3,6 +3,7 @@ import { lstat, readdir, readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import {
   createViolationBaseline,
+  stableStringCompare,
   tryReadViolationBaseline,
   writeManifest,
   writeViolationBaseline,
@@ -74,7 +75,7 @@ async function walkHumanDir(
     throw error;
   }
 
-  entries.sort((a, b) => a.name.localeCompare(b.name));
+  entries.sort((a, b) => stableStringCompare(a.name, b.name));
 
   for (const entry of entries) {
     if (entry.name === ".baseline.json" || entry.name === ".manifest.json") {

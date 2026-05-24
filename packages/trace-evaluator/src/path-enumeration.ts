@@ -6,6 +6,7 @@
  * skip — that is handled by the caller, this module just reports `truncated`.
  */
 
+import { stableStringCompare } from "@stele/core";
 import type { CallGraph, CallGraphEdge } from "@stele/call-graph-core";
 
 export interface EnumeratedPath {
@@ -53,7 +54,7 @@ function buildAdjacency(callGraph: CallGraph): AdjacencyIndex {
       if (a.callSite.column !== b.callSite.column) {
         return a.callSite.column - b.callSite.column;
       }
-      return a.toId.localeCompare(b.toId);
+      return stableStringCompare(a.toId, b.toId);
     });
   }
   const frozen: AdjacencyIndex = { out: map };

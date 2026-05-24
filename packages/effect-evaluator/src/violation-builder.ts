@@ -19,6 +19,7 @@ import {
   type ViolationPriority,
   type ViolationSeverity,
   createViolation,
+  stableStringCompare,
 } from "@stele/core";
 import type { CallGraph, CallGraphNode, UnresolvedCall } from "@stele/call-graph-core";
 
@@ -254,7 +255,7 @@ export function buildDisallowedEffectViolation(
   const callerFile = node.filePath;
   const callerLine = node.span.line;
 
-  const allowList = [...allowOnly].sort((a, b) => a.localeCompare(b));
+  const allowList = [...allowOnly].sort((a, b) => stableStringCompare(a, b));
   const allowRendered = allowList.length === 0 ? "<none>" : `[${allowList.join(", ")}]`;
 
   const summary =

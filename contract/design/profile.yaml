@@ -82,6 +82,12 @@ ddd:
           - report
         parsing:
           - domain-primitives
+        # Round 9 P-01: report uses stableStringCompare from
+        # `util/array.ts` for locale-independent ordering. The primitive
+        # helper is the only addition; report does not gain any
+        # higher-layer dependency.
+        report:
+          - domain-primitives
       aggregate_roots:
         - id: operator-registry
           class: OperatorRegistry

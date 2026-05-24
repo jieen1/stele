@@ -1,5 +1,6 @@
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import { relative, resolve } from "node:path";
+import { stableStringCompare } from "../util/array.js";
 import { isMissingFileError } from "../util/fs.js";
 import type { GeneratedFile, GeneratedVerificationFile, GeneratedVerificationResult } from "./types.js";
 
@@ -31,7 +32,7 @@ export async function collectExistingGeneratedEntries(
   }
 
   const entries = await walkGeneratedDirectory(outputDirectoryPath, projectRoot);
-  entries.sort((left, right) => left.path.localeCompare(right.path) || left.kind.localeCompare(right.kind));
+  entries.sort((left, right) => stableStringCompare(left.path, right.path) || stableStringCompare(left.kind, right.kind));
   return entries;
 }
 
@@ -42,7 +43,7 @@ export async function walkGeneratedDirectory(
   const entries = await readdir(directoryPath, { withFileTypes: true });
   const results: ExistingGeneratedEntry[] = [];
 
-  entries.sort((left, right) => left.name.localeCompare(right.name));
+  entries.sort((left, right) => stableStringCompare(left.name, right.name));
 
   for (const entry of entries) {
     const fullPath = resolve(directoryPath, entry.name);
@@ -130,7 +131,7 @@ export async function verifyFiles(
     });
   }
 
-  files.sort((left, right) => left.path.localeCompare(right.path));
+  files.sort((left, right) => stableStringCompare(left.path, right.path));
 
   return {
     ok: files.every((file) => file.status === "unchanged"),

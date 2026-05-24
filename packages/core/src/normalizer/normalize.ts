@@ -1,4 +1,5 @@
 import type { AstNode, ListNode } from "../ast/types.js";
+import { stableStringCompare } from "../util/array.js";
 import type {
   Contract,
   ContractFile,
@@ -13,7 +14,7 @@ const INDENT = "  ";
 export function normalizeContract(contract: Contract): string {
   return contract.files
     .slice()
-    .sort((a, b) => a.path.localeCompare(b.path))
+    .sort((a, b) => stableStringCompare(a.path, b.path))
     .map((file) => normalizeFile(file))
     .join("\n");
 }

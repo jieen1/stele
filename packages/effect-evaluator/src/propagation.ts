@@ -21,6 +21,7 @@
  * fail-closed) or as their computed value (lenient).
  */
 
+import { stableStringCompare } from "@stele/core";
 import type { CallGraph, CallGraphEdge } from "@stele/call-graph-core";
 
 import { unionEffects } from "./effect-set.js";
@@ -160,11 +161,11 @@ function buildIncomingAdjacency(
 }
 
 function edgeCmp(a: CallGraphEdge, b: CallGraphEdge): number {
-  const f = a.fromId.localeCompare(b.fromId);
+  const f = stableStringCompare(a.fromId, b.fromId);
   if (f !== 0) {
     return f;
   }
-  const t = a.toId.localeCompare(b.toId);
+  const t = stableStringCompare(a.toId, b.toId);
   if (t !== 0) {
     return t;
   }
@@ -309,7 +310,7 @@ export function propagateEffects(input: PropagationInput): PropagationResult {
   const inheritedByNode = new Map<string, ReadonlySet<string>>();
   for (const [id, set] of effective.entries()) {
     const frozen = new Set<string>(
-      [...set].sort((a, b) => a.localeCompare(b)),
+      [...set].sort((a, b) => stableStringCompare(a, b)),
     );
     effectiveFrozen.set(id, frozen);
 
@@ -322,7 +323,7 @@ export function propagateEffects(input: PropagationInput): PropagationResult {
     }
     inheritedByNode.set(
       id,
-      new Set<string>([...inherited].sort((a, b) => a.localeCompare(b))),
+      new Set<string>([...inherited].sort((a, b) => stableStringCompare(a, b))),
     );
   }
 
@@ -331,7 +332,7 @@ export function propagateEffects(input: PropagationInput): PropagationResult {
   for (const [id, perEffect] of roots.entries()) {
     const frozenPerEffect = new Map<string, readonly string[]>();
     for (const [e, bucket] of perEffect.entries()) {
-      const arr = [...bucket].sort((a, b) => a.localeCompare(b));
+      const arr = [...bucket].sort((a, b) => stableStringCompare(a, b));
       frozenPerEffect.set(e, Object.freeze(arr));
     }
     rootsFrozen.set(id, frozenPerEffect);

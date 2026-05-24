@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "daba22ede1694fdc379a96152ac249768ccde0ded772ab6244aab81242dfd470",
+  "profileHash": "ddb9d520ffdd5c8fd467061ea807b358fc81b682f1cb95ebd99ff1662c1250cc",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "081fe6f14b204864d99e52d78f5de316175b7336"
+    "git_sha": "d5508036fc009e9c1d363803131eef45e6011e75"
   },
   "templates": [
     "ddd-typedriven"
@@ -23,8 +23,8 @@
           "context_name": "Core"
         }
       ],
-      "fileHash": "336a2c268e1c8a4f92def318d44cbedd0d8bdbae32e1b73140b118f7e7f3fbdb",
-      "cdl": "(architecture \"ddd-core\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: core context must preserve DDD layer direction.\")\n\n  (module core-domain-primitives\n    (path \"packages/core/src/{ast,errors,config,util}/**\"))\n  (module core-domain-services\n    (path \"packages/core/src/{validator,registry,evaluator}/**\"))\n  (module core-application\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module core-parsing\n    (path \"packages/core/src/{lexer,parser}/**\"))\n  (module core-generation\n    (path \"packages/core/src/generator/**\"))\n  (module core-report\n    (path \"packages/core/src/report/**\"))\n\n  (layer domain-primitives core-domain-primitives)\n  (layer domain-services core-domain-services)\n  (layer application core-application)\n  (layer parsing core-parsing)\n  (layer generation core-generation)\n  (layer report core-report)\n\n  (allow-dependency core-domain-services core-domain-primitives core-report)\n  (allow-dependency core-application core-domain-primitives core-domain-services core-parsing core-generation core-report)\n  (allow-dependency core-generation core-domain-services core-domain-primitives core-parsing core-report)\n  (allow-dependency core-parsing core-domain-primitives)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
+      "fileHash": "846e17a445125a50a11072bb3bbedab9a6ec4d00fd621d2b90f7111048fed6f0",
+      "cdl": "(architecture \"ddd-core\"\n  (lang typescript)\n  (tsconfig \"packages/cli/tsconfig.json\")\n  (description \"Generated from contract/design/profile.yaml: core context must preserve DDD layer direction.\")\n\n  (module core-domain-primitives\n    (path \"packages/core/src/{ast,errors,config,util}/**\"))\n  (module core-domain-services\n    (path \"packages/core/src/{validator,registry,evaluator}/**\"))\n  (module core-application\n    (path \"packages/core/src/{loader,normalizer,manifest,baseline}/**\"))\n  (module core-parsing\n    (path \"packages/core/src/{lexer,parser}/**\"))\n  (module core-generation\n    (path \"packages/core/src/generator/**\"))\n  (module core-report\n    (path \"packages/core/src/report/**\"))\n\n  (layer domain-primitives core-domain-primitives)\n  (layer domain-services core-domain-services)\n  (layer application core-application)\n  (layer parsing core-parsing)\n  (layer generation core-generation)\n  (layer report core-report)\n\n  (allow-dependency core-domain-services core-domain-primitives core-report)\n  (allow-dependency core-application core-domain-primitives core-domain-services core-parsing core-generation core-report)\n  (allow-dependency core-generation core-domain-services core-domain-primitives core-parsing core-report)\n  (allow-dependency core-parsing core-domain-primitives)\n  (allow-dependency core-report core-domain-primitives)\n\n  (deny-cycles)\n  (fix \"Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change.\"))"
     },
     {
       "ruleId": "architecture.ddd-cli",
@@ -394,17 +394,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-24T04:05:22.455Z",
+  "generatedAt": "2026-05-24T05:39:50.848Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "1f7af6e6d861092b4e2862c5bedfa95ea0b33fadafb84aeccee0bb207d41dac9"
+      "hash": "6203d6bc4812524b36f2d1d4d559b9ae0107d0eb651496817c13146da0acd8f0"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "1f7af6e6d861092b4e2862c5bedfa95ea0b33fadafb84aeccee0bb207d41dac9",
+      "sha256": "6203d6bc4812524b36f2d1d4d559b9ae0107d0eb651496817c13146da0acd8f0",
       "rules": [
         {
           "id": "architecture.ddd-core",

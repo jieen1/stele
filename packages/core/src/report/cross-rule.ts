@@ -30,6 +30,7 @@
  * The function returns NEW Violation objects; inputs are not mutated.
  */
 
+import { stableStringCompare } from "../util/array.js";
 import type { Violation } from "./types.js";
 
 const CROSS_RULE_NOTE =
@@ -47,7 +48,7 @@ function uniqueSortedExcluding(
     seen.add(id);
   }
   return Object.freeze(
-    [...seen].sort((a, b) => a.localeCompare(b)),
+    [...seen].sort((a, b) => stableStringCompare(a, b)),
   );
 }
 

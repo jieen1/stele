@@ -77,6 +77,8 @@ def _lazy_load_checkers():
             "no_backward_compat_shims",
             "core_engine_purity",
             "cli_io_through_path_utils",
+            # Round 9 P-01 — locale-independent string compare
+            "no_bare_locale_compare",
         ):
             _checkers[name] = getattr(mod, name, None)
 
@@ -131,6 +133,8 @@ _CHECKER_NAME_MAP = {
     "no-backward-compat-shims": "no_backward_compat_shims",
     "core-engine-purity": "core_engine_purity",
     "cli-io-through-path-utils": "cli_io_through_path_utils",
+    # Round 9 P-01 — locale-independent string compare
+    "no-bare-locale-compare": "no_bare_locale_compare",
 }
 
 

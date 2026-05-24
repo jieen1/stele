@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { stableStringCompare } from "@stele/core";
 
 /**
  * stele observe — analyze agent observation data for invariant health trends.
@@ -135,7 +136,7 @@ async function readObservations(path: string): Promise<ObservationEntry[]> {
   }
 
   // Sort by timestamp
-  entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  entries.sort((a, b) => stableStringCompare(a.timestamp, b.timestamp));
 
   return entries;
 }

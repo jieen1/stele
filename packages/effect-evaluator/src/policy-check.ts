@@ -25,7 +25,7 @@ import {
   type CompiledPattern,
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
-import type { EffectPolicyDeclaration } from "@stele/core";
+import { stableStringCompare, type EffectPolicyDeclaration } from "@stele/core";
 
 import { expandEffectPatterns } from "./effect-set.js";
 
@@ -116,7 +116,7 @@ function collectMatches(options: CollectOptions): readonly PolicyMatch[] {
   const matches: PolicyMatch[] = [];
 
   // Deterministic node iteration order.
-  const nodes = [...callGraph.nodes].sort((a, b) => a.id.localeCompare(b.id));
+  const nodes = [...callGraph.nodes].sort((a, b) => stableStringCompare(a.id, b.id));
 
   for (const node of nodes) {
     if (!matchAny(node.id, scopePatterns)) {
@@ -133,7 +133,7 @@ function collectMatches(options: CollectOptions): readonly PolicyMatch[] {
         offending.push(e);
       }
     }
-    offending.sort((a, b) => a.localeCompare(b));
+    offending.sort((a, b) => stableStringCompare(a, b));
     for (const e of offending) {
       matches.push({
         node,
@@ -190,6 +190,6 @@ export function resolveScopeNodes(
       ids.push(n.id);
     }
   }
-  ids.sort((a, b) => a.localeCompare(b));
+  ids.sort((a, b) => stableStringCompare(a, b));
   return Object.freeze(ids);
 }

@@ -10,6 +10,8 @@
  * produces identical byte output.
  */
 
+import { stableStringCompare } from "@stele/core";
+
 const CHECKERS_KEY = "_checkers";
 
 type CheckerSpec = {
@@ -125,7 +127,7 @@ function parseCheckerSpecs(value: unknown): CheckerSpec[] {
     if (file === undefined || file.length === 0) continue;
     specs.push({ id, file, function: fn });
   }
-  specs.sort((left, right) => left.id.localeCompare(right.id));
+  specs.sort((left, right) => stableStringCompare(left.id, right.id));
   return specs;
 }
 

@@ -25,7 +25,7 @@ import type {
   EffectSuppressionDeclaration,
   Violation,
 } from "@stele/core";
-import { createViolation } from "@stele/core";
+import { createViolation, stableStringCompare } from "@stele/core";
 
 import { differenceEffects, expandEffectPatterns } from "./effect-set.js";
 
@@ -106,7 +106,7 @@ export function applySuppressions(
   for (const [id, set] of mask.entries()) {
     frozenMask.set(
       id,
-      new Set<string>([...set].sort((a, b) => a.localeCompare(b))),
+      new Set<string>([...set].sort((a, b) => stableStringCompare(a, b))),
     );
   }
 
@@ -122,7 +122,7 @@ function buildSuppressionActiveNotice(
   s: EffectSuppressionDeclaration,
   expandedSuppresses: ReadonlySet<string>,
 ): Violation {
-  const expanded = [...expandedSuppresses].sort((a, b) => a.localeCompare(b));
+  const expanded = [...expandedSuppresses].sort((a, b) => stableStringCompare(a, b));
   return createViolation({
     rule_id: "effect.suppression_active",
     rule_kind: "effect_suppression_notice",
@@ -164,7 +164,7 @@ function buildSuppressionDormantNotice(
       summary: `Effect suppression target \`${s.target}\` not found in the call graph (dormant).`,
       detail: [
         `target: ${s.target}`,
-        `suppresses: [${[...s.suppresses].sort((a, b) => a.localeCompare(b)).join(", ")}]`,
+        `suppresses: [${[...s.suppresses].sort((a, b) => stableStringCompare(a, b)).join(", ")}]`,
         `reason: ${s.reason}`,
         `note: the target NodeId did not resolve to any node — this suppression has no effect.`,
       ].join("\n"),

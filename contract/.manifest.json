@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-24T04:38:00.226Z",
+  "generated_at": "2026-05-24T05:40:13.563Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -16,12 +16,12 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "68529e0c5351a8b5ddf7210bd363b5af81651d3feaa54a96ad7bc439d268decc",
-      "size": 112289
+      "sha256": "319dbfc74225a350ac22e393ebac1b9c47bcca13431edf38eba47adabfc99290",
+      "size": 122261
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "71d40195b4dd7d4ec9fa32a2824850d132f9d55fbadbd2834a1b988cbccf0062",
-      "size": 50779
+      "sha256": "132ba0f3c4f5bfd7a3307e7a8aa54afd1f33dbd7aff1330a65d265969849f0d2",
+      "size": 56227
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
@@ -31,25 +31,29 @@
       "sha256": "4876017d1654d4def1333bda5b995d7d10f5d13fe94932d45de1d6c81b5b58a6",
       "size": 1673
     },
+    "contract/design/approvals/2026-05-24T05-39-44-84-ddb9d520.json": {
+      "sha256": "c3e3d693a811ee2b16f2f752385067354e9b84f3a7ca21e17e72e2ad1826aae8",
+      "size": 1746
+    },
     "contract/design/manifest.json": {
-      "sha256": "50cc1d526a59b4d3868fa0770ae6836ef541d1b7c958874a2db4b9d86fe58499",
-      "size": 44103
+      "sha256": "6d844c81a30ee285f9c41816954ef6f5c9b484276f000b26d77ea653bdb0698c",
+      "size": 44160
     },
     "contract/design/profile.yaml": {
-      "sha256": "daba22ede1694fdc379a96152ac249768ccde0ded772ab6244aab81242dfd470",
-      "size": 17807
+      "sha256": "ddb9d520ffdd5c8fd467061ea807b358fc81b682f1cb95ebd99ff1662c1250cc",
+      "size": 18086
     },
     "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml": {
       "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601",
       "size": 2615
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "1f7af6e6d861092b4e2862c5bedfa95ea0b33fadafb84aeccee0bb207d41dac9",
-      "size": 19953
+      "sha256": "6203d6bc4812524b36f2d1d4d559b9ae0107d0eb651496817c13146da0acd8f0",
+      "size": 20009
     },
     "contract/main.stele": {
-      "sha256": "f4ff9afcc917055eef76c2d8e8aad1ff14bd64f48d56f5c4d2349c3457da22fb",
-      "size": 17827
+      "sha256": "08e4b3c47fc820b1faab38be16b2c617491a13ed629e19ac257c76dfb52f620f",
+      "size": 18626
     },
     "package.json": {
       "sha256": "4cd157c4a07307f29229c884d4d3c6a1ac08104eaf2f37cc9758ee543eeb46e6",
@@ -112,16 +116,16 @@
       "size": 6317
     },
     "packages/claude-code-plugin/scripts/observation-hook.js": {
-      "sha256": "b8d20b81cf00d14440e47d073a6bddc97354cc5571512de275377e6d331aa46d",
-      "size": 15486
+      "sha256": "04dada4eb3958b5f092601199d9000580ad41a7912a4cc7fc41c6846076d2b0a",
+      "size": 15591
     },
     "packages/claude-code-plugin/scripts/path-utils.js": {
       "sha256": "92b294611fe9424b07d1ebfb0c5a782be4d07463fbc41253d7f3808127d7a687",
       "size": 1124
     },
     "packages/claude-code-plugin/scripts/pre-tool-protect.js": {
-      "sha256": "26b1045f1ed10bf7ebee72d8e0bf31b7d666e36c23f47b783e92eee7ef524364",
-      "size": 28208
+      "sha256": "7da99adc7247f553acd4bc8775340fff9d088df271db689ab6d66072fb787a10",
+      "size": 28313
     },
     "packages/claude-code-plugin/scripts/shell-utils.js": {
       "sha256": "f306212dae5fb55427a0db34f949368f3687f6236467cfd5e648230c83f50768",
@@ -187,6 +191,10 @@
       "sha256": "23df7532df4a019956a2d05a9e7da792d37020e92faf7ee34e2dc3d23d9adf03",
       "size": 112513
     },
+    "pnpm-workspace.yaml": {
+      "sha256": "0e316502859ceee6cd5180c9cdef463274c2531f518d2a9d73e31b4af12c1acf",
+      "size": 51
+    },
     "scripts/publish-npm.mjs": {
       "sha256": "504d955a6f6afdff10699601e808ad2944ebac525afd9d02200675fe2801cf65",
       "size": 9456
@@ -208,13 +216,17 @@
       "size": 30931
     },
     "tests/contract/conftest.py": {
-      "sha256": "db2aecdb010e6978895ac579343588e8801d98fa6120e30400bdb0b50868f6cd",
-      "size": 5812
+      "sha256": "a88154816b282b1bbacf97e69dc09c2faad80a82cf051bb889c9cf31616a326a",
+      "size": 6028
     },
     "tests/contract/test_contract.py": {
-      "sha256": "cb43d78199a436c9e91ae1189b7a1f7f944b9ecb883c9911f165df001da4494b",
-      "size": 9089
+      "sha256": "0eab8170d28ff075fbf587b4cb18fee53cb6bf36ffad3bb10d23f34aa86a431d",
+      "size": 9311
+    },
+    "tsconfig.base.json": {
+      "sha256": "14e86fc4216dd21efaadba41d3e644d1417b53209eb0faa76a4f082f0aa2bb02",
+      "size": 381
     }
   },
-  "contract_hash": "1a70e101f41919e40af8c0c7f56c64f80a32be223efff629a586b34721ee3de7"
+  "contract_hash": "ba53aa4dfb9ceaaa3e600eeaadde68e82d9fa7316a36644f5549e62d52604b68"
 }

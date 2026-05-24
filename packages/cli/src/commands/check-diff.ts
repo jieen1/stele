@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { relative, resolve, win32 } from "node:path";
 import { promisify } from "node:util";
-import type { Contract, ContractFile } from "@stele/core";
+import { stableStringCompare, type Contract, type ContractFile } from "@stele/core";
 
 const execFileAsync = promisify(execFile);
 
@@ -47,7 +47,7 @@ export async function collectDiffContractFiles(projectDir: string, ref: string):
     }
   }
 
-  return [...changedFiles].sort((a, b) => a.localeCompare(b));
+  return [...changedFiles].sort((a, b) => stableStringCompare(a, b));
 }
 
 /**
@@ -94,7 +94,7 @@ export async function collectGitDiffScope(projectDir: string, baseRef: string): 
     }
   }
 
-  return [...diffPaths].sort((left, right) => left.localeCompare(right));
+  return [...diffPaths].sort((left, right) => stableStringCompare(left, right));
 }
 
 /**

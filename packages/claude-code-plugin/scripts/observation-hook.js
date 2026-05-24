@@ -44,6 +44,9 @@ const DEFAULT_PROTECTED = [
   ".github/workflows/**",
   "scripts/publish-npm.mjs",
   "scripts/verify-packed-adoption.mjs",
+  // Round 9 P-02: workspace topology + base TS config.
+  "pnpm-workspace.yaml",
+  "tsconfig.base.json",
 ];
 
 try {

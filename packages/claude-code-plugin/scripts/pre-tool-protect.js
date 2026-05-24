@@ -59,6 +59,9 @@ const DEFAULT_PROTECTED = [
   ".github/workflows/**",
   "scripts/publish-npm.mjs",
   "scripts/verify-packed-adoption.mjs",
+  // Round 9 P-02: workspace topology + base TS config.
+  "pnpm-workspace.yaml",
+  "tsconfig.base.json",
 ];
 
 // Round 4 D-05: hoisted constants used by extractInterpreterScriptTargets.

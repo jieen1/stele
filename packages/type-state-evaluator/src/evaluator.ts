@@ -45,6 +45,7 @@ import type {
 } from "@stele/call-graph-core";
 import {
   createViolation,
+  stableStringCompare,
   type Contract,
   type TypeStateBindingDeclaration,
   type TypeStateDeclaration,
@@ -363,7 +364,7 @@ function indexInferences(
   }
   for (const bucket of map.values()) {
     bucket.sort((a, b) => {
-      const fileCmp = a.callerId.localeCompare(b.callerId);
+      const fileCmp = stableStringCompare(a.callerId, b.callerId);
       if (fileCmp !== 0) {
         return fileCmp;
       }
@@ -373,7 +374,7 @@ function indexInferences(
       if (a.callSite.column !== b.callSite.column) {
         return a.callSite.column - b.callSite.column;
       }
-      return a.method.localeCompare(b.method);
+      return stableStringCompare(a.method, b.method);
     });
   }
   return map;

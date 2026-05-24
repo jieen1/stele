@@ -18,7 +18,7 @@ import {
   type TypePolicyDeclaration,
   type Violation,
 } from "@stele/core";
-import { uniqueSortedStrings } from "@stele/core";
+import { stableStringCompare, uniqueSortedStrings } from "@stele/core";
 
 const execFileAsync = promisify(execFile);
 
@@ -959,7 +959,7 @@ async function walkRoot(directory: string, projectDir: string): Promise<string[]
     }
   }
 
-  return files.sort((left, right) => left.localeCompare(right));
+  return files.sort((left, right) => stableStringCompare(left, right));
 }
 
 function normalizeRelativePath(path: string): string {

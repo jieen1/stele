@@ -33,6 +33,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
+import { stableStringCompare } from "@stele/core";
 import * as ts from "typescript";
 import type {
   InferTypeStatesOptions,
@@ -573,13 +574,13 @@ export const tsTypeStateInferenceExtractor: TypeStateInferenceExtractor = {
 
     // Deterministic ordering — same shape as the call-graph extractor.
     out.sort((a, b) => {
-      const c1 = a.declarationId.localeCompare(b.declarationId);
+      const c1 = stableStringCompare(a.declarationId, b.declarationId);
       if (c1 !== 0) return c1;
-      const c2 = a.callerId.localeCompare(b.callerId);
+      const c2 = stableStringCompare(a.callerId, b.callerId);
       if (c2 !== 0) return c2;
       if (a.callSite.line !== b.callSite.line) return a.callSite.line - b.callSite.line;
       if (a.callSite.column !== b.callSite.column) return a.callSite.column - b.callSite.column;
-      return a.method.localeCompare(b.method);
+      return stableStringCompare(a.method, b.method);
     });
 
     return { inferences: Object.freeze(out) };

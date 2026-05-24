@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, readFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { posix as pathPosix } from "node:path";
+import { stableStringCompare } from "../util/array.js";
 import { isMissingFileError } from "../util/fs.js";
 import { SteleError } from "../errors/SteleError.js";
 import { isPlainRecord } from "../util/types.js";
@@ -56,7 +57,7 @@ export async function writeManifest(paths: string[], manifestPath: string, contr
       };
     }),
   );
-  const sortedFiles = files.slice().sort((left, right) => left.path.localeCompare(right.path));
+  const sortedFiles = files.slice().sort((left, right) => stableStringCompare(left.path, right.path));
   const protectedFiles: Record<string, ManifestProtectedFile> = {};
 
   for (const file of sortedFiles) {
@@ -95,7 +96,7 @@ export async function verifyManifest(manifestPath: string): Promise<Verification
   const manifest = await readManifestDocument(absoluteManifestPath);
   const files: VerifiedProtectedFile[] = [];
 
-  for (const path of Object.keys(manifest.protected_files).sort((left, right) => left.localeCompare(right))) {
+  for (const path of Object.keys(manifest.protected_files).sort((left, right) => stableStringCompare(left, right))) {
     const expected = manifest.protected_files[path]!;
     validateManifestProtectedPath(path);
     const absolutePath = resolve(manifestBaseDirectory, path);

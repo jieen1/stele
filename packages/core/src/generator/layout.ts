@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { stableStringCompare } from "../util/array.js";
 import type { Contract } from "../validator/structure.js";
 import type { GeneratedFile, LanguageBackend } from "./types.js";
 import { normalizeFileExtension, normalizeRelativeFilePath, assertPathWithinOutputDirectory, sanitizeGeneratedPathSegment } from "./path-safety.js";
@@ -50,7 +51,7 @@ export function buildCanonicalGeneratedPaths(
     );
   }
 
-  expectedPaths.sort((left, right) => left.localeCompare(right));
+  expectedPaths.sort((left, right) => stableStringCompare(left, right));
   return expectedPaths;
 }
 
@@ -63,7 +64,7 @@ export function mergeExpectedGeneratedPaths(canonicalPaths: string[], supportPat
     registerGeneratedPath(path, seenPaths, seenCaseFoldedPaths, "expected generated file path", (value) => expectedPaths.push(value));
   }
 
-  expectedPaths.sort((left, right) => left.localeCompare(right));
+  expectedPaths.sort((left, right) => stableStringCompare(left, right));
   return expectedPaths;
 }
 
@@ -93,7 +94,7 @@ export function normalizeGeneratedFiles(files: GeneratedFile[], outputDir: strin
     );
   }
 
-  normalizedFiles.sort((left, right) => left.path.localeCompare(right.path) || left.content.localeCompare(right.content));
+  normalizedFiles.sort((left, right) => stableStringCompare(left.path, right.path) || stableStringCompare(left.content, right.content));
   return normalizedFiles;
 }
 

@@ -42,6 +42,7 @@
  *       return None
  */
 
+import { stableStringCompare } from "@stele/core";
 import { toPythonString } from "./translation-utils.js";
 
 const CHECKERS_KEY = "_checkers";
@@ -172,7 +173,7 @@ function parseCheckerSpecs(value: unknown): CheckerSpec[] {
     specs.push({ id, file, function: fn });
   }
 
-  specs.sort((left, right) => left.id.localeCompare(right.id));
+  specs.sort((left, right) => stableStringCompare(left.id, right.id));
   return specs;
 }
 

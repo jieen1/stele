@@ -11,6 +11,8 @@
  * effect evaluator's output must be byte-stable across runs.
  */
 
+import { stableStringCompare } from "@stele/core";
+
 const GLOB_META = /[*]/;
 
 /**
@@ -35,7 +37,7 @@ export function unionEffects(
       merged.push(e);
     }
   }
-  merged.sort((a, b) => a.localeCompare(b));
+  merged.sort((a, b) => stableStringCompare(a, b));
   const out = new Set<string>();
   for (const e of merged) {
     out.add(e);
@@ -57,7 +59,7 @@ export function differenceEffects(
       out.push(e);
     }
   }
-  out.sort((a, b) => a.localeCompare(b));
+  out.sort((a, b) => stableStringCompare(a, b));
   const result = new Set<string>();
   for (const e of out) {
     result.add(e);
@@ -79,7 +81,7 @@ export function intersectEffects(
       out.push(e);
     }
   }
-  out.sort((a, b) => a.localeCompare(b));
+  out.sort((a, b) => stableStringCompare(a, b));
   const result = new Set<string>();
   for (const e of out) {
     result.add(e);
@@ -161,7 +163,7 @@ export function expandEffectPatterns(
   declaredEffects: Iterable<string>,
 ): ReadonlySet<string> {
   const declared = [...new Set(declaredEffects)].sort((a, b) =>
-    a.localeCompare(b),
+    stableStringCompare(a, b),
   );
   const out = new Set<string>();
   for (const ref of refs) {
@@ -184,7 +186,7 @@ export function expandEffectPatterns(
 
 /** Convert any iterable of effect names into a deterministic frozen set. */
 export function sortedSet(values: Iterable<string>): ReadonlySet<string> {
-  const arr = [...new Set(values)].sort((a, b) => a.localeCompare(b));
+  const arr = [...new Set(values)].sort((a, b) => stableStringCompare(a, b));
   const out = new Set<string>();
   for (const e of arr) {
     out.add(e);

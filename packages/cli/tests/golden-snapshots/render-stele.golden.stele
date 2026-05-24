@@ -27,6 +27,7 @@
   (allow-dependency core-application core-domain-primitives core-domain-services core-parsing core-generation core-report)
   (allow-dependency core-generation core-domain-services core-domain-primitives core-parsing core-report)
   (allow-dependency core-parsing core-domain-primitives)
+  (allow-dependency core-report core-domain-primitives)
 
   (deny-cycles)
   (fix "Move the dependency behind an allowed DDD layer boundary, or ask the user to approve a design-profile change."))

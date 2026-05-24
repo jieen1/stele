@@ -34,10 +34,11 @@ import {
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
 import type { CallGraph, CallGraphNode } from "@stele/call-graph-core";
-import type {
-  Contract,
-  EffectAnnotationDeclaration,
-  Violation,
+import {
+  stableStringCompare,
+  type Contract,
+  type EffectAnnotationDeclaration,
+  type Violation,
 } from "@stele/core";
 
 import { expandEffectPatterns, sortedSet, unionEffects } from "./effect-set.js";
@@ -207,9 +208,9 @@ function buildEvidence(
 
   return {
     offendingEffect: match.offendingEffect,
-    directEffectsOnNode: [...direct].sort((a, b) => a.localeCompare(b)),
-    inheritedEffects: [...inherited].sort((a, b) => a.localeCompare(b)),
-    propagationRootNodes: [...rootList].sort((a, b) => a.localeCompare(b)),
+    directEffectsOnNode: [...direct].sort((a, b) => stableStringCompare(a, b)),
+    inheritedEffects: [...inherited].sort((a, b) => stableStringCompare(a, b)),
+    propagationRootNodes: [...rootList].sort((a, b) => stableStringCompare(a, b)),
     propagationChain: chain,
   };
 }
@@ -433,7 +434,7 @@ function rebuildInherited(
       }
     }
     const sorted = new Set<string>(
-      [...inherited].sort((a, b) => a.localeCompare(b)),
+      [...inherited].sort((a, b) => stableStringCompare(a, b)),
     );
     out.set(id, sorted);
   }
