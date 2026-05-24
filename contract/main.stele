@@ -459,4 +459,45 @@
   (description "Phase 1 self-dogfooding: PackageName branded type guards the REGISTERED_BACKENDS list (and any future packageName field) so a typo'd `@stele/<backend>` name is caught at validation time.")
   (uses-checker package-name-uses-branded-type))
 
+; ============================================================================
+; Phase 2 (self-dogfooding plan) — code-shape contracts.
+; All declarations target Stele's own TypeScript / hook-script source via the
+; Round 14 P1 TypeScript code-shape evaluator. Each (lang typescript) form is
+; evaluated by `@stele/cli` in-process (no Python runtime), so these run on
+; every `stele check` regardless of `targetLanguage`.
+; ============================================================================
+
+; --- §2.1 boundary contracts --------------------------------------------------
+; Adapted from the phase document for the Round 14 P1 TypeScript analyzer
+; semantics: the TS analyzer captures imports as the module specifier only
+; (no `::name` candidate), and `deny-call` only matches MODULE-LEVEL calls
+; (both Python and TS analyzers skip into function bodies for the file-level
+; `calls` list). So we deny on the full module path and use `allow-target`
+; to enumerate the legitimate fs-importing files. New code in @stele/core
+; that needs `node:fs/promises` now requires an explicit contract update.
+
+(boundary core-no-fs-write-from-non-manifest
+  (lang typescript)
+  (target "packages/core/src/**/*.ts")
+  (deny-import "node:fs/promises")
+  (deny-import "node:fs")
+  (allow-target "packages/core/src/manifest/**")
+  (allow-target "packages/core/src/loader/load-contract.ts")
+  (allow-target "packages/core/src/generator/file-walk.ts")
+  (allow-target "packages/core/src/baseline/io.ts"))
+
+; CLI commands route file IO through path-safety helpers; the few bootstrap
+; commands that legitimately call writeFileSync are allow-listed. Since
+; module-level call detection skips function bodies, we also deny imports
+; of node:fs/promises and node:fs from commands that don't already route
+; through the path-utils layer (covered defense-in-depth by
+; cli_io_through_path_utils).
+(boundary cli-commands-no-direct-fs-write
+  (lang typescript)
+  (target "packages/cli/src/commands/**/*.ts")
+  (deny-call "writeFileSync")
+  (deny-call "appendFileSync")
+  (allow-target "packages/cli/src/commands/init.ts")
+  (allow-target "packages/cli/src/commands/design/**"))
+
 (import "generated/ddd-typedriven.stele")

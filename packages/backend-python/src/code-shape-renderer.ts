@@ -15,7 +15,15 @@ export { renderCodeShapeTest } from "./code-shape-renderers.js";
 export function generatePytestCodeShapeSource(contract: {
   codeShapes: CodeShapeDeclaration[];
 }): string {
-  const declarations = contract.codeShapes.slice().sort(compareCodeShapes);
+  // The pytest renderer only emits tests for `(lang python)` declarations.
+  // `(lang typescript)` declarations are evaluated by the CLI's in-process
+  // TypeScript analyzer in `@stele/cli` (Round 14 P1); rendering them as
+  // pytest tests would try to parse TS source via Python's `ast` module
+  // and fail with a SyntaxError.
+  const declarations = contract.codeShapes
+    .filter((d) => d.lang === "python")
+    .slice()
+    .sort(compareCodeShapes);
   const usedTestNames = new Set<string>();
   const bodyLines: string[] = [];
 

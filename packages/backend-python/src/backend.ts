@@ -44,7 +44,7 @@ const backend: LanguageBackend = {
       });
     }
 
-    if (contract.codeShapes.length > 0) {
+    if (contract.codeShapes.some((d) => d.lang === "python")) {
       files.push({
         path: posix.join(generatedDir, "test_code_shape.py"),
         content: generatePytestCodeShapeSource(contract),

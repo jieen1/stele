@@ -41,7 +41,7 @@ export function buildCanonicalGeneratedPaths(
     registerGeneratedPath(groupPath, seenPaths, seenCaseFoldedPaths, "canonical generated file path", (path) => expectedPaths.push(path));
   }
 
-  if (backend.name === "python" && contract.codeShapes.length > 0) {
+  if (backend.name === "python" && contract.codeShapes.some((d) => d.lang === "python")) {
     registerGeneratedPath(
       posix.join(outputDir, `test_code_shape${fileExtension}`),
       seenPaths,

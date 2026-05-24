@@ -1512,6 +1512,96 @@ def test_package_name_uses_branded_type_catches_raw_literal():
 
 
 # ---------------------------------------------------------------------------
+# Phase 2 (self-dogfooding plan): code-shape contracts.
+#
+# Code-shape contracts are evaluated by `@stele/cli`'s in-process TypeScript
+# analyzer (Round 14 P1). There is no paired Python checker, so the negative
+# tests run `node packages/cli/dist/index.js check` as a subprocess after
+# mutating source, assert that exit code != 0 AND that the expected
+# rule_id appears in the JSON report, then restore the source.
+# ---------------------------------------------------------------------------
+
+import subprocess  # noqa: E402  (deferred until Phase 2 tests)
+
+
+def _run_stele_check_expect_violation(rule_id: str) -> bool:
+    """Run `stele check --format json`; return True iff a violation with
+    matching rule_id appears AND exit code is non-zero."""
+    proc = subprocess.run(
+        [
+            "node",
+            str(sp._REPO_ROOT / "packages" / "cli" / "dist" / "index.js"),
+            "check",
+            "--format",
+            "json",
+        ],
+        cwd=str(sp._REPO_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        print(f"  MISS: {rule_id} — stele check exited 0 (expected non-zero)")
+        return False
+    try:
+        report = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        print(f"  MISS: {rule_id} — stele check did not emit JSON: {proc.stdout[:200]}")
+        return False
+    violations = report.get("violations", [])
+    matched = [v for v in violations if v.get("rule_id") == rule_id]
+    if matched:
+        print(f"  OK: {rule_id} — detected {len(matched)} violation(s)")
+        return True
+    print(f"  MISS: {rule_id} — no matching violations among {[v.get('rule_id') for v in violations]}")
+    return False
+
+
+def _code_shape_negative_with_temp_file(file_relpath: str, content: str, rule_id: str) -> bool:
+    """Create a temporary file, run stele check, restore, return detection result."""
+    target = sp._REPO_ROOT / file_relpath
+    if target.exists():
+        # We never overwrite real source — use a unique sentinel name.
+        raise RuntimeError(f"refusing to overwrite existing file {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+    try:
+        return _run_stele_check_expect_violation(rule_id)
+    finally:
+        try:
+            target.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def test_core_no_fs_write_from_non_manifest_catches_writeFile_import():
+    """Phase 2.1: adding a non-manifest core file that imports
+    `node:fs/promises` must trip the boundary."""
+    content = (
+        'import { writeFile } from "node:fs/promises";\n'
+        'export async function leak(p: string): Promise<void> { await writeFile(p, "x"); }\n'
+    )
+    return _code_shape_negative_with_temp_file(
+        "packages/core/src/__phase2_negative_fs_leak.ts",
+        content,
+        "core-no-fs-write-from-non-manifest",
+    )
+
+
+def test_cli_commands_no_direct_fs_write_catches_writeFileSync_call():
+    """Phase 2.1: a new CLI command outside the allow-list that calls
+    writeFileSync at module level must trip the boundary."""
+    content = (
+        'import { writeFileSync } from "node:fs";\n'
+        'writeFileSync("/tmp/leak.txt", "leak");\n'
+    )
+    return _code_shape_negative_with_temp_file(
+        "packages/cli/src/commands/__phase2_negative_sync_write.ts",
+        content,
+        "cli-commands-no-direct-fs-write",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1607,6 +1697,9 @@ def main() -> int:
         ("contract_path_uses_branded_type_catches_raw_literal", test_contract_path_uses_branded_type_catches_raw_literal),
         ("command_name_uses_branded_type_catches_raw_literal", test_command_name_uses_branded_type_catches_raw_literal),
         ("package_name_uses_branded_type_catches_raw_literal", test_package_name_uses_branded_type_catches_raw_literal),
+        # Phase 2 (self-dogfooding plan): code-shape contracts.
+        ("core_no_fs_write_from_non_manifest_catches_writeFile_import", test_core_no_fs_write_from_non_manifest_catches_writeFile_import),
+        ("cli_commands_no_direct_fs_write_catches_writeFileSync_call", test_cli_commands_no_direct_fs_write_catches_writeFileSync_call),
     ]
 
     print("=" * 60)
