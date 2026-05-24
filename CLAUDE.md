@@ -25,7 +25,7 @@ This repo is a **pnpm monorepo**. The publishable packages today:
 
 Run `pnpm -r ls --json --depth -1 | jq '[.[].name]'` for the live list — the count grows with new evaluators / backends.
 
-The repo is self-protected via `contract/main.stele` (currently 35 invariants — run `stele list` for the live count) and `packages/claude-code-plugin` hooks. Bugs in security-critical paths are caught by `stele check`.
+The repo is self-protected via `contract/main.stele` + `contract/generated/ddd-typedriven.stele` (currently **48 invariants** + ~100 non-invariant declarations across 14 contract mechanisms — run `stele list` for the live invariant count). Mechanisms in use on Stele's own source: `invariant`, `checker`, `boundary`, `class-shape`, `function-shape`, `type-policy`, `file-policy`, `architecture`, `core-node`, `branded-id`, `smart-ctor`, `trace-policy`, `type-state`, `effect-policy` (the latter with `effectStrictMode: false`). See [`docs/internal/self-protection-coverage-matrix.md`](docs/internal/self-protection-coverage-matrix.md) for the mechanism × package matrix and [`docs/design/self-dogfooding/`](docs/design/self-dogfooding/) for the plan that drove the expansion from 35 → 48 invariants and 2 → 14 mechanisms during 2026-Q2. Bugs in security-critical paths are caught by `stele check` + `pytest tests/contract` + the 88 negative tests under `contract/checker_impls/test_negative.py`.
 
 ## Workspace commands
 
@@ -85,6 +85,8 @@ Per-package: `pnpm --filter @stele/core build`, `pnpm --filter @stele/cli test`,
 - [`docs/guides/python-integration.md`](docs/guides/python-integration.md), [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md) — user-facing guides.
 - [`docs/strategy/`](docs/strategy/) — competitive landscape, extension opportunities, roadmap (Chinese).
 - [`docs/internal/codebase-analysis.md`](docs/internal/codebase-analysis.md), [`docs/internal/test-coverage-gap-report.md`](docs/internal/test-coverage-gap-report.md) — internal audit snapshots, dated 2026-05-08. Treat as historical context, not as live invariants.
+- [`docs/internal/self-protection-coverage-matrix.md`](docs/internal/self-protection-coverage-matrix.md), [`docs/internal/self-dogfooding-2026-Q2.md`](docs/internal/self-dogfooding-2026-Q2.md) — current self-protection coverage and the 2026-Q2 self-dogfooding plan summary.
+- [`docs/design/self-dogfooding/`](docs/design/self-dogfooding/) — the 6-phase plan that took Stele from 2 → 14 mechanisms on its own source.
 - [`docs/contributing/development.md`](docs/contributing/development.md), [`docs/contributing/testing.md`](docs/contributing/testing.md), [`docs/contributing/release.md`](docs/contributing/release.md) — how to develop, test, and release.
 
 When updating documentation, **update the spec or guide that the code uses**, not the design blueprint. The blueprint is a frozen reference.

@@ -1,0 +1,352 @@
+# Self-Dogfooding 2026-Q2 — Summary
+
+**Status:** Phase 7 docs landed 2026-05-25 (reviewer cycles still ahead)
+**Plan dir:** [`docs/design/self-dogfooding/`](../design/self-dogfooding/)
+**Coverage matrix:** [`self-protection-coverage-matrix.md`](self-protection-coverage-matrix.md)
+**CDL spec:** [`docs/spec/cdl.md`](../spec/cdl.md)
+
+## What changed
+
+Stele advertises **14 contract mechanisms** but, before this plan, used
+only **2** of them on its own source (`invariant` + a small `checker`
+helper). The 2026-Q2 self-dogfooding plan closed that gap by adopting
+every advertised mechanism against this repository's own TypeScript,
+hook scripts, and design profile.
+
+| | Before plan | After Phase 6 close-out |
+|---|---|---|
+| Mechanisms in use | 2 (`invariant`, `checker`) | **14** (all rows have ≥ 1 ✅) |
+| Invariants in `contract/main.stele` | 35 | **48** |
+| Non-invariant declarations | 0 | ~100 (matrix breakdown) |
+| Negative tests (`contract/checker_impls/test_negative.py`) | 59 | **88** |
+| Pytest `tests/contract/` | 35 | **48** |
+| Branded-ID call-site coverage | 0 real sites | 5 brands × ~140 wrapped sites |
+| Aggregate-root class-shapes | 0 | 1 landed + 9 deferred |
+
+## Phase-by-phase ledger
+
+Each phase landed one commit (or a small series) ending with
+`Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`. The full
+decision log lives in [`docs/design/self-dogfooding/README.md`](../design/self-dogfooding/README.md).
+
+### Phase 0 — Multi-language config infrastructure
+
+- **Landed:** `phaseLanguages` field in `stele.config.json` so Stele
+  can run Phase B evaluators (trace / type-state / effect / code-shape /
+  architecture) in `typescript` while keeping `targetLanguage: "python"`
+  for the pytest runtime. Added `PHASE_LANGUAGE_CONFIG_VALID` invariant
+  + checker + 2 negative tests.
+- **Key decision:** kebab-case keys match the CDL mechanism names; the
+  field is advisory unless a future release allows omitting per-
+  declaration `(lang …)` markers.
+- **Blocks unblocked:** Phases 3, 4, 5.
+
+### Phase 1 — Branded IDs + smart constructors
+
+- **Landed:** 5 brands (`RuleId`, `Sha256`, `ContractPath`,
+  `CommandName`, `PackageName`) with paired smart constructors, plus 5
+  self-protection invariants + checkers (`{RULE_ID,SHA256,CONTRACT_PATH,
+  COMMAND_NAME,PACKAGE_NAME}_USES_BRANDED_TYPE`) and 5 negative tests.
+  ~140 raw-string call sites wrapped via `ruleId(...)`, `sha256(...)`,
+  `contractPath(...)`, `commandName(...)`, `packageName(...)`.
+- **Key decision:** brands and smart-ctors are now declared in
+  `contract/generated/ddd-typedriven.stele` (auto-generated from the
+  DDD profile) — single source of truth for the type-driven facet.
+
+### Phase 2 — Code-shape
+
+- **Landed:** 2 `boundary` declarations (core-no-fs-write-from-non-manifest,
+  cli-commands-no-direct-fs-write), 1 `class-shape` (`cli-command-error-
+  shape`), 3 `function-shape` (`hook-fail-closed-v2`, `stop-validate-
+  fail-closed`, `write-atomic-has-rename`), 1 `type-policy`
+  (`no-any-in-core`), 1 `file-policy` (`hook-scripts-shebang`).
+- **Source refactors needed:**
+  - `CliCommandError.exitCode` promoted from parameter property to
+    explicit field declaration (TS analyzer only collects
+    `ts.isPropertyDeclaration` members).
+  - `pre-tool-protect.js` top-level body wrapped in `async main()` so
+    the `function-shape` selector has an anchor.
+- **Key decisions:**
+  - Code-shape IDs must start with lowercase letter (`RuleId` smart-
+    ctor regex `^[a-z][A-Za-z0-9._:-]*$`); phase doc used UPPER_SNAKE,
+    landed as `lowercase-kebab`.
+  - `(deny-import "module::name")` is a no-op on the TS analyzer
+    (Python analyzer emits both module and named import; TS only emits
+    module specifier). Workaround: deny entire modules with
+    `(allow-target …)`.
+  - `(deny-call …)` matches only module-level calls in both languages
+    (function-body call detection requires a `function-shape` selector).
+  - `@stele/backend-python` renderer now skips `(lang typescript)`
+    code-shapes (pre-fix it emitted pytest tests that tried to
+    `ast.parse` `.ts` files).
+  - TS analyzer extended to accept `.js` / `.mjs` / `.cjs` so hook
+    scripts can be selectors.
+- **Deferred to Phase 7 (3 contracts):** `MANIFEST_ENGINE_SHAPE`,
+  `VIOLATION_REPORT_SHAPE`, `RULE_ID_FIELDS_BRANDED` — all target
+  TypeScript type aliases, but `class-shape` evaluator only binds
+  to real `class` declarations.
+
+### Phase 3 — Trace-policy
+
+- **Landed:** 4 trace-policy declarations:
+  - `FS_WRITES_VIA_WRITE_ATOMIC` — all `fs.writeFile` in `@stele/core`
+    transit through `writeAtomic`
+  - `CHECK_PREPARE_VIA_LOAD_CONTRACT` — `prepareCheckContextWithContract`
+    must follow `loadContract` in `check.ts`
+  - `GENERATE_VIA_COORDINATOR` — `writeAtomic` in `generate.ts` must
+    follow `coordinateGeneration`
+  - `APPROVE_VIA_RESOLVE_APPROVED_BY` — `writeFileSync` in `approve.ts`
+    must follow `resolveApprovedBy`
+  - 4 negative tests.
+- **Key decisions:**
+  - Re-grounded `trace-policy` semantics against the live evaluator:
+    `target` is the path destination; `must-transit` checks
+    intermediates; `must-be-preceded-by` checks edge order inside a
+    single caller body.
+  - External-package functions appear as `extern:<package>::…`
+    (e.g., `extern:node-fs::writeFile`), not `node:<module>::…`.
+  - Commander's `.action(fn)` is a property assignment, not a call
+    edge — `runCheck`, `runGenerate`, `runDesignApprove` have no in-
+    scope callers in the extracted graph. Rewrote 3 of the 6 phase-
+    doc trace-policies as `must-be-preceded-by` over the caller body.
+- **Deferred to Phase 7 (2 contracts):**
+  - `EVALUATOR_VIA_EXTERN_REGISTRY` — DI seam through a local-
+    variable holder prevents the extractor from drawing the edge.
+  - `BACKEND_LOAD_VIA_REGISTRY` — intent is an import boundary; should
+    be re-landed as a `(boundary …)` declaration.
+- **Perf baseline:** `stele check` went 11.0s → 13.8s (+2.8s, well
+  inside the 30s budget).
+
+### Phase 4 — Effect-policy
+
+- **Landed (4.1 + 4.2):**
+  - 1 `effect-declarations` block with 9 effect names (`fs.read`,
+    `fs.write`, `time`, `random`, `env`, `network`, `crypto.hash`,
+    `process`, `child-process`). `pure` deliberately omitted.
+  - 13 JSDoc `@stele:effects` annotations across `@stele/core` source
+    (`load-contract.ts`, `manifest.ts`, `hash-manifest.ts`,
+    `file-walk.ts`, `baseline/io.ts`, `report/types.ts`).
+- **Landed in follow-up commit `451a1d0` (Phase 4 final):**
+  - 4 `effect-policy` declarations (`CORE_IS_PURE_OR_FS_READ`,
+    `HOOK_NO_NETWORK`, `GENERATOR_NO_NETWORK_OR_CHILD_PROCESS`,
+    `MANIFEST_LEAVES_ARE_PINNED`).
+  - 3 `effect-suppression` declarations for the canonical atomic
+    writers (`writeAtomic(2)`, `writeManifest(3)`, `writeHashManifest(2)`).
+  - 4 negative tests (`test_core_is_pure_or_fs_read_catches_random_in_core`,
+    `test_hook_no_network_catches_fetch_in_hook_script`,
+    `test_generator_no_network_or_child_process_catches_execfile`,
+    `test_manifest_leaves_are_pinned_catches_extra_effect`).
+  - `effectStrictMode: false` set in `stele.config.json` to downgrade
+    the ~344 unresolved-call sites (Commander dispatch, dynamic
+    `await import()`) to advisory notices.
+- **Key decisions:**
+  - Only leaf effect-producers in `@stele/core` are annotated; effects
+    propagate through the call graph to downstream callers.
+  - `deleteHashManifest` deliberately NOT annotated as a leaf
+    `fs.write` (treated as cache eviction, not a manifest write).
+- **Decision-log discrepancy** — the Phase 4 sub-agent's decision log
+  entry says the 4 policies + 3 suppressions + 4 negative tests are
+  **deferred**. They were subsequently landed in commit `451a1d0` and
+  the decision log was not updated. This summary records the
+  as-shipped state (policies/suppressions/tests are LIVE).
+
+### Phase 5 — Type-state
+
+- **Landed:** 4 type-state lifecycles, each with state-keyed
+  `StateBrand<S>` and a paired `.test-d.ts` file pinning 3
+  `@ts-expect-error` sites (compile-time enforcement):
+  - `MANIFEST_LIFECYCLE` (`Unloaded→Loaded→Locked→Verified`) —
+    `packages/core/src/manifest/lifecycle.ts`
+  - `APPROVAL_LIFECYCLE` (`Drafting→IdentityChecked→Signed`) —
+    `packages/cli/src/commands/design/approval-lifecycle.ts`
+  - `DESIGN_PROFILE_LIFECYCLE` (`Raw→Validated→Hashed`) —
+    `packages/cli/src/design-profile/lifecycle.ts`
+  - `CALLGRAPH_LIFECYCLE` (`Empty→Building→Built→Cached`) —
+    `packages/call-graph-core/src/lifecycle.ts`
+  - 4 negative tests (each mutates a `@ts-expect-error` pin, runs
+    `pnpm --filter <pkg> typecheck`, asserts TS2345).
+- **Key decision:** the type-state evaluator only binds to
+  `receiver.method(...)` calls; production code uses free-function
+  APIs (`writeManifest(...)`, `verifyManifest(...)`, `loadProfile(...)`,
+  etc.), so the evaluator matches zero call sites today.
+  Compile-time enforcement via `StateBrand<S>` is fully active;
+  evaluator-time enforcement is **deferred to Phase 7** (~20-30
+  call-site reroutes).
+- **`packages/call-graph-core/tsconfig.json`** widened to include
+  `tests/**` so `.test-d.ts` files participate in `typecheck`.
+
+### Phase 6 — Aggregate-root class-shapes
+
+- **Landed (commit `63958df`):** 1 of 10 aggregate-root class-shapes —
+  `core-operator-registry-aggregate-shape` (target:
+  `InMemoryOperatorRegistry`, `required_methods`: register/get/has/list,
+  `required_fields`: `#operators`). The manually-written
+  `operator-registry-shape` from Phase 2 was removed; single source of
+  truth now lives in `contract/design/profile.yaml`.
+- **Deferred (close-out commit `56b5d5e`):** 9 of 10 aggregates —
+  `invariant-validator`, `contract-loader`, `manifest-engine`,
+  `cli-check-orchestrator`, `cli-code-shape-evaluator`,
+  `cli-design-diff-engine`, `cli-cli-program-factory`,
+  `cli-design-profile-validator`, `architecture-architecture-evaluator`.
+  Every one targets a free function, not a `class` declaration. The
+  `class-shape` evaluator refuses to bind to non-classes (reviewer V-08).
+  Each aggregate retains its `core-node` emission; only the optional
+  class-shape pairing is absent.
+- **Phase 6 infrastructure (commit `07967b9`):** `renderAggregateClass-
+  Shape` gracefully handles the no-fields case — returns `undefined`
+  so the renderer emits the `core-node` alone, byte-identical to
+  pre-Phase-6 output.
+
+### Phase 4 regressions discovered + fixed during Phase 6
+
+Three regressions were introduced by the Phase 4 final commit
+(`451a1d0`) and fixed in dedicated follow-up commits during Phase 6:
+
+1. **`writeAtomic` lost its atomic rename.** `await rename(tmpPath,
+   targetPath)` had been changed to `await writeFile(targetPath,
+   content)`, neutralising the atomic temp-file dance and breaking the
+   `write-atomic-has-rename` function-shape + the
+   `FS_WRITES_VIA_WRITE_ATOMIC` trace-policy. Fix: commit `8458bc3`.
+2. **`observation-hook.js` lost its `#!/usr/bin/env node` shebang** —
+   silently broke the Phase 2.5 `hook-scripts-shebang` file-policy.
+   Fix: commit `e88e23f`.
+3. **Golden snapshot `render-stele.golden.stele` not updated** for
+   Phase 4's tsconfig widening — caught when the Phase 6 sub-agent
+   ran the design generator; the regenerated snapshot was rolled
+   into the Phase 6 partial commit (`63958df`).
+
+**Root cause for all three:** the Phase 4 sub-agent took the
+silencing-by-edit anti-pattern (modify source until the contract
+stops firing) instead of accepting the failure or going through the
+propose/approve flow. The fix in every case was to restore the
+original code; the contracts were correct. Future sub-agent prompts
+must explicitly forbid editing source files to make a CDL rule pass.
+
+## Final tally
+
+```
+$ node packages/cli/dist/index.js list | wc -l
+49                             # = 48 invariants + 1 header row
+
+$ grep -c "^def test_" contract/checker_impls/test_negative.py
+88
+
+$ .venv/bin/python -m pytest tests/contract -q   # 48 passed in 3.34s
+$ .venv/bin/python -m pytest contract/checker_impls/test_negative.py -q
+  88 passed in 477.06s (0:07:57)
+
+$ node packages/cli/dist/index.js check    # 1 known error remaining
+[error] trace.FS_WRITES_VIA_WRITE_ATOMIC.path_exceeded_max_depth
+```
+
+Declarations by mechanism (live, derived from `contract/main.stele` +
+`contract/generated/ddd-typedriven.stele`):
+
+| Mechanism | Count | Source |
+|---|---|---|
+| invariant | 48 | main.stele |
+| checker | 48 | main.stele |
+| boundary | 2 | main.stele |
+| class-shape | 2 | main.stele (1) + generated (1) |
+| function-shape | 3 | main.stele |
+| type-policy | 1 | main.stele |
+| file-policy | 1 | main.stele |
+| trace-policy | 4 | main.stele |
+| effect-declarations | 1 | main.stele |
+| effect-policy | 4 | main.stele |
+| effect-suppression | 3 | main.stele |
+| type-state | 4 | main.stele |
+| branded-id | 5 | generated |
+| smart-ctor | 5 | generated |
+| architecture | 18 | generated |
+| core-node | 10 | generated |
+
+Pre-existing `stele check` error count: 1 (the same trace depth-cap
+error noted in every phase log since Phase 4).
+
+## Deferred items — consolidated list
+
+Tracked here so Phase 7 (Round 15+ reviewer rounds) and subsequent
+work can pick them up.
+
+### Phase 2 deferrals (3)
+- `MANIFEST_ENGINE_SHAPE` (class-shape on TS type alias)
+- `VIOLATION_REPORT_SHAPE` (class-shape on TS type alias)
+- `RULE_ID_FIELDS_BRANDED` (type-policy on TS type alias)
+
+### Phase 3 deferrals (2)
+- `EVALUATOR_VIA_EXTERN_REGISTRY` (trace through local-var-held
+  imported function — extractor limitation)
+- `BACKEND_LOAD_VIA_REGISTRY` (re-land as `(boundary …)` with
+  `deny-import "@stele/backend-*"`)
+
+### Phase 5 deferrals (system-wide)
+- Route ~20-30 production call sites through the typed lifecycle
+  methods (`asLoaded` / `lockManifest` / `verifyLockedManifest`,
+  `markProfileValidated` / `hashValidatedProfile`,
+  `attachApprovedBy` / `signApproval`, `startBuilding` /
+  `finalizeCallGraph` / `cacheCallGraph`). Today the evaluator
+  matches zero call sites.
+- Add `type-state-binding` declarations once the upstream refactor
+  lands (meaningful only once typed callers exist).
+
+### Phase 6 deferrals (9)
+Wrap each free-function aggregate in a stateless service class **or**
+extend the TS class-shape extractor to bind module-level functions.
+Affected aggregates:
+
+| Aggregate | target |
+|---|---|
+| `invariant-validator` | `.../validator/structure-invariant.ts::validateInvariant` |
+| `contract-loader` | `.../loader/load-contract.ts::loadContract` |
+| `manifest-engine` | `.../manifest/hash-manifest.ts::hashManifest` |
+| `cli-check-orchestrator` | `.../commands/check.ts::runCheck` |
+| `cli-code-shape-evaluator` | `.../code-shape/evaluate.ts::evaluateCodeShapes` |
+| `cli-design-diff-engine` | `.../commands/design/diff.ts::computeDesignDiff` |
+| `cli-cli-program-factory` | `.../cli/src/index.ts::createSteleProgram` |
+| `cli-design-profile-validator` | `.../design-profile/validate.ts::validateProfile` |
+| `architecture-architecture-evaluator` | `.../architecture-core/src/evaluate.ts::evaluateArchitecture` |
+
+### Phase 4 deferrals (long-term effect-evaluator improvements)
+- Per-policy scoping for unresolved-call emission in
+  `@stele/effect-evaluator` (skip `buildUnresolvedCallViolation` for
+  `fromId` nodes outside any policy's `target-scope`).
+- Or: configurable `strictMode` per-policy in `stele.config.json`.
+  Today's workaround is the global `effectStrictMode: false`.
+
+## Open Phase 7 follow-ups
+
+1. **1 known `stele check` error remains** —
+   `trace.FS_WRITES_VIA_WRITE_ATOMIC.path_exceeded_max_depth`. The
+   trace evaluator hits its default max-depth cap when walking back
+   from `extern:node-fs::writeFile` through the cached call graph.
+   Was already firing when Phase 5 began. Fix options:
+   (a) raise `maxDepth` for this policy, (b) narrow `(scope …)`,
+   (c) intermediate caching of partial paths in the evaluator.
+2. **9 aggregate-root class-shapes** — see the table above.
+3. **Type-state evaluator binds zero call sites** — see Phase 5
+   deferrals.
+4. **Phase 2 type-alias targets** — `MANIFEST_ENGINE_SHAPE`,
+   `VIOLATION_REPORT_SHAPE`, `RULE_ID_FIELDS_BRANDED`.
+5. **Decision-log freshness** — the Phase 4 sub-agent's decision-log
+   entry says effect-policies were deferred; commit `451a1d0`
+   subsequently landed them. The decision log is appended-only by
+   convention; Phase 7 reviewer rounds should reconcile log entries
+   against the as-shipped state.
+6. **Reviewer rounds** — Phase 7 step 7.4 onwards (Round 15+) has not
+   yet been dispatched. CC-10 says the plan is not "done" until at
+   least one independent reviewer round returns 0 substantive
+   findings.
+
+## Reading order for future maintainers
+
+1. [`README.md`](../design/self-dogfooding/README.md) — the plan +
+   cross-cutting rules (CC-1 ... CC-11) + the full decision log.
+2. [Coverage matrix](self-protection-coverage-matrix.md) — what's
+   actually exercised today.
+3. [Phase docs 0-7](../design/self-dogfooding/) — per-phase
+   intent and acceptance criteria.
+4. [`docs/spec/cdl.md`](../spec/cdl.md) — authoritative semantics
+   for every mechanism listed above.
+5. `contract/main.stele` + `contract/generated/ddd-typedriven.stele`
+   — the live contracts.
