@@ -1,6 +1,6 @@
 (architecture "ddd-core"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: core context must preserve DDD layer direction.")
 
   (module core-domain-primitives
@@ -34,7 +34,7 @@
 
 (architecture "ddd-cli"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: cli context must preserve DDD layer direction.")
 
   (module cli-presentation
@@ -68,7 +68,7 @@
 
 (architecture "ddd-architecture"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: architecture context must preserve DDD layer direction.")
 
   (module architecture-domain
@@ -82,7 +82,7 @@
 
 (architecture "ddd-backends-ts"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: backends-ts context must preserve DDD layer direction.")
 
   (module backends-ts-domain
@@ -96,7 +96,7 @@
 
 (architecture "ddd-backends-py"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: backends-py context must preserve DDD layer direction.")
 
   (module backends-py-domain
@@ -110,7 +110,7 @@
 
 (architecture "ddd-hooks"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: hooks context must preserve DDD layer direction.")
 
   (module hooks-protocol
@@ -136,7 +136,7 @@
 
 (architecture "ddd-mcp"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: mcp context must preserve DDD layer direction.")
 
   (module mcp-application
@@ -154,7 +154,7 @@
 
 (architecture "ddd-backends-go"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: backends-go context must preserve DDD layer direction.")
 
   (module backends-go-domain
@@ -168,7 +168,7 @@
 
 (architecture "ddd-backends-java"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: backends-java context must preserve DDD layer direction.")
 
   (module backends-java-domain
@@ -182,7 +182,7 @@
 
 (architecture "ddd-backends-rust"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: backends-rust context must preserve DDD layer direction.")
 
   (module backends-rust-domain
@@ -196,7 +196,7 @@
 
 (architecture "ddd-github-action"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: github-action context must preserve DDD layer direction.")
 
   (module github-action-domain
@@ -210,7 +210,7 @@
 
 (architecture "ddd-plugin"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: plugin context must preserve DDD layer direction.")
 
   (module plugin-domain
@@ -224,7 +224,7 @@
 
 (architecture "ddd-call-graph-core"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: call-graph-core context must preserve DDD layer direction.")
 
   (module call-graph-core-domain
@@ -238,7 +238,7 @@
 
 (architecture "ddd-trace-evaluator"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: trace-evaluator context must preserve DDD layer direction.")
 
   (module trace-evaluator-domain
@@ -252,7 +252,7 @@
 
 (architecture "ddd-type-state-evaluator"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: type-state-evaluator context must preserve DDD layer direction.")
 
   (module type-state-evaluator-domain
@@ -266,7 +266,7 @@
 
 (architecture "ddd-effect-evaluator"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: effect-evaluator context must preserve DDD layer direction.")
 
   (module effect-evaluator-domain
@@ -280,7 +280,7 @@
 
 (architecture "ddd-type-driven-evaluator"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated from contract/design/profile.yaml: type-driven-evaluator context must preserve DDD layer direction.")
 
   (module type-driven-evaluator-domain
@@ -294,7 +294,7 @@
 
 (architecture "ddd-context-map"
   (lang typescript)
-  (tsconfig "packages/cli/tsconfig.json")
+  (tsconfig "tsconfig.base.json")
   (description "Generated context map: cross-context dependencies must follow declared integration patterns.")
 
   (module cli-infrastructure
@@ -367,12 +367,22 @@
 (core-node "core-operator-registry-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/core/src/registry/operators.ts::OperatorRegistry")
-  (description "Generated from design profile: OperatorRegistry aggregate must remain reviewable.")
-  (rationale "OperatorRegistry protects core core invariants; complexity drift makes agent changes risky.")
+  (target "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry")
+  (description "Generated from design profile: InMemoryOperatorRegistry aggregate must remain reviewable.")
+  (rationale "InMemoryOperatorRegistry protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 400) (max 800))
   (metric public-method-count (ideal 8) (max 20))
   (metric max-cyclomatic (ideal 10) (max 25))
+)
+
+(class-shape core-operator-registry-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry")
+  (must-have-method "get")
+  (must-have-method "has")
+  (must-have-method "list")
+  (must-have-method "register")
+  (must-have-field "#operators")
 )
 
 (core-node "core-invariant-validator-aggregate"

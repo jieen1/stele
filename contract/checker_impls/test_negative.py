@@ -1706,8 +1706,11 @@ def _mutate_then_check(file_relpath: str, mutator, rule_id: str) -> bool:
 
 
 def test_operator_registry_shape_catches_missing_method():
-    """Phase 2.2: removing the `register` method from InMemoryOperatorRegistry
-    must trip the class-shape."""
+    """Phase 6 self-dogfooding (2026-05-25): the operator-registry class-shape
+    now ships from the DDD design profile via the design generator. The
+    rule id is `core-operator-registry-aggregate-shape`; the mutation
+    asserts the same anti-evasion property — removing the `register`
+    method body from InMemoryOperatorRegistry must trip the contract."""
     return _mutate_then_check(
         "packages/core/src/registry/operators.ts",
         # Drop the `register` method body — a brittle but exact mutation.
@@ -1717,7 +1720,22 @@ def test_operator_registry_shape_catches_missing_method():
             text,
             count=1,
         ),
-        "operator-registry-shape",
+        "core-operator-registry-aggregate-shape",
+    )
+
+
+def test_operator_registry_shape_catches_missing_field():
+    """Phase 6 self-dogfooding: removing the `#operators` private field
+    declaration from InMemoryOperatorRegistry must trip the generated
+    class-shape's must-have-field constraint."""
+    return _mutate_then_check(
+        "packages/core/src/registry/operators.ts",
+        lambda text: text.replace(
+            "  readonly #operators = new Map<string, OperatorSpec>();\n",
+            "",
+            1,
+        ),
+        "core-operator-registry-aggregate-shape",
     )
 
 

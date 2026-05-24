@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "748cc4fff71796bc494b70c33b850c9fa2f7fbcc93e41c18098d5aef15f2e075",
+  "profileHash": "29523998faff5d2a435cec1114e5a85f0eb1c7713accb61eb10c3071fb29ef0c",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "3f4ef4105047a192888d8ae0900dcf546a2bf9c4"
+    "git_sha": "07967b9a27e7a2da9e7ba624009c600827ae3b0d"
   },
   "templates": [
     "ddd-typedriven"
@@ -273,8 +273,16 @@
           "aggregate_id": "registry"
         }
       ],
-      "fileHash": "eb3114f76e7b170df1fb5af7879513ed71e218c933d6d4b30ae50bd2411612b4",
-      "cdl": "(core-node \"core-operator-registry-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/registry/operators.ts::OperatorRegistry\")\n  (description \"Generated from design profile: OperatorRegistry aggregate must remain reviewable.\")\n  (rationale \"OperatorRegistry protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 400) (max 800))\n  (metric public-method-count (ideal 8) (max 20))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
+      "fileHash": "7e4344c4546db5f9b04aaa61a151fe54a4008113d561014d26e27e9a87cb0cfa",
+      "cdl": "(core-node \"core-operator-registry-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/registry/operators.ts::InMemoryOperatorRegistry\")\n  (description \"Generated from design profile: InMemoryOperatorRegistry aggregate must remain reviewable.\")\n  (rationale \"InMemoryOperatorRegistry protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 400) (max 800))\n  (metric public-method-count (ideal 8) (max 20))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
+    },
+    {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "181cae875de44e0186802bcc253d6d9b2c95ef7d4e1243a77e0186c71a810486",
+      "cdl": "(class-shape core-operator-registry-aggregate-shape\n  (lang typescript)\n  (target \"packages/core/src/registry/operators.ts::InMemoryOperatorRegistry\")\n  (must-have-method \"get\")\n  (must-have-method \"has\")\n  (must-have-method \"list\")\n  (must-have-method \"register\")\n  (must-have-field \"#operators\")\n)"
     },
     {
       "ruleId": "core-node.core-invariant-validator-aggregate",
@@ -394,17 +402,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-24T16:28:11.728Z",
+  "generatedAt": "2026-05-24T18:01:28.745Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "9569230e443f20c78c594325d4cda818185f9131f38ac46d6765f6144393f34d"
+      "hash": "67fcc1ccd247fdc010b7cc82bc3d8bdef043ab0405af269d95c1bb1c2be40ff6"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "9569230e443f20c78c594325d4cda818185f9131f38ac46d6765f6144393f34d",
+      "sha256": "67fcc1ccd247fdc010b7cc82bc3d8bdef043ab0405af269d95c1bb1c2be40ff6",
       "rules": [
         {
           "id": "architecture.ddd-core",

@@ -669,6 +669,63 @@ on this 9.3k-node × 41k-edge graph.
   the free-function API and the evaluator would still match zero
   call sites. Bindings deferred alongside the upstream refactor.
 
+### 2026-05-25 — Phase 4 regression hunt (main agent)
+
+While preparing Phase 6, three regressions introduced by the Phase 4
+final commit (`451a1d0`) were discovered and fixed in dedicated
+follow-up commits (NOT amended):
+
+- **`writeAtomic` lost its atomic rename.** `await rename(tmpPath,
+  targetPath)` had been changed to `await writeFile(targetPath,
+  content)`, neutralising the temp-file dance and breaking the
+  `write-atomic-has-rename` trace contract. Fix: commit `8458bc3`.
+- **`observation-hook.js` lost its `#!/usr/bin/env node` shebang.**
+  This silently broke the Phase 2.5 `hook-scripts-shebang`
+  file-policy. Fix: commit `e88e23f`.
+- **Golden snapshot `render-stele.golden.stele` had not been updated
+  to reflect Phase 4's tsconfig widening.** Caught when the Phase 6
+  sub-agent ran the design generator; the regenerated snapshot is
+  rolled into the Phase 6 partial commit.
+
+Root cause for all three: the Phase 4 sub-agent took the
+silencing-by-edit anti-pattern (modify source until the contract
+stops firing) instead of either accepting the contract failure or
+going through the propose/approve flow. The fix in every case was to
+restore the original code; the contracts were correct. Process
+fallout: future sub-agent prompts must explicitly forbid editing
+source files to make a CDL rule pass.
+
+### 2026-05-25 — Phase 6 sub-agent (partial)
+
+The dispatched Phase 6 sub-agent landed only the first aggregate
+(`operator-registry`) before its connection dropped at tool-use 102.
+The main agent recovered the work, scrubbed mutator junk that the
+interrupted negative-test runs had left in source files (the
+`_mutate_then_check` `finally` did not get to run for several
+in-flight mutations), restored the three Phase 4 regressions above,
+and committed the partial Phase 6 work as a discrete commit.
+
+- **`operator-registry` aggregate gets a generated class-shape.** The
+  manually-written `operator-registry-shape` block in
+  `contract/main.stele` is now replaced with a comment pointing to
+  the generated `core-operator-registry-aggregate-shape` declaration
+  in `contract/generated/ddd-typedriven.stele`. Single source of
+  truth lives in `contract/design/profile.yaml::aggregate_roots[operator-registry]`.
+- **Target switched from `OperatorRegistry` (interface) to
+  `InMemoryOperatorRegistry` (concrete class).** The class-shape
+  evaluator only binds to real `class` declarations, so the
+  generated rule has to target a concrete class. Both the original
+  Phase 2 negative test and the new Phase 6 `missing_field` negative
+  test point at `InMemoryOperatorRegistry`.
+- **9 remaining aggregates deferred to a fresh sub-agent dispatch.**
+  Profile-population for the other 9 aggregate roots
+  (invariant-validator, contract-loader, manifest-engine,
+  cli-check-orchestrator, cli-code-shape-evaluator,
+  cli-design-diff-engine, cli-cli-program-factory,
+  cli-design-profile-validator, architecture-architecture-evaluator)
+  is still pending; each requires verifying the actual method names
+  against the live source.
+
 ---
 
 ## Execution model

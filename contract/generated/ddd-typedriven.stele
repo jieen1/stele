@@ -367,12 +367,22 @@
 (core-node "core-operator-registry-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/core/src/registry/operators.ts::OperatorRegistry")
-  (description "Generated from design profile: OperatorRegistry aggregate must remain reviewable.")
-  (rationale "OperatorRegistry protects core core invariants; complexity drift makes agent changes risky.")
+  (target "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry")
+  (description "Generated from design profile: InMemoryOperatorRegistry aggregate must remain reviewable.")
+  (rationale "InMemoryOperatorRegistry protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 400) (max 800))
   (metric public-method-count (ideal 8) (max 20))
   (metric max-cyclomatic (ideal 10) (max 25))
+)
+
+(class-shape core-operator-registry-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry")
+  (must-have-method "get")
+  (must-have-method "has")
+  (must-have-method "list")
+  (must-have-method "register")
+  (must-have-field "#operators")
 )
 
 (core-node "core-invariant-validator-aggregate"

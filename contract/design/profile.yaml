@@ -94,9 +94,21 @@ ddd:
         report:
           - domain-primitives
       aggregate_roots:
+        # Phase 6 self-dogfooding: target switched from the OperatorRegistry
+        # interface to its sole concrete implementation, because the
+        # class-shape evaluator only binds to real `class` declarations.
+        # required_methods / required_fields populate the generated
+        # class-shape companion (see render/core-node.ts).
         - id: operator-registry
-          class: OperatorRegistry
-          target: "packages/core/src/registry/operators.ts::OperatorRegistry"
+          class: InMemoryOperatorRegistry
+          target: "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry"
+          required_methods:
+            - register
+            - get
+            - has
+            - list
+          required_fields:
+            - "#operators"
           metrics:
             sloc: { ideal: 400, max: 800 }
             public-method-count: { ideal: 8, max: 20 }
