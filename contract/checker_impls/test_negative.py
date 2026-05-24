@@ -1687,6 +1687,16 @@ def test_write_atomic_has_rename_catches_missing_rename_call():
     )
 
 
+def test_no_any_in_core_catches_any_annotation():
+    """Phase 2.4: adding a `: any` annotation inside @stele/core must trip
+    the type-policy."""
+    return _code_shape_negative_with_temp_file(
+        "packages/core/src/__phase2_negative_any_leak.ts",
+        "export const x: any = 1;\n",
+        "no-any-in-core",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1791,6 +1801,7 @@ def main() -> int:
         ("hook_fail_closed_v2_catches_missing_failClosed_call", test_hook_fail_closed_v2_catches_missing_failClosed_call),
         ("stop_validate_fail_closed_catches_missing_blockStop_call", test_stop_validate_fail_closed_catches_missing_blockStop_call),
         ("write_atomic_has_rename_catches_missing_rename_call", test_write_atomic_has_rename_catches_missing_rename_call),
+        ("no_any_in_core_catches_any_annotation", test_no_any_in_core_catches_any_annotation),
     ]
 
     print("=" * 60)

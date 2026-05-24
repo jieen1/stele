@@ -541,4 +541,17 @@
   (target "packages/core/src/manifest/hash-manifest.ts::writeAtomic")
   (must-have-call "rename"))
 
+; --- §2.4 type-policy contracts -----------------------------------------------
+; `rule-id-fields-branded` from the phase document is deferred to Phase 7 —
+; it targets `packages/core/src/report/types.ts::Violation`, but Violation is
+; a TypeScript type alias; the TS analyzer's class-shape / class-aware
+; selectors only resolve to real `class` declarations. Retyping
+; `Violation.rule_id` from `string` to `RuleId` would also cascade through
+; many call sites + vitest fixtures, exceeding Phase 2 scope.
+
+(type-policy no-any-in-core
+  (lang typescript)
+  (target "packages/core/src/**/*.ts")
+  (deny-type "any"))
+
 (import "generated/ddd-typedriven.stele")
