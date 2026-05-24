@@ -1188,6 +1188,58 @@ def test_strip_block_comment_does_not_mis_terminate_on_slash_star_slash():
 
 
 # ---------------------------------------------------------------------------
+# Round 10 — bypass-coverage tests for Q-01..Q-04 reviewer findings
+# ---------------------------------------------------------------------------
+
+
+def test_cli_io_through_path_utils_array_join_with_path_import_bypassed():
+    """Round 10 Q-01: a file that imports `path` (for whatever reason)
+    and then calls `Array#join("")` on a chunk array used to satisfy
+    the Round 9 bare-helper fallback. The Round 10 fix removes the
+    fallback — `chunks.join("")` is NOT a path-safety helper even if
+    `path` is imported."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "__negtest_q01_arrjoin.ts"
+    target.write_text(
+        'import path from "node:path";\n'
+        'import { writeFile } from "node:fs/promises";\n'
+        "export async function bad(input: string, chunks: string[]): Promise<void> {\n"
+        '  const data = chunks.join("");\n'
+        "  await writeFile(input, data);\n"
+        "  return path.basename(input).length > 0 ? undefined : undefined;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.cli_io_through_path_utils({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "cli_io_through_path_utils_array_join_with_path_import_bypassed")
+
+
+def test_core_engine_purity_multi_line_crypto_import():
+    """Round 10 Q-02: a multi-line `import {\\n  randomBytes\\n} from
+    "node:crypto"` was not matched by the Round 9 single-line regex
+    (`[^;\\n]*`). The Round 10 fix uses `[\\s\\S]*?` so the multi-line
+    case is caught."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "__negtest_q02_multi_import.ts"
+    target.write_text(
+        "import {\n"
+        "  randomBytes,\n"
+        "  randomUUID\n"
+        '} from "node:crypto";\n'
+        "export const v = randomBytes(8);\n",
+        encoding="utf-8",
+    )
+    try:
+        result = sp.core_engine_purity({})
+    finally:
+        target.unlink(missing_ok=True)
+    return _pass_if_false(result, "core_engine_purity_multi_line_crypto_import")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1262,6 +1314,9 @@ def main() -> int:
         ("core_engine_purity_string_mention_of_crypto_does_not_false_positive", test_core_engine_purity_string_mention_of_crypto_does_not_false_positive),
         ("cli_io_through_path_utils_array_join_no_longer_satisfies", test_cli_io_through_path_utils_array_join_no_longer_satisfies),
         ("strip_block_comment_does_not_mis_terminate_on_slash_star_slash", test_strip_block_comment_does_not_mis_terminate_on_slash_star_slash),
+        # Round 10: bypass-coverage tests for Q-01..Q-04.
+        ("cli_io_through_path_utils_array_join_with_path_import_bypassed", test_cli_io_through_path_utils_array_join_with_path_import_bypassed),
+        ("core_engine_purity_multi_line_crypto_import", test_core_engine_purity_multi_line_crypto_import),
     ]
 
     print("=" * 60)

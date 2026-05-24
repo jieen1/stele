@@ -374,7 +374,10 @@ describe("design init --generate", () => {
     const stdout = captureStdout();
 
     const previousApprover = process.env.STELE_APPROVED_BY;
-    process.env.STELE_APPROVED_BY = "test:fixture@round-5";
+    // Round 10 Q-04: the gate now splits on `:`/`@` and rejects
+    // self-attesting tokens like `test`, `fixture`, `round-N`. Use a
+    // realistic email-shaped value.
+    process.env.STELE_APPROVED_BY = "qa-operator@stele.example.com";
     try {
       await runDesignInit({ preset: "ddd-typedriven", generate: true }, dir);
     } finally {

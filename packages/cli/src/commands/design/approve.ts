@@ -43,7 +43,22 @@ export type DesignApproveOptions = {
 const _APPROVED_BY_FORBIDDEN_LITERALS = new Set([
   "agent", "bot", "claude", "tty", "human", "user", "service",
   "test", "ci", "unknown", "anonymous", "stele", "approved",
+  // Round 10 Q-04: also reject self-attesting placeholders that
+  // mechanically satisfy the `:` / `@` requirement but carry no
+  // human attribution. These are tokens an agent would naturally
+  // construct (`dogfood:roundN-XYZ`, `selfprotect:autotest`) when
+  // trying to mint approvals without operator involvement.
+  "dogfood", "selfprotect", "self-protect", "autotest",
+  "mock", "fake", "fixture", "placeholder", "noreply", "robot",
 ]);
+// Round 10 Q-04: regex patterns that reject self-referential prefixes
+// across `:` / `@` splits. `dogfood:roundN-XYZ` is rejected because
+// `dogfood` is forbidden as a left token; `round9-p01` matches the
+// `roundN` pattern.
+const _APPROVED_BY_FORBIDDEN_PATTERNS: readonly RegExp[] = [
+  /^round[\s-]?\d+$/i,
+  /^r\d+$/i,
+];
 
 function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; reason: string } {
   const explicit = process.env.STELE_APPROVED_BY;
@@ -91,6 +106,29 @@ function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; re
           `STELE_APPROVED_BY=${trimmed} must contain \`@\` (email) or \`:\` (scoped id like service:ci). ` +
           "Pure bare strings are not attributable.",
       };
+    }
+    // Round 10 Q-04: also reject self-referential prefixes on either
+    // side of the `:` / `@` split. An attacker that synthesises
+    // `dogfood:roundN-XYZ` only needs the literal denylist to miss the
+    // exact whole-string match — splitting catches that.
+    const tokens = trimmed.split(/[:@]/u).map((t) => t.trim().toLowerCase()).filter((t) => t.length > 0);
+    for (const tok of tokens) {
+      if (_APPROVED_BY_FORBIDDEN_LITERALS.has(tok)) {
+        return {
+          ok: false,
+          reason:
+            `STELE_APPROVED_BY=${trimmed} contains forbidden token "${tok}". ` +
+            "Use a real human-identifying token (email or service:ci where neither half is a self-attesting placeholder).",
+        };
+      }
+      if (_APPROVED_BY_FORBIDDEN_PATTERNS.some((re) => re.test(tok))) {
+        return {
+          ok: false,
+          reason:
+            `STELE_APPROVED_BY=${trimmed} contains a round-number / r-prefix placeholder "${tok}". ` +
+            "Use a real human-identifying token, not a release / round / iteration label.",
+        };
+      }
     }
     return { ok: true, approvedBy: trimmed };
   }
@@ -272,6 +310,18 @@ function extractAffectedSourceScope(
 
     // Layer changes affect context roots
     if (change.field.startsWith("ddd.contexts.") && change.field.includes(".layers.")) {
+      const contextId = change.field.split(".")[2];
+      const context = profile.ddd?.contexts?.find((c) => c.id === contextId);
+      if (context?.root) {
+        scopes.add(context.root);
+      }
+    }
+
+    // Round 10 Q-06: layer_dependencies changes also affect the
+    // context root — without this, an additive dependency bump (e.g.
+    // `report → domain-primitives`) shows an EMPTY affected-source
+    // scope to the human reviewer, understating the blast radius.
+    if (change.field.startsWith("ddd.contexts.") && change.field.includes(".layer_dependencies")) {
       const contextId = change.field.split(".")[2];
       const context = profile.ddd?.contexts?.find((c) => c.id === contextId);
       if (context?.root) {

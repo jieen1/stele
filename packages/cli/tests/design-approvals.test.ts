@@ -11,8 +11,11 @@ const tempDirs: string[] = [];
 // non-interactively; the new human-identity gate requires either an
 // interactive TTY or STELE_APPROVED_BY env. Set the env for the entire
 // suite so every test exercises the post-gate code paths.
+// Round 10 Q-04 follow-up: the denylist now splits on `:` / `@` and
+// rejects `test`, `fixture`, and round-N tokens. Use a realistic
+// email-shaped value that passes all current checks.
 const _previousApprovedBy = process.env.STELE_APPROVED_BY;
-process.env.STELE_APPROVED_BY = "test:fixture@round-5";
+process.env.STELE_APPROVED_BY = "qa-operator@stele.example.com";
 
 afterEach(() => {
   // Cleanup temp directories

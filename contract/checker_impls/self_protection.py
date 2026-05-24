@@ -2716,20 +2716,17 @@ _CORE_PURITY_FORBIDDEN = [
     ("randomInt (bare)",   r"\brandomInt\s*\(",   "import_crypto"),
 ]
 _CORE_PURITY_IMPORT_GATES = {
-    # Round 9 O-02: anchor on start-of-line + `import` keyword + the
-    # `from "...crypto"` clause. Run against the strings-blanked form
-    # so a string literal that merely *contains* the substring `from
-    # "node:crypto"` cannot trigger the gate. With the new helper, a
-    # real `import { x } from "node:crypto"` survives intact in the
-    # blanked form (the `from ""` quote pair stays, but the interior
-    # is blanked) — so we match the *shape* `import ... from "..."`
-    # plus the literal `crypto` token following the closing quote.
-    # We instead test for the bare keyword pair directly in the
-    # strings-preserved-and-comments-stripped form, but require the
-    # `import` token at the start of a line — real top-level ES module
-    # imports are always statement-level.
+    # Round 9 O-02 + Round 10 Q-02: anchor on start-of-line + `import`
+    # keyword + the `from "...crypto"` clause. Run against the
+    # strings-preserved-comments-stripped form so a string literal
+    # mention of `from "node:crypto"` cannot trigger the gate (the
+    # `import` prefix would be absent), AND tolerate multi-line
+    # imports — `import {\n  randomBytes\n} from "node:crypto"` is
+    # common and must still match. The `[\s\S]*?` instead of
+    # `[^;\n]*` covers the newline case; the `(?m)^\s*` start anchor
+    # still requires the `import` keyword at statement position.
     "import_crypto": re.compile(
-        r'(?m)^\s*import\b[^;\n]*\bfrom\s+["\'](?:node:)?crypto["\']',
+        r'(?m)^\s*import\b[\s\S]*?\bfrom\s+["\'](?:node:)?crypto["\']',
     ),
 }
 _CORE_PURITY_ALLOWLIST = {
@@ -2827,17 +2824,42 @@ _CLI_PATH_SAFETY_SCAN_DIRS = (
     ("cli", "src"),
     ("claude-code-plugin", "scripts"),
 )
-# Round 9 O-08: matches both ES module + CJS forms of node:path /
-# path imports. Anchored on `from "..."` / `require("...")` so a
-# string literal merely containing the substring `"node:path"` is
-# rejected (it would need the literal `import ... from`/`require(`
-# prefix to match).
-_PATH_MODULE_IMPORT_RE = re.compile(
-    r'(?:'
-    r'\bfrom\s+["\'](?:node:)?path["\']|'
-    r'\brequire\s*\(\s*["\'](?:node:)?path["\']\s*\)'
-    r')'
+
+# Round 10 Q-01: parse imports FROM `node:path` / `path`. Both forms:
+#   import path from "node:path"             → namespace = "path"
+#   import * as path from "node:path"        → namespace = "path"
+#   import { resolve, join } from "node:path" → names = {"resolve","join"}
+# String-blanked form keeps the module name visible because we run
+# this against the comments-only-stripped form (strings preserved).
+_PATH_IMPORT_NAMESPACE_RE = re.compile(
+    r'\bimport\s+(?:\*\s+as\s+)?([A-Za-z_$][\w$]*)\s+from\s+["\'](?:node:)?path["\']',
 )
+_PATH_IMPORT_NAMED_RE = re.compile(
+    r'\bimport\s+\{([^}]+)\}\s+from\s+["\'](?:node:)?path["\']',
+)
+
+
+def _path_module_bindings(comments_only_source: str) -> dict[str, set[str]]:
+    """Round 10 Q-01: return the local bindings introduced by any
+    `import ... from "(node:)?path"` statements in the file. Helps the
+    CLI_IO_THROUGH_PATH_UTILS check accept the right bare-name calls
+    without false-allowing unrelated `.join` / `.resolve` callers."""
+    namespaces: set[str] = set()
+    names: set[str] = set()
+    for m in _PATH_IMPORT_NAMESPACE_RE.finditer(comments_only_source):
+        namespaces.add(m.group(1))
+    for m in _PATH_IMPORT_NAMED_RE.finditer(comments_only_source):
+        for tok in m.group(1).split(","):
+            tok = tok.strip()
+            if not tok:
+                continue
+            # Honour `as` aliases — `{ resolve as r }` binds `r`.
+            parts = re.split(r"\s+as\s+", tok)
+            local = parts[-1].strip()
+            local = re.split(r"\W+", local, maxsplit=1)[0]
+            if local:
+                names.add(local)
+    return {"namespaces": namespaces, "names": names}
 
 
 def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
@@ -2875,41 +2897,46 @@ def cli_io_through_path_utils(ctx: dict, **kwargs: Any) -> dict[str, Any]:
                     continue
                 scanned += 1
                 # Use the strings-blanked form to LOOK FOR forbidden
-                # calls + qualified helpers (so a string can't smuggle
-                # either side of the check); use the comments-only-
-                # stripped form to detect IMPORT statements (the
-                # module name is itself a string literal — blanking it
-                # would hide the import).
+                # calls AND helpers (so a string can't smuggle either
+                # side of the check).
                 stripped = _strip_ts_comments_and_strings(content)
                 comments_only = _strip_ts_comments(content)
                 if not _CLI_FS_WRITE_RE.search(stripped):
                     continue
-                # Round 9 O-08: require qualified `path.X` forms (so
-                # `Array#join("")` / `Promise.resolve(x)` no longer
-                # satisfy the safety-helper check) OR a named helper
-                # that always belongs to the path-safety surface OR an
-                # explicit `from "node:path"` / `require("path")` import
-                # (in which case bare `resolve(` / `join(` are likely
-                # the imported path helpers).
-                explicit_helper = any(
-                    marker in stripped
-                    for marker in (
-                        "path.resolve(",
-                        "path.join(",
-                        "validateOutputPath(",
-                        "collectProtectedPaths(",
-                        "normalizeProjectRelativePath(",
-                        "isWithinProject(",
-                        "matchProtectedPath(",
-                    )
+                # Round 10 Q-01: parse what was imported from
+                # `node:path` / `path` and accept ONLY those bindings
+                # as path-safety helpers. Generic `Promise.resolve(x)`
+                # or `chunks.join("")` no longer satisfy the rule
+                # because the bare name has to be a destructure-import
+                # FROM node:path (not from anywhere else).
+                #
+                # Always-accepted explicit helpers (never depend on
+                # local import bindings — these are the project's
+                # own path-safety surface):
+                always_accepted = (
+                    "validateOutputPath(",
+                    "collectProtectedPaths(",
+                    "normalizeProjectRelativePath(",
+                    "isWithinProject(",
+                    "matchProtectedPath(",
                 )
-                # Bare `resolve(` / `join(` only count when a `path`
-                # module import is present in the same file.
-                bare_path_import = _PATH_MODULE_IMPORT_RE.search(comments_only) is not None
-                bare_helper = bare_path_import and (
-                    "resolve(" in stripped or "join(" in stripped
-                )
-                has_path_safety = explicit_helper or bare_helper
+                has_path_safety = any(marker in stripped for marker in always_accepted)
+                if not has_path_safety:
+                    bindings = _path_module_bindings(comments_only)
+                    # Namespace import (`import path from "node:path"`)
+                    # → accept `path.resolve(` / `path.join(`.
+                    for ns in bindings["namespaces"]:
+                        if f"{ns}.resolve(" in stripped or f"{ns}.join(" in stripped:
+                            has_path_safety = True
+                            break
+                    # Destructure import (`import { resolve, join, ... }
+                    # from "node:path"`) → accept the imported name as
+                    # a call.
+                    if not has_path_safety:
+                        for name in bindings["names"]:
+                            if name in {"resolve", "join", "dirname", "normalize", "relative"} and f"{name}(" in stripped:
+                                has_path_safety = True
+                                break
                 if not has_path_safety:
                     violations.append({
                         "file": rel,
@@ -2944,54 +2971,55 @@ _LOCALECOMPARE_ALLOWLIST = {
 
 
 def no_bare_locale_compare(ctx: dict, **kwargs: Any) -> dict[str, Any]:
-    """Round 9 P-01: `String.prototype.localeCompare()` reads ICU/host
-    locale and produces different orderings across machines (LANG=de_DE
-    vs LANG=sv_SE sort `ä` differently). That cracks determinism in the
-    generator output AND the manifest hash — same input → different
-    bytes → spurious tamper-detection alerts on CI vs. dev laptop.
+    """Round 9 P-01 + Round 10 Q-03: `String.prototype.localeCompare()`
+    reads ICU/host locale and produces different orderings across
+    machines (LANG=de_DE vs LANG=sv_SE sort `ä` differently). That
+    cracks determinism in the generator output AND the manifest hash
+    — same input → different bytes → spurious tamper-detection alerts
+    on CI vs. dev laptop.
 
     CORE_ENGINE_PURITY covers Date.now / Math.random / process.env /
     crypto.random*; locale dependence is just as much "the same input
     must produce the same output." Use `stableStringCompare(left, right)`
     from `@stele/core` everywhere instead.
 
-    Scope: all `.ts` source files under `packages/*/src`, excluding
-    `.d.ts` and the canonical `util/array.ts` allow-listed above.
+    Scope (Round 10 Q-03): all `.ts` source files under `packages/*/src`
+    AND `packages/*/tests/` — tests are also at risk of locale-flake
+    if they sort by string compare. Excludes `.d.ts` and the canonical
+    `util/array.ts` allow-listed above.
     """
     violations: list[dict[str, Any]] = []
     for pkg_dir in sorted(_PACKAGES_DIR.glob("*")):
         if not pkg_dir.is_dir():
             continue
-        src_dir = pkg_dir / "src"
-        if not src_dir.is_dir():
-            continue
-        for ts_file in src_dir.rglob("*.ts"):
-            if "node_modules" in ts_file.parts or "dist" in ts_file.parts:
+        for sub in ("src", "tests"):
+            scan_dir = pkg_dir / sub
+            if not scan_dir.is_dir():
                 continue
-            if str(ts_file).endswith(".d.ts"):
-                continue
-            rel = str(ts_file.relative_to(_REPO_ROOT))
-            if rel in _LOCALECOMPARE_ALLOWLIST:
-                continue
-            try:
-                content = ts_file.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            # Blank strings + comments so a docstring example does not
-            # false-positive (this checker is the "find a forbidden
-            # call" pattern; same lesson as N-02).
-            stripped = _strip_ts_comments_and_strings(content)
-            for m in _LOCALECOMPARE_RE.finditer(stripped):
-                line_no = stripped.count("\n", 0, m.start()) + 1
-                violations.append({
-                    "file": rel,
-                    "line": line_no,
-                    "column": None,
-                    "message": (
-                        "`.localeCompare(` is locale-dependent — use "
-                        "`stableStringCompare(left, right)` from @stele/core"
-                    ),
-                })
+            for ts_file in scan_dir.rglob("*.ts"):
+                if "node_modules" in ts_file.parts or "dist" in ts_file.parts:
+                    continue
+                if str(ts_file).endswith(".d.ts"):
+                    continue
+                rel = str(ts_file.relative_to(_REPO_ROOT))
+                if rel in _LOCALECOMPARE_ALLOWLIST:
+                    continue
+                try:
+                    content = ts_file.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                stripped = _strip_ts_comments_and_strings(content)
+                for m in _LOCALECOMPARE_RE.finditer(stripped):
+                    line_no = stripped.count("\n", 0, m.start()) + 1
+                    violations.append({
+                        "file": rel,
+                        "line": line_no,
+                        "column": None,
+                        "message": (
+                            "`.localeCompare(` is locale-dependent — use "
+                            "`stableStringCompare(left, right)` from @stele/core"
+                        ),
+                    })
     if violations:
         return {
             "passed": False,

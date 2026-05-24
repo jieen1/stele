@@ -83,7 +83,7 @@ describe("normalizeContract", () => {
     const normalized = normalizeContract(contract);
     const independentlyNormalizedFiles = contract.files
       .slice()
-      .sort((left, right) => left.path.localeCompare(right.path))
+      .sort((left, right) => stele.stableStringCompare(left.path, right.path))
       .map((file) => normalizeContract(createSingleFileContract(contract, file)));
 
     expect(normalized).toBe(independentlyNormalizedFiles.join("\n"));

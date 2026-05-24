@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { stableStringCompare } from "@stele/core";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
 import { runBaselineInit, runBaselineUpdate } from "../src/commands/baseline.js";
 import { runCheck } from "../src/commands/check.js";
@@ -968,7 +969,7 @@ async function snapshotProject(projectDir: string): Promise<Record<string, strin
   return Object.fromEntries(
     entries
       .filter(([path]) => path !== "contract/.last-check-report.json")
-      .sort(([left], [right]) => left.localeCompare(right)),
+      .sort(([left], [right]) => stableStringCompare(left, right)),
   );
 }
 
