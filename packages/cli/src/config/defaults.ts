@@ -1,3 +1,5 @@
+import { contractPath } from "@stele/core";
+
 export const STELE_CONFIG_FILE = "stele.config.json";
 export const STELE_BASELINE_FILE = "contract/.baseline.json";
 
@@ -66,7 +68,7 @@ export type SteleConfig = {
 export const DEFAULT_CONFIG: SteleConfig = {
   version: "0.1",
   contractDir: "contract",
-  entry: "contract/main.stele",
+  entry: contractPath("contract/main.stele"),
   generatedDir: "tests/contract",
   checkerImplDir: "contract/checker_impls",
   manifestPath: "contract/.manifest.json",

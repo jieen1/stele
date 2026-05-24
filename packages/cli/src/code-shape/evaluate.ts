@@ -8,6 +8,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { resolvePythonRuntime as resolvePythonRuntimeUncached } from "../utils/shared-utils.js";
 import {
+  contractPath,
   createViolation,
   ruleId,
   type BoundaryDeclaration,
@@ -235,7 +236,7 @@ async function analyzePythonFiles(
       files: [],
       errors: [
         {
-          path: [...relativeContractPaths.values()][0] ?? "contract/main.stele",
+          path: [...relativeContractPaths.values()][0] ?? contractPath("contract/main.stele"),
           summary: "Python 3 is required to evaluate Python code-shape rules.",
           detail: 'Install Python 3 and make sure "python", "py -3", or "python3" is available on PATH.',
         },
@@ -274,7 +275,7 @@ async function analyzePythonFiles(
       files: [],
       errors: [
         {
-          path: [...relativeContractPaths.values()][0] ?? "contract/main.stele",
+          path: [...relativeContractPaths.values()][0] ?? contractPath("contract/main.stele"),
           summary: "Python code-shape analysis could not be completed.",
           detail: sanitizePythonExecutionDetail(detail, command),
         },
