@@ -726,6 +726,73 @@ and committed the partial Phase 6 work as a discrete commit.
   is still pending; each requires verifying the actual method names
   against the live source.
 
+### 2026-05-25 — Phase 6 sub-agent (close-out)
+
+A second Phase 6 sub-agent was dispatched to land the remaining 9
+aggregate-root class-shapes. After auditing each target against the
+live source, the sub-agent concluded that **all 9 must be deferred to
+Phase 7** for the same root cause: every aggregate's `target` points
+at a free function, not a `class` declaration. The class-shape
+evaluator in `@stele/cli` only binds to real TypeScript `class`
+declarations (see `code-shape/evaluate.ts:396` —
+`"Target class \"<name>\" was not found."`), so adding
+`required_methods` / `required_fields` to these aggregates would
+either produce a class-shape that matches nothing (silently dropped
+by the evaluator) or — worse — push the sub-agent down the
+silencing-by-edit path the Phase 4 regression hunt called out as the
+anti-pattern.
+
+The first Phase 6 sub-agent's prompt acknowledged this escape hatch:
+*"If no concrete class exists (the aggregate is implemented as free
+functions), defer that aggregate to Phase 7."* The close-out
+sub-agent invoked it for the full set.
+
+| Aggregate | target | Status |
+|---|---|---|
+| operator-registry | `…/registry/operators.ts::InMemoryOperatorRegistry` | LANDED (commit 63958df) — `register`, `get`, `has`, `list` + `#operators` |
+| invariant-validator | `…/validator/structure-invariant.ts::validateInvariant` | DEFERRED — free function (re-export alias of `parseInvariantDeclaration`) |
+| contract-loader | `…/loader/load-contract.ts::loadContract` | DEFERRED — free async function |
+| manifest-engine | `…/manifest/hash-manifest.ts::hashManifest` | DEFERRED — free function |
+| cli-check-orchestrator | `…/commands/check.ts::runCheck` | DEFERRED — free function (Commander action) |
+| cli-code-shape-evaluator | `…/code-shape/evaluate.ts::evaluateCodeShapes` | DEFERRED — free function |
+| cli-design-diff-engine | `…/commands/design/diff.ts::computeDesignDiff` | DEFERRED — free function |
+| cli-cli-program-factory | `…/cli/src/index.ts::createSteleProgram` | DEFERRED — free function (factory) |
+| cli-design-profile-validator | `…/design-profile/validate.ts::validateProfile` | DEFERRED — free function |
+| architecture-architecture-evaluator | `…/architecture-core/src/evaluate.ts::evaluateArchitecture` | DEFERRED — free function |
+
+**No changes were applied to `profile.yaml` in this close-out
+commit.** Each of the 9 aggregates retains its current core-node
+emission (sloc / public-method-count / max-cyclomatic metrics
+continue to fire); only the optional class-shape pairing is absent.
+The Phase 6 infrastructure (commit `07967b9`) gracefully handles the
+no-fields case: `renderAggregateClassShape` returns `undefined` and
+the renderer emits the core-node alone, byte-identical to pre-Phase-6
+output.
+
+**Phase 6 final tally:** 1 / 10 aggregates LANDED, 9 / 10 DEFERRED.
+The 9 deferrals are not failure — the class-shape mechanism is doing
+exactly what reviewer V-08 demanded (refuse to bind against
+non-classes). Phase 7 has two options for unblocking:
+
+1. **Wrap each free-function aggregate in a stateless service class**
+   (e.g., `class ContractLoader { async load(rootPath) { … } }` with
+   `loadContract` becoming a thin re-export). Costs ~9 small
+   refactors, none touching call semantics. Then re-run the close-out
+   procedure: each aggregate gains `required_methods` + paired
+   negative test.
+2. **Extend the TS class-shape extractor to also bind against
+   module-level functions** (parallel to the function-shape
+   selector). This collapses the function-aggregate / class-aggregate
+   distinction in the evaluator and lets the design profile express
+   "this module is the aggregate root" without a refactor. Larger
+   change, but aligns better with Stele's "anemic with guarded
+   invariants" stance on entity_mutability — the value is the
+   contract, not the OO ceremony.
+
+Either path keeps the prohibition on editing source-to-satisfy-CDL
+intact. The Phase 7 follow-up should pick (1) or (2) before
+attempting the 9 deferrals again.
+
 ---
 
 ## Execution model
