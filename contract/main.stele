@@ -633,4 +633,29 @@
   (scope "packages/cli/src/commands/design/approve.ts")
   (fix-hint "[A] Approve flow MUST gate through `resolveApprovedBy` in `packages/cli/src/commands/design/approve.ts:180` before any `writeFileSync`. [B] If you're replacing the identity gate, write a new policy first."))
 
+; ============================================================================
+; Phase 4 — Effect-policy adoption.
+;
+; The effect alphabet is declared once here so every effect-annotation,
+; effect-policy, and effect-suppression in this file resolves through a known
+; name table. `pure` is intentionally NOT declared: per the effect-system spec
+; (docs/design/phase-b/04-effect-system.md §四), a node with `effects: []` is
+; pure by construction — adding a `pure` effect name would only create false
+; violations on allow-only policies.
+;
+; Dotted effect names (`fs.read`, `fs.write`, `crypto.hash`) are string-quoted
+; because the CDL identifier alphabet rejects `.` (Round 14 reviewer V-04).
+; ============================================================================
+
+(effect-declarations
+  (effect "fs.read")
+  (effect "fs.write")
+  (effect time)
+  (effect random)
+  (effect env)
+  (effect network)
+  (effect "crypto.hash")
+  (effect process)
+  (effect child-process))
+
 (import "generated/ddd-typedriven.stele")
