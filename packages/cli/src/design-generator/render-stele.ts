@@ -9,7 +9,7 @@
 
 export { renderContextArchitecture } from "./render/architecture.js";
 export { renderAclIntegration } from "./render/context-map.js";
-export { renderAggregateCoreNode } from "./render/core-node.js";
+export { renderAggregateCoreNode, renderAggregateClassShape } from "./render/core-node.js";
 export {
   renderBrandedId,
   renderSmartCtor,

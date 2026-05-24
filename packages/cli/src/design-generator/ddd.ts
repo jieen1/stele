@@ -5,6 +5,7 @@ import type { DesignProfile } from "../design-profile/types.js";
 import {
   renderContextArchitecture,
   renderAclIntegration,
+  renderAggregateClassShape,
   renderAggregateCoreNode,
   renderAllDeclarations,
   renderTraceSection,
@@ -18,7 +19,8 @@ import type { ProvenanceOutput, ProvenanceRule } from "./manifest.js";
 
 export interface GeneratorResult {
   architectures: string[]; // CDL strings for architecture declarations
-  coreNodes: string[];     // CDL strings for core-node declarations
+  coreNodes: string[];     // CDL strings for core-node declarations (Phase 6: class-shapes are interleaved here, immediately after their companion core-node)
+  classShapes: string[];   // CDL strings for class-shape declarations emitted from aggregate roots (Phase 6)
   brandedIds: string[];    // CDL strings for branded-id declarations
   smartCtors: string[];    // CDL strings for smart-ctor declarations
   combined: string;        // All declarations concatenated
@@ -74,7 +76,15 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
     });
   }
 
-  // Generate core-node declarations from aggregate roots
+  // Generate core-node declarations from aggregate roots. Phase 6
+  // (self-dogfooding, 2026-05-25): each aggregate root that carries
+  // `required_methods` or `required_fields` also emits a paired
+  // `(class-shape …)` immediately after its core-node so the structural
+  // shape is locked alongside the metric bounds. The class-shape
+  // evaluator (see packages/cli/src/code-shape/evaluate.ts) binds only
+  // to real TypeScript `class` declarations; aggregates whose target is
+  // a free function silently produce no class-shape (decision log).
+  const classShapes: string[] = [];
   if (profile.ddd?.contexts) {
     for (const ctx of profile.ddd.contexts) {
       if (ctx.aggregate_roots) {
@@ -88,6 +98,22 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
             enforcement_level: "hard",
             source: "generated",
           });
+          const cs = renderAggregateClassShape(ctx.id, agg);
+          if (cs !== undefined) {
+            // Append the class-shape immediately after the core-node in
+            // the coreNodes array so the two views of the aggregate
+            // stay adjacent in the generated CDL. Track it separately
+            // in classShapes for the manifest rule_count + provenance.
+            coreNodes.push(cs);
+            classShapes.push(cs);
+            provenanceRules.push({
+              id: `${ctx.id}-${agg.id}-aggregate-shape`,
+              kind: "class-shape",
+              origins: [],
+              enforcement_level: "hard",
+              source: "generated",
+            });
+          }
         }
       }
     }
@@ -151,6 +177,7 @@ export function generateFromProfile(profile: DesignProfile): GeneratorResult {
   return {
     architectures,
     coreNodes,
+    classShapes,
     brandedIds: typeDriven.brandedIds,
     smartCtors: typeDriven.smartCtors,
     combined: allDeclarations,

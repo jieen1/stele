@@ -34,6 +34,7 @@ export type ProvenanceRule = {
   kind:
     | "architecture"
     | "core-node"
+    | "class-shape"
     | "branded-id"
     | "smart-ctor"
     | "trace-policy"

@@ -34,6 +34,16 @@ export type AggregateRoot = {
   decision_ref?: string;
   class: string;
   target: string; // "path.ts::ClassName"
+  /**
+   * Phase 6 self-dogfooding: when populated, the design generator emits a
+   * paired `(class-shape …)` declaration alongside the aggregate's
+   * `(core-node …)`. The `target` field must resolve to a real class
+   * declaration for the class-shape evaluator to bind — function targets
+   * are silently dropped (logged at generate time). Both fields are
+   * optional; an aggregate without them is metric-bounded only.
+   */
+  required_methods?: string[];
+  required_fields?: string[];
   metrics: {
     sloc?: { ideal: number; max: number };
     "public-method-count"?: { ideal: number; max: number };
