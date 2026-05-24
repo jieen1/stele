@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   createViolation,
   createViolationReport,
+  ruleId,
   type ExternAliasDeclaration,
   type Violation,
   type ViolationReport,
@@ -93,7 +94,7 @@ export async function buildTraceStage(
       },
       violations: [
         createViolation({
-          rule_id: `trace.not-yet-supported.${language}`,
+          rule_id: ruleId(`trace.not-yet-supported.${language}`),
           rule_kind: "trace_unsupported_language",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },
@@ -128,7 +129,7 @@ export async function buildTraceStage(
       },
       violations: [
         createViolation({
-          rule_id: "trace.no-tsconfig",
+          rule_id: ruleId("trace.no-tsconfig"),
           rule_kind: "trace_no_tsconfig",
           severity: "warning",
           source: { tool: "stele", command, kind: "rule" },
@@ -164,7 +165,7 @@ export async function buildTraceStage(
       },
       violations: [
         createViolation({
-          rule_id: "trace.extraction_error",
+          rule_id: ruleId("trace.extraction_error"),
           rule_kind: "trace_extraction_error",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },

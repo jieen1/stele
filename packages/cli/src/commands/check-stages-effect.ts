@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   createViolation,
   createViolationReport,
+  ruleId,
   type ExternAliasDeclaration,
   type Violation,
   type ViolationReport,
@@ -127,7 +128,7 @@ export async function buildEffectStage(
       },
       violations: [
         createViolation({
-          rule_id: `effect.not-yet-supported.${language}`,
+          rule_id: ruleId(`effect.not-yet-supported.${language}`),
           rule_kind: "effect_unsupported_language",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },
@@ -160,7 +161,7 @@ export async function buildEffectStage(
       },
       violations: [
         createViolation({
-          rule_id: "effect.no-tsconfig",
+          rule_id: ruleId("effect.no-tsconfig"),
           rule_kind: "effect_no_tsconfig",
           severity: "warning",
           source: { tool: "stele", command, kind: "rule" },
@@ -196,7 +197,7 @@ export async function buildEffectStage(
       },
       violations: [
         createViolation({
-          rule_id: "effect.extraction_error",
+          rule_id: ruleId("effect.extraction_error"),
           rule_kind: "effect_extraction_error",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },
@@ -246,7 +247,7 @@ export async function buildEffectStage(
       },
       violations: [
         createViolation({
-          rule_id: "effect.evaluation_error",
+          rule_id: ruleId("effect.evaluation_error"),
           rule_kind: "effect_evaluation_error",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },

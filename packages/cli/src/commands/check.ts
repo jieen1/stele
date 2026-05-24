@@ -7,6 +7,7 @@ import {
   formatViolationReportJson,
   loadContract,
   normalizeContract,
+  ruleId,
   tryReadViolationBaseline,
   type Contract,
   type GeneratedVerificationResult,
@@ -471,7 +472,7 @@ async function checkSelfNoBaseline(projectDir: string): Promise<Violation[]> {
   }
 
   return [{
-    rule_id: "stele.self.no_baseline",
+    rule_id: ruleId("stele.self.no_baseline"),
     rule_kind: "rule_violation" as const,
     severity: "error" as const,
     source: { tool: "stele", command: "check", kind: "rule" },

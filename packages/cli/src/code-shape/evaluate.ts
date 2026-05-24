@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { resolvePythonRuntime as resolvePythonRuntimeUncached } from "../utils/shared-utils.js";
 import {
   createViolation,
+  ruleId,
   type BoundaryDeclaration,
   type ClassShapeDeclaration,
   type CodeShapeDeclaration,
@@ -711,7 +712,7 @@ function createRuleViolation(options: {
   scopePaths?: string[];
 }): Violation {
   return createViolation({
-    rule_id: options.declaration.id,
+    rule_id: ruleId(options.declaration.id),
     rule_kind: "rule_violation",
     severity: "error",
     source: {
@@ -737,7 +738,7 @@ function createRuleViolation(options: {
 
 function createExecutionErrorViolation(projectDir: string, error: PythonAnalysisError, command: string): Violation {
   return createViolation({
-    rule_id: "stele.check.execution_error",
+    rule_id: ruleId("stele.check.execution_error"),
     rule_kind: "execution_error",
     severity: "error",
     source: {
@@ -761,9 +762,9 @@ function createExecutionErrorViolation(projectDir: string, error: PythonAnalysis
   });
 }
 
-function createConfigurationViolation(contractPath: string, ruleId: string, summary: string, command: string): Violation {
+function createConfigurationViolation(contractPath: string, declarationId: string, summary: string, command: string): Violation {
   return createViolation({
-    rule_id: "stele.check.execution_error",
+    rule_id: ruleId("stele.check.execution_error"),
     rule_kind: "execution_error",
     severity: "error",
     source: {
@@ -779,7 +780,7 @@ function createConfigurationViolation(contractPath: string, ruleId: string, summ
     },
     scope_paths: [contractPath],
     fix: {
-      summary: `Update code-shape "${ruleId}" so its target selector is valid.`,
+      summary: `Update code-shape "${declarationId}" so its target selector is valid.`,
     },
   });
 }

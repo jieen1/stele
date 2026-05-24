@@ -1,4 +1,4 @@
-import { createViolationReport } from "@stele/core";
+import { createViolationReport, ruleId } from "@stele/core";
 import type { Violation, ViolationReport } from "@stele/core";
 import {
   evaluateArchitectureRuntime,
@@ -93,7 +93,7 @@ function buildDependencyViolations(
     const prefix = arch.description ? `${arch.description}. ` : "";
     const detail = `${prefix}Architecture violation: module "${v.fromModule}" imports from "${v.toModule}" via ${v.specifier} at ${v.fromFile}:${v.line}:${v.column}`;
     return {
-      rule_id: `architecture.${arch.id}.${v.fromModule}.${v.toModule}`,
+      rule_id: ruleId(`architecture.${arch.id}.${v.fromModule}.${v.toModule}`),
       rule_kind: "architecture_dependency" as const,
       severity: "error" as const,
       source: { tool: "stele", command, kind: "architecture" },
@@ -119,7 +119,7 @@ function buildCycleViolations(
     const prefix = arch.description ? `${arch.description}. ` : "";
 
     return {
-      rule_id: `architecture.${runtimeArch.id}.cycle.${cycle.modules.sort().join(".")}`,
+      rule_id: ruleId(`architecture.${runtimeArch.id}.cycle.${cycle.modules.sort().join(".")}`),
       rule_kind: "architecture_cycle" as const,
       severity: "error" as const,
       source: { tool: "stele", command, kind: "architecture" },
@@ -141,7 +141,7 @@ function buildLayerDirectionViolations(
   return result.layerDirectionViolations.map((ldv) => {
     const prefix = arch.description ? `${arch.description}. ` : "";
     return {
-      rule_id: `architecture.${arch.id}.layer-direction.${ldv.fromModule}.${ldv.toModule}`,
+      rule_id: ruleId(`architecture.${arch.id}.layer-direction.${ldv.fromModule}.${ldv.toModule}`),
       rule_kind: "architecture_layer_direction" as const,
       severity: "error" as const,
       source: { tool: "stele", command, kind: "architecture" },
@@ -165,7 +165,7 @@ function buildPublicEntryViolations(
   return result.publicEntryViolations.map((pev) => {
     const prefix = arch.description ? `${arch.description}. ` : "";
     return {
-      rule_id: `architecture.${arch.id}.public-entry.${pev.fromModule}.${pev.toModule}`,
+      rule_id: ruleId(`architecture.${arch.id}.public-entry.${pev.fromModule}.${pev.toModule}`),
       rule_kind: "architecture_public_entry" as const,
       severity: "error" as const,
       source: { tool: "stele", command, kind: "architecture" },
@@ -187,7 +187,7 @@ function buildUnownedFileViolations(
   command: string,
 ): Violation[] {
   return result.unownedFiles.map((uf) => ({
-    rule_id: `architecture.${arch.id}.unowned-file`,
+    rule_id: ruleId(`architecture.${arch.id}.unowned-file`),
     rule_kind: "architecture_unowned_file" as const,
     severity: "error" as const,
     source: { tool: "stele", command, kind: "architecture" },

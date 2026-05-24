@@ -792,6 +792,11 @@
           "name": "PackageName",
           "base_type": "string",
           "invariant": "matches /^[a-z][a-z0-9-]*(-[a-z0-9]+)*$/"
+        },
+        {
+          "name": "CommandName",
+          "base_type": "string",
+          "invariant": "matches /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/"
         }
       ]
     },
@@ -811,6 +816,16 @@
         {
           "name": "Sha256",
           "constructor": "parseSha256(input: string): Sha256",
+          "deny_raw": true
+        },
+        {
+          "name": "PackageName",
+          "constructor": "parsePackageName(input: string): PackageName",
+          "deny_raw": true
+        },
+        {
+          "name": "CommandName",
+          "constructor": "parseCommandName(input: string): CommandName",
           "deny_raw": true
         }
       ]

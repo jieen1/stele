@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   createViolation,
   createViolationReport,
+  ruleId,
   type ExternAliasDeclaration,
   type Violation,
   type ViolationReport,
@@ -119,7 +120,7 @@ export async function buildTypeStateStage(
       },
       violations: [
         createViolation({
-          rule_id: `typestate.not-yet-supported.${language}`,
+          rule_id: ruleId(`typestate.not-yet-supported.${language}`),
           rule_kind: "typestate_unsupported_language",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },
@@ -152,7 +153,7 @@ export async function buildTypeStateStage(
       },
       violations: [
         createViolation({
-          rule_id: "typestate.no-tsconfig",
+          rule_id: ruleId("typestate.no-tsconfig"),
           rule_kind: "typestate_no_tsconfig",
           severity: "warning",
           source: { tool: "stele", command, kind: "rule" },
@@ -188,7 +189,7 @@ export async function buildTypeStateStage(
       },
       violations: [
         createViolation({
-          rule_id: "typestate.extraction_error",
+          rule_id: ruleId("typestate.extraction_error"),
           rule_kind: "typestate_extraction_error",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },
@@ -237,7 +238,7 @@ export async function buildTypeStateStage(
       },
       violations: [
         createViolation({
-          rule_id: "typestate.evaluation_error",
+          rule_id: ruleId("typestate.evaluation_error"),
           rule_kind: "typestate_evaluation_error",
           severity: "error",
           source: { tool: "stele", command, kind: "rule" },

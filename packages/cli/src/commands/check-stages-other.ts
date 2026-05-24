@@ -1,5 +1,6 @@
 import {
   createViolationReport,
+  ruleId,
   type ContractNotice,
   type Violation,
   type ViolationReport,
@@ -74,7 +75,7 @@ export async function buildDesignStage(
   const violations: Violation[] = [];
   for (const error of result.errors) {
     violations.push({
-      rule_id: "design_integrity.violation",
+      rule_id: ruleId("design_integrity.violation"),
       rule_kind: "design_integrity",
       severity: "error",
       source: { tool: "stele", command, kind: "design" },
@@ -170,7 +171,7 @@ export async function buildComplexityStage(
     for (const v of result.violations) {
       const detail = `Complexity violation: ${v.metric} value ${v.value} exceeds max ${v.max} for core-node "${result.measurement.id}"`;
       violations.push({
-        rule_id: `complexity.${result.measurement.id}.${v.metric}`,
+        rule_id: ruleId(`complexity.${result.measurement.id}.${v.metric}`),
         rule_kind: "rule_violation" as const,
         severity: "error" as const,
         source: { tool: "stele", command, kind: "rule" },

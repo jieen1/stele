@@ -75,9 +75,28 @@ export type PackageName = string & { readonly __brand: typeof PACKAGE_NAME_BRAND
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-/** Validate a RuleId string format. */
+/**
+ * Validate a RuleId string format.
+ *
+ * Phase 1 self-dogfooding (V-07 widening): accept BOTH historical and
+ * stage-emitted forms so a single smart-constructor covers every
+ * `rule_id: ...` site in the CLI. The widened pattern admits:
+ *
+ *   - `stele:<token>` / `custom:<token>` (legacy prefix:body form)
+ *   - `architecture.<arch>.<rest>` (cli/src/architecture/stage.ts)
+ *   - `complexity.<id>.<metric>`, `design_integrity.violation`
+ *   - `effect.<rest>`, `trace.<rest>`, `typestate.<rest>`
+ *   - `typedriven.<rest>` (smart-ctor / branded-id / eslint / tsc)
+ *   - `stele.<rest>` (e.g. `stele.check.execution_error`,
+ *     `stele.baseline.human_file_drift`, `stele.self.no_baseline`)
+ *
+ * Constraint: starts with a lowercase letter, body is alphanumeric +
+ * `_.:-` (template-literal interpolation results may include upper-case
+ * identifiers from interpolated values, e.g. method names; those are
+ * allowed too).
+ */
 function isValidRuleId(value: string): boolean {
-  return /^stele:[A-Za-z0-9_-]+$|^custom:[A-Za-z0-9_-]+$/.test(value);
+  return /^[a-z][A-Za-z0-9._:-]*$/.test(value);
 }
 
 /** Validate a ContractPath string format. */
@@ -108,13 +127,15 @@ function isValidPackageName(value: string): boolean {
  * Create a RuleId. Throws on invalid format.
  *
  * @example
- *   const id = ruleId("stele:ddd-core");       // ok
- *   const bad = ruleId("invalid-format");      // throws TypeError
+ *   const id = ruleId("stele:ddd-core");        // ok
+ *   const a  = ruleId("architecture.ddd.foo");  // ok (Phase 1 V-07 widening)
+ *   const bad = ruleId("");                     // throws TypeError
+ *   const bad = ruleId("Has Space");            // throws TypeError
  */
 export function ruleId(value: string): RuleId {
   if (!isValidRuleId(value)) {
     throw new TypeError(
-      `Invalid RuleId: "${value}". Must match 'stele:*' or 'custom:*' format (e.g. "stele:ddd-core", "custom:balance-check").`,
+      `Invalid RuleId: "${value}". Must start with a lowercase letter and contain only [A-Za-z0-9._:-] (e.g. "stele:ddd-core", "architecture.ddd-core.foo.bar").`,
     );
   }
   return value as RuleId;

@@ -115,16 +115,19 @@ export {
   contractPath,
   sha256 as sha256Branded,
   commandName,
+  packageName,
   isRuleId,
   isContractPath,
   isSha256,
   isCommandName,
+  isPackageName,
 } from "./util/branded-types.js";
 export type {
   RuleId,
   ContractPath,
   Sha256,
   CommandName,
+  PackageName,
 } from "./util/branded-types.js";
 export {
   buildInvariantTrace,

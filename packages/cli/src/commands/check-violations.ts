@@ -1,5 +1,6 @@
 import {
   createViolation,
+  ruleId,
   type GeneratedVerificationResult,
   type HumanState,
   type VerificationResult,
@@ -16,7 +17,7 @@ export function createGeneratedDriftViolation(
   command: string,
 ): ReturnType<typeof createViolation> {
   return createViolation({
-    rule_id: "stele.check.generated_drift",
+    rule_id: ruleId("stele.check.generated_drift"),
     rule_kind: "generated_drift",
     severity: "error",
     source: {
@@ -50,7 +51,7 @@ export function createManifestDriftViolation(
   command: string,
 ): ReturnType<typeof createViolation> {
   return createViolation({
-    rule_id: "stele.check.manifest_drift",
+    rule_id: ruleId("stele.check.manifest_drift"),
     rule_kind: "manifest_drift",
     severity: "error",
     source: {
@@ -83,7 +84,7 @@ export function createProtectedFileDriftViolation(
   command: string,
 ): ReturnType<typeof createViolation> {
   return createViolation({
-    rule_id: "stele.check.protected_file_drift",
+    rule_id: ruleId("stele.check.protected_file_drift"),
     rule_kind: "protected_file_drift",
     severity: "error",
     source: {
@@ -117,7 +118,7 @@ export function createContractHashMismatchViolation(
   command: string,
 ): ReturnType<typeof createViolation> {
   return createViolation({
-    rule_id: "stele.check.contract_hash_mismatch",
+    rule_id: ruleId("stele.check.contract_hash_mismatch"),
     rule_kind: "contract_hash_mismatch",
     severity: "error",
     source: {
@@ -173,7 +174,7 @@ export function createHumanFileDriftViolation(
   driftedFiles.sort();
 
   return createViolation({
-    rule_id: "stele.baseline.human_file_drift",
+    rule_id: ruleId("stele.baseline.human_file_drift"),
     rule_kind: "human_file_drift",
     severity: "error",
     source: {
@@ -207,7 +208,7 @@ export function createExecutionViolation(
   const message = error instanceof Error ? error.message : String(error);
 
   return createViolation({
-    rule_id: "stele.check.execution_error",
+    rule_id: ruleId("stele.check.execution_error"),
     rule_kind: "execution_error",
     severity: "error",
     source: {
