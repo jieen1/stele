@@ -292,6 +292,7 @@ export function createViolationReport(input: ViolationReportInput): ViolationRep
   };
 }
 
+/** @stele:effects crypto.hash */
 export function buildViolationFingerprint(violation: Omit<Violation, "fingerprint" | "status" | "suppressed_by">): string {
   // Only stable fields participate in fingerprint — human-readable text (cause.summary/detail,
   // fix.summary) are excluded so baseline drift is not triggered by copywriting changes.
