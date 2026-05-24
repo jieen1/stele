@@ -454,6 +454,123 @@ contracts share one extraction. Phase 4 (effect-policy) and Phase 5
 (type-state) will reuse that cache through `getCachedCallGraph`, so
 cumulative Phase-B cost on the 9.3k-node graph should remain bounded.
 
+### 2026-05-24 — Phase 4 sub-agent
+
+- **Step 4.1 landed**: `(effect-declarations …)` block with 9 effect
+  names (`fs.read`, `fs.write`, `time`, `random`, `env`, `network`,
+  `crypto.hash`, `process`, `child-process`). Dotted names are
+  string-quoted per V-04. `pure` is deliberately omitted — per the
+  effect-system spec, "pure" is the absence of any declared effect, and
+  declaring it would only cause false violations on `allow-only`
+  policies whose whitelist omits `pure`.
+- **Step 4.2 partial**: only the LEAF effect-producers in @stele/core
+  were annotated (17 functions across 6 files), not the ~40 the phase
+  doc anticipated. The phase doc's table includes pure functions
+  annotated `@stele:effects pure`, but landing those would conflict
+  with the (no-`pure`-in-alphabet) decision above. JSDoc annotations
+  are direct effects; propagation through the call graph carries them
+  to downstream callers automatically, so leaf-annotation is sufficient
+  to surface the effect in the evaluator's effective set at every
+  caller. Annotated functions:
+  - `writeAtomic` → `fs.write, time, random` (sole leaf fs.write site
+    in core)
+  - `writeManifest` → `fs.read, crypto.hash` (fs.write inherits via
+    writeAtomic edge)
+  - `writeHashManifest`, `writeViolationBaseline` → no direct effects
+    (inherit fs.write/time/random via writeAtomic)
+  - `verifyManifest`, `loadContract`, `readHashManifest`,
+    `sha256OfFileOrNull`, `readViolationBaseline`,
+    `tryReadViolationBaseline`, `collectExistingGeneratedEntries`,
+    `walkGeneratedDirectory`, `readGeneratedFile`, `verifyFiles` →
+    `fs.read` (+ `crypto.hash` where relevant)
+  - `computeSha256` / `hashManifestSha256`,
+    `buildViolationFingerprint` → `crypto.hash`
+  - `deleteHashManifest` → not annotated. The unlink call is treated
+    as cache eviction, not a manifest write; deliberately NOT marked
+    as a leaf `fs.write` so the (deferred) MANIFEST_WRITES_ARE_ATOMIC
+    policy would not fire on cache cleanup.
+
+### Phase 4 deferred items (re-scope to Phase 7)
+
+**All 4 effect-policies (Step 4.3), all 3 effect-suppressions
+(Step 4.4), and all 4 negative tests (Step 4.5) are deferred.** The
+phase doc anticipated landing the policies once Step 4.1 + 4.2 were
+in place; in practice the strict-mode fail-closed mechanism (Round 2
+D-CG-5) is **globally unconditional** on the call graph's
+`unresolvedCalls` set, not scoped to each policy's `target-scope`:
+
+```ts
+// packages/effect-evaluator/src/evaluator.ts:307–325
+for (const u of callGraph.unresolvedCalls) {
+  const v = buildUnresolvedCallViolation({ policy: undefined, ... });
+  if (strictMode) violations.push(v);  // error-severity
+}
+```
+
+The Stele repo's call graph contains **344 unresolved-call sites**
+(across `packages/cli/src/**`, including 51 in `index.ts` alone from
+Commander's chained `.command(...).description(...).action(...)`
+fluent API, 38 in test files, and many `dynamic`-reason sites from
+untyped object dispatch in `glob.ts`, `architecture-runtime.ts`,
+`backend-registry.ts::loadBackend`, etc.). The moment ANY
+`effect-policy` is added to the contract, the effect stage activates
+and every one of these 344 sites produces an `error`-severity
+violation — even when the policy's `target-scope` is narrow (e.g.
+`packages/core/src/**::*` for `CORE_IS_PURE_OR_FS_READ`).
+
+Per the prompt's policy-gap rule ("If a policy fires on legitimate
+code that the suppressions don't cover, defer that policy + log the
+gap — DON'T silence the policy by adding a wildcard suppression"),
+the only correct path is to defer the policies. The four candidate
+policies — `CORE_IS_PURE_OR_FS_READ`, `MANIFEST_WRITES_ARE_ATOMIC`,
+`HOOK_NO_NETWORK`, `GENERATOR_NO_NETWORK_OR_CHILD_PROCESS` — and
+their three associated effect-suppressions remain valid as
+specifications; they cannot be enforced today without one of the
+following changes (Phase 7 options):
+
+1. **Per-policy scoping for unresolved-call emission** in
+   `@stele/effect-evaluator`. Skip `buildUnresolvedCallViolation` for
+   `(fromId)` nodes that do not match any policy's `target-scope`.
+   Round 2 D-CG-5's wording is "unresolved calls fail closed" — the
+   intent is policy-scoped fail-closed, but the implementation is
+   global. Cleanest fix.
+2. **A configurable `strictMode` per stele.config.json**, so the Stele
+   repo (where the CLI legitimately uses dynamic dispatch outside
+   policy scope) can run in lenient mode while still emitting violation
+   notices for audit. Less principled than (1) but a smaller patch.
+3. **CLI source refactoring** to eliminate the 100+ dynamic-dispatch
+   sites — far larger than Phase 4 scope and would require touching
+   every Commander `.action(...)` chain plus the dynamic-backend-import
+   path. Not recommended.
+
+Defence-in-depth note: the legacy `CORE_ENGINE_PURITY` Python checker
+(introduced in Round 7) continues to pass and still enforces
+"no clock / random / env / crypto outside the canonical allowlist"
+on `packages/core/src/**`. The intent of `CORE_IS_PURE_OR_FS_READ` is
+already covered functionally, just not via the effect-policy
+mechanism, until the evaluator gap is closed.
+
+### Phase 4 perf baseline
+
+Wall-clock for `time node packages/cli/dist/index.js check` (warm
+caches):
+
+| | seconds |
+| --- | --- |
+| Before Phase 4 (48 invariants, 4 trace-policies, 0 effect-policies) | 13.8 |
+| After Phase 4 (48 invariants, 4 trace-policies, 0 effect-policies, 1 effect-declarations + 17 effect annotations) | 13.7 |
+| Delta | ~0 |
+
+The effect-stage early-returns when `effectPolicies.length === 0`
+(see `packages/cli/src/commands/check-stages-effect.ts:97`), so the
+effect-stage cost is zero today. The 17 JSDoc annotations are
+out-of-band metadata the call-graph extractor ignores; once the
+deferred policies land in Phase 7 the cost will be the call-graph
+extraction (already amortised with the trace stage via the call-graph
+cache) plus the propagation pass — Round 2 MC-7 bounds propagation at
+`O(|edges| + |nodes|)`, so the projected cost is in the 1–2 s range
+on this 9.3k-node × 41k-edge graph.
+
 ---
 
 ## Execution model
