@@ -1413,6 +1413,105 @@ def test_phase_language_config_valid_rejects_bad_lang():
 
 
 # ---------------------------------------------------------------------------
+# Phase 1 (self-dogfooding plan) — branded-id call-site enforcement
+# ---------------------------------------------------------------------------
+#
+# For each of the 5 new invariants we mutate a TS file to introduce a
+# raw-string assignment to the branded field, run the checker, and
+# assert it fails. The originals are restored in a `try/finally` so a
+# test failure does not corrupt the working tree.
+
+
+def _inject_then_run(path: pathlib.Path, marker: str, replacement: str, checker):
+    """Helper: temporarily replace `marker` with `replacement` in `path`,
+    run `checker` with an empty context, then restore the original."""
+    original = path.read_text(encoding="utf-8")
+    tampered = original.replace(marker, replacement, 1)
+    if tampered == original:
+        raise RuntimeError(f"marker not found in {path}: {marker!r}")
+    path.write_text(tampered, encoding="utf-8")
+    try:
+        return checker({})
+    finally:
+        path.write_text(original, encoding="utf-8")
+
+
+def test_rule_id_uses_branded_type_catches_raw_literal():
+    """Phase 1.2: injecting `rule_id: "stele:test-bypass"` (raw literal)
+    into a real source file must trip the checker. The wrapped form
+    `ruleId("stele:test-bypass")` is what every site currently uses;
+    this proves dropping the wrap is detected."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "commands" / "check-violations.ts"
+    # Inject after the first `createGeneratedDriftViolation` body open
+    # — pick a stable marker that exists in the file today.
+    result = _inject_then_run(
+        target,
+        'rule_id: ruleId("stele.check.generated_drift"),',
+        'rule_id: "stele.check.generated_drift",  // BYPASS',
+        sp.rule_id_uses_branded_type,
+    )
+    return _pass_if_false(result, "rule_id_uses_branded_type_catches_raw_literal")
+
+
+def test_sha256_uses_branded_type_catches_raw_literal():
+    """Phase 1.3: injecting a `sha256: "<literal>"` line that bypasses
+    the smart constructor must trip the checker."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "core" / "src" / "manifest" / "manifest.ts"
+    result = _inject_then_run(
+        target,
+        'sha256: sha256SmartCtor(createHash("sha256").update(buffer).digest("hex")),',
+        'sha256: "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeef" + "deadbeefdeadbeef",  // BYPASS',
+        sp.sha256_uses_branded_type,
+    )
+    return _pass_if_false(result, "sha256_uses_branded_type_catches_raw_literal")
+
+
+def test_contract_path_uses_branded_type_catches_raw_literal():
+    """Phase 1.4: injecting an unwrapped `entry: "contract/main.stele"`
+    must trip the checker."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "config" / "defaults.ts"
+    result = _inject_then_run(
+        target,
+        'entry: contractPath("contract/main.stele"),',
+        'entry: "contract/main.stele",  // BYPASS',
+        sp.contract_path_uses_branded_type,
+    )
+    return _pass_if_false(result, "contract_path_uses_branded_type_catches_raw_literal")
+
+
+def test_command_name_uses_branded_type_catches_raw_literal():
+    """Phase 1.5: injecting an unwrapped `.command("...")` call must
+    trip the checker even though the same file already uses
+    `cmdSpec(...)` elsewhere."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "index.ts"
+    result = _inject_then_run(
+        target,
+        '.command(cmdSpec("doc"))',
+        '.command("doc-bypass")',
+        sp.command_name_uses_branded_type,
+    )
+    return _pass_if_false(result, "command_name_uses_branded_type_catches_raw_literal")
+
+
+def test_package_name_uses_branded_type_catches_raw_literal():
+    """Phase 1.6: injecting an unwrapped `packageName: "@stele/..."`
+    must trip the checker."""
+    _reset_caches()
+    target = sp._PACKAGES_DIR / "cli" / "src" / "backend-registry.ts"
+    result = _inject_then_run(
+        target,
+        'packageName: toPackageName("@stele/backend-python"),',
+        'packageName: "@stele/backend-python",  // BYPASS',
+        sp.package_name_uses_branded_type,
+    )
+    return _pass_if_false(result, "package_name_uses_branded_type_catches_raw_literal")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1502,6 +1601,12 @@ def main() -> int:
         # Phase 0 (self-dogfooding plan): phaseLanguages config validity.
         ("phase_language_config_valid_rejects_bad_key", test_phase_language_config_valid_rejects_bad_key),
         ("phase_language_config_valid_rejects_bad_lang", test_phase_language_config_valid_rejects_bad_lang),
+        # Phase 1 (self-dogfooding plan): branded-id call-site enforcement.
+        ("rule_id_uses_branded_type_catches_raw_literal", test_rule_id_uses_branded_type_catches_raw_literal),
+        ("sha256_uses_branded_type_catches_raw_literal", test_sha256_uses_branded_type_catches_raw_literal),
+        ("contract_path_uses_branded_type_catches_raw_literal", test_contract_path_uses_branded_type_catches_raw_literal),
+        ("command_name_uses_branded_type_catches_raw_literal", test_command_name_uses_branded_type_catches_raw_literal),
+        ("package_name_uses_branded_type_catches_raw_literal", test_package_name_uses_branded_type_catches_raw_literal),
     ]
 
     print("=" * 60)

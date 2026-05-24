@@ -25,7 +25,7 @@ import type {
   EffectSuppressionDeclaration,
   Violation,
 } from "@stele/core";
-import { createViolation, stableStringCompare } from "@stele/core";
+import { createViolation, ruleId, stableStringCompare } from "@stele/core";
 
 import { differenceEffects, expandEffectPatterns } from "./effect-set.js";
 
@@ -124,7 +124,7 @@ function buildSuppressionActiveNotice(
 ): Violation {
   const expanded = [...expandedSuppresses].sort((a, b) => stableStringCompare(a, b));
   return createViolation({
-    rule_id: "effect.suppression_active",
+    rule_id: ruleId("effect.suppression_active"),
     rule_kind: "effect_suppression_notice",
     severity: s.severity === "error" ? "error" : "warning",
     source: { tool: "stele", command: "check", kind: "effect" },
@@ -151,7 +151,7 @@ function buildSuppressionDormantNotice(
   s: EffectSuppressionDeclaration,
 ): Violation {
   return createViolation({
-    rule_id: "effect.suppression_dormant",
+    rule_id: ruleId("effect.suppression_dormant"),
     rule_kind: "effect_suppression_notice",
     severity: "warning",
     source: { tool: "stele", command: "check", kind: "effect" },

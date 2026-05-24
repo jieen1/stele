@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-24T13:29:09.012Z",
+  "generated_at": "2026-05-24T13:38:29.183Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -16,12 +16,12 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "bd3c6798db6cdfcf1613e20f3e11a4ca40833b7cc872e1e2971b3f3488684629",
-      "size": 138800
+      "sha256": "6a939cbcbb40f56eedc8a905e2e10f6e77e303877381136d1c3cbd18522b0f8f",
+      "size": 154229
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "9c062144ed68c3f202c7a844eea864b22588f523a03a552eb5efeb3a5864c68c",
-      "size": 68251
+      "sha256": "2303d5d8980f521ebb43513a327b34bbe5c3fe0b57c68f52cdfc4a92ced29a7b",
+      "size": 73185
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
@@ -56,8 +56,8 @@
       "size": 20498
     },
     "contract/main.stele": {
-      "sha256": "a1a87373244d4adb5e8398f060cc373c5d520d73e3e5c5866902a3f94890f06e",
-      "size": 20314
+      "sha256": "5da6906775b53d0f8617e20cb856aac9b224d6f9b14a9d604719f72f665579ec",
+      "size": 23412
     },
     "package.json": {
       "sha256": "4cd157c4a07307f29229c884d4d3c6a1ac08104eaf2f37cc9758ee543eeb46e6",
@@ -224,17 +224,17 @@
       "size": 30931
     },
     "tests/contract/conftest.py": {
-      "sha256": "f37da28616efe1340c644309437a4d2570a4a019379a3a96330296bfb6b103fc",
-      "size": 6497
+      "sha256": "7f098ad94ec3afabbf8ac2c0b68f97c3322cf3befaa28c3e98be25dce49dce85",
+      "size": 7213
     },
     "tests/contract/test_contract.py": {
-      "sha256": "13b0afa817466878d7870f0e7b67da2222d4c3f63531802f8b7e696c5e2c2bab",
-      "size": 9770
+      "sha256": "97741e4261dbcbf78fbf80ebb53768b7ca76665569f3fd344fe378c2826fb2ca",
+      "size": 10970
     },
     "tsconfig.base.json": {
       "sha256": "14e86fc4216dd21efaadba41d3e644d1417b53209eb0faa76a4f082f0aa2bb02",
       "size": 381
     }
   },
-  "contract_hash": "8ad546091f5599a83e7359c67d580d1d33ae5f5edd7eb4912a36d3d6c4cf807b"
+  "contract_hash": "d1dec4ae0fcbe2e4f292aad619637b4023728f677711b0551912e98669d4d52b"
 }

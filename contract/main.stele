@@ -412,4 +412,51 @@
   (description "Phase 0 (self-dogfooding plan): the per-phase language override field, when set, must be type-correct so that downstream check-stages dispatch deterministically.")
   (uses-checker phase-language-config-valid))
 
+; ============================================================================
+; Phase 1 (self-dogfooding plan) — branded-id call-site enforcement.
+; Defense in depth for the type-driven evaluator: even when the TS
+; toolchain is bypassed, `pytest tests/contract` still catches raw
+; literal assignments to branded-typed fields.
+; ============================================================================
+
+(checker rule-id-uses-branded-type
+  (description "Every TS source assignment to a `rule_id` field must go through `ruleId()` smart constructor — no raw string literals."))
+
+(invariant RULE_ID_USES_BRANDED_TYPE
+  (severity error)
+  (description "Phase 1 self-dogfooding: RuleId branded type must be the only way to construct a rule identifier in TS source. Catches `rule_id: \"stele:foo\"` raw-string assignments that bypass the smart constructor.")
+  (uses-checker rule-id-uses-branded-type))
+
+(checker sha256-uses-branded-type
+  (description "Every TS source assignment to a `sha256` / `transitive_hash` / `contract_hash` / `own_hash` field must go through one of the recognized Sha256 factories — no raw string literals."))
+
+(invariant SHA256_USES_BRANDED_TYPE
+  (severity error)
+  (description "Phase 1 self-dogfooding: SHA-256 hash values must always be computed via the sha256 smart-constructor (or one of the hash helpers that route through it). Catches hand-typed hash literals that bypass the brand.")
+  (uses-checker sha256-uses-branded-type))
+
+(checker contract-path-uses-branded-type
+  (description "Every TS source `entry` / `contractPath` field assigned a literal `.stele` path must go through `contractPath()` smart constructor."))
+
+(invariant CONTRACT_PATH_USES_BRANDED_TYPE
+  (severity error)
+  (description "Phase 1 self-dogfooding: ContractPath branded type guards `entry` and `contractPath` fields holding `.stele` literals so the path-shape invariant cannot be bypassed by inlining a typo.")
+  (uses-checker contract-path-uses-branded-type))
+
+(checker command-name-uses-branded-type
+  (description "Every `.command(...)` and `new Command(...)` call in TS CLI source must construct its first-argument name through `commandName()` or the local `cmdSpec()` helper."))
+
+(invariant COMMAND_NAME_USES_BRANDED_TYPE
+  (severity error)
+  (description "Phase 1 self-dogfooding: CommandName branded type catches accidental rename or typo of CLI command names. Every `program.command(\"...\")` and `new Command(\"...\")` site must validate the name through the smart constructor.")
+  (uses-checker command-name-uses-branded-type))
+
+(checker package-name-uses-branded-type
+  (description "Every TS source `packageName:` field assignment must go through `packageName()` smart constructor (imported as `toPackageName` where it collides with a local field)."))
+
+(invariant PACKAGE_NAME_USES_BRANDED_TYPE
+  (severity error)
+  (description "Phase 1 self-dogfooding: PackageName branded type guards the REGISTERED_BACKENDS list (and any future packageName field) so a typo'd `@stele/<backend>` name is caught at validation time.")
+  (uses-checker package-name-uses-branded-type))
+
 (import "generated/ddd-typedriven.stele")

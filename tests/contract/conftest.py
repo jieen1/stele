@@ -83,6 +83,12 @@ def _lazy_load_checkers():
             "bash_extractors_shared",
             # Phase 0 (self-dogfooding plan) — per-phase language config
             "phase_language_config_valid",
+            # Phase 1 (self-dogfooding plan) — branded-id call-site enforcement
+            "rule_id_uses_branded_type",
+            "sha256_uses_branded_type",
+            "contract_path_uses_branded_type",
+            "command_name_uses_branded_type",
+            "package_name_uses_branded_type",
         ):
             _checkers[name] = getattr(mod, name, None)
 
@@ -143,6 +149,12 @@ _CHECKER_NAME_MAP = {
     "bash-extractors-shared": "bash_extractors_shared",
     # Phase 0 (self-dogfooding plan) — per-phase language config
     "phase-language-config-valid": "phase_language_config_valid",
+    # Phase 1 (self-dogfooding plan) — branded-id call-site enforcement
+    "rule-id-uses-branded-type": "rule_id_uses_branded_type",
+    "sha256-uses-branded-type": "sha256_uses_branded_type",
+    "contract-path-uses-branded-type": "contract_path_uses_branded_type",
+    "command-name-uses-branded-type": "command_name_uses_branded_type",
+    "package-name-uses-branded-type": "package_name_uses_branded_type",
 }
 
 

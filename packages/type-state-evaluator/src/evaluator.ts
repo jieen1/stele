@@ -45,6 +45,7 @@ import type {
 } from "@stele/call-graph-core";
 import {
   createViolation,
+  ruleId,
   stableStringCompare,
   type Contract,
   type TypeStateBindingDeclaration,
@@ -512,7 +513,7 @@ export async function evaluateTypeStates(
     if (unreached.length === 0) continue;
     notices.push(
       createViolation({
-        rule_id: `typestate.${decl.id}.unreachable_state`,
+        rule_id: ruleId(`typestate.${decl.id}.unreachable_state`),
         rule_kind: "typestate_unreachable_state",
         severity: "warning",
         source: { tool: "stele", command: "check", kind: "typestate" },
