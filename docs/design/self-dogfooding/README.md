@@ -871,7 +871,7 @@ lines above. **Filed as a Phase 7 follow-up.**
 Round 15 Finding 4 (MED) called out that the Phase 4 final commit
 (`451a1d0`) added a new `effectStrictMode?: boolean` field to
 `SteleConfig` and shipped `stele.config.json` with it set to
-`false`. The 1,450 `effect.unresolved_call_blocks_evaluation`
+`false`. The ~1,454 `effect.unresolved_call_blocks_evaluation`
 violations that would have surfaced as `error` under Round 2 D-CG-5
 ("unresolved calls fail closed") now surface as `warning`.
 

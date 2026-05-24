@@ -3,7 +3,10 @@
 Each test creates a controlled violation, runs the checker, and verifies it fails.
 These confirm that each checker actually detects the thing it claims to protect.
 
-Run: python contract/checker_impls/test_negative.py
+Run via pytest (Round 15 fix: tests now use `assert`, not `return`, so the
+legacy ad-hoc `main()` runner at the bottom of this file would mis-count
+results — pytest is authoritative):
+    .venv/bin/pytest contract/checker_impls/test_negative.py -q
 """
 from __future__ import annotations
 
@@ -1922,7 +1925,7 @@ def test_manifest_lifecycle_brand_fires():
         "packages/core/tests/manifest-lifecycle.test-d.ts",
         "@ts-expect-error — Loaded cannot be passed where Locked is required",
         "@stele/core",
-    ), "checker did not detect violation: @stele/core"
+    ), "MANIFEST_LIFECYCLE StateBrand failed to fire — tsc accepted Loaded→Locked illegal transition"
 
 
 def test_approval_lifecycle_brand_fires():
@@ -1932,7 +1935,7 @@ def test_approval_lifecycle_brand_fires():
         "packages/cli/tests/approval-lifecycle.test-d.ts",
         "@ts-expect-error — Drafting cannot be passed where IdentityChecked is required",
         "@stele/cli",
-    ), "checker did not detect violation: @stele/cli"
+    ), "APPROVAL_LIFECYCLE StateBrand failed to fire — tsc accepted Drafting→IdentityChecked illegal transition"
 
 
 def test_design_profile_lifecycle_brand_fires():
@@ -1942,7 +1945,7 @@ def test_design_profile_lifecycle_brand_fires():
         "packages/cli/tests/design-profile-lifecycle.test-d.ts",
         "@ts-expect-error — Raw cannot be passed where Validated is required",
         "@stele/cli",
-    ), "checker did not detect violation: @stele/cli"
+    ), "DESIGN_PROFILE_LIFECYCLE StateBrand failed to fire — tsc accepted Raw→Validated illegal transition"
 
 
 def test_callgraph_lifecycle_brand_fires():
@@ -1952,7 +1955,7 @@ def test_callgraph_lifecycle_brand_fires():
         "packages/call-graph-core/tests/callgraph-lifecycle.test-d.ts",
         "@ts-expect-error — Empty cannot be passed where Building is required",
         "@stele/call-graph-core",
-    ), "checker did not detect violation: @stele/call-graph-core"
+    ), "CALLGRAPH_LIFECYCLE StateBrand failed to fire — tsc accepted Empty→Building illegal transition"
 
 
 # ---------------------------------------------------------------------------

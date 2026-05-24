@@ -6,3 +6,12 @@
 filterwarnings = [
     "error::pytest.PytestReturnNotNoneWarning",
 ]
+# Round 16 LOW finding: bare `pytest` from the repo root tried to discover
+# both `tests/contract/conftest.py` and `fixtures/python-app/tests/contract/conftest.py`
+# under the same module name `contract.conftest`, causing a collection-time
+# ModuleNotFoundError. Pin the two real test trees so bare `pytest` from
+# the repo root works for developers and CI.
+testpaths = [
+    "tests/contract",
+    "contract/checker_impls",
+]

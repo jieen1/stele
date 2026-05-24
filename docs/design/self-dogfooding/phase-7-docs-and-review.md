@@ -110,6 +110,65 @@ node packages/cli/dist/index.js list | wc -l   # should be ~84
 git push origin main
 ```
 
+### Step 7.9 — Phase 4 effect-evaluator follow-ups (added Round 15/16)
+
+The Round 15 audit and Round 16 regression hunt surfaced two
+concrete effect-evaluator improvements that the original Phase 4
+plan did not anticipate. Both should be tracked as discrete future
+work rather than rolled into a single "Phase 4 done" claim.
+
+**7.9.1 — Per-policy unresolved-call scoping.** Today the effect
+evaluator's `unresolved_call_blocks_evaluation` errors fire for the
+WHOLE call graph the moment any unresolved call exists, regardless
+of whether the unresolved call falls inside any policy's
+`target-scope`. This forced Phase 4 to ship `effectStrictMode: false`
+in `stele.config.json` to downgrade ~1,454 such errors to warnings.
+The principled fix:
+
+- In `@stele/effect-evaluator`, change the unresolved-call check so
+  it only emits a violation when the unresolved call node falls
+  inside at least one active policy's `target-scope` glob.
+- Removes the global fail-closed escape hatch; restores fail-closed
+  semantics per Round 2 D-CG-5 for the policies that actually care.
+- After the change lands, remove `effectStrictMode: false` from
+  `stele.config.json` and confirm `stele check` exit 0 with the same
+  4 policies still active.
+
+Acceptance: `stele check` reports zero `unresolved_call_blocks_evaluation`
+errors for `tests/conformance/runner-impl.ts` (a noisy known case
+outside any policy scope), while still reporting one if a function
+inside `packages/core/src/manifest/**` has unresolved calls.
+
+**7.9.2 — Enable allowJs (or .ts migration) for hook-script
+coverage.** The `HOOK_NO_NETWORK` effect-policy
+(`contract/main.stele:676`) targets `packages/claude-code-plugin/scripts/*.js`
+but the TS call-graph extractor sets `allowJs: false` and its
+fallback directory walker only collects `.ts/.tsx` — so the policy
+is dead by construction. Pick ONE:
+
+- (a) Enable `allowJs: true` in
+  `packages/backend-typescript/src/extractors/call-graph.ts:222`
+  and update the directory walker at line 269 to also collect
+  `.js/.cjs/.mjs`. Run the full `stele check` + benchmark before
+  / after — the larger call graph may slow Phase B evaluators
+  noticeably; if so, gate behind a config flag.
+- (b) Migrate hook scripts to `.ts` with a `tsup`-based build into
+  `packages/claude-code-plugin/dist/scripts/`. Update
+  `packages/claude-code-plugin/hooks/hooks.json` to point at the
+  built `.js` artefacts. Heavier refactor but no extractor-wide
+  change.
+
+Acceptance: `test_hook_no_network_catches_fetch_in_hook_script` is
+re-enabled (drop the `@pytest.mark.skip` decorator); the test
+passes against a real call-graph that includes hook scripts.
+
+**Tracking:** both items have their root-cause analysis recorded in
+`docs/design/self-dogfooding/README.md` decision-log entries
+("HOOK_NO_NETWORK policy is dead by construction" and
+"effectStrictMode: false is a policy degradation"). When either is
+landed, the corresponding decision-log entry should be appended (not
+edited) with the resolution commit SHA and a one-line outcome.
+
 ## Acceptance criteria
 
 - [ ] Coverage matrix doc written

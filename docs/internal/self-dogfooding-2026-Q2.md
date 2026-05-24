@@ -132,13 +132,33 @@ decision log lives in [`docs/design/self-dogfooding/README.md`](../design/self-d
     `MANIFEST_LEAVES_ARE_PINNED`).
   - 3 `effect-suppression` declarations for the canonical atomic
     writers (`writeAtomic(2)`, `writeManifest(3)`, `writeHashManifest(2)`).
-  - 4 negative tests (`test_core_is_pure_or_fs_read_catches_random_in_core`,
-    `test_hook_no_network_catches_fetch_in_hook_script`,
-    `test_generator_no_network_or_child_process_catches_execfile`,
-    `test_manifest_leaves_are_pinned_catches_extra_effect`).
+  - 4 negative tests for the 4 policies. **As of Round 15 (commit
+    `1423559`) only 2 of the 4 are live; the other 2 are
+    `@pytest.mark.skip`-ed as dead-by-construction:**
+    - `test_core_is_pure_or_fs_read_catches_random_in_core` — LIVE,
+      truly asserts.
+    - `test_manifest_leaves_are_pinned_catches_extra_effect` — LIVE,
+      truly asserts.
+    - `test_hook_no_network_catches_fetch_in_hook_script` — SKIPPED.
+      Root cause: HOOK_NO_NETWORK targets `*.js` files but the TS
+      call-graph extractor sets `allowJs: false`
+      (`packages/backend-typescript/src/extractors/call-graph.ts:222`)
+      and its directory walker only collects `.ts/.tsx` (line 269).
+      Policy is documentation, not enforcement. Filed as Phase 7
+      follow-up (see Step 7.9 below + README decision log entry
+      "HOOK_NO_NETWORK policy is dead by construction").
+    - `test_generator_no_network_or_child_process_catches_execfile`
+      — SKIPPED. Root cause: `target-scope` is a single file so a
+      sibling drop can never satisfy it. Phase 7 follow-up: widen
+      target-scope or rewrite using `_mutate_then_check` directly
+      against `generate.ts`.
   - `effectStrictMode: false` set in `stele.config.json` to downgrade
-    the ~344 unresolved-call sites (Commander dispatch, dynamic
-    `await import()`) to advisory notices.
+    the ~1,454 unresolved-call sites (Commander dispatch, dynamic
+    `await import()`) to advisory notices. **This is a policy
+    degradation**, not a principled fix — see README decision log
+    entry "effectStrictMode: false is a policy degradation". Filed
+    as Phase 7 follow-up (Step 7.9: implement per-policy
+    unresolved-call scoping).
 - **Key decisions:**
   - Only leaf effect-producers in `@stele/core` are annotated; effects
     propagate through the call graph to downstream callers.
@@ -148,7 +168,14 @@ decision log lives in [`docs/design/self-dogfooding/README.md`](../design/self-d
   entry says the 4 policies + 3 suppressions + 4 negative tests are
   **deferred**. They were subsequently landed in commit `451a1d0` and
   the decision log was not updated. This summary records the
-  as-shipped state (policies/suppressions/tests are LIVE).
+  as-shipped state (policies/suppressions/tests are LIVE — but 2 of
+  4 negative tests are skipped, per the bullet above).
+- **Round 15 follow-up: vacuous-test bug.** Until Round 15 caught it,
+  every Phase 4 negative test (and indeed all 88 negative tests in
+  the file) used `return _helper(...)` instead of `assert _helper(...)`.
+  pytest reported `passed` regardless of the helper's return value, so
+  the entire Phase 4 negative-test layer was silently inert. Fixed in
+  commit `1423559` — see "Open Phase 7 follow-ups" below.
 
 ### Phase 5 — Type-state
 
@@ -333,10 +360,39 @@ Affected aggregates:
    subsequently landed them. The decision log is appended-only by
    convention; Phase 7 reviewer rounds should reconcile log entries
    against the as-shipped state.
-6. **Reviewer rounds** — Phase 7 step 7.4 onwards (Round 15+) has not
-   yet been dispatched. CC-10 says the plan is not "done" until at
-   least one independent reviewer round returns 0 substantive
-   findings.
+6. **Reviewer rounds — Round 15 + Round 16 complete (2026-05-25).**
+   Round 15 (independent auditor T) returned 3 HIGH + 1 MED. The 3
+   HIGH findings were fixed in commit `1423559`:
+   - Vacuous-test bug (all 88 tests used `return` instead of
+     `assert`; pytest reported all PASSED regardless of helper return
+     value). 82 mechanical assert-conversions + a `pyproject.toml`
+     `filterwarnings = ["error::pytest.PytestReturnNotNoneWarning"]`
+     to prevent regression.
+   - 2 effect-policy rule_id case mismatches corrected.
+   - 2 dead-by-construction tests properly marked `@pytest.mark.skip`.
+   Round 16 (regression hunter) returned 0 HIGH + 2 MED + 4 LOW. The
+   MEDs were doc-tracking gaps (this section + Step 7.9 below) and
+   are addressed in commit `<round-16-fix-sha>`. CC-10 is satisfied
+   by these two rounds; a Round 17 may still be valuable but is not
+   blocking.
+7. **HOOK_NO_NETWORK policy is dead by construction.** Targets `*.js`
+   files but the TS call-graph extractor sets `allowJs: false`
+   (`packages/backend-typescript/src/extractors/call-graph.ts:222`)
+   and its directory walker only collects `.ts/.tsx` (line 269). Fix
+   options: (a) enable `allowJs` in the extractor (broader
+   call-graph scope; needs perf review), or (b) migrate hook scripts
+   to `.ts` with a transpile step. Until one of these lands the
+   policy is documentation, not enforcement, and the paired negative
+   test stays `@pytest.mark.skip`-ed. See README decision log entry
+   "HOOK_NO_NETWORK policy is dead by construction".
+8. **`effectStrictMode: false` is a policy degradation** that traded
+   1,454 unresolved-call errors for warnings to keep the 4 Phase 4
+   effect-policies green. Principled fix: implement per-policy
+   unresolved-call scoping in `@stele/effect-evaluator` (emit
+   unresolved-call errors only for nodes inside a policy's
+   `target-scope`), then remove the knob from `stele.config.json`.
+   See README decision log entry "effectStrictMode: false is a
+   policy degradation, not a fix".
 
 ## Reading order for future maintainers
 
