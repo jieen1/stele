@@ -41,6 +41,8 @@ export type {
   VerifiedProtectedFile,
 } from "./manifest/manifest.js";
 export { verifyManifest, writeManifest } from "./manifest/manifest.js";
+export type { Manifest, ManifestState, ManifestStateBrand } from "./manifest/lifecycle.js";
+export { asLoaded, lockManifest, verifyLockedManifest } from "./manifest/lifecycle.js";
 export type { FileEntry, HashManifest, ParsedFileLike } from "./manifest/hash-manifest.js";
 export {
   buildTransitiveHash,

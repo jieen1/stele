@@ -716,4 +716,35 @@
   (severity "warning")
   (reason "Wraps writeAtomic. Same rationale as writeManifest above."))
 
+; ============================================================================
+; §5 — Type-state lifecycles (self-dogfooding Phase 5).
+;
+; The phantom-type implementation lives in the per-lifecycle source file
+; cited by each (target ...) line. Primary enforcement is at TypeScript
+; compile time via the brand discriminator (V-05 state-keyed StateBrand);
+; companion *.test-d.ts files under each package's tests/ directory
+; exercise the discriminator and MUST NOT regress.
+;
+; The (type-state ...) form below feeds the @stele/type-state-evaluator
+; which walks the call graph for `receiver.method(...)` calls on the
+; target type. Free-function transitions are documented for human
+; readers; the type-state evaluator silently matches zero callers until
+; production call sites are routed through method-style transitions
+; (deferred follow-up work, not blocking).
+; ============================================================================
+
+(type-state MANIFEST_LIFECYCLE
+  (description "Stele's ContractManifest is born Unloaded, becomes Loaded once parsed from disk, Locked once written via writeAtomic, and Verified once the on-disk SHA-256 set has been re-validated. Skipping a step is a violation of the lifecycle.")
+  (target "packages/core/src/manifest/lifecycle.ts::Manifest")
+  (severity "error")
+  (states Unloaded Loaded Locked Verified)
+  (initial Unloaded)
+  (terminal Verified)
+  (transition (from Unloaded) (via asLoaded) (to Loaded))
+  (transition (from Loaded) (via lockManifest) (to Locked))
+  (transition (from Locked) (via verifyLockedManifest) (to Verified))
+  (allowed-ops Loaded asLoaded lockManifest)
+  (allowed-ops Locked verifyLockedManifest)
+  (fix-hint "Route the manifest through `asLoaded()` then `lockManifest()` then `verifyLockedManifest()` from `packages/core/src/manifest/lifecycle.ts`; skipping a transition is what trips this rule. If the lifecycle itself is wrong, propose an update via `stele design propose --type-state MANIFEST_LIFECYCLE` — do NOT edit the contract directly."))
+
 (import "generated/ddd-typedriven.stele")
