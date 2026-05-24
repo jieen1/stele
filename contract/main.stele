@@ -564,4 +564,32 @@
   (target "packages/claude-code-plugin/scripts/{pre-tool-protect,stop-validate,observation-hook,lifecycle-context}.js")
   (must-contain "#!/usr/bin/env node"))
 
+; --- §3 trace-policy contracts ------------------------------------------------
+; Phase B trace stage runs against the TypeScript call graph extracted from this
+; repo (phaseLanguages.trace = "typescript"). Trace-policy semantics — confirmed
+; against @stele/trace-evaluator and docs/design/phase-b/02-trace-based-policy.md:
+;   `target` = the destination function the policy protects (path endpoint).
+;   `scope`  = which callers participate (default: whole project).
+;   `must-transit` = at least one intermediate node on the path from caller to
+;                    target must match.
+;   `deny-direct`  = a direct edge from a caller in scope to a deny-direct node
+;                    is a violation.
+;   `exempt`       = caller nodes that bypass the policy.
+;
+; NodeIds are confirmed against the live extractor output (~9.3k nodes,
+; ~41k edges). External-package functions appear as `extern:<package>::...`,
+; not `node:<module>::...` — the phase doc's `node:fs/promises::*` form was
+; rewritten to `extern:node-fs::*` after reading the call graph.
+
+; 3.1 — All writeFile calls in @stele/core must transit through writeAtomic.
+; writeAtomic itself is exempted (it IS the legitimate writer).
+(trace-policy FS_WRITES_VIA_WRITE_ATOMIC
+  (description "Every fs writeFile call inside @stele/core must transit through writeAtomic.")
+  (severity "error")
+  (target "extern:node-fs::writeFile(*)")
+  (must-transit "packages/core/src/manifest/hash-manifest.ts::writeAtomic(2)")
+  (scope "packages/core/src/**/*.ts")
+  (exempt "packages/core/src/manifest/hash-manifest.ts::writeAtomic(2)" (reason "writeAtomic IS the atomic wrapper; the policy exists to force callers into it."))
+  (fix-hint "[A] Route the write through `writeAtomic` in `packages/core/src/manifest/hash-manifest.ts`. [B] If the call site legitimately needs a non-atomic write, add an explicit exempt entry here."))
+
 (import "generated/ddd-typedriven.stele")
