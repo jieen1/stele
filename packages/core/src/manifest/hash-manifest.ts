@@ -215,7 +215,7 @@ export async function writeAtomic(targetPath: string, content: string): Promise<
   await writeFile(tmpPath, content, "utf8");
 
   try {
-    await writeFile(targetPath, content);
+    await rename(tmpPath, targetPath);
   } catch (error) {
     // Windows: rename may fail if dest exists. Accept EEXIST gracefully —
     // the target already has correct content (written by a concurrent
