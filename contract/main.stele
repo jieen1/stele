@@ -621,4 +621,16 @@
   (scope "packages/cli/src/commands/generate.ts")
   (fix-hint "[A] Call `coordinateGeneration(contract, backend, config)` before writing files in `packages/cli/src/commands/generate.ts:99`. [B] If the coordinator is broken, fix it — don't route around it."))
 
+; 3.5 — In approve.ts, every writeFileSync must be preceded in the same caller
+; body by a call to resolveApprovedBy. The human-identity gate is the security
+; model for design approvals: skipping it lets an agent forge approval records
+; that survive the manifest-protection layer.
+(trace-policy APPROVE_VIA_RESOLVE_APPROVED_BY
+  (description "runDesignApprove must call resolveApprovedBy before writing any approval record — the human-identity gate is the security model.")
+  (severity "error")
+  (target "extern:node-fs::writeFileSync(*)")
+  (must-be-preceded-by "packages/cli/src/commands/design/approve.ts::resolveApprovedBy(0)")
+  (scope "packages/cli/src/commands/design/approve.ts")
+  (fix-hint "[A] Approve flow MUST gate through `resolveApprovedBy` in `packages/cli/src/commands/design/approve.ts:180` before any `writeFileSync`. [B] If you're replacing the identity gate, write a new policy first."))
+
 (import "generated/ddd-typedriven.stele")
