@@ -1629,25 +1629,56 @@ def test_core_is_pure_or_fs_read_catches_unresolved_dynamic_call_in_core():
     ), "checker did not detect violation: effect.unresolved_call_blocks_evaluation"
 
 
-@pytest.mark.skip(
-    reason=(
-        "HOOK_NO_NETWORK policy targets *.js files (hook scripts ship as "
-        "plain ESM .js), but the TypeScript call-graph extractor sets "
-        "allowJs:false (packages/backend-typescript/src/extractors/call-graph.ts:222) "
-        "and the directory walker only collects .ts/.tsx "
-        "(call-graph.ts:269). The policy is therefore dead: it cannot fire "
-        "on any real hook script, nor on this synthetic test file. "
-        "Round 15 reviewer T (2026-05-25) caught this — the prior test "
-        "used `return` instead of `assert` and falsely reported pass. "
-        "Phase 7 follow-up options: (a) enable allowJs in the extractor "
-        "(broader call-graph scope; needs perf check), or (b) migrate "
-        "hook scripts to .ts with a transpile step. Until one of those "
-        "lands the policy is effectively documentation, not enforcement."
-    )
-)
 def test_hook_no_network_catches_fetch_in_hook_script():
-    """Phase 4.3: a new hook script that calls fetch() must trip
-    HOOK_NO_NETWORK. Currently skipped — see decorator."""
+    """Phase 4.3 / Closeout 2 (2026-05-25): a new hook script under
+    `packages/claude-code-plugin/scripts/*.js` that calls fetch() must
+    trip HOOK_NO_NETWORK. The skip decorator was removed once Closeout
+    2 enabled `allowJs:true` in the call-graph + effect-annotation
+    extractors, making hook scripts visible to the analyzer."""
+    content = (
+        "/** @stele:effects network */\n"
+        "export async function phaseNegativeFetch() {\n"
+        '  await fetch("https://example.com/closeout2-negative");\n'
+        "}\n"
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/claude-code-plugin/scripts/__closeout2_negative_fetch.js",
+        content,
+        "effect.HOOK_NO_NETWORK.forbidden_effect",
+    ), "checker did not detect violation: effect.HOOK_NO_NETWORK.forbidden_effect"
+
+
+def test_hook_no_network_catches_https_request():
+    """Closeout 2 (2026-05-25) — paired second negative test for
+    HOOK_NO_NETWORK of a STRUCTURALLY DIFFERENT shape per CC-13's
+    anti-vacuity rule.
+
+    The first paired test (above) uses the global `fetch` builtin —
+    a property-free identifier-call shape. This one introduces a
+    DIFFERENT network shape: an `import { request } from "node:https"`
+    + property-access call `https.request({...})`. The two exercise
+    distinct extractor paths (identifier vs property-access call
+    resolution) and distinct evaluator paths (the `@stele:effects
+    network` annotation reaches the policy through the closed-world
+    override either way, but the call-graph node-kind differs, which
+    is what catches a "the extractor silently dropped one of these
+    shapes" regression). 'Two removals of the same kind do not count
+    as two tests.'
+    """
+    content = (
+        'import { request } from "node:https";\n'
+        "\n"
+        "/** @stele:effects network */\n"
+        "export function phaseNegativeHttpsRequest() {\n"
+        '  const req = request({ host: "example.com", path: "/closeout2-negative" });\n'
+        "  req.end();\n"
+        "}\n"
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/claude-code-plugin/scripts/__closeout2_negative_https.js",
+        content,
+        "effect.HOOK_NO_NETWORK.forbidden_effect",
+    ), "checker did not detect violation: effect.HOOK_NO_NETWORK.forbidden_effect"
 
 
 @pytest.mark.skip(
