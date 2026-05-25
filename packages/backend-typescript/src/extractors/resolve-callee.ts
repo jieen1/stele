@@ -37,6 +37,15 @@ export function resolveCallee(
     };
   }
 
+  // `super(...)` — call the parent class's constructor. Walk up from
+  // the call to find the enclosing class, then resolve to the parent
+  // class's constructor declaration (in-project) or treat as a no-op
+  // edge when the parent is a built-in (Error, Object, ...). Never
+  // unresolved — `super` is structurally unambiguous.
+  if (ts.isCallExpression(call) && expr.kind === ts.SyntaxKind.SuperKeyword) {
+    return resolveSuperCall(call, ctx, rawText);
+  }
+
   // Identify the symbol at the call site. `.expression.name` for
   // property access, the expression itself for bare identifiers.
   const target = getResolutionTarget(expr);
@@ -107,6 +116,7 @@ export function resolveCallee(
     // (trace evaluator) can decide what to do.
     const expanded: ts.Declaration[] = [];
     const isNewExpr = ts.isNewExpression(call);
+    let hadImplicitInProjectCtor = false;
     for (const d of expandedInProject) {
       if (isNewExpr && ts.isClassDeclaration(d)) {
         const ctors = d.members.filter((m) => ts.isConstructorDeclaration(m));
@@ -114,9 +124,17 @@ export function resolveCallee(
           for (const c of ctors) expanded.push(c);
           continue;
         }
-        // No explicit ctor — skip silently. A synthetic ctor edge
-        // would lie about source location. The class node itself is
-        // still in the graph for impact analysis.
+        // No explicit ctor — walk the extends chain. The implicit
+        // ctor is a synthetic `super(...args)` so its only "effect"
+        // is whatever the nearest in-project ancestor's ctor does. If
+        // the chain terminates at a built-in (Error, Object, ...) the
+        // edge is a no-op. Either way we have a structurally-known
+        // answer and must NOT fall back to unresolved.
+        const inherited = findInheritedConstructor(d, ctx);
+        if (inherited !== null) {
+          expanded.push(inherited);
+        }
+        hadImplicitInProjectCtor = true;
         continue;
       }
       expanded.push(d);
@@ -130,6 +148,12 @@ export function resolveCallee(
     const unique = uniqueSortedStrings(nodeIds);
 
     if (unique.length === 0) {
+      // Same-file `new X()` of a class whose implicit ctor's chain
+      // ends at a built-in: structurally resolved, just no in-project
+      // edge to emit.
+      if (hadImplicitInProjectCtor) {
+        return { kind: "resolved", nodeIds: [], rawText };
+      }
       return {
         kind: "unresolved",
         nodeIds: [],
@@ -164,6 +188,81 @@ export function resolveCallee(
     reason: "module-not-resolved",
     rawText,
   };
+}
+
+/**
+ * Resolve a `super(...)` call by walking up from the call site to the
+ * enclosing class, then resolving its `extends` clause to a parent
+ * class declaration. The returned NodeId points at the parent's
+ * explicit constructor when one exists; when the parent has no
+ * explicit ctor we recurse; when the chain bottoms out at a built-in
+ * (`Error`, `Object`, ...) we return resolved-with-no-edges so the
+ * caller does not attribute mystery effects to it.
+ *
+ * `super(...)` is structurally unambiguous — under no circumstances
+ * may we return `unresolved` here.
+ */
+function resolveSuperCall(
+  call: ts.CallExpression,
+  ctx: ExtractorContext,
+  rawText: string,
+): ResolvedCallee {
+  const enclosingClass = findEnclosingClass(call);
+  if (enclosingClass === null) {
+    return { kind: "resolved", nodeIds: [], rawText };
+  }
+  const parentCtor = findInheritedConstructor(enclosingClass, ctx);
+  if (parentCtor === null) {
+    // Parent terminates at a built-in or has no in-project ctor.
+    return { kind: "resolved", nodeIds: [], rawText };
+  }
+  const id = buildNodeIdForDeclaration(parentCtor as ts.FunctionLikeDeclaration, ctx);
+  return { kind: "resolved", nodeIds: [id], rawText };
+}
+
+function findEnclosingClass(node: ts.Node): ts.ClassDeclaration | null {
+  let cur: ts.Node | undefined = node.parent;
+  while (cur !== undefined) {
+    if (ts.isClassDeclaration(cur)) return cur;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+/**
+ * Walk the `extends` chain of a class declaration looking for the
+ * nearest ancestor with an explicit constructor declared in an
+ * in-project source file. Returns `null` when the chain terminates at
+ * a built-in (no `extends`, or `extends` resolves to a declaration in
+ * a `.d.ts` / `node_modules` file).
+ */
+function findInheritedConstructor(
+  cls: ts.ClassDeclaration,
+  ctx: ExtractorContext,
+): ts.ConstructorDeclaration | null {
+  if (cls.heritageClauses === undefined) return null;
+  for (const heritage of cls.heritageClauses) {
+    if (heritage.token !== ts.SyntaxKind.ExtendsKeyword) continue;
+    for (const baseTypeExpr of heritage.types) {
+      const baseSymbol = ctx.checker.getSymbolAtLocation(baseTypeExpr.expression);
+      if (baseSymbol === undefined) continue;
+      const baseResolved = followAlias(baseSymbol, ctx.checker);
+      const baseDecls = baseResolved.declarations ?? [];
+      for (const bd of baseDecls) {
+        if (!ts.isClassDeclaration(bd)) continue;
+        const sf = bd.getSourceFile();
+        if (sf.isDeclarationFile) return null;
+        if (sf.fileName.includes("/node_modules/")) return null;
+        if (!sf.fileName.startsWith(ctx.projectRoot)) return null;
+        const ctor = bd.members.find((m) => ts.isConstructorDeclaration(m));
+        if (ctor !== undefined) return ctor as ts.ConstructorDeclaration;
+        // Parent also has no explicit ctor — recurse one level up.
+        const grand = findInheritedConstructor(bd, ctx);
+        if (grand !== null) return grand;
+      }
+    }
+  }
+  return null;
 }
 
 function detectDynamicDispatch(expr: ts.LeftHandSideExpression): "dynamic" | "reflection" | null {
