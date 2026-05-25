@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "69fbe0f5a32ff07cf0b0913a3f4f3dc736312d83f9177ec91ff9920bc0520b9f",
+  "profileHash": "3f2cd7f150abd1a8de189946e51fe760be2373a5e63ca349312b02ae32e83201",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "123ed56780ceae45186b6c1f124f995ddf497af7"
+    "git_sha": "225deeefd690b587e5435739890509dc67da564f"
   },
   "templates": [
     "ddd-typedriven"
@@ -361,6 +361,14 @@
       "cdl": "(core-node \"cli-check-orchestrator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/commands/check.ts::runCheck\")\n  (description \"Generated from design profile: CheckOrchestrator aggregate must remain reviewable.\")\n  (rationale \"CheckOrchestrator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 400) (max 700))\n  (metric public-method-count (ideal 6) (max 15))\n  (metric max-cyclomatic (ideal 15) (max 30))\n)"
     },
     {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "6b4498a1f2d9119d971be9af799b3f368501a77048931a39eae2072557e99270",
+      "cdl": "(class-shape cli-check-orchestrator-aggregate-shape\n  (lang typescript)\n  (target \"packages/cli/src/commands/check.ts::runCheck\")\n  (must-have-method \"checkProject\")\n  (must-have-method \"collectProtectedCheckState\")\n  (must-have-method \"prepareCheckContext\")\n  (must-have-method \"runCheck\")\n  (aggregate-members \"buildRawCheckReport\" \"checkProject\" \"collectProtectedCheckState\" \"prepareCheckContext\" \"prepareCheckContextWithContract\" \"runCheck\")\n)"
+    },
+    {
       "ruleId": "core-node.cli-code-shape-evaluator-aggregate",
       "ruleKind": "core-node",
       "origin": "aggregate:evaluator",
@@ -374,6 +382,14 @@
       "cdl": "(core-node \"cli-code-shape-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes\")\n  (description \"Generated from design profile: CodeShapeEvaluator aggregate must remain reviewable.\")\n  (rationale \"CodeShapeEvaluator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 400) (max 800))\n  (metric public-method-count (ideal 8) (max 20))\n  (metric max-cyclomatic (ideal 15) (max 35))\n)"
     },
     {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "e7933e0a0323ea3c90278252fc383f3edb87e917139f72de50408d78902bdb4b",
+      "cdl": "(class-shape cli-code-shape-evaluator-aggregate-shape\n  (lang typescript)\n  (target \"packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes\")\n  (must-have-method \"evaluateBoundaryDeclaration\")\n  (must-have-method \"evaluateClassShapeDeclaration\")\n  (must-have-method \"evaluateCodeShapes\")\n  (must-have-method \"evaluateFunctionShapeDeclaration\")\n  (aggregate-members \"evaluateBoundaryDeclaration\" \"evaluateClassShapeDeclaration\" \"evaluateCodeShapes\" \"evaluateFilePolicyDeclaration\" \"evaluateFreeFunctionClassShape\" \"evaluateFunctionShapeDeclaration\" \"evaluateTypePolicyDeclaration\")\n)"
+    },
+    {
       "ruleId": "core-node.cli-design-diff-engine-aggregate",
       "ruleKind": "core-node",
       "origin": "aggregate:engine",
@@ -385,6 +401,14 @@
       ],
       "fileHash": "4d615bfa13a4e70860df32601c5336b57ac7bfc0773c5a037c92476692783780",
       "cdl": "(core-node \"cli-design-diff-engine-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/commands/design/diff.ts::computeDesignDiff\")\n  (description \"Generated from design profile: DesignDiffEngine aggregate must remain reviewable.\")\n  (rationale \"DesignDiffEngine protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 300) (max 600))\n  (metric max-cyclomatic (ideal 12) (max 25))\n)"
+    },
+    {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "c48d2172e988535d8d37ae7075233769f1080550a544ed08882ab757af016b8b",
+      "cdl": "(class-shape cli-design-diff-engine-aggregate-shape\n  (lang typescript)\n  (target \"packages/cli/src/commands/design/diff.ts::computeDesignDiff\")\n  (must-have-method \"compareContexts\")\n  (must-have-method \"compareCoreInvariants\")\n  (must-have-method \"compareIntegrations\")\n  (must-have-method \"computeDesignDiff\")\n  (must-have-field \"SEVERITY\")\n  (aggregate-members \"SEVERITY\" \"compareContexts\" \"compareCoreInvariants\" \"compareIntegrations\" \"compareProject\" \"compareSharedKernels\" \"compareToolchainContracts\" \"compareTypeDriven\" \"computeDesignDiff\")\n)"
     },
     {
       "ruleId": "core-node.cli-cli-program-factory-aggregate",
@@ -426,17 +450,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-25T09:12:26.258Z",
+  "generatedAt": "2026-05-25T09:25:09.591Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "c374fca38df0e0b369a11b8baa44bf3466c82fd945285331bb2c2cdd31b72d6b"
+      "hash": "ccea03af887ea3a16feec9bd3a91142b102a8abedd7e020ecdff7d1430cc56c8"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "c374fca38df0e0b369a11b8baa44bf3466c82fd945285331bb2c2cdd31b72d6b",
+      "sha256": "ccea03af887ea3a16feec9bd3a91142b102a8abedd7e020ecdff7d1430cc56c8",
       "rules": [
         {
           "id": "architecture.ddd-core",

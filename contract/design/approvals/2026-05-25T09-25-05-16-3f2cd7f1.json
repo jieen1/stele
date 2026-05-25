@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "base_profile_sha256": "69fbe0f5a32ff07cf0b0913a3f4f3dc736312d83f9177ec91ff9920bc0520b9f",
+  "approved_profile_sha256": "3f2cd7f150abd1a8de189946e51fe760be2373a5e63ca349312b02ae32e83201",
+  "approved_proposals": [
+    {
+      "path": "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml",
+      "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601"
+    }
+  ],
+  "diff_classification": "additive",
+  "affected_generated_rules": [
+    "architecture.ddd-core",
+    "architecture.ddd-cli",
+    "architecture.ddd-architecture",
+    "architecture.ddd-backends-ts",
+    "architecture.ddd-backends-py",
+    "architecture.ddd-hooks",
+    "architecture.ddd-mcp",
+    "architecture.ddd-backends-go",
+    "architecture.ddd-backends-java",
+    "architecture.ddd-backends-rust",
+    "architecture.ddd-github-action",
+    "architecture.ddd-plugin",
+    "architecture.ddd-call-graph-core",
+    "architecture.ddd-trace-evaluator",
+    "architecture.ddd-type-state-evaluator",
+    "architecture.ddd-effect-evaluator",
+    "architecture.ddd-type-driven-evaluator",
+    "architecture.ddd-context-map",
+    "core-node.core-operator-registry-aggregate",
+    "core-node.unknown",
+    "core-node.core-invariant-validator-aggregate",
+    "core-node.unknown",
+    "core-node.core-contract-loader-aggregate",
+    "core-node.unknown",
+    "core-node.core-manifest-engine-aggregate",
+    "core-node.unknown",
+    "core-node.cli-check-orchestrator-aggregate",
+    "core-node.cli-code-shape-evaluator-aggregate",
+    "core-node.cli-design-diff-engine-aggregate",
+    "core-node.cli-cli-program-factory-aggregate",
+    "core-node.cli-design-profile-validator-aggregate",
+    "core-node.architecture-architecture-evaluator-aggregate"
+  ],
+  "affected_source_scope": [],
+  "reason": "Closeout 3b batch 2: cli-check-orchestrator + cli-code-shape-evaluator + cli-design-diff-engine class-shapes",
+  "approved_by": "wncjknvwpv@privaterelay.appleid.com",
+  "approved_at": "2026-05-25T09:25:05.168Z"
+}

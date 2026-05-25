@@ -456,6 +456,16 @@
   (metric max-cyclomatic (ideal 15) (max 30))
 )
 
+(class-shape cli-check-orchestrator-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/commands/check.ts::runCheck")
+  (must-have-method "checkProject")
+  (must-have-method "collectProtectedCheckState")
+  (must-have-method "prepareCheckContext")
+  (must-have-method "runCheck")
+  (aggregate-members "buildRawCheckReport" "checkProject" "collectProtectedCheckState" "prepareCheckContext" "prepareCheckContextWithContract" "runCheck")
+)
+
 (core-node "cli-code-shape-evaluator-aggregate"
   (lang typescript)
   (role business-core-service)
@@ -467,6 +477,16 @@
   (metric max-cyclomatic (ideal 15) (max 35))
 )
 
+(class-shape cli-code-shape-evaluator-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes")
+  (must-have-method "evaluateBoundaryDeclaration")
+  (must-have-method "evaluateClassShapeDeclaration")
+  (must-have-method "evaluateCodeShapes")
+  (must-have-method "evaluateFunctionShapeDeclaration")
+  (aggregate-members "evaluateBoundaryDeclaration" "evaluateClassShapeDeclaration" "evaluateCodeShapes" "evaluateFilePolicyDeclaration" "evaluateFreeFunctionClassShape" "evaluateFunctionShapeDeclaration" "evaluateTypePolicyDeclaration")
+)
+
 (core-node "cli-design-diff-engine-aggregate"
   (lang typescript)
   (role business-core-service)
@@ -475,6 +495,17 @@
   (rationale "DesignDiffEngine protects core cli invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 300) (max 600))
   (metric max-cyclomatic (ideal 12) (max 25))
+)
+
+(class-shape cli-design-diff-engine-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/commands/design/diff.ts::computeDesignDiff")
+  (must-have-method "compareContexts")
+  (must-have-method "compareCoreInvariants")
+  (must-have-method "compareIntegrations")
+  (must-have-method "computeDesignDiff")
+  (must-have-field "SEVERITY")
+  (aggregate-members "SEVERITY" "compareContexts" "compareCoreInvariants" "compareIntegrations" "compareProject" "compareSharedKernels" "compareToolchainContracts" "compareTypeDriven" "computeDesignDiff")
 )
 
 (core-node "cli-cli-program-factory-aggregate"

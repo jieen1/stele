@@ -210,6 +210,18 @@ ddd:
         - id: check-orchestrator
           class: CheckOrchestrator
           target: "packages/cli/src/commands/check.ts::runCheck"
+          required_methods:
+            - runCheck
+            - checkProject
+            - prepareCheckContext
+            - collectProtectedCheckState
+          aggregate_members:
+            - runCheck
+            - checkProject
+            - prepareCheckContext
+            - prepareCheckContextWithContract
+            - collectProtectedCheckState
+            - buildRawCheckReport
           metrics:
             sloc: { ideal: 400, max: 700 }
             public-method-count: { ideal: 6, max: 15 }
@@ -217,6 +229,19 @@ ddd:
         - id: code-shape-evaluator
           class: CodeShapeEvaluator
           target: "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes"
+          required_methods:
+            - evaluateCodeShapes
+            - evaluateBoundaryDeclaration
+            - evaluateClassShapeDeclaration
+            - evaluateFunctionShapeDeclaration
+          aggregate_members:
+            - evaluateCodeShapes
+            - evaluateBoundaryDeclaration
+            - evaluateClassShapeDeclaration
+            - evaluateFunctionShapeDeclaration
+            - evaluateTypePolicyDeclaration
+            - evaluateFilePolicyDeclaration
+            - evaluateFreeFunctionClassShape
           metrics:
             sloc: { ideal: 400, max: 800 }
             public-method-count: { ideal: 8, max: 20 }
@@ -224,6 +249,23 @@ ddd:
         - id: design-diff-engine
           class: DesignDiffEngine
           target: "packages/cli/src/commands/design/diff.ts::computeDesignDiff"
+          required_methods:
+            - computeDesignDiff
+            - compareContexts
+            - compareIntegrations
+            - compareCoreInvariants
+          required_fields:
+            - SEVERITY
+          aggregate_members:
+            - computeDesignDiff
+            - compareContexts
+            - compareIntegrations
+            - compareSharedKernels
+            - compareCoreInvariants
+            - compareTypeDriven
+            - compareToolchainContracts
+            - compareProject
+            - SEVERITY
           metrics:
             sloc: { ideal: 300, max: 600 }
             max-cyclomatic: { ideal: 12, max: 25 }

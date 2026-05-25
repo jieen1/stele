@@ -2200,6 +2200,114 @@ def test_manifest_engine_shape_catches_missing_required_field():
     ), "checker did not detect violation: core-manifest-engine-aggregate-shape (missing required field)"
 
 
+def test_check_orchestrator_shape_catches_missing_method():
+    """Closeout 3b — Test A for cli-check-orchestrator: deleting the
+    `collectProtectedCheckState` exported function body must trip the
+    must-have-method check."""
+    assert _mutate_then_check(
+        "packages/cli/src/commands/check.ts",
+        lambda text: re.sub(
+            r"\nexport async function collectProtectedCheckState\([\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "cli-check-orchestrator-aggregate-shape",
+    ), "checker did not detect violation: cli-check-orchestrator-aggregate-shape (missing method)"
+
+
+def test_check_orchestrator_shape_catches_missing_aggregate_member():
+    """Closeout 3b — Test B for cli-check-orchestrator: renaming
+    `buildRawCheckReport` (listed in aggregate_members but not in
+    required_methods) so the listed name no longer matches any
+    module-level declaration must trip the aggregate-member coherence
+    check — a different evaluator branch from Test A's
+    'must define module function' path."""
+    assert _mutate_then_check(
+        "packages/cli/src/commands/check.ts",
+        # Rename the declaration; do not touch its call sites here
+        # because the TS analyzer's class-shape pass only inspects
+        # top-level statements, and the mutation is restored after the
+        # check completes regardless of secondary references.
+        lambda text: text.replace(
+            "export async function buildRawCheckReport",
+            "export async function buildRawCheckReportRenamedForTest",
+            1,
+        ),
+        "cli-check-orchestrator-aggregate-shape",
+    ), "checker did not detect violation: cli-check-orchestrator-aggregate-shape (missing aggregate-member)"
+
+
+def test_code_shape_evaluator_shape_catches_missing_method():
+    """Closeout 3b — Test A for cli-code-shape-evaluator: deleting the
+    `evaluateBoundaryDeclaration` function body must trip the
+    must-have-method check."""
+    assert _mutate_then_check(
+        "packages/cli/src/code-shape/evaluate.ts",
+        lambda text: re.sub(
+            r"\nfunction evaluateBoundaryDeclaration\([\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "cli-code-shape-evaluator-aggregate-shape",
+    ), "checker did not detect violation: cli-code-shape-evaluator-aggregate-shape (missing method)"
+
+
+def test_code_shape_evaluator_shape_catches_missing_aggregate_member():
+    """Closeout 3b — Test B for cli-code-shape-evaluator: renaming
+    `evaluateFreeFunctionClassShape` (an aggregate_members entry not in
+    required_methods) so the listed sibling name no longer matches any
+    module-level declaration must trip the aggregate-member coherence
+    check."""
+    assert _mutate_then_check(
+        "packages/cli/src/code-shape/evaluate.ts",
+        lambda text: text.replace(
+            "function evaluateFreeFunctionClassShape",
+            "function evaluateFreeFunctionClassShapeRenamedForTest",
+            1,
+        ),
+        "cli-code-shape-evaluator-aggregate-shape",
+    ), "checker did not detect violation: cli-code-shape-evaluator-aggregate-shape (missing aggregate-member)"
+
+
+def test_design_diff_engine_shape_catches_missing_method():
+    """Closeout 3b — Test A for cli-design-diff-engine: deleting the
+    `compareIntegrations` function body must trip the must-have-method
+    check."""
+    assert _mutate_then_check(
+        "packages/cli/src/commands/design/diff.ts",
+        lambda text: re.sub(
+            r"\nfunction compareIntegrations\([\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "cli-design-diff-engine-aggregate-shape",
+    ), "checker did not detect violation: cli-design-diff-engine-aggregate-shape (missing method)"
+
+
+def test_design_diff_engine_shape_catches_missing_required_field():
+    """Closeout 3b — Test B for cli-design-diff-engine: removing the
+    `SEVERITY` const declaration must trip the must-have-field check —
+    a different evaluator branch from Test A's must-have-method
+    failure."""
+    assert _mutate_then_check(
+        "packages/cli/src/commands/design/diff.ts",
+        # Rename the const so it no longer exists as a top-level
+        # declaration named SEVERITY. (The TS analyzer doesn't run the
+        # typechecker, so call sites for the renamed identifier are
+        # not relevant — the analyzer reads top-level declarations
+        # only.)
+        lambda text: text.replace(
+            "const SEVERITY: Record<ChangeClass, number> = {",
+            "const SEVERITY_RENAMED_FOR_TEST: Record<ChangeClass, number> = {",
+            1,
+        ),
+        "cli-design-diff-engine-aggregate-shape",
+    ), "checker did not detect violation: cli-design-diff-engine-aggregate-shape (missing required field)"
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -2330,6 +2438,12 @@ def main() -> int:
         ("contract_loader_shape_catches_missing_required_field", test_contract_loader_shape_catches_missing_required_field),
         ("manifest_engine_shape_catches_missing_method", test_manifest_engine_shape_catches_missing_method),
         ("manifest_engine_shape_catches_missing_required_field", test_manifest_engine_shape_catches_missing_required_field),
+        ("check_orchestrator_shape_catches_missing_method", test_check_orchestrator_shape_catches_missing_method),
+        ("check_orchestrator_shape_catches_missing_aggregate_member", test_check_orchestrator_shape_catches_missing_aggregate_member),
+        ("code_shape_evaluator_shape_catches_missing_method", test_code_shape_evaluator_shape_catches_missing_method),
+        ("code_shape_evaluator_shape_catches_missing_aggregate_member", test_code_shape_evaluator_shape_catches_missing_aggregate_member),
+        ("design_diff_engine_shape_catches_missing_method", test_design_diff_engine_shape_catches_missing_method),
+        ("design_diff_engine_shape_catches_missing_required_field", test_design_diff_engine_shape_catches_missing_required_field),
     ]
 
     print("=" * 60)
