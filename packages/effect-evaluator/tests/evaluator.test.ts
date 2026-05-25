@@ -375,6 +375,118 @@ describe("evaluateEffects — Closeout 1 EvaluateEffectOptions surface", () => {
   });
 });
 
+describe("evaluateEffects — Closeout 1 Category B: annotated nodes are closed-world", () => {
+  it("in-scope unresolved call on a SOURCE-annotated node emits nothing", async () => {
+    // The author declared `@stele:effects fs.read` on the caller. Even
+    // though there is an unresolved callee in-scope, the author's
+    // explicit declaration overrides the analyzer's uncertainty: we
+    // trust the declaration and do not widen / emit.
+    const node = mkNode({ id: "src/c/Q.tsx::handler(0)", filePath: "src/c/Q.tsx" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(ALL_EFFECTS)],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "C_FORBIDS_HTTP",
+            targetScope: ["src/c/**::*"],
+            forbid: ["http.outgoing"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({
+        nodes: [node],
+        edges: [],
+        unresolvedCalls: [
+          mkUnresolved({ from: node.id, line: 12, column: 4, reason: "dynamic" }),
+        ],
+      }),
+      extractor: new StubExtractor(
+        new Map<string, readonly string[]>([[node.id, ["db.read"]]]),
+      ),
+    });
+    const unresolved = r.violations.filter(
+      (v) => v.rule_id === "effect.unresolved_call_blocks_evaluation",
+    );
+    expect(unresolved).toEqual([]);
+    expect(r.stats.unresolvedFailures).toBe(0);
+  });
+
+  it("in-scope unresolved call on a CDL-annotated node emits nothing", async () => {
+    // Same closed-world principle but the annotation comes from a CDL
+    // `(effect-annotation ...)` declaration instead of source JSDoc.
+    const node = mkNode({ id: "src/c/Q.tsx::handler(0)", filePath: "src/c/Q.tsx" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(ALL_EFFECTS)],
+        effectAnnotations: [
+          mkEffectAnnotation({
+            target: ["src/c/Q.tsx::handler(0)"],
+            annotates: ["db.read"],
+          }),
+        ],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "C_FORBIDS_HTTP",
+            targetScope: ["src/c/**::*"],
+            forbid: ["http.outgoing"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({
+        nodes: [node],
+        edges: [],
+        unresolvedCalls: [
+          mkUnresolved({ from: node.id, line: 12, column: 4, reason: "dynamic" }),
+        ],
+      }),
+      extractor: new StubExtractor(),
+    });
+    const unresolved = r.violations.filter(
+      (v) => v.rule_id === "effect.unresolved_call_blocks_evaluation",
+    );
+    expect(unresolved).toEqual([]);
+    expect(r.stats.unresolvedFailures).toBe(0);
+  });
+
+  it("annotated node still fires policy violations for the DECLARED effects", async () => {
+    // Closed-world means the analyzer trusts the declaration as the full
+    // truth — but the declaration itself is still subject to per-policy
+    // checks. An author who declares `http.outgoing` in a scope that
+    // forbids it should still trip the forbid policy.
+    const node = mkNode({ id: "src/c/Q.tsx::handler(0)", filePath: "src/c/Q.tsx" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(ALL_EFFECTS)],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "C_FORBIDS_HTTP",
+            targetScope: ["src/c/**::*"],
+            forbid: ["http.outgoing"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({
+        nodes: [node],
+        edges: [],
+        unresolvedCalls: [
+          mkUnresolved({ from: node.id, line: 12, column: 4, reason: "dynamic" }),
+        ],
+      }),
+      extractor: new StubExtractor(
+        new Map<string, readonly string[]>([[node.id, ["http.outgoing"]]]),
+      ),
+    });
+    const unresolved = r.violations.filter(
+      (v) => v.rule_id === "effect.unresolved_call_blocks_evaluation",
+    );
+    const forbidHits = r.violations.filter(
+      (v) => v.rule_id === "effect.C_FORBIDS_HTTP.forbidden_effect",
+    );
+    expect(unresolved).toEqual([]);
+    expect(forbidHits).toHaveLength(1);
+  });
+});
+
 describe("evaluateEffects — stats", () => {
   it("populates all stat fields", async () => {
     const node = mkNode({ id: "src/c/A.tsx::A(0)", filePath: "src/c/A.tsx" });

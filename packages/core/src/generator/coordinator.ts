@@ -22,6 +22,22 @@ export {
   type ConformanceFixture,
 } from "./types.js";
 
+/**
+ * Coordinate generation: run the backend's pure `generate` /
+ * `supportFiles` callbacks to produce the in-memory `GeneratedFile[]`
+ * (path + content) the CLI later writes to disk. The `LanguageBackend`
+ * interface (see `./types.ts`) types `generate` and `supportFiles` as
+ * pure transformations from `Contract` → `GeneratedFile[]`; backends
+ * may not perform IO from them (writes happen in the CLI layer via the
+ * 3 audited atomic-writer leaves). This function is therefore pure.
+ *
+ * The closed-world declaration below tells the effect-evaluator that
+ * the unresolved `backend.generate(...)` / `backend.supportFiles?.(...)`
+ * callees through the function-typed interface members are accounted
+ * for; the interface contract pins them to zero effects.
+ *
+ * @stele:effects
+ */
 export function coordinateGeneration(
   contract: Contract,
   backend: LanguageBackend,

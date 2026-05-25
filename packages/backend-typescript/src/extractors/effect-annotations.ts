@@ -124,21 +124,33 @@ function readSteleEffectsTag(tag: ts.JSDocTag): readonly string[] | null {
 /**
  * Collect every `@stele:effects` annotation on `decl`. Multiple tags on
  * the same declaration are unioned, with first-seen order preserved.
+ *
+ * `present` is true when AT LEAST ONE `@stele:effects` tag was found on
+ * the declaration, regardless of whether the resulting effect list is
+ * empty. An empty list with `present: true` is a deliberate author
+ * declaration that the node performs zero effects — the evaluator uses
+ * this to gate the unresolved-call fail-closed behaviour (Closeout 1
+ * Category B).
  */
-function annotationsForDeclaration(decl: ts.Node): readonly string[] {
+function annotationsForDeclaration(decl: ts.Node): {
+  readonly effects: readonly string[];
+  readonly present: boolean;
+} {
   const tags = ts.getJSDocTags(decl);
   const seen = new Set<string>();
   const out: string[] = [];
+  let present = false;
   for (const tag of tags) {
     const effects = readSteleEffectsTag(tag);
     if (effects === null) continue;
+    present = true;
     for (const e of effects) {
       if (seen.has(e)) continue;
       seen.add(e);
       out.push(e);
     }
   }
-  return Object.freeze(out);
+  return { effects: Object.freeze(out), present };
 }
 
 function isFunctionLikeDeclaration(node: ts.Node): node is ts.FunctionLikeDeclaration {
@@ -239,8 +251,14 @@ function visitSourceFile(
       // both the overload signatures and the implementation — they all
       // share the same NodeId (per node-id-builder.ts), so the union
       // logic below merges them onto a single entry.
-      const effects = annotationsForDeclaration(decl);
-      if (effects.length > 0) {
+      //
+      // Closeout 1 Category B (2026-05-25): emit an entry for ANY node
+      // bearing a `@stele:effects` tag, even if the effect list is empty.
+      // An empty annotation list is a deliberate author declaration of
+      // zero effects, and the evaluator uses the presence of an entry to
+      // gate unresolved-call fail-closed widening (closed-world override).
+      const { effects, present } = annotationsForDeclaration(decl);
+      if (present) {
         let nodeId: string;
         try {
           nodeId = buildNodeIdForDeclaration(decl, ctx);

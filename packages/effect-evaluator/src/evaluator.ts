@@ -184,6 +184,46 @@ function nodesById(callGraph: CallGraph): ReadonlyMap<string, CallGraphNode> {
   return out;
 }
 
+/**
+ * Set of NodeIds the author has explicitly annotated with an effect set
+ * (either via JSDoc `@stele:effects ...` in source, or via a CDL
+ * `(effect-annotation ...)` declaration). Closeout 1 Category B
+ * (2026-05-25): these nodes are treated as closed-world — the author's
+ * declaration overrides analyzer uncertainty about unresolved callees.
+ *
+ * An empty annotation list (an `@stele:effects` tag with no names) also
+ * counts: it is a deliberate declaration that the node performs zero
+ * effects, which is itself information the analyzer could not have
+ * inferred from an unresolved call.
+ */
+function collectNodesWithDeclaredEffects(
+  contract: Contract,
+  callGraph: CallGraph,
+  annotationsByNode: ReadonlyMap<string, readonly string[]>,
+  externAliases: ExternAliasRegistry | undefined,
+): ReadonlySet<string> {
+  const out = new Set<string>();
+  // Source-level annotations from the extractor.
+  for (const nodeId of annotationsByNode.keys()) {
+    out.add(nodeId);
+  }
+  // CDL `(effect-annotation ...)` declarations.
+  const compiledAnnotations = contract.effectAnnotations.map((a) => ({
+    annotation: a,
+    patterns: compileAnnotationTargets(a, callGraph.language, externAliases),
+  }));
+  for (const node of callGraph.nodes) {
+    if (out.has(node.id)) continue;
+    for (const { patterns } of compiledAnnotations) {
+      if (matchAny(node.id, patterns)) {
+        out.add(node.id);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 function buildEvidence(
   propagation: PropagationResult,
   match: PolicyMatch,
@@ -310,10 +350,29 @@ export async function evaluateEffects(
   // active policy's target-scope. Out-of-scope caller nodes emit nothing
   // because no policy cares — the principled replacement for the prior
   // global strictMode knob (which silenced everything indiscriminately).
+  //
+  // Additional gate (Closeout 1 Category B, 2026-05-25): a node that
+  // carries an explicit source-level effect annotation (`@stele:effects
+  // ...`) OR matches a CDL `(effect-annotation ...)` is treated as
+  // closed-world — the author has attested to the complete effect set,
+  // overriding the analyzer's "I cannot resolve this callee" uncertainty.
+  // Such nodes do NOT emit `unresolved_call_blocks_evaluation`, and the
+  // fail-closed widening does not apply (the declared effects already
+  // sit in `initialEffects`; widening to ALL declared effects would
+  // falsely accuse the node of effects the author has explicitly
+  // disclaimed). If the author lies, downstream policy checks still fire
+  // against the declared set, and ordinary code review catches the lie.
   const nodeIndex = nodesById(callGraph);
+  const nodesWithDeclaredEffects = collectNodesWithDeclaredEffects(
+    contract,
+    callGraph,
+    extracted.annotationsByNode,
+    externAliases,
+  );
   const inScopeUnresolvedNodes = new Set<string>();
   for (const u of callGraph.unresolvedCalls) {
     if (inScopeUnresolvedNodes.has(u.fromId)) continue;
+    if (nodesWithDeclaredEffects.has(u.fromId)) continue;
     if (matchAny(u.fromId, activeScopeMatchers)) {
       inScopeUnresolvedNodes.add(u.fromId);
     }

@@ -259,6 +259,15 @@ async function buildHashManifestFileEntries(
  * single-project `runGenerate` on each (with `--recursive` removed). Per
  * EP08 spec: any sub-project exit 1 → total 1; otherwise max of remaining
  * non-zero codes.
+ *
+ * Effects: writes status lines through the injected `output` bundle. The
+ * production caller (`index.ts`) binds `output.stdout` to
+ * `process.stdout.write`, so this function performs `process` effects via
+ * the callback. The single-project worker `runGenerate` is invoked through
+ * `runSingleProjectGenerate` (resolved statically) and its effects
+ * propagate through normal call-graph edges.
+ *
+ * @stele:effects process
  */
 export async function runGenerateRecursive(
   rootDir: string,
@@ -429,6 +438,18 @@ export async function collectProtectedPaths(projectDir: string, options: Protect
   return uniqueSortedPaths([...matchedPaths]);
 }
 
+/**
+ * Verify that the generated test files on disk match what the backend
+ * would produce from the contract.
+ *
+ * Effects: dynamically imports `@stele/core` (in-project module — the
+ * dynamic form is used because this file is loaded by the CLI before
+ * `runGenerate` runs and the static dependency would create a cycle),
+ * then calls `verifyGenerated` which reads files under
+ * `<projectDir>/<generatedDir>` and compares them in memory. No writes.
+ *
+ * @stele:effects fs.read
+ */
 export async function verifyManagedGeneratedFiles(
   projectDir: string,
   generatedDir: string,

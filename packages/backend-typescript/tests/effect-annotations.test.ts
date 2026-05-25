@@ -163,10 +163,14 @@ describe("tsEffectAnnotationExtractor — merging multiple tags", () => {
 });
 
 describe("tsEffectAnnotationExtractor — unannotated and edge cases", () => {
-  it("produces an empty map when no functions are annotated", async () => {
+  it("produces a map containing only the empty-annotation entry; unannotated functions are absent", async () => {
+    // Closeout 1 Category B (2026-05-25): an `@stele:effects` tag with
+    // no effect names IS a deliberate author declaration of zero effects.
+    // The extractor records it so the evaluator's closed-world override
+    // can find it. Unannotated functions remain absent.
     const m = await runExtract("unannotated");
-    // emptyAnnotation has `@stele:effects` with no body — must NOT be present.
-    expect(m.size).toBe(0);
+    expect([...m.keys()]).toEqual(["src/index.ts::emptyAnnotation(0)"]);
+    expect(m.get("src/index.ts::emptyAnnotation(0)")).toEqual([]);
   });
 
   it("does NOT read line-comment forms `// @stele:effects ...`", async () => {
@@ -179,9 +183,14 @@ describe("tsEffectAnnotationExtractor — unannotated and edge cases", () => {
     expect(m.has("src/index.ts::regularJsdoc(1)")).toBe(false);
   });
 
-  it("treats an empty `@stele:effects` tag as no-effects (no entry)", async () => {
+  it("records an empty `@stele:effects` tag as an entry with an empty effect list (closed-world declaration)", async () => {
+    // Closeout 1 Category B (2026-05-25): an empty annotation is no
+    // longer dropped. It is recorded so the evaluator can treat the
+    // node as closed-world (the author has attested to zero effects),
+    // which overrides the unresolved-call fail-closed widening.
     const m = await runExtract("unannotated");
-    expect(m.has("src/index.ts::emptyAnnotation(0)")).toBe(false);
+    expect(m.has("src/index.ts::emptyAnnotation(0)")).toBe(true);
+    expect(m.get("src/index.ts::emptyAnnotation(0)")).toEqual([]);
   });
 });
 
@@ -253,8 +262,12 @@ describe("tsEffectAnnotationExtractor — result shape", () => {
     expect([...a.keys()]).toEqual([...b.keys()]);
   });
 
-  it("returns an empty map for fixtures with zero annotations", async () => {
+  it("returns a map sized to the count of explicitly-annotated nodes", async () => {
+    // Closeout 1 Category B (2026-05-25): the `unannotated` fixture has
+    // one function with an empty `@stele:effects` tag (a deliberate
+    // zero-effects declaration). The map records that one entry; all
+    // truly-unannotated functions remain absent.
     const m = await runExtract("unannotated");
-    expect(m.size).toBe(0);
+    expect(m.size).toBe(1);
   });
 });

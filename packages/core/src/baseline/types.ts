@@ -89,7 +89,18 @@ export function createViolationBaseline(options: CreateViolationBaselineOptions)
 export function filterViolationReport(report: ViolationReport, options: FilterViolationReportOptions = {}): ViolationReport {
   const diffScopePaths = options.diffScopePaths === undefined ? undefined : new Set([...options.diffScopePaths].map(normalizePath));
   const isSuppressible = options.isSuppressible ?? (() => true);
-  const violations = report.violations.map((violation) => {
+  const violations = report.violations.map(
+    /**
+     * Per-violation classifier: applies diff-scope and baseline-suppression
+     * via the `isSuppressible` predicate (a pure callback passed in by the
+     * caller). Itself performs no IO — only object reshaping and a
+     * predicate call. The closed-world declaration below tells the
+     * effect-evaluator that the unresolved `isSuppressible(...)` callee is
+     * accounted for and contributes no effects to this lambda's set.
+     *
+     * @stele:effects
+     */
+    (violation) => {
     const normalized = {
       ...violation,
       source: { ...violation.source },

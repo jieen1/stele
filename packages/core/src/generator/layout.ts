@@ -127,6 +127,17 @@ export function assertGeneratedFilesMatchExpectedLayout(
   );
 }
 
+/**
+ * Pure helper: validate that `normalizedPath` is unique (and that no
+ * case-insensitive collision exists) before invoking the `register`
+ * callback to record it. The `register` callback is a function-typed
+ * parameter — every production caller binds it to a pure in-memory
+ * `Set.add` / `Map.set` update; none performs IO. The closed-world
+ * declaration tells the effect-evaluator that the unresolved
+ * `register(...)` callee is accounted for and contributes no effects.
+ *
+ * @stele:effects
+ */
 function registerGeneratedPath(
   normalizedPath: string,
   seenPaths: Set<string>,

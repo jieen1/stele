@@ -321,6 +321,18 @@ function parseTarget(node: ListNode, label: string, id: string): string {
 
 // -- Field collection --
 
+/**
+ * Pure AST-walking helper. Loops through the declared `fields`, looks
+ * each one up in the `DeclarationConfig`'s field-map, and invokes the
+ * config's pure `reader` callback (e.g. `readStrings`, `readNames`,
+ * `readFieldRequirements`) to parse the value. Every `reader` in
+ * `CODE_SHAPE_REGISTRY` is a pure AST inspector — none performs IO.
+ * The closed-world declaration tells the effect-evaluator that the
+ * unresolved `spec.reader(...)` callee is accounted for and
+ * contributes no effects.
+ *
+ * @stele:effects
+ */
 function collectFields(
   config: DeclarationConfig,
   id: string,
