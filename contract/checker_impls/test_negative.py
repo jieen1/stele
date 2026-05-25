@@ -2308,6 +2308,103 @@ def test_design_diff_engine_shape_catches_missing_required_field():
     ), "checker did not detect violation: cli-design-diff-engine-aggregate-shape (missing required field)"
 
 
+def test_cli_program_factory_shape_catches_missing_method():
+    """Closeout 3b — Test A for cli-cli-program-factory: deleting the
+    `cmdSpec` function body must trip the must-have-method check."""
+    assert _mutate_then_check(
+        "packages/cli/src/index.ts",
+        lambda text: re.sub(
+            r"\nfunction cmdSpec\(name: string, positional = \"\"\): string \{[\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "cli-cli-program-factory-aggregate-shape",
+    ), "checker did not detect violation: cli-cli-program-factory-aggregate-shape (missing method)"
+
+
+def test_cli_program_factory_shape_catches_missing_aggregate_member():
+    """Closeout 3b — Test B for cli-cli-program-factory: renaming
+    `loadAgentHooksInstaller` (an aggregate_members entry not in
+    required_methods) so the listed sibling name no longer matches any
+    module-level declaration must trip the aggregate-member coherence
+    check — a different evaluator branch from Test A."""
+    assert _mutate_then_check(
+        "packages/cli/src/index.ts",
+        lambda text: text.replace(
+            "async function loadAgentHooksInstaller",
+            "async function loadAgentHooksInstallerRenamedForTest",
+            1,
+        ),
+        "cli-cli-program-factory-aggregate-shape",
+    ), "checker did not detect violation: cli-cli-program-factory-aggregate-shape (missing aggregate-member)"
+
+
+def test_design_profile_validator_shape_catches_missing_method():
+    """Closeout 3b — Test A for cli-design-profile-validator: deleting
+    the `addDddErrors` function body must trip the must-have-method
+    check."""
+    assert _mutate_then_check(
+        "packages/cli/src/design-profile/validate.ts",
+        lambda text: re.sub(
+            r"\nfunction addDddErrors\(profile: DesignProfile, errors: ValidationErrors, profilePath: string\): void \{[\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "cli-design-profile-validator-aggregate-shape",
+    ), "checker did not detect violation: cli-design-profile-validator-aggregate-shape (missing method)"
+
+
+def test_design_profile_validator_shape_catches_missing_aggregate_member():
+    """Closeout 3b — Test B for cli-design-profile-validator: renaming
+    `addTraceErrors` (an aggregate_members entry not in required_methods)
+    so the listed sibling name no longer matches any module-level
+    declaration must trip the aggregate-member coherence check."""
+    assert _mutate_then_check(
+        "packages/cli/src/design-profile/validate.ts",
+        lambda text: text.replace(
+            "function addTraceErrors",
+            "function addTraceErrorsRenamedForTest",
+            1,
+        ),
+        "cli-design-profile-validator-aggregate-shape",
+    ), "checker did not detect violation: cli-design-profile-validator-aggregate-shape (missing aggregate-member)"
+
+
+def test_architecture_evaluator_shape_catches_missing_method():
+    """Closeout 3b — Test A for architecture-architecture-evaluator:
+    deleting the `findCycleViolations` exported function body must trip
+    the must-have-method check."""
+    assert _mutate_then_check(
+        "packages/architecture-core/src/evaluate.ts",
+        lambda text: re.sub(
+            r"\nexport function findCycleViolations\([\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "architecture-architecture-evaluator-aggregate-shape",
+    ), "checker did not detect violation: architecture-architecture-evaluator-aggregate-shape (missing method)"
+
+
+def test_architecture_evaluator_shape_catches_missing_aggregate_member():
+    """Closeout 3b — Test B for architecture-architecture-evaluator:
+    renaming `buildAllowMap` (an aggregate_members entry not in
+    required_methods) so the listed sibling name no longer matches any
+    module-level declaration must trip the aggregate-member coherence
+    check."""
+    assert _mutate_then_check(
+        "packages/architecture-core/src/evaluate.ts",
+        lambda text: text.replace(
+            "function buildAllowMap",
+            "function buildAllowMapRenamedForTest",
+            1,
+        ),
+        "architecture-architecture-evaluator-aggregate-shape",
+    ), "checker did not detect violation: architecture-architecture-evaluator-aggregate-shape (missing aggregate-member)"
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -2444,6 +2541,12 @@ def main() -> int:
         ("code_shape_evaluator_shape_catches_missing_aggregate_member", test_code_shape_evaluator_shape_catches_missing_aggregate_member),
         ("design_diff_engine_shape_catches_missing_method", test_design_diff_engine_shape_catches_missing_method),
         ("design_diff_engine_shape_catches_missing_required_field", test_design_diff_engine_shape_catches_missing_required_field),
+        ("cli_program_factory_shape_catches_missing_method", test_cli_program_factory_shape_catches_missing_method),
+        ("cli_program_factory_shape_catches_missing_aggregate_member", test_cli_program_factory_shape_catches_missing_aggregate_member),
+        ("design_profile_validator_shape_catches_missing_method", test_design_profile_validator_shape_catches_missing_method),
+        ("design_profile_validator_shape_catches_missing_aggregate_member", test_design_profile_validator_shape_catches_missing_aggregate_member),
+        ("architecture_evaluator_shape_catches_missing_method", test_architecture_evaluator_shape_catches_missing_method),
+        ("architecture_evaluator_shape_catches_missing_aggregate_member", test_architecture_evaluator_shape_catches_missing_aggregate_member),
     ]
 
     print("=" * 60)

@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "3f2cd7f150abd1a8de189946e51fe760be2373a5e63ca349312b02ae32e83201",
+  "profileHash": "d00c377850b4601807aa345a87b200699ea651bc072d652875dde7f179c6d113",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "225deeefd690b587e5435739890509dc67da564f"
+    "git_sha": "694972a5810227de9b96994afd6ca3dd486a79b1"
   },
   "templates": [
     "ddd-typedriven"
@@ -420,8 +420,16 @@
           "aggregate_id": "factory"
         }
       ],
-      "fileHash": "701dae5a72732436231d7de7e7386ce94bd369159d5d9bd2282a2e2412f2e912",
-      "cdl": "(core-node \"cli-cli-program-factory-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/index.ts::createSteleProgram\")\n  (description \"Generated from design profile: CliProgramFactory aggregate must remain reviewable.\")\n  (rationale \"CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric public-method-count (ideal 4) (max 10))\n)"
+      "fileHash": "831b944a60c06ba3e4b93cfdb210fac9652d192ea25062e13c24c6389940c1ad",
+      "cdl": "(core-node \"cli-cli-program-factory-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/index.ts::createProgram\")\n  (description \"Generated from design profile: CliProgramFactory aggregate must remain reviewable.\")\n  (rationale \"CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric public-method-count (ideal 4) (max 10))\n)"
+    },
+    {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "54532958040f9cb64b1791919ee89caad70d1b0a546e7b49f8295fe394e293b3",
+      "cdl": "(class-shape cli-cli-program-factory-aggregate-shape\n  (lang typescript)\n  (target \"packages/cli/src/index.ts::createProgram\")\n  (must-have-method \"cmdSpec\")\n  (must-have-method \"createProgram\")\n  (must-have-method \"runCli\")\n  (aggregate-members \"cmdSpec\" \"createProgram\" \"formatVersion\" \"loadAgentHooksInstaller\" \"runCli\" \"runInstallCommand\")\n)"
     },
     {
       "ruleId": "core-node.cli-design-profile-validator-aggregate",
@@ -437,6 +445,14 @@
       "cdl": "(core-node \"cli-design-profile-validator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/design-profile/validate.ts::validateProfile\")\n  (description \"Generated from design profile: DesignProfileValidator aggregate must remain reviewable.\")\n  (rationale \"DesignProfileValidator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     },
     {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "9a2bd1815ef1ee7c1bc47f5d4d909fb8f74018e1f77db3be955deb5d6a1dfabb",
+      "cdl": "(class-shape cli-design-profile-validator-aggregate-shape\n  (lang typescript)\n  (target \"packages/cli/src/design-profile/validate.ts::validateProfile\")\n  (must-have-method \"addDddErrors\")\n  (must-have-method \"addTypeDrivenErrors\")\n  (must-have-method \"validateProfile\")\n  (must-have-method \"validateTargetFormat\")\n  (aggregate-members \"addCoreInvariantErrors\" \"addDddErrors\" \"addProjectErrors\" \"addSchemaVersionErrors\" \"addTraceErrors\" \"addTypeDrivenErrors\" \"addUniquenessErrors\" \"isPathTraversal\" \"validateProfile\" \"validateTargetFormat\")\n)"
+    },
+    {
       "ruleId": "core-node.architecture-architecture-evaluator-aggregate",
       "ruleKind": "core-node",
       "origin": "aggregate:evaluator",
@@ -448,19 +464,27 @@
       ],
       "fileHash": "2cec395eccfb622b6e53aeebeb261deb5ad5faaaff83d9ac43b5f29455bb0ee6",
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
+    },
+    {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "fbaa0027d1f80347a4ad9155b53e51a02be5bb9a39b56cfcef4dff358992fe5b",
+      "cdl": "(class-shape architecture-architecture-evaluator-aggregate-shape\n  (lang typescript)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (must-have-method \"detectCycles\")\n  (must-have-method \"evaluateArchitecture\")\n  (must-have-method \"findCycleViolations\")\n  (must-have-method \"findDependencyViolations\")\n  (must-have-method \"findLayerDirectionViolations\")\n  (must-have-method \"findPublicEntryViolations\")\n  (aggregate-members \"buildAllowMap\" \"detectCycles\" \"evaluateArchitecture\" \"findCycleViolations\" \"findDependencyViolations\" \"findLayerDirectionViolations\" \"findPublicEntryViolations\")\n)"
     }
   ],
-  "generatedAt": "2026-05-25T09:25:09.591Z",
+  "generatedAt": "2026-05-25T09:33:39.378Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "ccea03af887ea3a16feec9bd3a91142b102a8abedd7e020ecdff7d1430cc56c8"
+      "hash": "7d39002d77db764f0d24735bdbae64ec92fe0455846ace60b66495c9cd7e2c33"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "ccea03af887ea3a16feec9bd3a91142b102a8abedd7e020ecdff7d1430cc56c8",
+      "sha256": "7d39002d77db764f0d24735bdbae64ec92fe0455846ace60b66495c9cd7e2c33",
       "rules": [
         {
           "id": "architecture.ddd-core",

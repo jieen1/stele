@@ -511,11 +511,20 @@
 (core-node "cli-cli-program-factory-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/cli/src/index.ts::createSteleProgram")
+  (target "packages/cli/src/index.ts::createProgram")
   (description "Generated from design profile: CliProgramFactory aggregate must remain reviewable.")
   (rationale "CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 200) (max 400))
   (metric public-method-count (ideal 4) (max 10))
+)
+
+(class-shape cli-cli-program-factory-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/index.ts::createProgram")
+  (must-have-method "cmdSpec")
+  (must-have-method "createProgram")
+  (must-have-method "runCli")
+  (aggregate-members "cmdSpec" "createProgram" "formatVersion" "loadAgentHooksInstaller" "runCli" "runInstallCommand")
 )
 
 (core-node "cli-design-profile-validator-aggregate"
@@ -528,6 +537,16 @@
   (metric max-cyclomatic (ideal 10) (max 25))
 )
 
+(class-shape cli-design-profile-validator-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/design-profile/validate.ts::validateProfile")
+  (must-have-method "addDddErrors")
+  (must-have-method "addTypeDrivenErrors")
+  (must-have-method "validateProfile")
+  (must-have-method "validateTargetFormat")
+  (aggregate-members "addCoreInvariantErrors" "addDddErrors" "addProjectErrors" "addSchemaVersionErrors" "addTraceErrors" "addTypeDrivenErrors" "addUniquenessErrors" "isPathTraversal" "validateProfile" "validateTargetFormat")
+)
+
 (core-node "architecture-architecture-evaluator-aggregate"
   (lang typescript)
   (role business-core-service)
@@ -536,6 +555,18 @@
   (rationale "ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 200) (max 400))
   (metric max-cyclomatic (ideal 10) (max 25))
+)
+
+(class-shape architecture-architecture-evaluator-aggregate-shape
+  (lang typescript)
+  (target "packages/architecture-core/src/evaluate.ts::evaluateArchitecture")
+  (must-have-method "detectCycles")
+  (must-have-method "evaluateArchitecture")
+  (must-have-method "findCycleViolations")
+  (must-have-method "findDependencyViolations")
+  (must-have-method "findLayerDirectionViolations")
+  (must-have-method "findPublicEntryViolations")
+  (aggregate-members "buildAllowMap" "detectCycles" "evaluateArchitecture" "findCycleViolations" "findDependencyViolations" "findLayerDirectionViolations" "findPublicEntryViolations")
 )
 
 (branded-id "RuleId"

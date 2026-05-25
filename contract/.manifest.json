@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-25T09:25:10.358Z",
+  "generated_at": "2026-05-25T09:33:40.050Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -20,8 +20,8 @@
       "size": 154229
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "d104fb40ef16c713adcdca87c8d8208336f23820cb0596b40897b8f870de8b16",
-      "size": 112620
+      "sha256": "1788f22f0aceb0916ae1a9300065b54ca81389676a7f174e28fc63f37131f1f0",
+      "size": 118215
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
@@ -55,21 +55,25 @@
       "sha256": "cdac3084de83919da138700693516ceba3b28ff787449f8db0d68fb65ca9340b",
       "size": 2029
     },
+    "contract/design/approvals/2026-05-25T09-33-39-03-d00c3778.json": {
+      "sha256": "8f66ae994b700b6dca9a7f926be12fcd89ea818af4ae1a5417f851f836f1d56d",
+      "size": 2109
+    },
     "contract/design/manifest.json": {
-      "sha256": "709c81c3ab84bcc5f6445da9bca5bc0af2e17782a3b4a01f801399798e44e71e",
-      "size": 49254
+      "sha256": "ed049f332597004635f6eda7b9ac6f9d01148844696ff5e7c880dae18be3b668",
+      "size": 51551
     },
     "contract/design/profile.yaml": {
-      "sha256": "3f2cd7f150abd1a8de189946e51fe760be2373a5e63ca349312b02ae32e83201",
-      "size": 23242
+      "sha256": "d00c377850b4601807aa345a87b200699ea651bc072d652875dde7f179c6d113",
+      "size": 24848
     },
     "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml": {
       "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601",
       "size": 2615
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "ccea03af887ea3a16feec9bd3a91142b102a8abedd7e020ecdff7d1430cc56c8",
-      "size": 23643
+      "sha256": "7d39002d77db764f0d24735bdbae64ec92fe0455846ace60b66495c9cd7e2c33",
+      "size": 25150
     },
     "contract/main.stele": {
       "sha256": "d91d97462bc29ca8c985cc74af13bde5dc75292cad747835dec5a1dabc99f8bd",
@@ -252,5 +256,5 @@
       "size": 381
     }
   },
-  "contract_hash": "bc360580ba1bf8ec8c73f6fd3eba3cb99295fa5875d2bdcb0b2e5c86611078c5"
+  "contract_hash": "b0285ab8e788646433847ad481c596061447b2b4863de86f8314675af3cb7dfa"
 }

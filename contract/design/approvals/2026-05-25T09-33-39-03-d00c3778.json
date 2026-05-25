@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "base_profile_sha256": "3f2cd7f150abd1a8de189946e51fe760be2373a5e63ca349312b02ae32e83201",
+  "approved_profile_sha256": "d00c377850b4601807aa345a87b200699ea651bc072d652875dde7f179c6d113",
+  "approved_proposals": [
+    {
+      "path": "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml",
+      "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601"
+    }
+  ],
+  "diff_classification": "additive",
+  "affected_generated_rules": [
+    "architecture.ddd-core",
+    "architecture.ddd-cli",
+    "architecture.ddd-architecture",
+    "architecture.ddd-backends-ts",
+    "architecture.ddd-backends-py",
+    "architecture.ddd-hooks",
+    "architecture.ddd-mcp",
+    "architecture.ddd-backends-go",
+    "architecture.ddd-backends-java",
+    "architecture.ddd-backends-rust",
+    "architecture.ddd-github-action",
+    "architecture.ddd-plugin",
+    "architecture.ddd-call-graph-core",
+    "architecture.ddd-trace-evaluator",
+    "architecture.ddd-type-state-evaluator",
+    "architecture.ddd-effect-evaluator",
+    "architecture.ddd-type-driven-evaluator",
+    "architecture.ddd-context-map",
+    "core-node.core-operator-registry-aggregate",
+    "core-node.unknown",
+    "core-node.core-invariant-validator-aggregate",
+    "core-node.unknown",
+    "core-node.core-contract-loader-aggregate",
+    "core-node.unknown",
+    "core-node.core-manifest-engine-aggregate",
+    "core-node.unknown",
+    "core-node.cli-check-orchestrator-aggregate",
+    "core-node.unknown",
+    "core-node.cli-code-shape-evaluator-aggregate",
+    "core-node.unknown",
+    "core-node.cli-design-diff-engine-aggregate",
+    "core-node.unknown",
+    "core-node.cli-cli-program-factory-aggregate",
+    "core-node.cli-design-profile-validator-aggregate",
+    "core-node.architecture-architecture-evaluator-aggregate"
+  ],
+  "affected_source_scope": [],
+  "reason": "Closeout 3b batch 3: cli-cli-program-factory + cli-design-profile-validator + architecture-architecture-evaluator",
+  "approved_by": "wncjknvwpv@privaterelay.appleid.com",
+  "approved_at": "2026-05-25T09:33:39.037Z"
+}
