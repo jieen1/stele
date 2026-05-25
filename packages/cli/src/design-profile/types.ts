@@ -33,17 +33,30 @@ export type AggregateRoot = {
   id: string;
   decision_ref?: string;
   class: string;
-  target: string; // "path.ts::ClassName"
+  target: string; // "path.ts::ClassName" OR "path.ts::functionName" (Closeout 3a)
   /**
    * Phase 6 self-dogfooding: when populated, the design generator emits a
    * paired `(class-shape …)` declaration alongside the aggregate's
-   * `(core-node …)`. The `target` field must resolve to a real class
-   * declaration for the class-shape evaluator to bind — function targets
-   * are silently dropped (logged at generate time). Both fields are
-   * optional; an aggregate without them is metric-bounded only.
+   * `(core-node …)`. The `target` field may resolve to a class declaration
+   * or — after Closeout 3a (2026-05-25) — a free function (module function
+   * or factory). For free-function targets, `aggregate_members` is required
+   * when `required_methods` / `required_fields` reference siblings other
+   * than the target itself. Both required-* fields are optional; an
+   * aggregate without them is metric-bounded only.
    */
   required_methods?: string[];
   required_fields?: string[];
+  /**
+   * Closeout 3a (2026-05-25): explicit sibling-export enumeration for free-
+   * function aggregate targets. Lists the exact top-level names (functions
+   * or const exports) in the target file that constitute this aggregate's
+   * identity. The class-shape evaluator restricts its required-method /
+   * required-field lookup to these names — preventing two aggregates whose
+   * targets live in the same module from cross-binding on each other's
+   * siblings (M6 fix). Unused for class targets; unused for factory targets
+   * (the return type is the enumeration).
+   */
+  aggregate_members?: string[];
   metrics: {
     sloc?: { ideal: number; max: number };
     "public-method-count"?: { ideal: number; max: number };

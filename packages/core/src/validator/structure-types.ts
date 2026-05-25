@@ -257,6 +257,17 @@ export type ClassShapeDeclaration = {
   mustHaveFields: ClassShapeFieldRequirement[];
   mustHaveMethods: string[];
   mustExtend: string[];
+  /**
+   * Closeout 3a (2026-05-25): explicit member enumeration for free-function
+   * aggregate targets. When the class-shape target resolves to a module-level
+   * function (not a class), `aggregateMembers` lists the exact sibling
+   * function/variable names that belong to the aggregate. The evaluator's
+   * required-method / required-field check is then scoped to this enumeration
+   * — no implicit "all siblings" matching (M6 fix). For class targets the
+   * field is ignored; for factory-mode targets the return type's members are
+   * used and this field has no effect.
+   */
+  aggregateMembers: string[];
 };
 
 export type FunctionShapeDeclaration = {

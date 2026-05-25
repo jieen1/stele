@@ -378,6 +378,50 @@ describe("code-shape declarations", () => {
     expect(shape.mustExtend).toEqual(["BaseService"]);
   });
 
+  it("accepts class-shape declarations with aggregate-members for free-function targets (Closeout 3a)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(class-shape check_aggregate_shape",
+        "  (lang typescript)",
+        '  (target "packages/cli/src/commands/check.ts::runCheck")',
+        '  (must-have-method "runCheck")',
+        '  (must-have-method "prepareCheckContextWithContract")',
+        '  (aggregate-members "prepareCheckContextWithContract" "runCheckImpl"))',
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    const shape = contract.codeShapes[0];
+    expect(shape.kind).toBe("class-shape");
+    if (shape.kind !== "class-shape") {
+      throw new Error("expected class-shape");
+    }
+    expect(shape.mustHaveMethods).toEqual(["runCheck", "prepareCheckContextWithContract"]);
+    expect(shape.aggregateMembers).toEqual([
+      "prepareCheckContextWithContract",
+      "runCheckImpl",
+    ]);
+  });
+
+  it("class-shape without aggregate-members exposes an empty array (back-compat with class targets)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        "(class-shape regular_class",
+        "  (lang python)",
+        '  (target "src/services.py::Service")',
+        "  (must-have-method save))",
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    const shape = contract.codeShapes[0];
+    expect(shape.kind).toBe("class-shape");
+    if (shape.kind !== "class-shape") {
+      throw new Error("expected class-shape");
+    }
+    expect(shape.aggregateMembers).toEqual([]);
+  });
+
   it("accepts function-shape declarations", async () => {
     const project = await createTempProject({
       "main.stele": [

@@ -253,6 +253,37 @@ function addDddErrors(profile: DesignProfile, errors: ValidationErrors, profileP
           message: err,
         });
       }
+
+      // Closeout 3a (2026-05-25): aggregate-members coherence check. When an
+      // aggregate declares `aggregate_members`, every name in
+      // `required_methods` / `required_fields` must appear in
+      // `aggregate_members` (or be the target's own name). Mismatch is a
+      // free-function-aggregate authoring error — the class-shape evaluator
+      // would otherwise look for sibling names that this aggregate does not
+      // claim, producing confusing "method not found" violations.
+      const aggMembers = agg.aggregate_members ?? [];
+      if (aggMembers.length > 0) {
+        const targetName = agg.target.split("::")[1] ?? "";
+        const allowed = new Set<string>([targetName, ...aggMembers]);
+        for (const method of agg.required_methods ?? []) {
+          if (!allowed.has(method)) {
+            errors.push({
+              field: `ddd.contexts.${ctx.id}.aggregate_roots.${agg.id}.required_methods`,
+              path: profilePath,
+              message: `required_method "${method}" is not in aggregate_members ([${aggMembers.join(", ")}]) — every required_method on a free-function aggregate must be the target name or appear in aggregate_members.`,
+            });
+          }
+        }
+        for (const field of agg.required_fields ?? []) {
+          if (!allowed.has(field)) {
+            errors.push({
+              field: `ddd.contexts.${ctx.id}.aggregate_roots.${agg.id}.required_fields`,
+              path: profilePath,
+              message: `required_field "${field}" is not in aggregate_members ([${aggMembers.join(", ")}]) — every required_field on a free-function aggregate must be the target name or appear in aggregate_members.`,
+            });
+          }
+        }
+      }
     }
   }
 

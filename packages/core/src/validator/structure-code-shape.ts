@@ -48,6 +48,11 @@ export function parseCodeShapeDeclaration(filePath: string, node: ListNode): Cod
         mustHaveFields: (collected.get("must-have-field") as ClassShapeFieldRequirement[]) ?? [],
         mustHaveMethods: (collected.get("must-have-method") as string[]) ?? [],
         mustExtend: (collected.get("must-extend") as string[]) ?? [],
+        // Closeout 3a (2026-05-25): explicit aggregate-member enumeration for
+        // free-function targets. Empty array means "not provided" — class-
+        // targeted shapes ignore it; free-function shapes require it for
+        // anything beyond a self-referential single-method check.
+        aggregateMembers: (collected.get("aggregate-members") as string[]) ?? [],
       };
 
     case "function-shape":
@@ -170,6 +175,11 @@ const CODE_SHAPE_REGISTRY: Record<CodeShapeDeclaration["kind"], DeclarationConfi
       { key: "must-have-field", reader: readFieldRequirements },
       { key: "must-have-method", reader: readNames },
       { key: "must-extend", reader: readNames },
+      // Closeout 3a (2026-05-25): explicit sibling enumeration used when the
+      // target resolves to a free function instead of a class. Each entry is
+      // an identifier or string referring to a top-level export name in the
+      // target file.
+      { key: "aggregate-members", reader: readNames },
     ],
   },
   "function-shape": {

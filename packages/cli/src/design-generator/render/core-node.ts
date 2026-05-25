@@ -3,10 +3,16 @@
 // Phase 6 self-dogfooding (2026-05-25): when an aggregate root carries
 // `required_methods` and/or `required_fields`, the renderer also emits a
 // paired `(class-shape …)` declaration so the aggregate's structural
-// identity is locked alongside its complexity metrics. The class-shape
-// evaluator only binds to real `class` declarations — function-targeted
-// aggregates (e.g. `validateInvariant`, `runCheck`) cannot use this
-// extension today (see decision log).
+// identity is locked alongside its complexity metrics.
+//
+// Closeout 3a (2026-05-25): the class-shape evaluator now binds to free-
+// function targets (module functions and factory functions) in addition
+// to TypeScript `class` declarations. When the YAML aggregate provides
+// `aggregate_members`, the renderer emits a paired
+// `(aggregate-members "<name>" …)` form so the evaluator can scope the
+// required-method / required-field lookup to that explicit enumeration
+// (M6 fix — prevents two aggregates targeting the same module from
+// cross-binding on each other's siblings).
 
 import type { AggregateRoot } from "../../design-profile/types.js";
 import { escapeString } from "./shared.js";
@@ -82,12 +88,20 @@ export function renderAggregateClassShape(
   // Sorted for deterministic output regardless of YAML key order.
   const methods = [...(agg.required_methods ?? [])].sort();
   const fields = [...(agg.required_fields ?? [])].sort();
+  const members = [...(agg.aggregate_members ?? [])].sort();
 
   for (const method of methods) {
     lines.push(`  (must-have-method "${escapeString(method)}")`);
   }
   for (const field of fields) {
     lines.push(`  (must-have-field "${escapeString(field)}")`);
+  }
+  // Closeout 3a (2026-05-25): explicit aggregate-member enumeration for
+  // free-function targets. The form is emitted as a single list with all
+  // members so the evaluator sees them in one collected entry.
+  if (members.length > 0) {
+    const memberList = members.map((m) => `"${escapeString(m)}"`).join(" ");
+    lines.push(`  (aggregate-members ${memberList})`);
   }
 
   lines.push(")");

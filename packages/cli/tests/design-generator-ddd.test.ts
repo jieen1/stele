@@ -292,6 +292,64 @@ describe("renderAggregateCoreNode — aggregate root", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Closeout 3a — renderAggregateClassShape emits aggregate-members
+// ---------------------------------------------------------------------------
+
+describe("renderAggregateClassShape — aggregate-members emission (Closeout 3a)", () => {
+  it("emits an (aggregate-members …) form when aggregate_members is populated", async () => {
+    const { renderAggregateClassShape } = await import(
+      "../src/design-generator/render/core-node.js"
+    );
+    const cdl = renderAggregateClassShape("cli", {
+      id: "check-orchestrator",
+      class: "CheckOrchestrator",
+      target: "packages/cli/src/commands/check.ts::runCheck",
+      required_methods: ["runCheck", "prepareCheckContextWithContract"],
+      aggregate_members: ["prepareCheckContextWithContract", "runCheckImpl"],
+      metrics: {},
+    });
+    expect(cdl).toBeDefined();
+    expect(cdl!).toContain(
+      '(aggregate-members "prepareCheckContextWithContract" "runCheckImpl")',
+    );
+    expect(cdl!).toContain('(must-have-method "runCheck")');
+    expect(cdl!).toContain('(must-have-method "prepareCheckContextWithContract")');
+  });
+
+  it("omits the (aggregate-members …) form when aggregate_members is empty/undefined", async () => {
+    const { renderAggregateClassShape } = await import(
+      "../src/design-generator/render/core-node.js"
+    );
+    const cdl = renderAggregateClassShape("core", {
+      id: "operator-registry",
+      class: "InMemoryOperatorRegistry",
+      target: "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry",
+      required_methods: ["register", "get"],
+      required_fields: ["#operators"],
+      metrics: {},
+    });
+    expect(cdl).toBeDefined();
+    expect(cdl!).not.toContain("aggregate-members");
+  });
+
+  it("emits members sorted alphabetically for deterministic output", async () => {
+    const { renderAggregateClassShape } = await import(
+      "../src/design-generator/render/core-node.js"
+    );
+    const cdl = renderAggregateClassShape("cli", {
+      id: "anything",
+      class: "Anything",
+      target: "src/foo.ts::anything",
+      required_methods: ["anything"],
+      aggregate_members: ["zebra", "alpha", "mango"],
+      metrics: {},
+    });
+    expect(cdl).toBeDefined();
+    expect(cdl!).toContain('(aggregate-members "alpha" "mango" "zebra")');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Full profile generation via generateFromProfile
 // ---------------------------------------------------------------------------
 

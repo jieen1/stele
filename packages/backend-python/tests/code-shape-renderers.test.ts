@@ -12,6 +12,7 @@ function makeClassShape(overrides?: Partial<ClassShapeDeclaration>): ClassShapeD
     mustHaveFields: [],
     mustHaveMethods: [],
     mustExtend: [],
+    aggregateMembers: [],
     node: { kind: "list", head: "class-shape", items: [], span: { file: "", line: 1, column: 1 } },
     span: { file: "", line: 1, column: 1 },
     ...overrides,

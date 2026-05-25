@@ -91,6 +91,9 @@ export type IndexedCodeShape =
       must_have_fields: Array<{ name: string; type: string | null }>;
       must_have_methods: string[];
       must_extend: string[];
+      // Closeout 3a (2026-05-25): explicit sibling enumeration; empty array
+      // means "not provided".
+      aggregate_members: string[];
       design_origin: DesignOrigin;
     }
   | {
@@ -303,7 +306,7 @@ function indexBoundary(
 }
 
 function indexClassShape(
-  base: Omit<Extract<IndexedCodeShape, { kind: "class-shape" }>, "kind" | "must_have_fields" | "must_have_methods" | "must_extend">,
+  base: Omit<Extract<IndexedCodeShape, { kind: "class-shape" }>, "kind" | "must_have_fields" | "must_have_methods" | "must_extend" | "aggregate_members">,
   shape: ClassShapeDeclaration,
 ): Extract<IndexedCodeShape, { kind: "class-shape" }> {
   return {
@@ -312,6 +315,7 @@ function indexClassShape(
     must_have_fields: shape.mustHaveFields.map((field) => ({ name: field.name, type: field.type ?? null })),
     must_have_methods: [...shape.mustHaveMethods],
     must_extend: [...shape.mustExtend],
+    aggregate_members: [...shape.aggregateMembers],
   };
 }
 

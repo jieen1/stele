@@ -653,6 +653,147 @@ describe("validateProfile — uniqueness", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Closeout 3a — aggregate_members coherence
+// ---------------------------------------------------------------------------
+
+describe("aggregate_members coherence (Closeout 3a)", () => {
+  it("rejects a required_method that is not in aggregate_members or the target name", () => {
+    const profile = {
+      ...minimalProfile(),
+      ddd: {
+        bounded_context_strategy: "by_business_function",
+        contexts: [
+          {
+            id: "core",
+            name: "Core",
+            subdomain_type: "core",
+            root: "src/core",
+            layers: {},
+            aggregate_roots: [
+              {
+                id: "check-orchestrator",
+                class: "CheckOrchestrator",
+                target: "src/core/check.ts::runCheck",
+                required_methods: ["runCheck", "prepareContext", "renamedSibling"],
+                aggregate_members: ["prepareContext"],
+                metrics: {},
+              },
+            ],
+          },
+        ],
+      },
+    } as unknown as DesignProfile;
+    const errors = validateProfile(profile);
+    const offending = errors.find((e) =>
+      e.field === "ddd.contexts.core.aggregate_roots.check-orchestrator.required_methods" &&
+      e.message.includes("renamedSibling"),
+    );
+    expect(offending).toBeDefined();
+  });
+
+  it("rejects a required_field that is not in aggregate_members or the target name", () => {
+    const profile = {
+      ...minimalProfile(),
+      ddd: {
+        bounded_context_strategy: "by_business_function",
+        contexts: [
+          {
+            id: "core",
+            name: "Core",
+            subdomain_type: "core",
+            root: "src/core",
+            layers: {},
+            aggregate_roots: [
+              {
+                id: "loader",
+                class: "Loader",
+                target: "src/core/load.ts::loadContract",
+                required_methods: ["loadContract"],
+                required_fields: ["CACHE_SLAB"],
+                aggregate_members: ["DEFAULT_PATH"],
+                metrics: {},
+              },
+            ],
+          },
+        ],
+      },
+    } as unknown as DesignProfile;
+    const errors = validateProfile(profile);
+    const offending = errors.find((e) =>
+      e.field === "ddd.contexts.core.aggregate_roots.loader.required_fields" &&
+      e.message.includes("CACHE_SLAB"),
+    );
+    expect(offending).toBeDefined();
+  });
+
+  it("accepts required_methods that all appear in aggregate_members plus the target name", () => {
+    const profile = {
+      ...minimalProfile(),
+      ddd: {
+        bounded_context_strategy: "by_business_function",
+        contexts: [
+          {
+            id: "core",
+            name: "Core",
+            subdomain_type: "core",
+            root: "src/core",
+            layers: {},
+            aggregate_roots: [
+              {
+                id: "check-orchestrator",
+                class: "CheckOrchestrator",
+                target: "src/core/check.ts::runCheck",
+                required_methods: ["runCheck", "prepareContext"],
+                aggregate_members: ["prepareContext", "runCheckImpl"],
+                metrics: {},
+              },
+            ],
+          },
+        ],
+      },
+    } as unknown as DesignProfile;
+    const errors = validateProfile(profile);
+    const offending = errors.find((e) =>
+      e.field.endsWith(".required_methods") || e.field.endsWith(".required_fields"),
+    );
+    expect(offending).toBeUndefined();
+  });
+
+  it("skips the aggregate-members check when aggregate_members is empty (back-compat with class targets)", () => {
+    const profile = {
+      ...minimalProfile(),
+      ddd: {
+        bounded_context_strategy: "by_business_function",
+        contexts: [
+          {
+            id: "core",
+            name: "Core",
+            subdomain_type: "core",
+            root: "src/core",
+            layers: {},
+            aggregate_roots: [
+              {
+                id: "registry",
+                class: "InMemoryOperatorRegistry",
+                target: "src/core/registry.ts::InMemoryOperatorRegistry",
+                required_methods: ["register", "get", "has"],
+                required_fields: ["#operators"],
+                metrics: {},
+              },
+            ],
+          },
+        ],
+      },
+    } as unknown as DesignProfile;
+    const errors = validateProfile(profile);
+    const offending = errors.find((e) =>
+      e.field.endsWith(".required_methods") || e.field.endsWith(".required_fields"),
+    );
+    expect(offending).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Full profile round-trip through YAML
 // ---------------------------------------------------------------------------
 
