@@ -45,16 +45,22 @@ export type VerificationResult = {
 };
 
 /**
- * Reads each protected file to hash it, then writes the manifest via
- * writeAtomic. fs.write / time / random are inherited via propagation
- * from the writeAtomic edge and audited via effect-suppression.
+ * Construct an in-memory ContractManifest by reading and hashing each
+ * protected file. The returned object carries the full set of fields
+ * `writeManifest` would otherwise write — version, stele_version,
+ * generated_at, protected_files (sorted), and the contract hash. This
+ * is the read-and-hash half of the legacy `writeManifest` split out so
+ * Closeout 4's typed pipeline can construct a Manifest before deciding
+ * to persist it.
  *
  * @stele:effects fs.read, crypto.hash
  */
-export async function writeManifest(paths: string[], manifestPath: string, contractHash: string): Promise<void> {
+export async function buildContractManifest(
+  paths: readonly string[],
+  manifestPath: string,
+  contractHash: string,
+): Promise<ContractManifest> {
   const absoluteManifestPath = resolve(manifestPath);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _manifestDirectory = dirname(absoluteManifestPath);
   const manifestBaseDirectory = getManifestBaseDirectory(absoluteManifestPath);
   const files = await Promise.all(
     paths.map(async (path) => {
@@ -67,35 +73,65 @@ export async function writeManifest(paths: string[], manifestPath: string, contr
   );
   const sortedFiles = files.slice().sort((left, right) => stableStringCompare(left.path, right.path));
   const protectedFiles: Record<string, ManifestProtectedFile> = {};
-
   for (const file of sortedFiles) {
     protectedFiles[file.path] = {
       sha256: file.sha256,
       size: file.size,
     };
   }
-
-  const existingManifest = await tryReadManifestDocument(absoluteManifestPath);
-
-  if (
-    existingManifest !== undefined &&
-    existingManifest.version === MANIFEST_VERSION &&
-    existingManifest.stele_version === STELE_VERSION &&
-    existingManifest.contract_hash === contractHash &&
-    sameProtectedFiles(existingManifest.protected_files, protectedFiles)
-  ) {
-    return;
-  }
-
-  const manifest: ContractManifest = {
+  return {
     version: MANIFEST_VERSION,
     generated_at: new Date().toISOString(),
     stele_version: STELE_VERSION,
     protected_files: protectedFiles,
     contract_hash: contractHash,
   };
+}
+
+/**
+ * Persist an already-built ContractManifest object to disk, with the
+ * existing short-circuit when the on-disk manifest already matches.
+ * `manifestPath` is the disk path; the object's `generated_at` is
+ * preserved verbatim. The persist site for Closeout 4's typed pipeline.
+ *
+ * @stele:effects fs.read, fs.write
+ */
+export async function writeContractManifestObject(
+  manifest: ContractManifest,
+  manifestPath: string,
+): Promise<void> {
+  const absoluteManifestPath = resolve(manifestPath);
+  const existingManifest = await tryReadManifestDocument(absoluteManifestPath);
+
+  if (
+    existingManifest !== undefined &&
+    existingManifest.version === manifest.version &&
+    existingManifest.stele_version === manifest.stele_version &&
+    existingManifest.contract_hash === manifest.contract_hash &&
+    sameProtectedFiles(existingManifest.protected_files, manifest.protected_files)
+  ) {
+    return;
+  }
 
   await writeAtomic(absoluteManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+/**
+ * Reads each protected file to hash it, then writes the manifest via
+ * writeAtomic. fs.write / time / random are inherited via propagation
+ * from the writeAtomic edge and audited via effect-suppression.
+ *
+ * Closeout 4 (self-dogfooding plan): production callers go through the
+ * typed `buildLoadedManifestForPaths → lockManifest → writeLockedManifest`
+ * chain in `lifecycle.ts`. The function below is retained because the
+ * typed chain delegates to `buildContractManifest` + `writeContractManifestObject`
+ * which together produce the same byte-stable on-disk format.
+ *
+ * @stele:effects fs.read, crypto.hash
+ */
+export async function writeManifest(paths: string[], manifestPath: string, contractHash: string): Promise<void> {
+  const manifest = await buildContractManifest(paths, manifestPath, contractHash);
+  await writeContractManifestObject(manifest, manifestPath);
 }
 
 /** @stele:effects fs.read, crypto.hash */

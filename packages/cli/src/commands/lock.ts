@@ -1,5 +1,12 @@
 import { resolve } from "node:path";
-import { SteleError, loadContract, normalizeContract, writeManifest } from "@stele/core";
+import {
+  SteleError,
+  buildLoadedManifestForPaths,
+  loadContract,
+  lockManifest,
+  normalizeContract,
+  writeLockedManifest,
+} from "@stele/core";
 import { createEvent, writeEvent } from "../events/write-event.js";
 import { loadBackend } from "../backend-registry.js";
 import { loadConfig } from "../config/loadConfig.js";
@@ -51,7 +58,17 @@ export async function lockProject(projectDir: string, _options: LockOptions): Pr
   const protectedPaths = await collectProtectedPaths(projectDir, config);
   await assertProtectedContractFilesReachable(projectDir, config.entry, protectedPaths, contract);
 
-  await writeManifest(protectedPaths, resolve(projectDir, config.manifestPath), computeSha256(normalizeContract(contract)));
+  // Closeout 4 (self-dogfooding plan): route through the typed
+  // MANIFEST_LIFECYCLE — build the in-memory manifest in `Loaded` state,
+  // promote it to `Locked`, then persist via the typed-write entry.
+  // The persist site only accepts a `Manifest<"Locked">`; calling
+  // `writeManifest` directly would bypass the lifecycle and is a
+  // typestate.MANIFEST_LIFECYCLE.wrong_state_at_binding violation.
+  const manifestPath = resolve(projectDir, config.manifestPath);
+  const contractHash = computeSha256(normalizeContract(contract));
+  const loaded = await buildLoadedManifestForPaths(protectedPaths, manifestPath, contractHash);
+  const locked = lockManifest(loaded);
+  await writeLockedManifest(locked, manifestPath);
 
   await writeEvent(
     projectDir,
