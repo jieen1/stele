@@ -47,6 +47,15 @@ export interface InferredStateAtCallSite {
   readonly declarationId: string;
   /** Inferred state name (e.g. "Paid"). `undefined` when inference failed. */
   readonly inferredState: string | undefined;
+  /**
+   * Optional: when the receiver resolves to a parameter of the caller
+   * function, the visible parameter index (skipping `this`). The evaluator
+   * uses this to correlate the inferred state against a
+   * `(type-state-binding ...)` declaration that pins a state for the
+   * same parameter index — disagreement yields
+   * `typestate.<id>.wrong_state_at_binding`.
+   */
+  readonly receiverParamIndex?: number;
   /** Why the state was inferred (for inference_source in violations). */
   readonly inferenceReason: string | undefined;
   /** Where the inference originated (e.g. the createOrder() return site). */

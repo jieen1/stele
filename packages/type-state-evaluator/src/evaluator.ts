@@ -67,6 +67,7 @@ import type { InferenceSource } from "./types.js";
 import {
   buildDisallowedOpViolation,
   buildInferenceFailedViolation,
+  buildWrongStateAtBindingViolation,
 } from "./violation-builder.js";
 
 export interface EvaluateTypeStateOptions {
@@ -299,6 +300,27 @@ function anyBindingCovers(
 }
 
 /**
+ * Closeout 4 helper: find the binding's declared state for a specific
+ * parameter index of a caller. Returns the state string or `null` if no
+ * binding covers the caller, or covers it but does not pin this param.
+ */
+function findBindingStateForParam(
+  bindings: readonly TypeStateBindingDeclaration[],
+  callerId: string,
+  paramIndex: number,
+): string | null {
+  for (const b of bindings) {
+    if (!bindingMatchesCaller(b, callerId)) continue;
+    for (const p of b.params) {
+      if (p.index === paramIndex) {
+        return p.state;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Build the InferenceSource that travels with a disallowed-op violation
  * (Round 2 E-P1-1).
  */
@@ -477,8 +499,48 @@ export async function evaluateTypeStates(
         continue;
       }
 
-      // Inferred state is known. Three possibilities:
+      // Inferred state is known. Four possibilities:
       const state = inference.inferredState;
+
+      // Closeout 4: when the receiver resolves to a parameter of the
+      // caller AND a `(type-state-binding ...)` exists declaring a state
+      // for that parameter, the binding's state must agree with what
+      // the static type system inferred. Disagreement is its own
+      // violation kind — distinct from disallowed_op (which checks the
+      // method against the inferred state) and inference_failed (which
+      // fires only when inference produced no state).
+      if (inference.receiverParamIndex !== undefined) {
+        const bindingState = findBindingStateForParam(
+          bindings,
+          inference.callerId,
+          inference.receiverParamIndex,
+        );
+        if (bindingState !== null && bindingState !== state) {
+          // Only emit when both states are members of THIS declaration's
+          // state set; mismatches against an unrelated lifecycle's state
+          // are not this declaration's business.
+          if (decl.states.includes(bindingState) && decl.states.includes(state)) {
+            violations.push(
+              buildWrongStateAtBindingViolation({
+                decl,
+                callerId: inference.callerId,
+                callSite,
+                method,
+                paramIndex: inference.receiverParamIndex,
+                declaredState: bindingState,
+                inferredState: state,
+                inferenceSource: inferenceSourceFrom(inference),
+                callGraph,
+                receiverName: inference.receiverName,
+              }),
+            );
+            // Do not also fire disallowed_op for this call site — the
+            // mismatch IS the finding, and we don't want to double-report.
+            continue;
+          }
+        }
+      }
+
       if (methodIsTransition(decl, state, method)) {
         // Legitimate transition out of `state` — no violation.
         continue;

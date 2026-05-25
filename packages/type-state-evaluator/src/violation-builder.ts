@@ -24,6 +24,7 @@ import type { CallGraph, CallGraphNode } from "@stele/call-graph-core";
 import {
   defaultDisallowedOpFixHint,
   defaultInferenceFailedFixHint,
+  defaultWrongStateAtBindingFixHint,
 } from "./fix-hint.js";
 import type { InferenceSource, TypeStateViolationKind } from "./types.js";
 
@@ -37,6 +38,11 @@ export function defaultPriority(kind: TypeStateViolationKind): ViolationPriority
       // strictMode=true escalates this to error severity; even then, the
       // agent can address it incrementally, so we keep priority=major.
       return "major";
+    case "wrong_state_at_binding":
+      // Closeout 4: contract + code disagree about a bound parameter's
+      // state. This is a design-time invariant violation just like
+      // disallowed_op — fail-closed.
+      return "blocking";
     default: {
       const exhaustive: never = kind;
       throw new Error(`defaultPriority: unreachable kind ${String(exhaustive)}`);
@@ -174,6 +180,99 @@ export function buildDisallowedOpViolation(options: BuildDisallowedOpOptions): V
       summary: fixSummary,
     },
     priority: defaultPriority("disallowed_op"),
+    group_id: callerId,
+  });
+}
+
+export interface BuildWrongStateAtBindingOptions {
+  readonly decl: TypeStateDeclaration;
+  readonly callerId: string;
+  readonly callSite: { readonly path: string; readonly line: number; readonly column: number };
+  readonly method: string;
+  readonly paramIndex: number;
+  readonly declaredState: string;
+  readonly inferredState: string;
+  readonly inferenceSource: InferenceSource;
+  readonly callGraph: CallGraph;
+  readonly receiverName?: string;
+  readonly fixHintOverride?: string;
+}
+
+/**
+ * Build a `typestate.<id>.wrong_state_at_binding` violation. Fires when a
+ * `(type-state-binding ...)` declaration says param N is in state X but
+ * the per-backend extractor's static inference at a call site in the
+ * caller resolves the same param to a different state Y.
+ *
+ * Closeout 4 (self-dogfooding plan): without this rule the binding form
+ * is only a SUPPRESSOR for inference_failed, which means a binding
+ * could quietly disagree with the underlying type system and the
+ * mismatch would never surface. Now the evaluator fails closed on the
+ * disagreement.
+ */
+export function buildWrongStateAtBindingViolation(
+  options: BuildWrongStateAtBindingOptions,
+): Violation {
+  const {
+    decl,
+    callerId,
+    callSite,
+    method,
+    paramIndex,
+    declaredState,
+    inferredState,
+    inferenceSource,
+    callGraph,
+    receiverName,
+    fixHintOverride,
+  } = options;
+
+  const ruleIdStr = `typestate.${decl.id}.wrong_state_at_binding`;
+  const receiverLabel = receiverName ?? "<receiver>";
+  const summary =
+    `Binding for param ${paramIndex} declares state \`${declaredState}\` but ` +
+    `the type system infers \`${inferredState}\` for \`${receiverLabel}\` ` +
+    `at the call to \`${method}\` (rule \`${decl.id}\`).`;
+
+  const fixSummary = fixHintOverride ?? decl.fixHint ?? defaultWrongStateAtBindingFixHint(
+    decl,
+    callerId,
+    paramIndex,
+    declaredState,
+    inferredState,
+  );
+
+  const detailParts: string[] = [
+    `binding_param_index: ${paramIndex}`,
+    `binding_declared_state: ${declaredState}`,
+    `inferred_state: ${inferredState}`,
+    `receiver: ${receiverLabel}`,
+    renderInferenceSource(inferenceSource),
+  ];
+
+  return createViolation({
+    rule_id: ruleIdStr,
+    rule_kind: "type_state_violation",
+    severity: severityForDisallowed(decl),
+    source: {
+      tool: "stele",
+      command: "check",
+      kind: "type-state",
+    },
+    location: {
+      path: callSite.path,
+      line: callSite.line,
+      column: callSite.column,
+    },
+    cause: {
+      summary,
+      detail: detailParts.join("\n"),
+    },
+    scope_paths: scopePathsFor(callGraph, callerId, callSite.path),
+    fix: {
+      summary: fixSummary,
+    },
+    priority: defaultPriority("wrong_state_at_binding"),
     group_id: callerId,
   });
 }

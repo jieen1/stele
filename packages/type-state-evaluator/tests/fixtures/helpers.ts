@@ -210,6 +210,7 @@ export function mkInference(opts: {
   readonly line?: number;
   readonly column?: number;
   readonly receiverName?: string;
+  readonly receiverParamIndex?: number;
   readonly method: string;
   readonly declarationId: string;
   readonly inferredState: string | undefined;
@@ -221,6 +222,7 @@ export function mkInference(opts: {
     callerId: opts.callerId,
     callSite: { line: opts.line ?? 10, column: opts.column ?? 3 },
     receiverName: opts.receiverName ?? "order",
+    receiverParamIndex: opts.receiverParamIndex,
     method: opts.method,
     declarationId: opts.declarationId,
     inferredState: opts.inferredState,

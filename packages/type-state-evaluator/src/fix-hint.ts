@@ -66,6 +66,47 @@ export function defaultDisallowedOpFixHint(
 }
 
 /**
+ * Default fix-hint for `typestate.<id>.wrong_state_at_binding`. The
+ * contract's `(type-state-binding ...)` declared state for a parameter,
+ * and the static type system says a different state. One of the two is
+ * wrong, and the agent must choose:
+ *   [A] Code issue — the phantom annotation on the parameter (or the
+ *       caller's local flow) disagrees with the contract's intent. Fix
+ *       the type so the parameter's brand matches the binding.
+ *   [B] Contract issue — the binding is stale or wrong. Propose a new
+ *       binding through stele design propose.
+ */
+export function defaultWrongStateAtBindingFixHint(
+  decl: TypeStateDeclaration,
+  callerNodeId: string,
+  paramIndex: number,
+  declaredState: string,
+  inferredState: string,
+): string {
+  const head = [
+    `Type-state \`${decl.id}\`: binding declares param ${paramIndex} in state`,
+    `\`${declaredState}\` but the static type system infers state`,
+    `\`${inferredState}\` for caller \`${callerNodeId}\`.`,
+  ].join(" ");
+  const codeBranch = [
+    `[A] Code issue — the rule + binding are correct, the parameter's phantom annotation is wrong:`,
+    `    Either change the parameter's signature to brand it as \`${declaredState}\` so the type system agrees,`,
+    `    or fix the local flow so the value passed through param ${paramIndex} actually carries state \`${declaredState}\`.`,
+  ].join("\n");
+  return [
+    head,
+    ``,
+    `This violation needs you to first determine: code issue or contract issue?`,
+    ``,
+    codeBranch,
+    ``,
+    proposeExitText(decl.id),
+    ``,
+    `Choose [A] or [B] before acting. Editing the binding is itself a contract change — it must go through propose, never written to the contract file as a direct edit.`,
+  ].join("\n");
+}
+
+/**
  * Default fix-hint for `typestate.<id>.inference_failed`. Forces A/B branching:
  *   [A] Add a state annotation (phantom type, generic, sealed type, separate
  *       type) — the inference was failing because the code is missing the
