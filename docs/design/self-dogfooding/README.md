@@ -878,6 +878,20 @@ Until then `test_hook_no_network_catches_fetch_in_hook_script` is
 `@pytest.mark.skip`-ed with a `reason=` pointing at the extractor
 lines above. **Filed as a Phase 7 follow-up.**
 
+**RESOLVED in commits 9a011b4 + 3a434d2 (Closeout 2, 2026-05-25):**
+Option (1) was taken — the TypeScript call-graph AND effect-annotation
+extractors now set `allowJs: true` and the walker collects `.js / .cjs
+/ .mjs` (excluding `.d.ts / .d.mts / .d.cts` and `dist/` build
+artifacts). `HOOK_NO_NETWORK` binds on real hook-script NodeIds; the
+two paired negative tests
+`test_hook_no_network_catches_fetch_in_hook_script` (un-skipped) and
+`test_hook_no_network_catches_https_request` (new, per CC-13) both
+pass against synthetic `.js` files dropped under
+`packages/claude-code-plugin/scripts/`. Perf delta: -0.5s wall-clock
+(36.6s median post-mitigation vs 37.1s baseline; mitigation = filter
+`dist/` from `rootNames` after `parseJsonConfigFileContent` to match
+the fallback walker's existing exclusion).
+
 ### 2026-05-25 — `effectStrictMode: false` is a policy degradation, not a fix
 
 Round 15 Finding 4 (MED) called out that the Phase 4 final commit
