@@ -2077,7 +2077,7 @@ def test_fs_writes_via_write_atomic_catches_direct_writeFile():
         "}\n"
     )
     assert _code_shape_negative_with_temp_file(
-        "packages/core/src/__phase3_negative_fs_leak.ts",
+        "packages/core/src/manifest/__phase3_negative_fs_leak.ts",
         content,
         "trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit",
     ), "checker did not detect violation: trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit"
