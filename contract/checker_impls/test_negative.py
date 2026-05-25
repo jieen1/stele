@@ -1594,6 +1594,41 @@ def test_core_is_pure_or_fs_read_catches_random_in_core():
     ), "checker did not detect violation: effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect"
 
 
+def test_core_is_pure_or_fs_read_catches_unresolved_dynamic_call_in_core():
+    """Closeout 1 (2026-05-25) — paired negative test for
+    CORE_IS_PURE_OR_FS_READ via the per-policy unresolved-call gate.
+
+    A new @stele/core file with an unresolved dynamic call (here a
+    computed-property method invocation, which the TS call-graph
+    extractor records as `unresolved` with `reason: dynamic`) AND no
+    `@stele:effects` annotation on the caller must trip
+    `effect.unresolved_call_blocks_evaluation`. The caller node falls
+    inside `CORE_IS_PURE_OR_FS_READ`'s target-scope
+    (`packages/core/src/**::*`), so the per-policy gate emits.
+
+    Without the per-policy scoping mechanism this fixture would be
+    silenced globally (the prior `effectStrictMode: false` behaviour).
+    Without Category B's closed-world override gating, adding any
+    `@stele:effects` annotation to the caller would still emit the
+    violation. Both gates are exercised by this test:
+      (1) caller is in scope → emission gate fires
+      (2) caller has no annotation → closed-world override does NOT
+          suppress the emission
+    """
+    # Dynamic computed-property dispatch on an arbitrary string keyed
+    # off a runtime input — the analyzer cannot resolve `tools[name]`.
+    content = (
+        'export function dispatch(tools: Record<string, () => number>, name: string): number {\n'
+        '  return tools[name]();\n'
+        '}\n'
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/core/src/__closeout1_negative_unresolved_dynamic.ts",
+        content,
+        "effect.unresolved_call_blocks_evaluation",
+    ), "checker did not detect violation: effect.unresolved_call_blocks_evaluation"
+
+
 @pytest.mark.skip(
     reason=(
         "HOOK_NO_NETWORK policy targets *.js files (hook scripts ship as "
@@ -1639,6 +1674,47 @@ def test_manifest_leaves_are_pinned_catches_extra_effect():
             "\n/** @stele:effects network */\n"
             "export async function phaseNegativeNetwork(): Promise<void> {\n"
             "  // synthetic — for Phase 4 negative test only\n"
+            "}\n"
+        )
+        return text + injection
+
+    assert _mutate_then_check(
+        "packages/core/src/manifest/hash-manifest.ts",
+        mutator,
+        "effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect",
+    ), "checker did not detect violation: effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect"
+
+
+def test_manifest_leaves_are_pinned_catches_child_process_effect():
+    """Closeout 1 (2026-05-25) — paired second negative test for
+    MANIFEST_LEAVES_ARE_PINNED of a STRUCTURALLY DIFFERENT shape per
+    CC-13's anti-vacuity rule.
+
+    The first paired test (above) introduces a `network` effect on
+    a new function inside hash-manifest.ts. This one introduces a
+    DIFFERENT forbidden effect — `child-process` — on a separately
+    named function. The closeout doc suggested `Date.now()` (a `time`
+    effect) "outside the 3 atomic-writer leaves", but the active
+    policy's allow-only list IS `fs.read fs.write crypto.hash time
+    random`, so `time` is permitted everywhere in hash-manifest.ts;
+    a `Date.now()` injection would NOT fire MANIFEST_LEAVES_ARE_PINNED
+    (and Closeout 1 must not narrow the policy to make a test pass).
+
+    `child-process` is a clean second-shape alternative: it is
+    forbidden by BOTH the broader `CORE_IS_PURE_OR_FS_READ`
+    `allow-only fs.read fs.write crypto.hash` AND by
+    MANIFEST_LEAVES_ARE_PINNED's tighter `allow-only fs.read fs.write
+    crypto.hash time random`, but the two suites of policies hit
+    different evaluator pathways, the effect name is different from
+    `network`, and the rule_id we assert is the MANIFEST one (the
+    tightest scope decides). This satisfies CC-13's "Two removals
+    of the same kind do not count as two tests" anti-vacuity rule.
+    """
+    def mutator(text: str) -> str:
+        injection = (
+            "\n/** @stele:effects child-process */\n"
+            "export function phaseNegativeChildProcess(): void {\n"
+            "  // synthetic — Closeout 1 paired negative test\n"
             "}\n"
         )
         return text + injection
