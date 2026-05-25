@@ -2066,6 +2066,141 @@ def test_callgraph_lifecycle_brand_fires():
 
 
 # ---------------------------------------------------------------------------
+# Closeout 3b (2026-05-25) — paired negatives for the 9 free-function
+# aggregate class-shapes populated via the design generator. Each aggregate
+# gets 2 tests of STRUCTURALLY DIFFERENT shape per CC-13's anti-vacuity
+# rule:
+#   Test A: delete a `required_method` body so the class-shape's
+#           must-have-method check fires ("must define module function …").
+#   Test B: rename an `aggregate_members` entry's underlying top-level
+#           declaration so the contract sees a missing sibling
+#           ("aggregate-member … was not found at module level").
+# Two removals of the same kind would not count — the violation
+# subsystems and code paths differ.
+# ---------------------------------------------------------------------------
+
+
+def test_invariant_validator_shape_catches_missing_method():
+    """Closeout 3b — Test A for core-invariant-validator: deleting the
+    `readStringLiteral` function body must trip the aggregate's
+    must-have-method requirement."""
+    assert _mutate_then_check(
+        "packages/core/src/validator/structure-invariant.ts",
+        # Delete the entire `function readStringLiteral(...) { ... }` body.
+        lambda text: re.sub(
+            r"\nfunction readStringLiteral\(node: ListNode, label: string\): string \{[\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "core-invariant-validator-aggregate-shape",
+    ), "checker did not detect violation: core-invariant-validator-aggregate-shape (missing method)"
+
+
+def test_invariant_validator_shape_catches_missing_aggregate_member():
+    """Closeout 3b — Test B for core-invariant-validator: renaming the
+    `readMultiValueField` declaration so the listed `aggregate_members`
+    entry no longer corresponds to any top-level declaration must trip
+    the evaluator's aggregate-member coherence check (a different
+    violation summary, different evaluator branch, than Test A)."""
+    assert _mutate_then_check(
+        "packages/core/src/validator/structure-invariant.ts",
+        # Rename function declaration so the aggregate_members entry
+        # `readMultiValueField` no longer exists at module level.
+        # Both definition and the single call site are renamed in
+        # lockstep so the mutated source still type-checks.
+        lambda text: text.replace(
+            "function readMultiValueField",
+            "function readMultiValueFieldRenamedForTest",
+            1,
+        ).replace(
+            "readMultiValueField(field, \"tags\")",
+            "readMultiValueFieldRenamedForTest(field, \"tags\")",
+            1,
+        ),
+        "core-invariant-validator-aggregate-shape",
+    ), "checker did not detect violation: core-invariant-validator-aggregate-shape (missing aggregate-member)"
+
+
+def test_contract_loader_shape_catches_missing_method():
+    """Closeout 3b — Test A for core-contract-loader: deleting the
+    `validateContract` exported function body must trip the
+    must-have-method check."""
+    assert _mutate_then_check(
+        "packages/core/src/loader/load-contract.ts",
+        lambda text: re.sub(
+            r"\nexport function validateContract\(contract: Contract\): Contract \{[\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "core-contract-loader-aggregate-shape",
+    ), "checker did not detect violation: core-contract-loader-aggregate-shape (missing method)"
+
+
+def test_contract_loader_shape_catches_missing_required_field():
+    """Closeout 3b — Test B for core-contract-loader: removing the
+    `MAX_IMPORT_DEPTH` const declaration must trip the must-have-field
+    check (different evaluator branch than the must-have-method path)."""
+    assert _mutate_then_check(
+        "packages/core/src/loader/load-contract.ts",
+        # Replace the const declaration with an inline literal at the
+        # one usage site so the rest of the source still compiles.
+        lambda text: text.replace(
+            "const MAX_IMPORT_DEPTH = 100;",
+            "// removed for test",
+            1,
+        ).replace(
+            "if (depth > MAX_IMPORT_DEPTH) {",
+            "if (depth > 100) {",
+            1,
+        ).replace(
+            "`Import depth exceeded ${MAX_IMPORT_DEPTH}.`",
+            "`Import depth exceeded ${100}.`",
+            1,
+        ),
+        "core-contract-loader-aggregate-shape",
+    ), "checker did not detect violation: core-contract-loader-aggregate-shape (missing required field)"
+
+
+def test_manifest_engine_shape_catches_missing_method():
+    """Closeout 3b — Test A for core-manifest-engine: deleting the
+    `computeSha256` exported function body must trip the
+    must-have-method check."""
+    assert _mutate_then_check(
+        "packages/core/src/manifest/hash-manifest.ts",
+        lambda text: re.sub(
+            r"\nexport function computeSha256\(value: string\): Sha256 \{[\s\S]*?\n\}\n",
+            "\n",
+            text,
+            count=1,
+        ),
+        "core-manifest-engine-aggregate-shape",
+    ), "checker did not detect violation: core-manifest-engine-aggregate-shape (missing method)"
+
+
+def test_manifest_engine_shape_catches_missing_required_field():
+    """Closeout 3b — Test B for core-manifest-engine: removing the
+    `HASH_MANIFEST_RELATIVE_PATH` const export must trip the
+    must-have-field check (different branch from Test A)."""
+    assert _mutate_then_check(
+        "packages/core/src/manifest/hash-manifest.ts",
+        # Replace the const declaration with a usage-site inline so the
+        # rest of the module still compiles. There are two callers
+        # (readHashManifest + writeHashManifest); inline both.
+        lambda text: text.replace(
+            'export const HASH_MANIFEST_RELATIVE_PATH = "contract/.cache/hash-manifest.json";',
+            '// removed for test',
+            1,
+        ).replace(
+            "HASH_MANIFEST_RELATIVE_PATH",
+            '"contract/.cache/hash-manifest.json"',
+        ),
+        "core-manifest-engine-aggregate-shape",
+    ), "checker did not detect violation: core-manifest-engine-aggregate-shape (missing required field)"
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -2186,6 +2321,15 @@ def main() -> int:
         ("approval_lifecycle_brand_fires", test_approval_lifecycle_brand_fires),
         ("design_profile_lifecycle_brand_fires", test_design_profile_lifecycle_brand_fires),
         ("callgraph_lifecycle_brand_fires", test_callgraph_lifecycle_brand_fires),
+        # Closeout 3b: 9 free-function aggregate class-shapes × 2 paired
+        # negatives of different shape (Test A: missing method;
+        # Test B: missing field or missing aggregate_member).
+        ("invariant_validator_shape_catches_missing_method", test_invariant_validator_shape_catches_missing_method),
+        ("invariant_validator_shape_catches_missing_aggregate_member", test_invariant_validator_shape_catches_missing_aggregate_member),
+        ("contract_loader_shape_catches_missing_method", test_contract_loader_shape_catches_missing_method),
+        ("contract_loader_shape_catches_missing_required_field", test_contract_loader_shape_catches_missing_required_field),
+        ("manifest_engine_shape_catches_missing_method", test_manifest_engine_shape_catches_missing_method),
+        ("manifest_engine_shape_catches_missing_required_field", test_manifest_engine_shape_catches_missing_required_field),
     ]
 
     print("=" * 60)

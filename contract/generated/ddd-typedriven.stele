@@ -388,11 +388,20 @@
 (core-node "core-invariant-validator-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/core/src/validator/structure-invariant.ts::validateInvariant")
+  (target "packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration")
   (description "Generated from design profile: InvariantValidator aggregate must remain reviewable.")
   (rationale "InvariantValidator protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 150) (max 350))
   (metric public-method-count (ideal 4) (max 10))
+)
+
+(class-shape core-invariant-validator-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration")
+  (must-have-method "parseInvariantDeclaration")
+  (must-have-method "readSingleText")
+  (must-have-method "readStringLiteral")
+  (aggregate-members "parseInvariantDeclaration" "readMultiValueField" "readSingleText" "readSingleValueField" "readStringLiteral")
 )
 
 (core-node "core-contract-loader-aggregate"
@@ -405,14 +414,35 @@
   (metric public-method-count (ideal 3) (max 8))
 )
 
+(class-shape core-contract-loader-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/loader/load-contract.ts::loadContract")
+  (must-have-method "loadContract")
+  (must-have-method "loadRecursive")
+  (must-have-method "validateContract")
+  (must-have-field "MAX_IMPORT_DEPTH")
+  (aggregate-members "MAX_IMPORT_DEPTH" "loadContract" "loadRecursive" "readContractFile" "validateContract")
+)
+
 (core-node "core-manifest-engine-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/core/src/manifest/hash-manifest.ts::hashManifest")
+  (target "packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash")
   (description "Generated from design profile: ManifestEngine aggregate must remain reviewable.")
   (rationale "ManifestEngine protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 100) (max 250))
   (metric max-cyclomatic (ideal 8) (max 20))
+)
+
+(class-shape core-manifest-engine-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash")
+  (must-have-method "buildTransitiveHash")
+  (must-have-method "computeSha256")
+  (must-have-method "writeAtomic")
+  (must-have-field "HASH_MANIFEST_RELATIVE_PATH")
+  (must-have-field "HASH_MANIFEST_VERSION")
+  (aggregate-members "HASH_MANIFEST_RELATIVE_PATH" "HASH_MANIFEST_VERSION" "buildTransitiveHash" "computeSha256" "readHashManifest" "writeAtomic" "writeHashManifest")
 )
 
 (core-node "cli-check-orchestrator-aggregate"

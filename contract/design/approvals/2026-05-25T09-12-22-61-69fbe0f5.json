@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "base_profile_sha256": "29523998faff5d2a435cec1114e5a85f0eb1c7713accb61eb10c3071fb29ef0c",
+  "approved_profile_sha256": "69fbe0f5a32ff07cf0b0913a3f4f3dc736312d83f9177ec91ff9920bc0520b9f",
+  "approved_proposals": [
+    {
+      "path": "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml",
+      "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601"
+    }
+  ],
+  "diff_classification": "additive",
+  "affected_generated_rules": [
+    "architecture.ddd-core",
+    "architecture.ddd-cli",
+    "architecture.ddd-architecture",
+    "architecture.ddd-backends-ts",
+    "architecture.ddd-backends-py",
+    "architecture.ddd-hooks",
+    "architecture.ddd-mcp",
+    "architecture.ddd-backends-go",
+    "architecture.ddd-backends-java",
+    "architecture.ddd-backends-rust",
+    "architecture.ddd-github-action",
+    "architecture.ddd-plugin",
+    "architecture.ddd-call-graph-core",
+    "architecture.ddd-trace-evaluator",
+    "architecture.ddd-type-state-evaluator",
+    "architecture.ddd-effect-evaluator",
+    "architecture.ddd-type-driven-evaluator",
+    "architecture.ddd-context-map",
+    "core-node.core-operator-registry-aggregate",
+    "core-node.unknown",
+    "core-node.core-invariant-validator-aggregate",
+    "core-node.core-contract-loader-aggregate",
+    "core-node.core-manifest-engine-aggregate",
+    "core-node.cli-check-orchestrator-aggregate",
+    "core-node.cli-code-shape-evaluator-aggregate",
+    "core-node.cli-design-diff-engine-aggregate",
+    "core-node.cli-cli-program-factory-aggregate",
+    "core-node.cli-design-profile-validator-aggregate",
+    "core-node.architecture-architecture-evaluator-aggregate"
+  ],
+  "affected_source_scope": [],
+  "reason": "Closeout 3b: populate 9 aggregate class-shapes (batch 1: invariant-validator, contract-loader, manifest-engine)",
+  "approved_by": "wncjknvwpv@privaterelay.appleid.com",
+  "approved_at": "2026-05-25T09:12:22.617Z"
+}

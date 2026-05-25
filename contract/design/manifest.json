@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "29523998faff5d2a435cec1114e5a85f0eb1c7713accb61eb10c3071fb29ef0c",
+  "profileHash": "69fbe0f5a32ff07cf0b0913a3f4f3dc736312d83f9177ec91ff9920bc0520b9f",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "07967b9a27e7a2da9e7ba624009c600827ae3b0d"
+    "git_sha": "123ed56780ceae45186b6c1f124f995ddf497af7"
   },
   "templates": [
     "ddd-typedriven"
@@ -294,8 +294,16 @@
           "aggregate_id": "validator"
         }
       ],
-      "fileHash": "4d8f20c3613d09e9b5459818e4903e51bcffa23869296e8cc0f3deecc077b8c3",
-      "cdl": "(core-node \"core-invariant-validator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/validator/structure-invariant.ts::validateInvariant\")\n  (description \"Generated from design profile: InvariantValidator aggregate must remain reviewable.\")\n  (rationale \"InvariantValidator protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 150) (max 350))\n  (metric public-method-count (ideal 4) (max 10))\n)"
+      "fileHash": "fdf21243a9c3e2a46ec27f110e7ff4326597e0599850a2aace656aa80e1a0d5e",
+      "cdl": "(core-node \"core-invariant-validator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration\")\n  (description \"Generated from design profile: InvariantValidator aggregate must remain reviewable.\")\n  (rationale \"InvariantValidator protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 150) (max 350))\n  (metric public-method-count (ideal 4) (max 10))\n)"
+    },
+    {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "158b82f420dde724b68316aa3269d3d28ee091ddf57de0416b64073dfc9722e3",
+      "cdl": "(class-shape core-invariant-validator-aggregate-shape\n  (lang typescript)\n  (target \"packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration\")\n  (must-have-method \"parseInvariantDeclaration\")\n  (must-have-method \"readSingleText\")\n  (must-have-method \"readStringLiteral\")\n  (aggregate-members \"parseInvariantDeclaration\" \"readMultiValueField\" \"readSingleText\" \"readSingleValueField\" \"readStringLiteral\")\n)"
     },
     {
       "ruleId": "core-node.core-contract-loader-aggregate",
@@ -311,6 +319,14 @@
       "cdl": "(core-node \"core-contract-loader-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/loader/load-contract.ts::loadContract\")\n  (description \"Generated from design profile: ContractLoader aggregate must remain reviewable.\")\n  (rationale \"ContractLoader protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 100) (max 250))\n  (metric public-method-count (ideal 3) (max 8))\n)"
     },
     {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "7d8a5532fb9a879dd6e1cc11b57d1f189a57323daf2de9cfcbcb9c4019d9a0d5",
+      "cdl": "(class-shape core-contract-loader-aggregate-shape\n  (lang typescript)\n  (target \"packages/core/src/loader/load-contract.ts::loadContract\")\n  (must-have-method \"loadContract\")\n  (must-have-method \"loadRecursive\")\n  (must-have-method \"validateContract\")\n  (must-have-field \"MAX_IMPORT_DEPTH\")\n  (aggregate-members \"MAX_IMPORT_DEPTH\" \"loadContract\" \"loadRecursive\" \"readContractFile\" \"validateContract\")\n)"
+    },
+    {
       "ruleId": "core-node.core-manifest-engine-aggregate",
       "ruleKind": "core-node",
       "origin": "aggregate:engine",
@@ -320,8 +336,16 @@
           "aggregate_id": "engine"
         }
       ],
-      "fileHash": "d8fd0170fb822945cb779698a0ea51d97db74f3b8bff7aec112455dd58be27c8",
-      "cdl": "(core-node \"core-manifest-engine-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/manifest/hash-manifest.ts::hashManifest\")\n  (description \"Generated from design profile: ManifestEngine aggregate must remain reviewable.\")\n  (rationale \"ManifestEngine protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 100) (max 250))\n  (metric max-cyclomatic (ideal 8) (max 20))\n)"
+      "fileHash": "5d98ff1180d7db8a0fa83dca72babc8b6c4391d96463a74ef76c56265aa3ad9d",
+      "cdl": "(core-node \"core-manifest-engine-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash\")\n  (description \"Generated from design profile: ManifestEngine aggregate must remain reviewable.\")\n  (rationale \"ManifestEngine protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 100) (max 250))\n  (metric max-cyclomatic (ideal 8) (max 20))\n)"
+    },
+    {
+      "ruleId": "core-node.unknown",
+      "ruleKind": "core-node",
+      "origin": "unknown",
+      "origins": [],
+      "fileHash": "ace620e8a9fd2fc978e911749f0a758e8e8f7091a845ad864abc5c5bc6c45883",
+      "cdl": "(class-shape core-manifest-engine-aggregate-shape\n  (lang typescript)\n  (target \"packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash\")\n  (must-have-method \"buildTransitiveHash\")\n  (must-have-method \"computeSha256\")\n  (must-have-method \"writeAtomic\")\n  (must-have-field \"HASH_MANIFEST_RELATIVE_PATH\")\n  (must-have-field \"HASH_MANIFEST_VERSION\")\n  (aggregate-members \"HASH_MANIFEST_RELATIVE_PATH\" \"HASH_MANIFEST_VERSION\" \"buildTransitiveHash\" \"computeSha256\" \"readHashManifest\" \"writeAtomic\" \"writeHashManifest\")\n)"
     },
     {
       "ruleId": "core-node.cli-check-orchestrator-aggregate",
@@ -402,17 +426,17 @@
       "cdl": "(core-node \"architecture-architecture-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (description \"Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.\")\n  (rationale \"ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 200) (max 400))\n  (metric max-cyclomatic (ideal 10) (max 25))\n)"
     }
   ],
-  "generatedAt": "2026-05-24T18:01:28.745Z",
+  "generatedAt": "2026-05-25T09:12:26.258Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "67fcc1ccd247fdc010b7cc82bc3d8bdef043ab0405af269d95c1bb1c2be40ff6"
+      "hash": "c374fca38df0e0b369a11b8baa44bf3466c82fd945285331bb2c2cdd31b72d6b"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "67fcc1ccd247fdc010b7cc82bc3d8bdef043ab0405af269d95c1bb1c2be40ff6",
+      "sha256": "c374fca38df0e0b369a11b8baa44bf3466c82fd945285331bb2c2cdd31b72d6b",
       "rules": [
         {
           "id": "architecture.ddd-core",
