@@ -12,6 +12,7 @@
  */
 
 import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 export type ApprovalState = "Drafting" | "IdentityChecked" | "Signed";
 
@@ -85,5 +86,8 @@ export function writeSignedApproval(
   approval: Approval<"Signed">,
   approvalPath: string,
 ): void {
-  writeFileSync(approvalPath, JSON.stringify(approval, null, 2), "utf8");
+  // Resolve the input path before the write — same path-safety
+  // contract every other CLI-side fs write follows (CLI_IO_THROUGH_PATH_UTILS).
+  const absolute = resolve(approvalPath);
+  writeFileSync(absolute, JSON.stringify(approval, null, 2), "utf8");
 }

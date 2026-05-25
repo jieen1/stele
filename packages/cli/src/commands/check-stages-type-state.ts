@@ -30,6 +30,7 @@ import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import {
   getCachedCallGraph,
   setCachedCallGraph,
+  wrapExtractedGraph,
 } from "./check-stages-call-graph-cache.js";
 
 /**
@@ -306,6 +307,7 @@ async function extractOrCacheCallGraph(
   tsconfigPath: string,
   deps: TypeStateStageDeps,
 ): Promise<CallGraph> {
+  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — see trace stage.
   const cached = getCachedCallGraph(context);
   if (cached !== undefined) {
     return cached;
@@ -316,8 +318,9 @@ async function extractOrCacheCallGraph(
     tsconfigPath,
     cacheDir: resolve(context.projectDir, "contract/.cache"),
   });
-  setCachedCallGraph(context, callGraph);
-  return callGraph;
+  const typed = wrapExtractedGraph(callGraph);
+  setCachedCallGraph(context, typed);
+  return typed;
 }
 
 async function defaultExtract(options: {

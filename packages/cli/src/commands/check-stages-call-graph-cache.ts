@@ -1,4 +1,10 @@
-import type { CallGraph } from "@stele/call-graph-core";
+import type { CallGraph, TypedCallGraph } from "@stele/call-graph-core";
+import {
+  cacheCallGraph,
+  emptyCallGraph,
+  finalizeCallGraph,
+  startBuilding,
+} from "@stele/call-graph-core";
 import type { PreparedCheckContext } from "../architecture/types.js";
 
 /**
@@ -9,20 +15,41 @@ import type { PreparedCheckContext } from "../architecture/types.js";
  * Both stages compute the same CallGraph for the same project; storing it
  * once means `dependsOn: ["trace"]` ordering lets the type-state stage reuse
  * the graph the trace stage already extracted.
+ *
+ * Closeout 4 (self-dogfooding plan): the cache stores `TypedCallGraph<"Cached">`,
+ * the lifecycle's terminal-consumable state. The wrap-as-cached transition
+ * `emptyCallGraph → startBuilding → finalizeCallGraph → cacheCallGraph`
+ * happens in `wrapExtractedGraph` so every evaluator gets a typed value
+ * regardless of cache hit or miss.
  */
-const callGraphCache: WeakMap<PreparedCheckContext, CallGraph> = new WeakMap();
+const callGraphCache: WeakMap<PreparedCheckContext, TypedCallGraph<"Cached">> = new WeakMap();
 
 export function getCachedCallGraph(
   context: PreparedCheckContext,
-): CallGraph | undefined {
+): TypedCallGraph<"Cached"> | undefined {
   return callGraphCache.get(context);
 }
 
 export function setCachedCallGraph(
   context: PreparedCheckContext,
-  callGraph: CallGraph,
+  callGraph: TypedCallGraph<"Cached">,
 ): void {
   callGraphCache.set(context, callGraph);
+}
+
+/**
+ * Closeout 4 typed wrap: take a freshly-extracted `CallGraph`, chain it
+ * through the CALLGRAPH_LIFECYCLE transitions, and return the terminal
+ * `TypedCallGraph<"Cached">`. Persisting under the WeakMap is the
+ * runtime side of `cacheCallGraph`; the brand carries the typestate.
+ */
+export function wrapExtractedGraph(
+  graph: CallGraph,
+): TypedCallGraph<"Cached"> {
+  const empty = emptyCallGraph(graph);
+  const building = startBuilding(empty);
+  const built = finalizeCallGraph(building);
+  return cacheCallGraph(built);
 }
 
 /**

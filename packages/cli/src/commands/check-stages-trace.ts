@@ -26,6 +26,7 @@ import {
   _clearCallGraphCacheForTests as _clearSharedCallGraphCacheForTests,
   getCachedCallGraph,
   setCachedCallGraph,
+  wrapExtractedGraph,
 } from "./check-stages-call-graph-cache.js";
 
 /**
@@ -269,6 +270,11 @@ async function extractOrCacheCallGraph(
   deps: TraceStageDeps,
   extractor: CallGraphExtractor,
 ): Promise<CallGraph> {
+  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — return the cached
+  // value directly (it is `TypedCallGraph<"Cached">`); otherwise wrap a
+  // fresh extraction through `wrapExtractedGraph` so the typestate
+  // transitions Empty → Building → Built → Cached happen exactly once
+  // per cache miss.
   const cached = getCachedCallGraph(context);
   if (cached !== undefined) {
     return cached;
@@ -286,8 +292,9 @@ async function extractOrCacheCallGraph(
     tsconfigPath: tsconfigPath ?? "",
     cacheDir: resolve(context.projectDir, "contract/.cache"),
   });
-  setCachedCallGraph(context, callGraph);
-  return callGraph;
+  const typed = wrapExtractedGraph(callGraph);
+  setCachedCallGraph(context, typed);
+  return typed;
 }
 
 /**
