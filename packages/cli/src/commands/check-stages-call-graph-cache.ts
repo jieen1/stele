@@ -62,10 +62,16 @@ export function wrapExtractedGraph(
  *
  * Returns the underlying `CallGraph` field so existing evaluator
  * call sites keep their access pattern.
+ *
+ * The `graph.valueOf()` call below is the receiver-method site the
+ * TS type-state extractor inspects: it produces an inference whose
+ * receiver type is `TypedCallGraph<"Cached">`, which the evaluator
+ * compares against the binding's declared state.
  */
 export function useCachedCallGraph(
   graph: TypedCallGraph<"Cached">,
 ): CallGraph {
+  graph.valueOf();
   return graph as CallGraph;
 }
 

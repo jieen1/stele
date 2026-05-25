@@ -103,6 +103,12 @@ export async function writeLockedManifest(
   locked: Manifest<"Locked">,
   manifestPath: string,
 ): Promise<Manifest<"Verified">> {
+  // Closeout 4: the `locked.valueOf()` call gives the TS type-state
+  // extractor a receiver-method site on the bound parameter, so the
+  // evaluator can correlate the inferred state with the binding's
+  // declared `Locked` state. Zero-cost (valueOf is a no-op on plain
+  // objects); see `useHashedProfile` for the equivalent pattern.
+  locked.valueOf();
   await writeContractManifestObject(locked, manifestPath);
   return locked as unknown as Manifest<"Verified">;
 }

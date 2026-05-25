@@ -11,6 +11,7 @@ import {
   asRawProfile,
   hashValidatedProfile,
   markProfileValidated,
+  useHashedProfile,
   type TypedDesignProfile,
 } from "../src/design-profile/lifecycle.js";
 import type { DesignProfile } from "../src/design-profile/types.js";
@@ -44,3 +45,9 @@ markProfileValidated(hashed);
 // @ts-expect-error — DesignProfile is not assignable to TypedDesignProfile<"Raw">
 const smuggled: TypedDesignProfile<"Raw"> = sample;
 void smuggled;
+
+// 4. Closeout 4: `useHashedProfile` accepts only `TypedDesignProfile<"Hashed">`.
+//    Passing a Raw brand MUST fail — the read site is the runtime gate
+//    that validation + hashing transitions ran first.
+// @ts-expect-error — Raw cannot be passed where useHashedProfile requires Hashed
+useHashedProfile(raw);

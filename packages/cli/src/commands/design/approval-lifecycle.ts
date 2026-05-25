@@ -86,6 +86,9 @@ export function writeSignedApproval(
   approval: Approval<"Signed">,
   approvalPath: string,
 ): void {
+  // Closeout 4: receiver-method site for the bound `approval` param —
+  // see `useHashedProfile` for rationale.
+  approval.valueOf();
   // Resolve the input path before the write — same path-safety
   // contract every other CLI-side fs write follows (CLI_IO_THROUGH_PATH_UTILS).
   const absolute = resolve(approvalPath);
