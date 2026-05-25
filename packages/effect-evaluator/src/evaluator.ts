@@ -15,11 +15,15 @@
  *      annotations (extractor result merged onto CallGraphNode.effects).
  *   3. Apply CDL suppressions to the INITIAL set (Round 1 spec).
  *   4. Worklist + reverse-postorder propagation (Round 2 MC-7).
- *   5. For each unresolved call in the graph: in strictMode (default true,
- *      Round 2 D-CG-1) emit a fail-closed violation
- *      `effect.unresolved_call_blocks_evaluation` AND opaquely include all
- *      declared effects on the offending node's effective set (Round 2
- *      D-CG-5). In lenient mode emit a notice and leave the set alone.
+ *   5. For each unresolved call in the graph whose caller node sits inside
+ *      at least one active policy's `target-scope`: emit a fail-closed
+ *      violation `effect.unresolved_call_blocks_evaluation` (always
+ *      severity=error — Round 2 D-CG-5) AND opaquely include all declared
+ *      effects on the offending node's effective set. Unresolved calls in
+ *      out-of-scope nodes emit nothing: no policy cares, so there is
+ *      nothing to fail closed on. Closeout 1 (2026-05-25) replaces the
+ *      prior globally-unconditional strictMode behaviour with this
+ *      per-policy gate.
  *   6. For each effect-policy: walk scope nodes and emit violations for
  *      forbid/allow-only mismatches.
  *
@@ -61,14 +65,6 @@ export interface EvaluateEffectOptions {
   readonly contract: Contract;
   readonly callGraph: CallGraph;
   readonly extractor: EffectAnnotationExtractor;
-  /**
-   * Round 2 D-CG-1: strict default true. When true, unresolved calls
-   * produce `error`-severity violations AND fail-closed (the node's
-   * effective effects are widened to include every declared effect).
-   * When false, unresolved calls produce advisory notices and do not
-   * widen the set.
-   */
-  readonly strictMode?: boolean;
   /**
    * Round 4 D-07: cross-language alias registry built from
    * `(extern-alias ...)` declarations in the contract. When present, any
@@ -216,42 +212,61 @@ function buildEvidence(
 }
 
 /**
- * Apply Round 2 D-CG-5: in strictMode, widen every unresolved-call node's
+ * Apply Round 2 D-CG-5: widen every IN-SCOPE unresolved-call node's
  * effective set to include all declared effects. Returns a NEW effective
  * map (input is unchanged).
+ *
+ * Closeout 1 (2026-05-25): only unresolved-call sites whose caller node
+ * sits inside at least one active policy's `target-scope` are widened
+ * (and emitted). Out-of-scope sites are invisible — no policy cares.
+ * `inScopeUnresolvedNodes` is the gating set computed by the caller.
  */
 function applyUnresolvedFailClosed(
   effectiveByNode: ReadonlyMap<string, ReadonlySet<string>>,
-  callGraph: CallGraph,
   declaredEffects: ReadonlySet<string>,
-  strictMode: boolean,
-): {
-  effective: ReadonlyMap<string, ReadonlySet<string>>;
-  unresolvedNodes: ReadonlySet<string>;
-} {
-  const unresolvedNodes = new Set<string>();
-  for (const u of callGraph.unresolvedCalls) {
-    unresolvedNodes.add(u.fromId);
-  }
-  if (!strictMode || unresolvedNodes.size === 0 || declaredEffects.size === 0) {
-    return { effective: effectiveByNode, unresolvedNodes };
+  inScopeUnresolvedNodes: ReadonlySet<string>,
+): ReadonlyMap<string, ReadonlySet<string>> {
+  if (inScopeUnresolvedNodes.size === 0 || declaredEffects.size === 0) {
+    return effectiveByNode;
   }
   const out = new Map<string, ReadonlySet<string>>(effectiveByNode);
-  for (const id of unresolvedNodes) {
+  for (const id of inScopeUnresolvedNodes) {
     const previous = out.get(id) ?? new Set<string>();
     out.set(id, unionEffects(previous, declaredEffects));
   }
-  return { effective: out, unresolvedNodes };
+  return out;
 }
 
 export async function evaluateEffects(
   options: EvaluateEffectOptions,
 ): Promise<EvaluateEffectResult> {
   const { contract, callGraph, extractor, externAliases } = options;
-  const strictMode = options.strictMode ?? true;
 
   // Step 1 — declared effect name table.
   const declaredEffects = flattenDeclaredEffects(contract);
+
+  // Closeout 1 (2026-05-25) — pre-compile every active policy's target-scope
+  // patterns once per evaluator run. The same compiled patterns gate
+  // unresolved-call emission (step 6 below) so per-policy fail-closed
+  // semantics replace the old globally-unconditional strictMode behaviour.
+  // Out-of-scope nodes simply emit nothing: no policy cares.
+  const activeScopeMatchers: CompiledPattern[] = [];
+  for (const policy of contract.effectPolicies) {
+    for (const raw of policy.targetScope) {
+      let pattern = raw;
+      if (externAliases !== undefined) {
+        const resolved = resolveExternPattern(
+          pattern,
+          callGraph.language,
+          externAliases,
+        );
+        if (resolved !== null) {
+          pattern = resolved;
+        }
+      }
+      activeScopeMatchers.push(compilePattern(pattern));
+    }
+  }
 
   // Step 2 — read source-code annotations.
   const extracted = await extractor.extractAnnotations({
@@ -290,21 +305,35 @@ export async function evaluateEffects(
     initialEffectsByNode: suppressionResult.initialEffectsByNode,
   });
 
-  // Step 6 — D-CG-5 fail-closed widening for unresolved-call nodes.
-  const { effective: effectiveByNode, unresolvedNodes } = applyUnresolvedFailClosed(
+  // Step 6 — D-CG-5 fail-closed gating (Closeout 1, 2026-05-25). Compute
+  // the set of unresolved-call caller nodes that fall inside at least one
+  // active policy's target-scope. Out-of-scope caller nodes emit nothing
+  // because no policy cares — the principled replacement for the prior
+  // global strictMode knob (which silenced everything indiscriminately).
+  const nodeIndex = nodesById(callGraph);
+  const inScopeUnresolvedNodes = new Set<string>();
+  for (const u of callGraph.unresolvedCalls) {
+    if (inScopeUnresolvedNodes.has(u.fromId)) continue;
+    if (matchAny(u.fromId, activeScopeMatchers)) {
+      inScopeUnresolvedNodes.add(u.fromId);
+    }
+  }
+  const effectiveByNode = applyUnresolvedFailClosed(
     propagation.effectiveByNode,
-    callGraph,
     declaredEffects,
-    strictMode,
+    inScopeUnresolvedNodes,
   );
 
   const violations: Violation[] = [];
   const notices: Violation[] = [...suppressionResult.notices];
 
-  // Emit unresolved-call violations / notices.
-  const nodeIndex = nodesById(callGraph);
+  // Emit one unresolved-call violation per (fromId, callSite) pair whose
+  // caller is in-scope. Severity is always `error` — fail-closed restored.
   let unresolvedFailures = 0;
   for (const u of callGraph.unresolvedCalls) {
+    if (!inScopeUnresolvedNodes.has(u.fromId)) {
+      continue;
+    }
     const node = nodeIndex.get(u.fromId);
     if (node === undefined) {
       continue;
@@ -314,14 +343,9 @@ export async function evaluateEffects(
       node,
       unresolved: u,
       callGraph,
-      strictMode,
     });
-    if (strictMode) {
-      violations.push(v);
-      unresolvedFailures += 1;
-    } else {
-      notices.push(v);
-    }
+    violations.push(v);
+    unresolvedFailures += 1;
   }
 
   // Step 7 — per-policy checks. Use the (possibly-widened) effective map.
@@ -352,7 +376,7 @@ export async function evaluateEffects(
         // unresolved-call violation already covers it — skip to avoid
         // duplicate noise.
         if (
-          unresolvedNodes.has(match.node.id) &&
+          inScopeUnresolvedNodes.has(match.node.id) &&
           !match.directOnNode &&
           !propagation.effectiveByNode.get(match.node.id)?.has(match.offendingEffect)
         ) {
@@ -382,7 +406,7 @@ export async function evaluateEffects(
       });
       for (const match of matches) {
         if (
-          unresolvedNodes.has(match.node.id) &&
+          inScopeUnresolvedNodes.has(match.node.id) &&
           !match.directOnNode &&
           !propagation.effectiveByNode.get(match.node.id)?.has(match.offendingEffect)
         ) {

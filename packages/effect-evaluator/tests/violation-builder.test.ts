@@ -289,27 +289,25 @@ describe("buildUnresolvedCallViolation", () => {
     ],
   });
 
-  it("strictMode=true emits severity=error", () => {
+  it("always emits severity=error (Closeout 1 — fail-closed restored)", () => {
     const v = buildUnresolvedCallViolation({
       policy: undefined,
       node: NODE,
       unresolved: cg.unresolvedCalls[0] ?? mkUnresolved({ from: NODE.id }),
       callGraph: cg,
-      strictMode: true,
     });
     expect(v.severity).toBe("error");
     expect(v.rule_id).toBe("effect.unresolved_call_blocks_evaluation");
   });
 
-  it("strictMode=false emits severity=warning", () => {
+  it("records `mode: strict (fail-closed)` in cause.detail", () => {
     const v = buildUnresolvedCallViolation({
       policy: undefined,
       node: NODE,
       unresolved: cg.unresolvedCalls[0] ?? mkUnresolved({ from: NODE.id }),
       callGraph: cg,
-      strictMode: false,
     });
-    expect(v.severity).toBe("warning");
+    expect(v.cause.detail).toContain("mode: strict (fail-closed)");
   });
 
   it("priority is `major`", () => {
@@ -318,7 +316,6 @@ describe("buildUnresolvedCallViolation", () => {
       node: NODE,
       unresolved: cg.unresolvedCalls[0] ?? mkUnresolved({ from: NODE.id }),
       callGraph: cg,
-      strictMode: true,
     });
     expect(v.priority).toBe("major");
   });

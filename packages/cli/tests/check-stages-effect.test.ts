@@ -417,7 +417,6 @@ describe("buildEffectStage — successful evaluation", () => {
       extractCallGraph: vi.fn(async () => mkCallGraph({})),
       evaluate,
       extractor: STUB_EXTRACTOR,
-      strictMode: false,
     });
 
     expect(report.ok).toBe(true);
@@ -432,7 +431,11 @@ describe("buildEffectStage — successful evaluation", () => {
     _clearCallGraphCacheForTests(context);
   });
 
-  it("threads strictMode=true through to the evaluator by default", async () => {
+  it("never passes a `strictMode` field to the evaluator (Closeout 1)", async () => {
+    // Closeout 1 (2026-05-25) removed strictMode from the evaluator's
+    // option surface. Catch regressions: anyone re-adding the field to
+    // EffectStageDeps would also have to pass it here, which a diff
+    // review would flag.
     const policy = mkEffectPolicy({ id: "NO_IO" });
     const context = mkContext({
       contract: mkContract([policy]),
@@ -448,7 +451,8 @@ describe("buildEffectStage — successful evaluation", () => {
 
     expect(evaluate).toHaveBeenCalledTimes(1);
     const call = evaluate.mock.calls[0]?.[0];
-    expect(call?.strictMode).toBe(true);
+    expect(call).toBeDefined();
+    expect(call !== undefined && "strictMode" in call).toBe(false);
     _clearCallGraphCacheForTests(context);
   });
 });

@@ -119,11 +119,13 @@ export function defaultDisallowedEffectFixHint(
 
 /**
  * Default fix-hint for the Round 2 D-CG-5 fail-closed result:
- * `effect.unresolved_call_blocks_evaluation`. Fires when strictMode=true
- * and the node has an unresolved call that prevents static effect
- * determination. The fix is either to refactor the call (so the analyzer
- * can resolve it) or add an explicit (effect-annotation ...) covering the
- * node.
+ * `effect.unresolved_call_blocks_evaluation`. Fires when the caller node
+ * sits inside at least one active effect-policy's `target-scope` AND has
+ * an unresolved call that prevents static effect determination
+ * (Closeout 1, 2026-05-25 — per-policy gating replaces the prior global
+ * strictMode knob). The fix is either to refactor the call (so the
+ * analyzer can resolve it) or add an explicit (effect-annotation ...)
+ * covering the node.
  */
 export function defaultUnresolvedCallFixHint(
   policy: EffectPolicyDeclaration | undefined,

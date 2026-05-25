@@ -335,19 +335,21 @@ export interface BuildUnresolvedCallOptions {
   readonly node: CallGraphNode;
   readonly unresolved: UnresolvedCall;
   readonly callGraph: CallGraph;
-  readonly strictMode: boolean;
   readonly fixHintOverride?: string;
 }
 
 /**
  * Build the Round 2 D-CG-5 fail-closed violation
- * `effect.unresolved_call_blocks_evaluation`. Severity follows strictMode:
- * `error` when true, `warning` (notice) when false.
+ * `effect.unresolved_call_blocks_evaluation`. Severity is always `error`
+ * — Closeout 1 (2026-05-25) removed the lenient/strict knob; emission is
+ * now gated by per-policy `target-scope` membership at the call site
+ * (see evaluator.ts), so reaching this builder implies the caller is
+ * inside an active policy's scope and the failure is real.
  */
 export function buildUnresolvedCallViolation(
   options: BuildUnresolvedCallOptions,
 ): Violation {
-  const { policy, node, unresolved, callGraph, strictMode, fixHintOverride } = options;
+  const { policy, node, unresolved, callGraph, fixHintOverride } = options;
   const ruleId = "effect.unresolved_call_blocks_evaluation";
   const callerFile = node.filePath;
   const callerLine = unresolved.callSite.line;
@@ -364,7 +366,7 @@ export function buildUnresolvedCallViolation(
   return createViolation({
     rule_id: ruleId,
     rule_kind: "effect_violation",
-    severity: strictMode ? "error" : "warning",
+    severity: "error",
     source: {
       tool: "stele",
       command: "check",
@@ -382,7 +384,7 @@ export function buildUnresolvedCallViolation(
         `unresolved_call: ${unresolved.rawText}`,
         `reason: ${unresolved.reason}`,
         policy === undefined ? `policy: <none>` : `policy: ${policy.id}`,
-        `mode: ${strictMode ? "strict (fail-closed)" : "lenient"}`,
+        `mode: strict (fail-closed)`,
       ].join("\n"),
     },
     scope_paths: scopePathsFor(callGraph, node.id),

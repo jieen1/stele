@@ -39,6 +39,13 @@ import {
 /**
  * Injection seam: tests replace the extractor + evaluator with stubs.
  * Production code falls back to the real TypeScript implementations.
+ *
+ * Closeout 1 (2026-05-25) removed the prior `strictMode` knob: the
+ * effect evaluator now always emits `error`-severity violations for
+ * unresolved calls that fall inside an active policy's `target-scope`,
+ * and emits nothing for out-of-scope unresolved calls. There is no
+ * opt-out — the `unresolved_call_blocks_evaluation` rule is policy-gated,
+ * not config-gated.
  */
 export interface EffectStageDeps {
   readonly extractCallGraph?: (options: {
@@ -48,12 +55,6 @@ export interface EffectStageDeps {
   }) => Promise<CallGraph>;
   readonly evaluate?: typeof evaluateEffects;
   readonly extractor?: EffectAnnotationExtractor;
-  /**
-   * Per Round 2 D-CG-1, strict mode (default true) routes unresolved-call
-   * failures to `violations` (severity=error). Tests can flip this to
-   * exercise the notice path.
-   */
-  readonly strictMode?: boolean;
   /** Round 4 D-07 — pre-built registry override for tests. */
   readonly externAliases?: ExternAliasRegistry;
 }
@@ -218,12 +219,10 @@ export async function buildEffectStage(
 
   const evaluate = deps.evaluate ?? evaluateEffects;
   const extractor = deps.extractor ?? effectAnnotationExtractor;
-  // Phase 4 self-dogfooding: `effectStrictMode` in stele.config.json
-  // can downgrade unresolved-call errors to advisory notices. Default
-  // true preserves Round 2 D-CG-1 behavior for adopters; Stele's own
-  // repo sets false because dynamic dispatch produces ~344 legitimate
-  // unresolved sites the extractor cannot model.
-  const strictMode = deps.strictMode ?? context.config.effectStrictMode ?? true;
+  // Closeout 1 (2026-05-25): no strict-mode knob. Unresolved-call
+  // emission is gated by per-policy `target-scope` membership inside the
+  // evaluator. Out-of-scope unresolved calls emit nothing because no
+  // policy cares; in-scope unresolved calls fail closed at error severity.
   // Round 4 D-07: build the cross-language alias registry from the
   // contract's (extern-alias ...) declarations and pass it to the
   // evaluator alongside the call graph + extractor.
@@ -236,7 +235,6 @@ export async function buildEffectStage(
       contract: context.contract,
       callGraph,
       extractor,
-      strictMode,
       externAliases,
     });
   } catch (error) {

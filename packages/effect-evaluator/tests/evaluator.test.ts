@@ -222,8 +222,8 @@ describe("evaluateEffects — suppression", () => {
   });
 });
 
-describe("evaluateEffects — Round 2 D-CG-5 fail-closed", () => {
-  it("strictMode=true + unresolved call → error violation", async () => {
+describe("evaluateEffects — Round 2 D-CG-5 fail-closed (Closeout 1 per-policy gating)", () => {
+  it("in-scope unresolved call still emits an error-severity violation", async () => {
     const node = mkNode({ id: "src/c/Q.tsx::Q(0)", filePath: "src/c/Q.tsx" });
     const r = await evaluateEffects({
       contract: mkContract({
@@ -250,18 +250,22 @@ describe("evaluateEffects — Round 2 D-CG-5 fail-closed", () => {
         ],
       }),
       extractor: new StubExtractor(),
-      strictMode: true,
     });
-    const unresolvedV = r.violations.find(
+    const unresolvedHits = r.violations.filter(
       (x) => x.rule_id === "effect.unresolved_call_blocks_evaluation",
     );
-    expect(unresolvedV).toBeDefined();
-    expect(unresolvedV?.severity).toBe("error");
+    expect(unresolvedHits).toHaveLength(1);
+    expect(unresolvedHits[0]?.severity).toBe("error");
     expect(r.stats.unresolvedFailures).toBe(1);
   });
 
-  it("strictMode=false + unresolved call → warning notice (no fail-closed widening)", async () => {
-    const node = mkNode({ id: "src/c/Q.tsx::Q(0)", filePath: "src/c/Q.tsx" });
+  it("out-of-scope unresolved call emits zero violations and zero notices", async () => {
+    // Caller node lives in src/unrelated/** which is outside every policy
+    // scope, so the per-policy gate skips emission entirely.
+    const node = mkNode({
+      id: "src/unrelated/helper.ts::dispatch(0)",
+      filePath: "src/unrelated/helper.ts",
+    });
     const r = await evaluateEffects({
       contract: mkContract({
         effectDeclarations: [mkEffectDeclarations(ALL_EFFECTS)],
@@ -281,20 +285,60 @@ describe("evaluateEffects — Round 2 D-CG-5 fail-closed", () => {
         ],
       }),
       extractor: new StubExtractor(),
-      strictMode: false,
     });
-    const violation = r.violations.find(
+    const violations = r.violations.filter(
       (x) => x.rule_id === "effect.unresolved_call_blocks_evaluation",
     );
-    expect(violation).toBeUndefined();
-    const notice = r.notices.find(
+    const notices = r.notices.filter(
       (x) => x.rule_id === "effect.unresolved_call_blocks_evaluation",
     );
-    expect(notice).toBeDefined();
-    expect(notice?.severity).toBe("warning");
+    expect(violations).toEqual([]);
+    expect(notices).toEqual([]);
+    expect(r.stats.unresolvedFailures).toBe(0);
   });
 
-  it("strictMode=true (default) is the default — D-CG-1", async () => {
+  it("unresolved call in overlap of two policy scopes emits exactly one violation (no per-policy duplication)", async () => {
+    const node = mkNode({
+      id: "src/overlap/area.ts::touch(0)",
+      filePath: "src/overlap/area.ts",
+    });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(ALL_EFFECTS)],
+        effectPolicies: [
+          // Both target-scopes match the same node.
+          mkEffectPolicy({
+            id: "AREA_RULE_A",
+            targetScope: ["**/overlap/**::*"],
+            forbid: ["db.*"],
+          }),
+          mkEffectPolicy({
+            id: "AREA_RULE_B",
+            targetScope: ["src/overlap/area.ts::*"],
+            forbid: ["http.outgoing"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({
+        nodes: [node],
+        edges: [],
+        unresolvedCalls: [
+          mkUnresolved({ from: node.id, line: 17, column: 4, reason: "dynamic" }),
+        ],
+      }),
+      extractor: new StubExtractor(),
+    });
+    const unresolvedHits = r.violations.filter(
+      (x) => x.rule_id === "effect.unresolved_call_blocks_evaluation",
+    );
+    expect(unresolvedHits).toHaveLength(1);
+  });
+
+  it("no contract policies → no unresolved-call emission anywhere on the graph", async () => {
+    // Without policies there is no active scope, so the per-policy gate
+    // suppresses every unresolved-call site. This replaces the prior
+    // "strictMode default true" behaviour that emitted globally; under
+    // Closeout 1 the principled behaviour is silence when no policy cares.
     const node = mkNode({ id: "src/c/Q.tsx::Q(0)", filePath: "src/c/Q.tsx" });
     const r = await evaluateEffects({
       contract: mkContract({
@@ -309,9 +353,25 @@ describe("evaluateEffects — Round 2 D-CG-5 fail-closed", () => {
         ],
       }),
       extractor: new StubExtractor(),
-      // strictMode omitted → defaults to true
     });
-    expect(r.stats.unresolvedFailures).toBe(1);
+    expect(r.stats.unresolvedFailures).toBe(0);
+  });
+});
+
+describe("evaluateEffects — Closeout 1 EvaluateEffectOptions surface", () => {
+  it("EvaluateEffectOptions has no `strictMode` field at the call site", async () => {
+    // The argument object passed to evaluateEffects is a runtime witness
+    // that the strictMode knob has been removed (Closeout 1). If anyone
+    // re-adds the property they'll have to also re-add it here, which is
+    // visible in a diff review.
+    const options = {
+      contract: mkContract({}),
+      callGraph: mkCallGraph({ nodes: [], edges: [] }),
+      extractor: new StubExtractor(),
+    } as const;
+    expect("strictMode" in options).toBe(false);
+    const r = await evaluateEffects(options);
+    expect(r.violations).toEqual([]);
   });
 });
 
@@ -485,12 +545,19 @@ describe("evaluateEffects — performance smoke", () => {
   });
 });
 
-describe("evaluateEffects — strict default + opt-out", () => {
-  it("violation set with strict default true contains unresolved-call error", async () => {
+describe("evaluateEffects — in-scope unresolved is always an error", () => {
+  it("an in-scope unresolved-call site fires error severity regardless of any flag", async () => {
     const node = mkNode({ id: "src/c/Q.tsx::Q(0)", filePath: "src/c/Q.tsx" });
     const r = await evaluateEffects({
       contract: mkContract({
         effectDeclarations: [mkEffectDeclarations(ALL_EFFECTS)],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "C_LAYER_FORBIDS_DB",
+            targetScope: ["src/c/**::*"],
+            forbid: ["db.read"],
+          }),
+        ],
       }),
       callGraph: mkCallGraph({
         nodes: [node],
@@ -499,8 +566,11 @@ describe("evaluateEffects — strict default + opt-out", () => {
       }),
       extractor: new StubExtractor(),
     });
-    expect(r.violations).toHaveLength(1);
-    expect(r.violations[0]?.severity).toBe("error");
+    const unresolved = r.violations.filter(
+      (v) => v.rule_id === "effect.unresolved_call_blocks_evaluation",
+    );
+    expect(unresolved).toHaveLength(1);
+    expect(unresolved[0]?.severity).toBe("error");
   });
 });
 

@@ -16,7 +16,7 @@
  *
  * `runEffectFixture()` loads the contract, extracts the call graph via
  * `tsCallGraphExtractor`, then invokes `evaluateEffects({ contract,
- * callGraph, extractor: tsEffectAnnotationExtractor, strictMode })`.
+ * callGraph, extractor: tsEffectAnnotationExtractor })`.
  *
  * The runner is intentionally tolerant: if either `@stele/effect-evaluator`
  * (T5.2) or `tsEffectAnnotationExtractor` (T5.3) is not yet built, the
@@ -24,10 +24,10 @@
  * should skip cleanly. This lets the fixture suite land independently of
  * the upstream tasks.
  *
- * Strict-mode detection: a fixture opts out of strict mode (the default) by
- * placing a `.fixture-config.json` file with `{ "strictMode": false }` at
- * the fixture root. Otherwise strictMode=true. See
- * `loadFixtureConfig()` below.
+ * Closeout 1 (2026-05-25): the prior strictMode fixture knob is gone.
+ * Unresolved-call emission is now gated by per-policy `target-scope`
+ * membership inside the evaluator, so there is nothing for a fixture to
+ * opt into or out of. The legacy `.fixture-config.json` file is ignored.
  *
  * Parse-error fixtures: a fixture whose `expected-violations.json` is a
  * single object with a string `expected_parse_error` field (instead of an
@@ -100,7 +100,6 @@ interface EffectEvaluatorModule {
     readonly contract: Awaited<ReturnType<typeof loadContract>>;
     readonly callGraph: CallGraph;
     readonly extractor: EffectAnnotationExtractorLike;
-    readonly strictMode?: boolean;
   }) => Promise<{
     readonly violations: readonly Violation[];
     readonly notices: readonly Violation[];
@@ -223,30 +222,16 @@ export async function isEffectInfrastructureAvailable(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Fixture-config detection
+// Fixture-config detection (Closeout 1: no per-fixture knobs)
 // ---------------------------------------------------------------------------
 
-interface FixtureConfig {
-  readonly strictMode: boolean;
-}
-
 /**
- * Load `.fixture-config.json` from the fixture root if present. Defaults to
- * `{ strictMode: true }` — the evaluator's documented default. A fixture
- * opts into lenient mode by writing `{ "strictMode": false }`.
+ * Closeout 1 (2026-05-25) removed the strictMode knob. Loader is retained
+ * as a zero-arg no-op for source compatibility with the fixture runner
+ * call site; any legacy `.fixture-config.json` is ignored.
  */
-export function loadFixtureConfig(fixturePath: string): FixtureConfig {
-  const configPath = resolve(fixturePath, ".fixture-config.json");
-  if (!existsSync(configPath)) {
-    return { strictMode: true };
-  }
-  const raw = readFileSync(configPath, "utf-8");
-  const parsed: unknown = JSON.parse(raw);
-  if (parsed === null || typeof parsed !== "object") {
-    return { strictMode: true };
-  }
-  const strict = (parsed as { strictMode?: unknown }).strictMode;
-  return { strictMode: strict === false ? false : true };
+export function loadFixtureConfig(_fixturePath: string): Record<string, never> {
+  return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -286,8 +271,10 @@ export function isParseErrorSpec(
 // Fixture loader / runner
 // ---------------------------------------------------------------------------
 
+// Closeout 1: kept as an empty struct so call sites that pass `{}` still
+// typecheck. There are no per-call knobs to thread anymore.
 export interface RunEffectFixtureOptions {
-  readonly strictMode?: boolean;
+  readonly _placeholder?: never;
 }
 
 /**
@@ -297,7 +284,7 @@ export interface RunEffectFixtureOptions {
  */
 export async function runEffectFixture(
   fixturePath: string,
-  options: RunEffectFixtureOptions = {},
+  _options: RunEffectFixtureOptions = {},
 ): Promise<EffectFixtureResult> {
   const contractPath = resolve(fixturePath, "contract/main.stele");
   if (!existsSync(contractPath)) {
@@ -329,14 +316,10 @@ export async function runEffectFixture(
     );
   }
 
-  const fixtureConfig = loadFixtureConfig(fixturePath);
-  const strictMode = options.strictMode ?? fixtureConfig.strictMode;
-
   const result = await evaluator.evaluateEffects({
     contract,
     callGraph,
     extractor,
-    strictMode,
   });
 
   return {

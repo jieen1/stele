@@ -101,9 +101,12 @@ describe("effect-policy end-to-end fixtures", () => {
         return;
       }
 
-      const { strictMode } = loadFixtureConfig(fixturePath);
+      // Closeout 1 (2026-05-25): loadFixtureConfig is a no-op now; the
+      // strictMode knob is gone. Calling it keeps the import live so a
+      // missing fixture-config file path is still surfaced as a real bug.
+      loadFixtureConfig(fixturePath);
 
-      const result = await runEffectFixture(fixturePath, { strictMode });
+      const result = await runEffectFixture(fixturePath);
 
       // Effect findings split into `violations` (blocking) and `notices`
       // (informational / lenient-mode downgrades / suppression-active).
