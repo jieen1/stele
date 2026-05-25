@@ -568,14 +568,16 @@ describe("buildEffectStage — cross-stage cache reuse", () => {
     });
 
     // Seed the shared cache as if the trace/type-state stage had already run.
-    const { setCachedCallGraph } = await import(
+    // Closeout 4: cache stores `TypedCallGraph<"Cached">`; route the seed
+    // through `wrapExtractedGraph` so the brand transitions hold.
+    const { setCachedCallGraph, wrapExtractedGraph } = await import(
       "../src/commands/check-stages-call-graph-cache.js"
     );
     const seeded: CallGraph = mkCallGraph({
       nodes: [mkNode({ id: "src/seed.ts::seed(0)" })],
       edges: [mkEdge({ from: "src/seed.ts::seed(0)", to: "src/seed.ts::seed(0)" })],
     });
-    setCachedCallGraph(context, seeded);
+    setCachedCallGraph(context, wrapExtractedGraph(seeded));
 
     const extract = vi.fn(async () => mkCallGraph({}));
     const evaluate = vi.fn<EvaluateFn>(async () => okResult());

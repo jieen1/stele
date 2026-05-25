@@ -13,6 +13,7 @@ import {
   attachApprovedBy,
   draftApproval,
   signApproval,
+  writeSignedApproval,
   type Approval,
   type ApprovalPayload,
 } from "../src/commands/design/approval-lifecycle.js";
@@ -50,3 +51,9 @@ attachApprovedBy(signed);
 // @ts-expect-error — ApprovalPayload is not assignable to Approval<"Drafting">
 const smuggled: Approval<"Drafting"> = payload;
 void smuggled;
+
+// 4. Closeout 4: `writeSignedApproval` accepts only `Approval<"Signed">`.
+//    Passing a Drafting brand MUST fail — the persist site is the runtime
+//    gate that the identity check + signing transitions happened.
+// @ts-expect-error — Drafting cannot be passed where writeSignedApproval requires Signed
+writeSignedApproval(drafting, "contract/design/approvals/x.json");

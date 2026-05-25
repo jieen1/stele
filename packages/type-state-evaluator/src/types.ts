@@ -7,12 +7,14 @@
 /** Discriminated kinds reported as `typestate.<id>.<kind>`. */
 export type TypeStateViolationKind =
   | "disallowed_op"
-  | "inference_failed";
+  | "inference_failed"
+  | "wrong_state_at_binding";
 
 export const ALL_TYPE_STATE_VIOLATION_KINDS: readonly TypeStateViolationKind[] =
   Object.freeze([
     "disallowed_op",
     "inference_failed",
+    "wrong_state_at_binding",
   ] as const);
 
 /**

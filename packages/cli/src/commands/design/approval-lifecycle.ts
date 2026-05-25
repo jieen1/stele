@@ -11,6 +11,9 @@
  * the transition sequence at the type level.
  */
 
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 export type ApprovalState = "Drafting" | "IdentityChecked" | "Signed";
 
 export type ApprovalStateBrand<S extends ApprovalState> = {
@@ -65,4 +68,29 @@ export function signApproval(
   approval: Approval<"IdentityChecked">,
 ): Approval<"Signed"> {
   return approval as unknown as Approval<"Signed">;
+}
+
+/**
+ * Closeout 4 (self-dogfooding plan): typed write entry for an approval
+ * record. Accepts only an `Approval<"Signed">` value so the persist
+ * site cannot serialise a Drafting or IdentityChecked record — both
+ * pre-attribution states are bytes-on-disk vulnerabilities.
+ *
+ * Internally writes the JSON via `writeFileSync` (the existing approve
+ * implementation; the wrapper exists solely to gate the write with the
+ * brand).
+ *
+ * @stele:effects fs.write
+ */
+export function writeSignedApproval(
+  approval: Approval<"Signed">,
+  approvalPath: string,
+): void {
+  // Closeout 4: receiver-method site for the bound `approval` param —
+  // see `useHashedProfile` for rationale.
+  approval.valueOf();
+  // Resolve the input path before the write — same path-safety
+  // contract every other CLI-side fs write follows (CLI_IO_THROUGH_PATH_UTILS).
+  const absolute = resolve(approvalPath);
+  writeFileSync(absolute, JSON.stringify(approval, null, 2), "utf8");
 }

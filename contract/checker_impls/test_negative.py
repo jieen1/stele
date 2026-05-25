@@ -2406,6 +2406,65 @@ def test_architecture_evaluator_shape_catches_missing_aggregate_member():
 
 
 # ---------------------------------------------------------------------------
+# Closeout 4 Test A (CC-13 paired negative shape #1, compile-time):
+# the typed CONSUMER wrappers (writeLockedManifest, writeSignedApproval,
+# useHashedProfile, useCachedCallGraph) reject non-matching brands at
+# tsc. Each `.test-d.ts` file pins one such illegal call with an
+# `@ts-expect-error` comment; removing the pin must surface TS2345.
+#
+# Test B (the runtime-evaluator paired test) lives in
+# `packages/type-state-evaluator/tests/closeout-4-test-b.test.ts` and
+# asserts the new `wrong_state_at_binding` rule fires per CC-13's
+# requirement that the paired test exercises a DIFFERENT enforcement
+# layer.
+# ---------------------------------------------------------------------------
+
+
+def test_writelockedmanifest_brand_fires():
+    """Closeout 4 (MANIFEST): removing the pin on the Loaded → write
+    illegal transition must surface TS2345 from
+    `packages/core/tests/manifest-lifecycle.test-d.ts`."""
+    assert _type_state_brand_negative(
+        "packages/core/tests/manifest-lifecycle.test-d.ts",
+        "@ts-expect-error — Loaded cannot be passed where writeLockedManifest requires Locked",
+        "@stele/core",
+    ), "MANIFEST_LIFECYCLE typed-write brand failed to fire — tsc accepted Loaded → writeLockedManifest"
+
+
+def test_writesignedapproval_brand_fires():
+    """Closeout 4 (APPROVAL): removing the pin on the Drafting → write
+    illegal transition must surface TS2345 from
+    `packages/cli/tests/approval-lifecycle.test-d.ts`."""
+    assert _type_state_brand_negative(
+        "packages/cli/tests/approval-lifecycle.test-d.ts",
+        "@ts-expect-error — Drafting cannot be passed where writeSignedApproval requires Signed",
+        "@stele/cli",
+    ), "APPROVAL_LIFECYCLE typed-write brand failed to fire — tsc accepted Drafting → writeSignedApproval"
+
+
+def test_usehashedprofile_brand_fires():
+    """Closeout 4 (DESIGN_PROFILE): removing the pin on the Raw → use
+    illegal transition must surface TS2345 from
+    `packages/cli/tests/design-profile-lifecycle.test-d.ts`."""
+    assert _type_state_brand_negative(
+        "packages/cli/tests/design-profile-lifecycle.test-d.ts",
+        "@ts-expect-error — Raw cannot be passed where useHashedProfile requires Hashed",
+        "@stele/cli",
+    ), "DESIGN_PROFILE_LIFECYCLE typed-use brand failed to fire — tsc accepted Raw → useHashedProfile"
+
+
+def test_usecachedcallgraph_brand_fires():
+    """Closeout 4 (CALLGRAPH): removing the pin on the Built → use
+    illegal transition must surface TS2345 from
+    `packages/cli/tests/cached-callgraph-consumer.test-d.ts`."""
+    assert _type_state_brand_negative(
+        "packages/cli/tests/cached-callgraph-consumer.test-d.ts",
+        "@ts-expect-error — Built cannot be passed where useCachedCallGraph requires Cached",
+        "@stele/cli",
+    ), "CALLGRAPH_LIFECYCLE typed-use brand failed to fire — tsc accepted Built → useCachedCallGraph"
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -2548,6 +2607,12 @@ def main() -> int:
         ("design_profile_validator_shape_catches_missing_aggregate_member", test_design_profile_validator_shape_catches_missing_aggregate_member),
         ("architecture_evaluator_shape_catches_missing_method", test_architecture_evaluator_shape_catches_missing_method),
         ("architecture_evaluator_shape_catches_missing_aggregate_member", test_architecture_evaluator_shape_catches_missing_aggregate_member),
+        # Closeout 4 Test A (CC-13 paired negative shape #1, compile-time):
+        # typed-CONSUMER brand-fires for the 4 lifecycle wrappers.
+        ("writelockedmanifest_brand_fires", test_writelockedmanifest_brand_fires),
+        ("writesignedapproval_brand_fires", test_writesignedapproval_brand_fires),
+        ("usehashedprofile_brand_fires", test_usehashedprofile_brand_fires),
+        ("usecachedcallgraph_brand_fires", test_usecachedcallgraph_brand_fires),
     ]
 
     print("=" * 60)

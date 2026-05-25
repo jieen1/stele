@@ -318,6 +318,19 @@ work can pick them up.
 - Add `type-state-binding` declarations once the upstream refactor
   lands (meaningful only once typed callers exist).
 
+> **RESOLVED in Closeout 4 (2026-05-25).** 24 production call sites
+> routed through typed lifecycle methods (MANIFEST 4, APPROVAL 1,
+> DESIGN_PROFILE 15, CALLGRAPH 4). 4 `type-state-binding` declarations
+> added to `contract/main.stele` (one per lifecycle, pinning the
+> typed consumer's param 0 to the lifecycle's terminal state). The
+> type-state evaluator was extended with a new rule
+> `typestate.<LIFECYCLE>.wrong_state_at_binding` to fail closed when a
+> binding's declared state disagrees with the static inference for
+> the same param. 8 paired negative tests (CC-13 different shape)
+> cover both enforcement layers (tsc + runtime evaluator). See
+> [`docs/design/self-dogfooding-closeout/closeout-4-callsite-inventory.md`](../design/self-dogfooding-closeout/closeout-4-callsite-inventory.md)
+> for the call-site checklist.
+
 ### Phase 6 deferrals (9)
 Wrap each free-function aggregate in a stateless service class **or**
 extend the TS class-shape extractor to bind module-level functions.

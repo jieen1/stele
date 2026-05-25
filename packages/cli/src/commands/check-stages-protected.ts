@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import {
   createViolationReport,
   tryReadViolationBaseline,
-  verifyManifest,
+  verifyManifestToVerified,
   type HumanState,
   type ViolationReport,
 } from "@stele/core";
@@ -129,7 +129,14 @@ async function buildProtectedReportWithManifest(
   protectedState: ProtectedCheckState,
   command: string,
 ): Promise<ViolationReport> {
-  const manifest = await verifyManifest(resolve(context.projectDir, context.config.manifestPath));
+  // Closeout 4 (self-dogfooding plan): typed MANIFEST_LIFECYCLE entry —
+  // `verifyManifestToVerified` returns a `Manifest<"Verified">` brand
+  // alongside the underlying `VerificationResult`. The persist site
+  // upstream only emits Locked manifests; the verify site here is the
+  // typed downstream consumer.
+  const { verification: manifest } = await verifyManifestToVerified(
+    resolve(context.projectDir, context.config.manifestPath),
+  );
   const currentProtectedPaths = toManifestPaths(context.projectDir, protectedState.protectedPaths);
   const manifestProtectedPathSet = new Set(manifest.files.map((file) => file.path));
   const violations = [

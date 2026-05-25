@@ -20,6 +20,7 @@ import {
   asLoaded,
   lockManifest,
   verifyLockedManifest,
+  writeLockedManifest,
   type Manifest,
 } from "../src/manifest/lifecycle.js";
 
@@ -57,3 +58,12 @@ lockManifest(verified);
 // @ts-expect-error — ContractManifest is not assignable to Manifest<"Loaded">
 const smuggled: Manifest<"Loaded"> = sample;
 void smuggled;
+
+// 5. Closeout 4: `writeLockedManifest` accepts only `Manifest<"Locked">`.
+//    Passing a `Loaded` brand MUST fail — the typed write entry is the
+//    runtime gate that the MANIFEST_LIFECYCLE persist step happens via
+//    `lockManifest` first. Mutating a production caller to drop
+//    `lockManifest(loaded)` and feed the Loaded value directly into
+//    `writeLockedManifest` trips THIS assertion.
+// @ts-expect-error — Loaded cannot be passed where writeLockedManifest requires Locked
+void writeLockedManifest(loaded, "contract/.manifest.json");

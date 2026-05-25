@@ -16,7 +16,8 @@ import {
 } from "@stele/core";
 import { loadConfig } from "../config/loadConfig.js";
 import { readManifest, type GenerationManifest } from "../design-generator/manifest.js";
-import { loadProfile, profilePathExists } from "../design-profile/load.js";
+import { profilePathExists } from "../design-profile/load.js";
+import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import type { DesignProfile } from "../design-profile/types.js";
 
 import { compareInvariants, formatAstNode, toProjectRelativePath } from "../utils/shared-utils.js";
@@ -191,7 +192,8 @@ export async function buildRuleIndex(projectDir: string): Promise<RuleIndex> {
   const contract = await loadContract(resolve(projectDir, config.entry));
 
   const manifest = readManifest(projectDir);
-  const profile = profilePathExists(projectDir) ? loadProfile(projectDir) : null;
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  const profile = profilePathExists(projectDir) ? loadHashedProfile(projectDir).profile : null;
   const provenance = buildProvenanceMap(manifest, profile);
 
   return {

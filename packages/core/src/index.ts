@@ -40,9 +40,21 @@ export type {
   VerificationResult,
   VerifiedProtectedFile,
 } from "./manifest/manifest.js";
-export { verifyManifest, writeManifest } from "./manifest/manifest.js";
+export {
+  buildContractManifest,
+  verifyManifest,
+  writeContractManifestObject,
+  writeManifest,
+} from "./manifest/manifest.js";
 export type { Manifest, ManifestState, ManifestStateBrand } from "./manifest/lifecycle.js";
-export { asLoaded, lockManifest, verifyLockedManifest } from "./manifest/lifecycle.js";
+export {
+  asLoaded,
+  buildLoadedManifestForPaths,
+  lockManifest,
+  verifyLockedManifest,
+  verifyManifestToVerified,
+  writeLockedManifest,
+} from "./manifest/lifecycle.js";
 export type { FileEntry, HashManifest, ParsedFileLike } from "./manifest/hash-manifest.js";
 export {
   buildTransitiveHash,

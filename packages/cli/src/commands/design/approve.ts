@@ -1,14 +1,34 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+// `writeFileSync` is re-imported (unused locally — production callers
+// go through `writeSignedApproval`) so the
+// `trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor` negative
+// test can inject a bypass function calling `writeFileSync` directly
+// and prove the trace policy still catches it. The `void writeFileSync`
+// below keeps strict noUnusedLocals quiet.
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+void writeFileSync;
 import { resolve } from "node:path";
 import * as yaml from "js-yaml";
 
 import { hashFile } from "../../design-profile/hash.js";
-import { loadProfile, profilePathExists } from "../../design-profile/load.js";
+import { profilePathExists } from "../../design-profile/load.js";
+import { loadHashedProfile } from "../../design-profile/lifecycle.js";
 import { readManifest } from "../../design-generator/manifest.js";
 import { computeDesignDiff } from "./diff.js";
 import type { DesignProfile } from "../../design-profile/types.js";
 import { ExitCode } from "../../errors.js";
+import {
+  attachApprovedBy,
+  draftApproval,
+  signApproval,
+  writeSignedApproval,
+  type ApprovalPayload,
+} from "./approval-lifecycle.js";
 
 export type DesignApproveOptions = {
   from?: string;        // Path to previous profile for field-level diff
@@ -184,7 +204,8 @@ export async function runDesignApprove(
     return;
   }
 
-  const currentProfile = loadProfile(projectDir);
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  const currentProfile = loadHashedProfile(projectDir).profile;
   const profileHash = hashFile(resolve(projectDir, "contract/design/profile.yaml"));
   const manifest = readManifest(projectDir);
   const baseHash = manifest?.profileHash ?? null;
@@ -241,7 +262,7 @@ export async function runDesignApprove(
   // has been deleted (i.e. merged into the approved profile).
   const approvedProposals = readProposalsAtApproval(projectDir);
 
-  const approval = {
+  const approvalPayload: ApprovalPayload = {
     schema_version: 1,
     base_profile_sha256: baseHash,
     approved_profile_sha256: profileHash,
@@ -256,7 +277,16 @@ export async function runDesignApprove(
     approved_at: new Date().toISOString(),
   };
 
-  writeFileSync(approvalPath, JSON.stringify(approval, null, 2), "utf8");
+  // Closeout 4 (self-dogfooding plan): route through the typed
+  // APPROVAL_LIFECYCLE chain — Drafting → IdentityChecked → Signed.
+  // The persist site `writeSignedApproval` only accepts a
+  // `Approval<"Signed">`, so a caller that skips a step gets a tsc
+  // error AND the evaluator's wrong_state_at_binding rule when a
+  // matching (type-state-binding ...) is in force.
+  const drafting = draftApproval(approvalPayload);
+  const identityChecked = attachApprovedBy(drafting);
+  const signed = signApproval(identityChecked);
+  writeSignedApproval(signed, approvalPath);
   process.stdout.write(`[design] Approval written to ${approvalPath}\n`);
   process.stdout.write(`[design] Classification: ${diffClassification}\n`);
 }

@@ -4,7 +4,7 @@ import * as yaml from "js-yaml";
 
 import { computeDesignDiff } from "./diff.js";
 import type { AggregateRoot, BrandedId, Context, CoreInvariant, DesignProfile } from "../../design-profile/types.js";
-import { loadProfile } from "../../design-profile/load.js";
+import { loadHashedProfile } from "../../design-profile/lifecycle.js";
 import { ExitCode } from "../../errors.js";
 import { validateProposalSchema, PHASE_A_KINDS, PHASE_B_KINDS } from "./proposal-schema.js";
 
@@ -27,8 +27,9 @@ export async function runDesignPropose(
     return;
   }
 
-  // Validate: proposal is add-only (no modifications or removals)
-  const profile = await loadProfile(projectDir);
+  // Validate: proposal is add-only (no modifications or removals).
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  const profile = loadHashedProfile(projectDir).profile;
 
   // Check for duplicate id in existing profile entries
   if (proposalType === "invariant") {
@@ -157,8 +158,9 @@ export async function runDesignPropose(
   }
   writeFileSync(filePath, yaml.dump(content), "utf8");
 
-  // Validate: run diff to prove the proposal is additive (no weakening or restructuring)
-  const currentProfile = await loadProfile(projectDir);
+  // Validate: run diff to prove the proposal is additive (no weakening or restructuring).
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  const currentProfile = loadHashedProfile(projectDir).profile;
   const mergedProfile = mergeProposalIntoProfile(currentProfile, proposalType, content);
   const diff = computeDesignDiff(currentProfile, mergedProfile);
 

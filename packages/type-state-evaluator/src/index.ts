@@ -24,14 +24,17 @@ export {
 export {
   buildDisallowedOpViolation,
   buildInferenceFailedViolation,
+  buildWrongStateAtBindingViolation,
   defaultPriority,
   type BuildDisallowedOpOptions,
   type BuildInferenceFailedOptions,
+  type BuildWrongStateAtBindingOptions,
 } from "./violation-builder.js";
 
 export {
   defaultDisallowedOpFixHint,
   defaultInferenceFailedFixHint,
+  defaultWrongStateAtBindingFixHint,
   proposeExitText,
 } from "./fix-hint.js";
 

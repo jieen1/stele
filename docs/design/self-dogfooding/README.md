@@ -681,6 +681,19 @@ on this 9.3k-node × 41k-edge graph.
   the free-function API and the evaluator would still match zero
   call sites. Bindings deferred alongside the upstream refactor.
 
+> **RESOLVED in closeout-4 (2026-05-25, branch `worktree-agent-a742af981e5a7de8a`).**
+> Both deferred items landed via the
+> [self-dogfooding-closeout/](../self-dogfooding-closeout/) plan:
+> 24 production call sites routed through typed lifecycle methods
+> (MANIFEST 4, APPROVAL 1, DESIGN_PROFILE 15, CALLGRAPH 4), 4
+> `type-state-binding` declarations added to `contract/main.stele`,
+> and the type-state evaluator extended with a new rule
+> `typestate.<LIFECYCLE>.wrong_state_at_binding` that fires whenever a
+> binding's declared state disagrees with the static inference at the
+> same parameter index. 8 paired negative tests (CC-13 different
+> shape) verify both enforcement layers — tsc-level brand discriminator
+> AND runtime evaluator rule — fire on regression.
+
 ### 2026-05-25 — Phase 4 regression hunt (main agent)
 
 While preparing Phase 6, three regressions introduced by the Phase 4

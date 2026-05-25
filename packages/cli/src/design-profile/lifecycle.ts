@@ -8,7 +8,10 @@
  * profile to generation skips the integrity gate.
  */
 
+import { resolve } from "node:path";
 import type { Sha256 } from "@stele/core";
+import { hashFile } from "./hash.js";
+import { loadProfile } from "./load.js";
 import type { DesignProfile } from "./types.js";
 
 export type DesignProfileState = "Raw" | "Validated" | "Hashed";
@@ -60,4 +63,50 @@ export function hashValidatedProfile(
     profile: profile as unknown as TypedDesignProfile<"Hashed">,
     contentHash,
   };
+}
+
+/**
+ * Closeout 4 (self-dogfooding plan): single sanctioned entry for
+ * production callers that need a profile + its content hash. Internally
+ * chains `loadProfile → asRawProfile → markProfileValidated →
+ * hashValidatedProfile`. Every downstream consumer reads `.profile` for
+ * the YAML fields and `.contentHash` for the SHA-256.
+ *
+ * `loadProfile` (the free function in `load.ts`) is retained for the
+ * `useProfile` test path that needs raw profile shapes without forcing
+ * lifecycle threading through every fixture; production code goes
+ * through `loadHashedProfile`.
+ */
+export function loadHashedProfile(
+  projectDir: string,
+  profilePath: string = "contract/design/profile.yaml",
+): HashedDesignProfile {
+  const profile = loadProfile(projectDir, profilePath);
+  // validateProfile already ran inside loadProfile; mark Validated.
+  const raw = asRawProfile(profile);
+  const validated = markProfileValidated(raw);
+  const contentHash = hashFile(resolve(projectDir, profilePath));
+  return hashValidatedProfile(validated, contentHash);
+}
+
+/**
+ * Closeout 4: typed consumer for a Hashed profile. Accepts only a
+ * `TypedDesignProfile<"Hashed">` (the phantom-branded profile inside a
+ * HashedDesignProfile), so a caller cannot pass a Raw/Validated brand.
+ * The matching `(type-state-binding ...)` in `contract/main.stele`
+ * pins param 0 to state `Hashed`; the evaluator's
+ * wrong_state_at_binding rule fires if the inferred state disagrees.
+ *
+ * The `profile.valueOf()` call below is the receiver-method site the
+ * TS type-state extractor inspects: it gives the extractor a concrete
+ * call expression whose receiver type is `TypedDesignProfile<"Hashed">`,
+ * so the inferred state can be compared against the binding's declared
+ * state. Without this call the bound function would have no inference
+ * site and the wrong_state_at_binding rule would never fire for it.
+ */
+export function useHashedProfile(
+  profile: TypedDesignProfile<"Hashed">,
+): DesignProfile {
+  profile.valueOf();
+  return profile as DesignProfile;
 }

@@ -14,7 +14,8 @@ import {
   type ShapeViolation,
   type BrandedIdViolation,
 } from "@stele/type-driven-evaluator";
-import { profilePathExists, loadProfile } from "../design-profile/load.js";
+import { profilePathExists } from "../design-profile/load.js";
+import { loadHashedProfile } from "../design-profile/lifecycle.js";
 
 const RULE_KIND_BRANDED = "typescript-branded-id";
 const RULE_KIND_SMART = "typescript-smart-ctor";
@@ -48,9 +49,10 @@ export async function buildTypeDrivenStage(
   let tsconfigPath = resolve(context.projectDir, "tsconfig.json");
   if (profilePathExists(context.projectDir)) {
     try {
-      const profile = loadProfile(context.projectDir);
-      if (profile.project?.tsconfig) {
-        tsconfigPath = resolve(context.projectDir, profile.project.tsconfig);
+      // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+      const hashed = loadHashedProfile(context.projectDir);
+      if (hashed.profile.project?.tsconfig) {
+        tsconfigPath = resolve(context.projectDir, hashed.profile.project.tsconfig);
       }
     } catch {
       // ignore — fall back to default tsconfig

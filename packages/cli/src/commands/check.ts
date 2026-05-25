@@ -38,7 +38,10 @@ import {
 import { createExecutionViolation } from "./check-violations.js";
 import { profilePathExists } from "../design-profile/load.js";
 import { createEvent, writeEvent } from "../events/write-event.js";
-import { loadProfile } from "../design-profile/load.js";
+import {
+  loadHashedProfile,
+  useHashedProfile,
+} from "../design-profile/lifecycle.js";
 import { runAllStages } from "./check-stages-registry.js";
 import { isBaselineEligibleViolation, type ReportFilters } from "../report/filters.js";
 
@@ -453,12 +456,15 @@ async function checkSelfNoBaseline(projectDir: string): Promise<Violation[]> {
     return [];
   }
 
-  let profile: ReturnType<typeof loadProfile>;
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain — load, then
+  // unwrap through `useHashedProfile` (param 0 typed `Hashed`).
+  let hashed: ReturnType<typeof loadHashedProfile>;
   try {
-    profile = loadProfile(projectDir);
+    hashed = loadHashedProfile(projectDir);
   } catch {
     return [];
   }
+  const profile = useHashedProfile(hashed.profile);
 
   if (!profile.self_constraints?.no_baseline) {
     return [];

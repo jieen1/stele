@@ -503,6 +503,14 @@ function inferInSourceFile(
       };
     })();
 
+    // Closeout 4: when the receiver is the identifier of a parameter of
+    // the enclosing caller, report the parameter index so the evaluator
+    // can correlate the inferred state against any matching
+    // `(type-state-binding ...)` param declaration.
+    const receiverParamIndex = ts.isIdentifier(receiver)
+      ? (findParameterIndex(receiver, caller, checker) ?? undefined)
+      : undefined;
+
     out.push({
       callerId,
       callSite: callPos,
@@ -510,6 +518,7 @@ function inferInSourceFile(
       method,
       declarationId: decl.id,
       inferredState: inferred.state ?? undefined,
+      receiverParamIndex,
       inferenceReason: inferred.reason,
       inferenceOrigin: origin,
       flowSteps: Object.freeze(inferred.flowSteps.slice()),

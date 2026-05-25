@@ -9,7 +9,8 @@ import {
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { MAX_CHILD_PROCESS_BUFFER } from "../config/defaults.js";
 import { profilePathExists } from "../design-profile/load.js";
-import { loadProfile } from "../design-profile/load.js";
+import { loadHashedProfile } from "../design-profile/lifecycle.js";
+import type { DesignProfile } from "../design-profile/types.js";
 import { resolveCommand } from "../toolchain/command-resolver.js";
 import { validateTsconfigPolicy } from "../toolchain/tsconfig-policy.js";
 import { parseTscOutputToViolations, DEFAULT_TSC_COMMAND } from "../toolchain/typescript.js";
@@ -25,9 +26,10 @@ export async function buildToolchainStage(
     return createEmptyViolationReport(protectedState.summary.invariantCount);
   }
 
-  let profile: ReturnType<typeof loadProfile>;
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  let profile: DesignProfile;
   try {
-    profile = loadProfile(context.projectDir);
+    profile = loadHashedProfile(context.projectDir).profile;
   } catch (error) {
     process.stderr.write(
       "warn: failed to load design profile, skipping design checks: " + (error instanceof Error ? error.message : String(error)) + "\n",

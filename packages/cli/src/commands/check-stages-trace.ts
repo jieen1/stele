@@ -17,14 +17,18 @@ import {
   type CallGraphExtractor,
   type ExternAlias,
   type ExternAliasRegistry,
+  type TypedCallGraph,
 } from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { pickPhaseLanguage } from "../config/phase-language.js";
-import { profilePathExists, loadProfile } from "../design-profile/load.js";
+import { profilePathExists } from "../design-profile/load.js";
+import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import {
   _clearCallGraphCacheForTests as _clearSharedCallGraphCacheForTests,
   getCachedCallGraph,
   setCachedCallGraph,
+  useCachedCallGraph,
+  wrapExtractedGraph,
 } from "./check-stages-call-graph-cache.js";
 
 /**
@@ -149,9 +153,12 @@ export async function buildTraceStage(
     });
   }
 
-  let callGraph: CallGraph;
+  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — the cache returns a
+  // `TypedCallGraph<"Cached">`; `useCachedCallGraph` is the bound entry
+  // that param 0 must be `Cached` to consume.
+  let cached: TypedCallGraph<"Cached">;
   try {
-    callGraph = await extractOrCacheCallGraph(context, tsconfigPath, deps, extractor);
+    cached = await extractOrCacheCallGraph(context, tsconfigPath, deps, extractor);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -190,6 +197,8 @@ export async function buildTraceStage(
   // (tests do this); production always derives it from the parsed contract.
   const externAliases =
     deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
+  // Closeout 4: bound consumer for the cached call graph.
+  const callGraph: CallGraph = useCachedCallGraph(cached);
   const result = evaluate({
     contract: context.contract,
     callGraph,
@@ -246,12 +255,13 @@ function resolveTsconfigPath(context: PreparedCheckContext): string | null {
     : resolve(context.projectDir, "tsconfig.json");
   if (profilePathExists(context.projectDir)) {
     try {
-      const profile = loadProfile(context.projectDir);
-      if (profile.project?.tsconfig) {
-        tsconfigPath = resolve(context.projectDir, profile.project.tsconfig);
+      // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+      const hashed = loadHashedProfile(context.projectDir);
+      if (hashed.profile.project?.tsconfig) {
+        tsconfigPath = resolve(context.projectDir, hashed.profile.project.tsconfig);
       }
     } catch {
-      // Fall back to default; loadProfile errors are not the trace stage's
+      // Fall back to default; profile errors are not the trace stage's
       // problem (the design stage will surface them).
     }
   }
@@ -266,7 +276,12 @@ async function extractOrCacheCallGraph(
   tsconfigPath: string | null,
   deps: TraceStageDeps,
   extractor: CallGraphExtractor,
-): Promise<CallGraph> {
+): Promise<TypedCallGraph<"Cached">> {
+  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — return the cached
+  // value directly (it is `TypedCallGraph<"Cached">`); otherwise wrap a
+  // fresh extraction through `wrapExtractedGraph` so the typestate
+  // transitions Empty → Building → Built → Cached happen exactly once
+  // per cache miss.
   const cached = getCachedCallGraph(context);
   if (cached !== undefined) {
     return cached;
@@ -284,8 +299,9 @@ async function extractOrCacheCallGraph(
     tsconfigPath: tsconfigPath ?? "",
     cacheDir: resolve(context.projectDir, "contract/.cache"),
   });
-  setCachedCallGraph(context, callGraph);
-  return callGraph;
+  const typed = wrapExtractedGraph(callGraph);
+  setCachedCallGraph(context, typed);
+  return typed;
 }
 
 /**

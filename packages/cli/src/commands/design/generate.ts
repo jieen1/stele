@@ -3,9 +3,11 @@ import { resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { sha256Branded } from "@stele/core";
 
-import { loadProfile, profilePathExists } from "../../design-profile/load.js";
+import { profilePathExists } from "../../design-profile/load.js";
+import { loadHashedProfile } from "../../design-profile/lifecycle.js";
 import { validateProfile } from "../../design-profile/validate.js";
 import { hashFile } from "../../design-profile/hash.js";
+import type { DesignProfile } from "../../design-profile/types.js";
 import { buildManifest, writeManifest } from "../../design-generator/manifest.js";
 import { generateFromProfile } from "../../design-generator/ddd.js";
 import type { ProvenanceOutput, ProvenanceRule } from "../../design-generator/manifest.js";
@@ -27,8 +29,13 @@ export async function runDesignGenerate(opts: DesignGenerateOptions, projectDir:
     return;
   }
 
-  // 2. Load + validate profile
-  const profile = await loadProfile(projectDir);
+  // 2. Load + validate profile.
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  // The explicit `validateProfile` call after the typed load preserves
+  // the structured error surface the generator's exit path needs (the
+  // typed load throws a single Error; the loop below reports per-field).
+  const hashed = loadHashedProfile(projectDir);
+  const profile = hashed.profile;
   const validationErrors = validateProfile(profile);
   if (validationErrors.length > 0) {
     process.stderr.write("[design] Profile validation errors:\n");
@@ -263,7 +270,7 @@ function proposalsStillMatch(
  * Build ProvenanceOutput entries with enforcement_level for each generated rule.
  */
 function buildProvenanceOutputs(
-  profile: ReturnType<typeof loadProfile>,
+  profile: DesignProfile,
   result: ReturnType<typeof generateFromProfile>,
   content: string,
 ): ProvenanceOutput[] {

@@ -2,11 +2,13 @@ import { createHash } from "node:crypto";
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import {
+  buildLoadedManifestForPaths,
   createViolationBaseline,
+  lockManifest,
   sha256Branded,
   stableStringCompare,
   tryReadViolationBaseline,
-  writeManifest,
+  writeLockedManifest,
   writeViolationBaseline,
   type HumanState,
   type Violation,
@@ -157,7 +159,18 @@ async function baselineProject(projectDir: string, options: BaselineCommandOptio
     lockedContext.contract,
     lockedContext.generated,
   );
-  await writeManifest(lockedProtectedState.protectedPaths, resolve(projectDir, lockedContext.config.manifestPath), lockedProtectedState.contractHash);
+  // Closeout 4: typed MANIFEST_LIFECYCLE chain — build (Loaded) →
+  // promote (Locked) → persist (writeLockedManifest accepts only Locked).
+  {
+    const lockedManifestPath = resolve(projectDir, lockedContext.config.manifestPath);
+    const loaded = await buildLoadedManifestForPaths(
+      lockedProtectedState.protectedPaths,
+      lockedManifestPath,
+      lockedProtectedState.contractHash,
+    );
+    const locked = lockManifest(loaded);
+    await writeLockedManifest(locked, lockedManifestPath);
+  }
 
   const finalContext = await prepareCheckContext(projectDir);
   const finalReport = await buildRawCheckReport(finalContext, "check");
@@ -177,7 +190,17 @@ async function baselineProject(projectDir: string, options: BaselineCommandOptio
     humanState: finalHumanState,
   });
   await writeViolationBaseline(baselinePath, finalBaseline);
-  await writeManifest(finalProtectedState.protectedPaths, resolve(projectDir, finalContext.config.manifestPath), finalProtectedState.contractHash);
+  // Closeout 4: typed MANIFEST_LIFECYCLE chain for the final write.
+  {
+    const finalManifestPath = resolve(projectDir, finalContext.config.manifestPath);
+    const loaded = await buildLoadedManifestForPaths(
+      finalProtectedState.protectedPaths,
+      finalManifestPath,
+      finalProtectedState.contractHash,
+    );
+    const locked = lockManifest(loaded);
+    await writeLockedManifest(locked, finalManifestPath);
+  }
 
   await writeEvent(
     projectDir,
