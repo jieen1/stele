@@ -4,6 +4,31 @@
  * Round 2 D-CG-2 + MC-8: default max depth is 10. When the cap is hit the
  * evaluator must emit a `path_exceeded_max_depth` notice rather than silently
  * skip — that is handled by the caller, this module just reports `truncated`.
+ *
+ * Closeout 5 (2026-05-25): adds **negative partial-path memoization** scoped
+ * to a single `enumeratePaths` invocation. The cache stores, for each node,
+ * the LARGEST remaining-budget at which that node was exhaustively proven
+ * to reach no target. Any future visit with the same-or-smaller remaining
+ * budget can re-use the proof and short-circuit.
+ *
+ * Why depth-tagged (not just per-node): the depth cap is what terminates
+ * deep DFS branches before they finish. A node's clean-status can only be
+ * proven up to whatever remaining budget the FIRST visit had. A second
+ * visit with EQUAL OR LESS remaining budget will explore only a subset of
+ * the first visit's subtree, so the proof carries over. A second visit
+ * with MORE remaining budget might explore additional depth and could
+ * (in principle) find a target the first visit missed; we therefore
+ * conservatively skip the cache in that direction.
+ *
+ * The cache is sound under simple-path DFS because:
+ *
+ *   1. We only cache when the subtree was fully explored within the
+ *      remaining budget — no cycle-skip, no depth-cap, no maxPaths cap.
+ *   2. A future visit with the same-or-smaller remaining budget would
+ *      explore a strict subset of what was already explored; if the
+ *      first explored set had no targets, neither does any subset.
+ *   3. The cache lives only inside this `enumeratePaths` call; it never
+ *      leaks to other calls (which could have different `toIds`).
  */
 
 import { stableStringCompare } from "@stele/core";
@@ -88,24 +113,43 @@ export function enumeratePaths(
   let truncated = false;
   let depthCapHit = false;
 
+  // Closeout 5: per-invocation negative cache, KEYED BY (nodeId, remaining
+  // budget). For each node we keep the LARGEST remaining-budget at which
+  // exhaustive exploration found no targets. Future visits with remaining
+  // budget <= cachedRemaining can re-use the proof: their explored set is
+  // a strict subset.
+  //
+  // The cache is freed when this function returns — no cross-invocation
+  // leakage. We rely on `toIds` / `maxDepth` / `maxPaths` being constant
+  // for the call.
+  const cleanAtRemaining = new Map<string, number>();
+
   const stack: string[] = [fromId];
   const onStack = new Set<string>([fromId]);
 
-  const dfs = (): void => {
+  /**
+   * Returns the largest remaining-budget at which the current top-of-stack
+   * node has been exhaustively proven to reach no target during this
+   * sub-call, or `null` when the walk was not exhaustive (cycle-skip,
+   * depth-cap, path-cap, or a target was found). Only an exhaustive walk
+   * is sound to memoize.
+   */
+  const dfs = (): number | null => {
     if (found.length >= maxPaths) {
       truncated = true;
-      return;
+      return null;
     }
 
     const current = stack[stack.length - 1];
     if (current === undefined) {
-      return;
+      return null;
     }
 
-    // If we are deeper than allowed: record cap hit and back off.
+    // If we are deeper than allowed: record cap hit and back off. The walk
+    // from this node was NOT exhaustive — do not memoize.
     if (stack.length > maxDepth) {
       depthCapHit = true;
-      return;
+      return null;
     }
 
     // If current is a target AND we are past the caller, record the path.
@@ -116,42 +160,82 @@ export function enumeratePaths(
       found.push({ nodes: Object.freeze([...stack]) });
       if (found.length >= maxPaths) {
         truncated = true;
-        return;
+        return null;
       }
-      // Continue exploring past this target: a longer path may exist that
-      // visits another target node. But to keep determinism + cost bounded,
-      // we DO NOT extend past a target; only one "ends here" record per
-      // simple path. This matches the spec's "path from caller to target".
-      return;
+      // Reaching a target ends this path; the node IS a target — never
+      // memoize a target as "clean."
+      return null;
+    }
+
+    const remaining = maxDepth - stack.length;
+    // Cache hit: have we already proven `current` is clean at a remaining
+    // budget >= the budget we have now? If so, this sub-call yields no
+    // new paths (a strict subset of what was already explored).
+    const cachedRemaining = cleanAtRemaining.get(current);
+    if (cachedRemaining !== undefined && cachedRemaining >= remaining) {
+      return remaining;
     }
 
     // Expand neighbours.
-    if (stack.length === maxDepth) {
+    if (remaining === 0) {
       // Cannot go deeper. If we haven't yielded yet, that's a depth cap miss.
       depthCapHit = true;
-      return;
+      return null;
     }
 
     const edges = adj.out.get(current);
     if (edges === undefined) {
-      return;
+      // Leaf node with no outgoing edges, not a target — exhaustively walked
+      // (vacuously) and proven clean at this remaining budget.
+      cleanAtRemaining.set(current, remaining);
+      return remaining;
     }
+
+    let exhaustive = true;
+    let foundCountBefore = found.length;
 
     for (const edge of edges) {
       if (onStack.has(edge.toId)) {
-        // Cycle — skip to keep paths simple.
+        // Cycle — skip to keep paths simple. Cycle-skip means the walk from
+        // `current` is NOT fully exhaustive (this child was not explored,
+        // and on a future visit where the child is not on stack it might
+        // reach a target). Suppress memoization for `current`.
+        exhaustive = false;
         continue;
       }
       stack.push(edge.toId);
       onStack.add(edge.toId);
-      dfs();
+      const childCleanRemaining = dfs();
       onStack.delete(edge.toId);
       stack.pop();
+
+      if (found.length > foundCountBefore) {
+        // This branch reached a target — `current` is not clean.
+        exhaustive = false;
+        foundCountBefore = found.length;
+      }
+      if (childCleanRemaining === null) {
+        exhaustive = false;
+      }
+
       if (found.length >= maxPaths) {
         truncated = true;
-        return;
+        return null;
       }
     }
+
+    if (exhaustive) {
+      // Cache the proof. Children were each either pruned by the on-stack
+      // cycle check (but if so we already set exhaustive=false above) or
+      // proven clean at remaining-1; therefore the entire subtree from
+      // `current` within budget `remaining` reached no target.
+      const prior = cleanAtRemaining.get(current);
+      if (prior === undefined || prior < remaining) {
+        cleanAtRemaining.set(current, remaining);
+      }
+      return remaining;
+    }
+    return null;
   };
 
   dfs();
