@@ -88,6 +88,17 @@ export interface TsFunction {
   calls: TsCall[];
   annotations: TsAnnotation[];
   fastapiRoute: boolean;
+  /**
+   * Closeout 3a (2026-05-25): when the function's declared return type is a
+   * literal object type (`function makeFoo(): { a(): void; b: number }`),
+   * `returnTypeMembers` lists the names of properties declared in that
+   * literal type. The class-shape evaluator's factory mode uses this list
+   * for required-method / required-field lookup. `undefined` when:
+   *   - the function has no return type annotation,
+   *   - the return type is a reference (e.g. `: Promise<Foo>`),
+   *   - parsing the return type literal failed.
+   */
+  returnTypeMembers?: string[];
 }
 
 export interface TsFileAnalysis {
@@ -97,6 +108,19 @@ export interface TsFileAnalysis {
   annotations: TsAnnotation[];
   classes: TsClass[];
   functions: TsFunction[];
+  /**
+   * Closeout 3a (2026-05-25): names of all top-level value declarations in
+   * the file. Includes:
+   *   - exported and non-exported `const`/`let`/`var` identifiers (any
+   *     initializer kind, not just functions),
+   *   - exported and non-exported `function` declaration names,
+   *   - exported and non-exported `class` declaration names.
+   * The class-shape evaluator's module-function mode consults this list to
+   * verify that every member named by `aggregate-members` actually exists
+   * in the target file, and to satisfy required-field checks (which look
+   * for a const export rather than a class property).
+   */
+  moduleVariables: string[];
 }
 
 function scriptKindFor(filePath: string): ts.ScriptKind {
@@ -171,6 +195,10 @@ function analyzeSourceFile(sourceFile: ts.SourceFile, relativePath: string): TsF
     annotations: [],
     classes: [],
     functions: [],
+    // Closeout 3a (2026-05-25): every top-level value declaration name —
+    // const/let/var, function, class — collected during the same statement
+    // walk below.
+    moduleVariables: [],
   };
 
   const fileLevelCalls: TsCall[] = [];
@@ -186,16 +214,22 @@ function analyzeSourceFile(sourceFile: ts.SourceFile, relativePath: string): TsF
       if (importEntry) out.imports.push(importEntry);
     } else if (ts.isClassDeclaration(statement) && statement.name) {
       out.classes.push(readClassDeclaration(sourceFile, statement));
+      out.moduleVariables.push(statement.name.text);
     } else if (ts.isFunctionDeclaration(statement) && statement.name) {
       out.functions.push(readFunctionDeclaration(sourceFile, statement));
+      out.moduleVariables.push(statement.name.text);
     } else if (ts.isVariableStatement(statement)) {
       // Top-level `const x = () => {...}` arrow function; record as
-      // function with bestEffort name.
+      // function with bestEffort name. Other initializer kinds still
+      // contribute the identifier to `moduleVariables` so the class-shape
+      // evaluator's module-function mode can find required-field exports.
       for (const decl of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(decl.name)) {
+          continue;
+        }
+        out.moduleVariables.push(decl.name.text);
         if (decl.initializer && (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))) {
-          if (ts.isIdentifier(decl.name)) {
-            out.functions.push(readArrowFunction(sourceFile, decl.name.text, decl.initializer));
-          }
+          out.functions.push(readArrowFunction(sourceFile, decl.name.text, decl.initializer));
         }
       }
     }
@@ -308,6 +342,7 @@ function readFunctionDeclaration(sourceFile: ts.SourceFile, node: ts.FunctionDec
     calls,
     annotations,
     fastapiRoute: false,
+    returnTypeMembers: extractReturnTypeMembers(node.type),
   };
 }
 
@@ -335,7 +370,40 @@ function readArrowFunction(
     calls,
     annotations,
     fastapiRoute: false,
+    returnTypeMembers: extractReturnTypeMembers(node.type),
   };
+}
+
+/**
+ * Closeout 3a (2026-05-25): if `typeNode` is a literal object type
+ * (`{ a(): void; b: number }`), return the names of its property /
+ * method members. Otherwise return `undefined` — the evaluator's factory
+ * mode treats `undefined` as "not a factory" and falls through to the
+ * "not found" violation path.
+ *
+ * Index signatures and call signatures contribute no named member; they
+ * are skipped silently.
+ */
+function extractReturnTypeMembers(typeNode: ts.TypeNode | undefined): string[] | undefined {
+  if (typeNode === undefined) return undefined;
+  if (!ts.isTypeLiteralNode(typeNode)) return undefined;
+  const names: string[] = [];
+  for (const member of typeNode.members) {
+    let memberName: string | undefined;
+    if (ts.isPropertySignature(member) && member.name) {
+      memberName = propertyKeyText(member.name);
+    } else if (ts.isMethodSignature(member) && member.name) {
+      memberName = propertyKeyText(member.name);
+    }
+    if (memberName !== undefined) names.push(memberName);
+  }
+  return names;
+}
+
+function propertyKeyText(name: ts.PropertyName): string | undefined {
+  if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) return name.text;
+  if (ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+  return undefined;
 }
 
 function readMethodLike(
