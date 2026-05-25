@@ -1,13 +1,13 @@
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { validateOutputPath } from "../utils/output-path.js";
 import { buildRawCheckReport, prepareCheckContext } from "./check.js";
 import { buildRuleIndex } from "./rules.js";
-import { profilePathExists, loadProfile } from "../design-profile/load.js";
+import { profilePathExists } from "../design-profile/load.js";
+import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import { verifyManifestIntegrity } from "../design-generator/manifest.js";
-import { hashFile } from "../design-profile/hash.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -71,9 +71,12 @@ async function collectDesignProfileInfo(projectDir: string): Promise<string> {
     return "## Design profile\n\n- <none>";
   }
 
-  let profile: ReturnType<typeof loadProfile> | undefined;
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain — returns
+  // { profile, contentHash } so the maintenance summary cites the
+  // pipeline-computed hash instead of hashing the file a second time.
+  let hashed: ReturnType<typeof loadHashedProfile> | undefined;
   try {
-    profile = loadProfile(projectDir);
+    hashed = loadHashedProfile(projectDir);
   } catch {
     return "## Design profile\n- Profile file exists but could not be parsed.";
   }
@@ -83,12 +86,12 @@ async function collectDesignProfileInfo(projectDir: string): Promise<string> {
   const lines = [
     "## Design profile",
     "",
-    `- Profile hash: ${hashFile(resolve(projectDir, "contract/design/profile.yaml"))}`,
+    `- Profile hash: ${hashed.contentHash}`,
   ];
 
-  if (profile) {
-    lines.push(`- Profile ID: ${profile.profile_id}`);
-    lines.push(`- Decisions: ${profile.decisions?.length ?? 0}`);
+  if (hashed.profile) {
+    lines.push(`- Profile ID: ${hashed.profile.profile_id}`);
+    lines.push(`- Decisions: ${hashed.profile.decisions?.length ?? 0}`);
   }
 
   lines.push(`- Manifest valid: ${manifestValid}`);

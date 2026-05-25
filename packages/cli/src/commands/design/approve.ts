@@ -4,7 +4,8 @@ import { resolve } from "node:path";
 import * as yaml from "js-yaml";
 
 import { hashFile } from "../../design-profile/hash.js";
-import { loadProfile, profilePathExists } from "../../design-profile/load.js";
+import { profilePathExists } from "../../design-profile/load.js";
+import { loadHashedProfile } from "../../design-profile/lifecycle.js";
 import { readManifest } from "../../design-generator/manifest.js";
 import { computeDesignDiff } from "./diff.js";
 import type { DesignProfile } from "../../design-profile/types.js";
@@ -191,7 +192,8 @@ export async function runDesignApprove(
     return;
   }
 
-  const currentProfile = loadProfile(projectDir);
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  const currentProfile = loadHashedProfile(projectDir).profile;
   const profileHash = hashFile(resolve(projectDir, "contract/design/profile.yaml"));
   const manifest = readManifest(projectDir);
   const baseHash = manifest?.profileHash ?? null;

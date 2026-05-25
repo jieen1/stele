@@ -1,5 +1,7 @@
-import { loadProfile, profilePathExists } from "../../design-profile/load.js";
+import { profilePathExists } from "../../design-profile/load.js";
+import { loadHashedProfile } from "../../design-profile/lifecycle.js";
 import { validateProfile } from "../../design-profile/validate.js";
+import type { DesignProfile } from "../../design-profile/types.js";
 import { verifyManifestIntegrity } from "../../design-generator/manifest.js";
 import { validateOwnership, validateSourceOwnership } from "../../design-generator/ownership.js";
 import { ExitCode } from "../../errors.js";
@@ -47,11 +49,16 @@ export async function checkDesign(projectDir: string, opts: DesignCheckOptions):
     };
   }
 
-  // 2. Validate profile schema
+  // 2. Validate profile schema.
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  // `loadHashedProfile` runs the same validateProfile internally and
+  // throws on errors; we keep the explicit `validateProfile(profile)`
+  // call so the design-check stage surfaces structured errors for
+  // operators (loadHashedProfile collapses them to a single Error).
   let profileValid = true;
-  let profile: Awaited<ReturnType<typeof loadProfile>> | null = null;
+  let profile: DesignProfile | null = null;
   try {
-    profile = await loadProfile(projectDir);
+    profile = loadHashedProfile(projectDir).profile;
     const validationErrors = validateProfile(profile);
     if (validationErrors.length > 0) {
       profileValid = false;
@@ -175,7 +182,7 @@ function formatDesignCheck(result: DesignCheckResult): string {
  */
 function runSourceOwnership(
   projectDir: string,
-  profile: Awaited<ReturnType<typeof loadProfile>>,
+  profile: DesignProfile,
 ): ReturnType<typeof validateSourceOwnership> {
   const contextRoots = profile.ddd?.contexts
     ?.map((ctx) => ctx.root)

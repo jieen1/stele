@@ -30,7 +30,8 @@ import {
 } from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { pickPhaseLanguage } from "../config/phase-language.js";
-import { profilePathExists, loadProfile } from "../design-profile/load.js";
+import { profilePathExists } from "../design-profile/load.js";
+import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import {
   getCachedCallGraph,
   setCachedCallGraph,
@@ -297,12 +298,13 @@ function resolveTsconfigPath(context: PreparedCheckContext): string | null {
     : resolve(context.projectDir, "tsconfig.json");
   if (profilePathExists(context.projectDir)) {
     try {
-      const profile = loadProfile(context.projectDir);
-      if (profile.project?.tsconfig) {
-        tsconfigPath = resolve(context.projectDir, profile.project.tsconfig);
+      // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+      const hashed = loadHashedProfile(context.projectDir);
+      if (hashed.profile.project?.tsconfig) {
+        tsconfigPath = resolve(context.projectDir, hashed.profile.project.tsconfig);
       }
     } catch {
-      // Fall back to default; loadProfile errors are surfaced by the design
+      // Fall back to default; profile errors are surfaced by the design
       // stage, not this one.
     }
   }

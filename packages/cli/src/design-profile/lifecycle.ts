@@ -8,7 +8,10 @@
  * profile to generation skips the integrity gate.
  */
 
+import { resolve } from "node:path";
 import type { Sha256 } from "@stele/core";
+import { hashFile } from "./hash.js";
+import { loadProfile } from "./load.js";
 import type { DesignProfile } from "./types.js";
 
 export type DesignProfileState = "Raw" | "Validated" | "Hashed";
@@ -60,4 +63,28 @@ export function hashValidatedProfile(
     profile: profile as unknown as TypedDesignProfile<"Hashed">,
     contentHash,
   };
+}
+
+/**
+ * Closeout 4 (self-dogfooding plan): single sanctioned entry for
+ * production callers that need a profile + its content hash. Internally
+ * chains `loadProfile → asRawProfile → markProfileValidated →
+ * hashValidatedProfile`. Every downstream consumer reads `.profile` for
+ * the YAML fields and `.contentHash` for the SHA-256.
+ *
+ * `loadProfile` (the free function in `load.ts`) is retained for the
+ * `useProfile` test path that needs raw profile shapes without forcing
+ * lifecycle threading through every fixture; production code goes
+ * through `loadHashedProfile`.
+ */
+export function loadHashedProfile(
+  projectDir: string,
+  profilePath: string = "contract/design/profile.yaml",
+): HashedDesignProfile {
+  const profile = loadProfile(projectDir, profilePath);
+  // validateProfile already ran inside loadProfile; mark Validated.
+  const raw = asRawProfile(profile);
+  const validated = markProfileValidated(raw);
+  const contentHash = hashFile(resolve(projectDir, profilePath));
+  return hashValidatedProfile(validated, contentHash);
 }

@@ -1,5 +1,6 @@
 import type { DesignProfile } from "../../design-profile/types.js";
-import { loadProfile, profilePathExists } from "../../design-profile/load.js";
+import { profilePathExists } from "../../design-profile/load.js";
+import { loadHashedProfile } from "../../design-profile/lifecycle.js";
 import { readManifest } from "../../design-generator/manifest.js";
 
 // ---------------------------------------------------------------------------
@@ -976,7 +977,8 @@ async function diffDesign(_opts: DesignDiffOptions, projectDir: string): Promise
     };
   }
 
-  const currentProfile = loadProfile(projectDir);
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  const currentProfile = loadHashedProfile(projectDir).profile;
   const manifest = readManifest(projectDir);
 
   // If there's a manifest with a stored profile, we can try to load the old profile

@@ -1,5 +1,7 @@
-import { loadProfile, profilePathExists } from "../../design-profile/load.js";
+import { profilePathExists } from "../../design-profile/load.js";
+import { loadHashedProfile } from "../../design-profile/lifecycle.js";
 import { readManifest } from "../../design-generator/manifest.js";
+import type { DesignProfile } from "../../design-profile/types.js";
 
 export type DesignExplainOptions = {
   json?: boolean;
@@ -55,7 +57,8 @@ async function explainDesign(target: string, projectDir: string): Promise<Design
     return result;
   }
 
-  const profile = await loadProfile(projectDir);
+  // Closeout 4: typed DESIGN_PROFILE_LIFECYCLE chain.
+  const profile = loadHashedProfile(projectDir).profile;
 
   // Parse target prefix
   if (target.startsWith("context:")) {
@@ -75,7 +78,7 @@ async function explainDesign(target: string, projectDir: string): Promise<Design
   return result;
 }
 
-function explainContext(result: DesignExplainResult, profile: ReturnType<typeof loadProfile>, ctxId: string): void {
+function explainContext(result: DesignExplainResult, profile: DesignProfile, ctxId: string): void {
   const ctx = profile.ddd?.contexts?.find((c) => c.id === ctxId);
   if (!ctx) return;
 
@@ -90,7 +93,7 @@ function explainContext(result: DesignExplainResult, profile: ReturnType<typeof 
     : null;
 }
 
-function explainRule(result: DesignExplainResult, _profile: ReturnType<typeof loadProfile>, ruleId: string, projectDir: string): void {
+function explainRule(result: DesignExplainResult, _profile: DesignProfile, ruleId: string, projectDir: string): void {
   const manifest = readManifest(projectDir);
   if (!manifest) return;
 
@@ -105,7 +108,7 @@ function explainRule(result: DesignExplainResult, _profile: ReturnType<typeof lo
   };
 }
 
-function explainType(result: DesignExplainResult, profile: ReturnType<typeof loadProfile>, typeName: string): void {
+function explainType(result: DesignExplainResult, profile: DesignProfile, typeName: string): void {
   const brandedId = profile.type_driven?.branded_ids?.declarations?.find((d) => d.type_name === typeName);
   if (!brandedId) return;
 
@@ -120,7 +123,7 @@ function explainType(result: DesignExplainResult, profile: ReturnType<typeof loa
     : null;
 }
 
-function findDecision(profile: ReturnType<typeof loadProfile>, decisionRef?: string): { id: string; question_id?: string; selected_option?: string; rationale?: string } | null {
+function findDecision(profile: DesignProfile, decisionRef?: string): { id: string; question_id?: string; selected_option?: string; rationale?: string } | null {
   if (!decisionRef) return null;
   return profile.decisions?.find((d) => d.id === decisionRef) ?? null;
 }
