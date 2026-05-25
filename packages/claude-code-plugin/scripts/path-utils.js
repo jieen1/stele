@@ -8,6 +8,7 @@ export function extractTargetPaths(payload) {
   return [...new Set(extractPathsFromValue(payload, new Set()))];
 }
 
+/** @stele:effects */
 export function extractPathsFromValue(value, seen) {
   if (typeof value === "string") {
     return [];

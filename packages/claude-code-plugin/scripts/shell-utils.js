@@ -58,10 +58,12 @@ export function shouldContinueLine(previous, current) {
   return false;
 }
 
+/** @stele:effects */
 export function shouldStartNewLine(line) {
   return line.trim().length > 0;
 }
 
+/** @stele:effects */
 export function stripShellComment(line) {
   let quote = null;
   let escaped = false;
@@ -109,6 +111,7 @@ export function startsShellComment(line, index) {
   return /[\s;|&()]/u.test(line[index - 1] ?? "");
 }
 
+/** @stele:effects */
 export function tokenizeShellLine(line) {
   const tokens = [];
   let current = "";
@@ -163,6 +166,7 @@ export function tokenizeShellLine(line) {
   return tokens;
 }
 
+/** @stele:effects */
 function pushWordToken(tokens, value) {
   if (value.length > 0) {
     tokens.push({ type: "word", value });

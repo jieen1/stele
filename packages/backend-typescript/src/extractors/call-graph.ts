@@ -219,7 +219,8 @@ function createProgram(projectRoot: string, tsconfigPath: string | undefined): t
     strict: true,
     skipLibCheck: true,
     noEmit: true,
-    allowJs: false,
+    allowJs: true,
+    checkJs: false,
     esModuleInterop: true,
   };
 
@@ -234,15 +235,28 @@ function createProgram(projectRoot: string, tsconfigPath: string | undefined): t
   }
 
   if (rootNames.length === 0) {
-    // Fallback: enumerate every .ts/.tsx under projectRoot, excluding
-    // node_modules and dist.
-    rootNames = collectTsFiles(projectRoot);
+    // Fallback: enumerate every .ts/.tsx/.js/.cjs/.mjs under projectRoot,
+    // excluding node_modules and dist.
+    rootNames = collectJsTsFiles(projectRoot);
   }
+
+  // Closeout 2 (2026-05-25): `dist/` is build output, never source. The
+  // fallback walker already excludes it; once `allowJs:true` is on, the
+  // tsconfig-driven enumeration would otherwise pull in every emitted
+  // chunk under packages/*/dist/*.js — duplicating call-graph nodes (the
+  // .ts source already produced them) and ballooning extraction time
+  // ~6x. Equalize the two paths so both reject build artifacts.
+  rootNames = rootNames.filter((name) => !isInDistDir(name));
 
   return ts.createProgram({ rootNames, options: compilerOptions });
 }
 
-function collectTsFiles(root: string): string[] {
+function isInDistDir(filePath: string): boolean {
+  const posix = filePath.split(sep).join("/");
+  return posix.includes("/dist/") || posix.endsWith("/dist") || posix.startsWith("dist/");
+}
+
+function collectJsTsFiles(root: string): string[] {
   const fs = readDirSync(root);
   return fs;
 }
@@ -266,13 +280,27 @@ function readDirSync(root: string): string[] {
       if (ent.isDirectory()) {
         stack.push(full);
       } else if (ent.isFile()) {
-        if (ent.name.endsWith(".ts") || ent.name.endsWith(".tsx")) {
-          if (!ent.name.endsWith(".d.ts")) out.push(full);
+        if (isExtractableSourceFile(ent.name)) {
+          out.push(full);
         }
       }
     }
   }
   return out;
+}
+
+function isExtractableSourceFile(name: string): boolean {
+  // Ambient declaration files never have runtime behaviour — exclude.
+  if (name.endsWith(".d.ts") || name.endsWith(".d.mts") || name.endsWith(".d.cts")) {
+    return false;
+  }
+  return (
+    name.endsWith(".ts") ||
+    name.endsWith(".tsx") ||
+    name.endsWith(".js") ||
+    name.endsWith(".cjs") ||
+    name.endsWith(".mjs")
+  );
 }
 
 function extractFromSourceFile(

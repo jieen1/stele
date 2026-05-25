@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-25T04:11:48.959Z",
+  "generated_at": "2026-05-25T05:08:38.808Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -124,32 +124,32 @@
       "size": 1113
     },
     "packages/claude-code-plugin/scripts/bash-extractors.js": {
-      "sha256": "115dd43caa6b18999adeb4ed2db66517c4d1c73231751011e18f32c3b16bfee7",
-      "size": 12700
+      "sha256": "71981d6c77babcc17dfb4de7b8b05bfd8150f7d3dc8ee263173d633ab4525d6f",
+      "size": 13008
     },
     "packages/claude-code-plugin/scripts/lifecycle-context.js": {
-      "sha256": "671955c70843eeb62c3cfe3e04cff5fb6e34ca1aac92610db0c2ba726b2176c3",
-      "size": 6317
+      "sha256": "99f3f2f2195284f10b926ae89275293c2da4004dff47177fb328fe561ef7b08d",
+      "size": 6599
     },
     "packages/claude-code-plugin/scripts/observation-hook.js": {
-      "sha256": "e938797cd27fab50fa5212d08b6e900d6da490cf84f25b9a339663e0b909a6e2",
-      "size": 10490
+      "sha256": "6814bd6e3565413e9c65a5e3045f0d42daa72c3d2273dcaed6eb18464db8b3a0",
+      "size": 10770
     },
     "packages/claude-code-plugin/scripts/path-utils.js": {
-      "sha256": "92b294611fe9424b07d1ebfb0c5a782be4d07463fbc41253d7f3808127d7a687",
-      "size": 1124
+      "sha256": "dfb504c651506332cae42aef7a312b03618507c9ef9020384f3dd233371e89ac",
+      "size": 1146
     },
     "packages/claude-code-plugin/scripts/pre-tool-protect.js": {
-      "sha256": "9a30d66ced88c9bb13abe7b53401760058979c8a59ffd88bc704770e5e2e3e12",
-      "size": 12145
+      "sha256": "e59f761dca57bce64289dc633a2d5a5187c2d9013c858682f4e859252cdd1da0",
+      "size": 12403
     },
     "packages/claude-code-plugin/scripts/shell-utils.js": {
-      "sha256": "f306212dae5fb55427a0db34f949368f3687f6236467cfd5e648230c83f50768",
-      "size": 3941
+      "sha256": "3a487b628f53355c91f0778dabaa805482bb34f821c09d19bd9135b25c8df2ef",
+      "size": 4029
     },
     "packages/claude-code-plugin/scripts/stop-validate.js": {
-      "sha256": "53a4837f51ab7f04a2778541692a8d5da5d4877bd64fd3bceff7d0af0894ae68",
-      "size": 23005
+      "sha256": "d24d56423f25e639a0a9b7c8881eee74c95f96cb3c2e006108e8a957b9afaac6",
+      "size": 23251
     },
     "packages/cli/package.json": {
       "sha256": "5b0dae678a4ae78e0ea64d7ae8d1aa60209cd049848b5a3184a255e817837788",

@@ -54,6 +54,7 @@ try {
   process.exit(0);
 }
 
+/** @stele:effects process */
 async function readStdin() {
   const chunks = [];
 
@@ -64,6 +65,7 @@ async function readStdin() {
   return chunks.join("");
 }
 
+/** @stele:effects */
 function parseHookInput(stdin) {
   if (stdin.trim().length === 0) {
     return {};
@@ -108,6 +110,7 @@ function getHookEventName(payload) {
 }
 
 // extractTargetPaths and extractPathsFromValue imported from path-utils.js
+/** @stele:effects child-process */
 async function collectGitDiffFiles(projectDir) {
   const result = await runCommand({
     commandPath: "git",
@@ -121,7 +124,7 @@ async function collectGitDiffFiles(projectDir) {
 
   return result.stdout
     .split(/\r?\n/u)
-    .map((line) => line.trim())
+    .map(/** @stele:effects */ (line) => line.trim())
     .filter((line) => line.length > 0);
 }
 
@@ -161,6 +164,7 @@ async function resolveCommandAtLocations(searchDirs, commands) {
   return null;
 }
 
+/** @stele:effects fs.read */
 async function resolveCommandOnPath(commands, pathValue) {
   for (const rawEntry of pathValue.split(path.delimiter)) {
     const entry = rawEntry.trim().replace(/^"(.*)"$/u, "$1");
@@ -221,17 +225,17 @@ async function runCommand({ commandPath, args, cwd, timeoutMs = 60000 }) {
   let stdout = "";
   let stderr = "";
 
-  child.stdout?.on("data", (chunk) => {
+  child.stdout?.on("data", /** @stele:effects process */ (chunk) => {
     stdout += chunk.toString();
   });
-  child.stderr?.on("data", (chunk) => {
+  child.stderr?.on("data", /** @stele:effects process */ (chunk) => {
     stderr += chunk.toString();
   });
 
   return await new Promise((resolve) => {
     let finished = false;
 
-    child.on("error", (error) => {
+    child.on("error", /** @stele:effects process */ (error) => {
       if (finished) {
         return;
       }
@@ -240,7 +244,7 @@ async function runCommand({ commandPath, args, cwd, timeoutMs = 60000 }) {
       resolve({ code: 1, stdout, stderr: `${stderr}${error instanceof Error ? error.message : String(error)}` });
     });
 
-    child.on("close", (code) => {
+    child.on("close", /** @stele:effects process */ (code) => {
       if (finished) {
         return;
       }
@@ -251,6 +255,7 @@ async function runCommand({ commandPath, args, cwd, timeoutMs = 60000 }) {
   });
 }
 
+/** @stele:effects */
 function normalizeLineEndings(value) {
   return value.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
 }

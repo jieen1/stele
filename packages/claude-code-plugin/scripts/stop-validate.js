@@ -220,13 +220,13 @@ async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = t
   let stdout = "";
   let stderr = "";
 
-  child.stdout?.on("data", (chunk) => {
+  child.stdout?.on("data", /** @stele:effects process */ (chunk) => {
     stdout += chunk.toString();
     if (forwardOutput) {
       process.stdout.write(chunk);
     }
   });
-  child.stderr?.on("data", (chunk) => {
+  child.stderr?.on("data", /** @stele:effects process */ (chunk) => {
     stderr += chunk.toString();
     if (forwardOutput) {
       process.stderr.write(chunk);
@@ -236,7 +236,7 @@ async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = t
   return await new Promise((resolve, reject) => {
     let finished = false;
 
-    child.on("error", (error) => {
+    child.on("error", /** @stele:effects process */ (error) => {
       if (finished) {
         return;
       }
@@ -252,7 +252,7 @@ async function runCommand({ stageName, commandPath, args, cwd, forwardOutput = t
       resolve({ code: 1, stdout, stderr: `${stderr}${message}` });
     });
 
-    child.on("close", (code, signal) => {
+    child.on("close", /** @stele:effects process */ (code, signal) => {
       if (finished) {
         return;
       }
@@ -347,6 +347,7 @@ function parseObservationLine(line) {
   }
 }
 
+/** @stele:effects process */
 async function readStdin() {
   const chunks = [];
 
@@ -357,6 +358,7 @@ async function readStdin() {
   return chunks.join("");
 }
 
+/** @stele:effects */
 function parseHookInput(stdin) {
   if (stdin.trim().length === 0) {
     return {};
@@ -365,6 +367,7 @@ function parseHookInput(stdin) {
   return JSON.parse(stdin);
 }
 
+/** @stele:effects */
 function resolveSessionId(payload) {
   if (isObject(payload) && typeof payload.session_id === "string" && payload.session_id.trim().length > 0) {
     return payload.session_id;
@@ -390,6 +393,7 @@ async function fileExists(filePath) {
   }
 }
 
+/** @stele:effects */
 function safeFileName(value) {
   return value.replace(/[^A-Za-z0-9._-]/gu, "_").slice(0, 128);
 }
@@ -402,6 +406,7 @@ function isMissingFileError(error) {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
+/** @stele:effects fs.read */
 async function resolveCommandOnPath(commands, pathValue) {
   for (const rawEntry of pathValue.split(path.delimiter)) {
     const entry = rawEntry.trim().replace(/^"(.*)"$/u, "$1");

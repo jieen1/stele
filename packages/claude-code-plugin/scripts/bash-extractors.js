@@ -59,6 +59,7 @@ const _REAL_CMD_BASENAMES = new Set([
  * de-duped array of literal paths (+ any synthetic targets the
  * interpreter extractor surfaces).
  */
+/** @stele:effects */
 export function extractBashWriteTargets(command) {
   const targets = [];
   const pendingHeredocs = [];
@@ -81,6 +82,7 @@ export function extractBashWriteTargets(command) {
   return [...new Set(targets)];
 }
 
+/** @stele:effects */
 export function extractWriteTargetsFromLine(line) {
   if (line.trim().length === 0) {
     return [];
@@ -112,6 +114,7 @@ export function extractRedirectTargets(tokens) {
   return targets;
 }
 
+/** @stele:effects */
 export function extractTeeTargets(tokens) {
   const targets = [];
   let segmentStart = 0;
@@ -125,6 +128,7 @@ export function extractTeeTargets(tokens) {
   return targets;
 }
 
+/** @stele:effects */
 function extractTeeTargetsFromSegment(tokens) {
   const commandToken = tokens.find((token) => token.type === "word");
   if (!commandToken || path.posix.basename(commandToken.value) !== "tee") {
@@ -151,6 +155,7 @@ function extractTeeTargetsFromSegment(tokens) {
   return targets;
 }
 
+/** @stele:effects */
 export function extractFileOperationTargets(tokens) {
   const targets = [];
   let segmentStart = 0;
@@ -164,6 +169,7 @@ export function extractFileOperationTargets(tokens) {
   return targets;
 }
 
+/** @stele:effects */
 function extractFileOperationTargetsFromSegment(tokens) {
   const wordTokens = tokens.filter((t) => t.type === "word");
   const realCmdIdx = _firstRealCommandIndex(wordTokens);
@@ -207,6 +213,7 @@ function extractFileOperationTargetsFromSegment(tokens) {
   return targets;
 }
 
+/** @stele:effects */
 export function extractDdTargets(tokens) {
   const targets = [];
   let segmentStart = 0;
@@ -220,6 +227,7 @@ export function extractDdTargets(tokens) {
   return targets;
 }
 
+/** @stele:effects */
 function extractDdTargetsFromSegment(tokens) {
   const wordTokens = tokens.filter((t) => t.type === "word");
   if (wordTokens.length === 0) {
@@ -250,6 +258,7 @@ function extractDdTargetsFromSegment(tokens) {
  * the working tree from history — equivalent to a write for the
  * purpose of protecting `contract/**` etc.
  */
+/** @stele:effects */
 export function extractGitCheckoutTargets(tokens) {
   const targets = [];
   let segmentStart = 0;
@@ -263,6 +272,7 @@ export function extractGitCheckoutTargets(tokens) {
   return targets;
 }
 
+/** @stele:effects */
 function extractGitCheckoutFromSegment(tokens) {
   const wordTokens = tokens.filter((t) => t.type === "word");
   if (wordTokens.length < 2) return [];
@@ -296,6 +306,7 @@ function extractGitCheckoutFromSegment(tokens) {
  * execute the interpreter, so we surface every quoted path-shaped
  * substring on the line when the body shows write-shaped tokens.
  */
+/** @stele:effects */
 export function extractInterpreterScriptTargets(tokens, line) {
   const wordTokens = tokens.filter((t) => t.type === "word");
   if (wordTokens.length < 2) return [];
@@ -305,7 +316,7 @@ export function extractInterpreterScriptTargets(tokens, line) {
   if (!_INTERPRETER_NAMES.has(cmd)) return [];
   const interpreterFlag = wordTokens.slice(realCmdIdx + 1).find((t) => t.value === "-c" || t.value === "-e");
   if (interpreterFlag === undefined) return [];
-  if (!_INTERPRETER_WRITE_HINTS.some((hint) => line.includes(hint))) {
+  if (!_INTERPRETER_WRITE_HINTS.some(/** @stele:effects */ (hint) => line.includes(hint))) {
     return [];
   }
   return _extractProtectedSubstringsFromLine(line);
@@ -346,6 +357,7 @@ function _extractProtectedSubstringsFromLine(line) {
  * token is one of `_REAL_CMD_BASENAMES` or another interpreter — i.e.
  * "if it looks like the actual command, stop peeling."
  */
+/** @stele:effects */
 export function _firstRealCommandIndex(wordTokens) {
   let i = 0;
   while (i < wordTokens.length) {
@@ -374,6 +386,7 @@ export function _firstRealCommandIndex(wordTokens) {
   return -1;
 }
 
+/** @stele:effects */
 export function extractHeredocDelimiters(line) {
   const delimiters = [];
   const regex = /<<-?\s*(?:'([^']+)'|"([^"]+)"|([^\s"'`<>|&;()]+))/gu;

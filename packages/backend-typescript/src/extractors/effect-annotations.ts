@@ -189,13 +189,29 @@ function toPosixCollect(root: string): string[] {
       if (ent.isDirectory()) {
         stack.push(full);
       } else if (ent.isFile()) {
-        if ((ent.name.endsWith(".ts") || ent.name.endsWith(".tsx")) && !ent.name.endsWith(".d.ts")) {
+        if (isExtractableAnnotationSource(ent.name)) {
           out.push(full);
         }
       }
     }
   }
   return out;
+}
+
+function isExtractableAnnotationSource(name: string): boolean {
+  // Closeout 2 (2026-05-25): mirror the call-graph extractor's file-set
+  // so annotations on .js/.cjs/.mjs callers (which now have NodeIds in
+  // the graph) are picked up by the closed-world override.
+  if (name.endsWith(".d.ts") || name.endsWith(".d.mts") || name.endsWith(".d.cts")) {
+    return false;
+  }
+  return (
+    name.endsWith(".ts") ||
+    name.endsWith(".tsx") ||
+    name.endsWith(".js") ||
+    name.endsWith(".cjs") ||
+    name.endsWith(".mjs")
+  );
 }
 
 function createProgram(projectRoot: string, tsconfigPath: string | undefined): ts.Program | null {
@@ -209,7 +225,8 @@ function createProgram(projectRoot: string, tsconfigPath: string | undefined): t
     strict: true,
     skipLibCheck: true,
     noEmit: true,
-    allowJs: false,
+    allowJs: true,
+    checkJs: false,
     esModuleInterop: true,
   };
 
@@ -233,8 +250,21 @@ function createProgram(projectRoot: string, tsconfigPath: string | undefined): t
     rootNames = toPosixCollect(projectRoot);
   }
 
+  // Closeout 2 (2026-05-25): exclude build output (`dist/`) from
+  // annotation extraction — mirrors the call-graph extractor's filter.
+  // Annotations live on source declarations; dist artifacts re-bundle
+  // them in shapes the NodeId builder can't track meaningfully, and
+  // including them inflates Program creation time ~6x once `allowJs`
+  // is on.
+  rootNames = rootNames.filter((name) => !isInDistPath(name));
+
   if (rootNames.length === 0) return null;
   return ts.createProgram({ rootNames, options: compilerOptions });
+}
+
+function isInDistPath(filePath: string): boolean {
+  const posix = filePath.split(sep).join("/");
+  return posix.includes("/dist/") || posix.endsWith("/dist") || posix.startsWith("dist/");
 }
 
 function visitSourceFile(

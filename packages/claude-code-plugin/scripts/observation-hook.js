@@ -98,6 +98,7 @@ try {
   process.exit(0);
 }
 
+/** @stele:effects process */
 async function readStdin() {
   const chunks = [];
 
@@ -108,6 +109,7 @@ async function readStdin() {
   return chunks.join("");
 }
 
+/** @stele:effects */
 function parseHookInput(stdin) {
   if (stdin.trim().length === 0) {
     return {};
@@ -120,6 +122,7 @@ function parseHookInput(stdin) {
   }
 }
 
+/** @stele:effects fs.read */
 async function loadConfig(projectDir) {
   try {
     const raw = await readFile(path.join(projectDir, "stele.config.json"), "utf8");
@@ -189,10 +192,12 @@ function isSafeGlobPattern(pattern) {
   return true;
 }
 
+/** @stele:effects */
 function isAbsoluteLikePattern(pattern) {
   return pattern.startsWith("/") || pattern.startsWith("\\") || /^[a-zA-Z]:/.test(pattern);
 }
 
+/** @stele:effects */
 function containsParentTraversal(pattern) {
   const parts = pattern.split("/");
   return parts.some((part) => part === ".." || part === path.posix.sep + "..");
@@ -210,6 +215,7 @@ function extractTargetPaths(payload) {
 }
 
 
+/** @stele:effects */
 function extractBashCommand(payload) {
   if (!isObject(payload) || typeof payload.tool_name !== "string" || payload.tool_name.toLowerCase() !== "bash") {
     return null;
@@ -218,6 +224,7 @@ function extractBashCommand(payload) {
   return extractCommandFromValue(payload, new Set());
 }
 
+/** @stele:effects */
 function extractCommandFromValue(value, seen) {
   if (typeof value === "string") {
     return null;
@@ -250,6 +257,7 @@ function extractCommandFromValue(value, seen) {
 // imported from  (shared with pre-tool-protect).
 
 
+/** @stele:effects */
 function isMaterialChange(projectDir, protectedPatterns, targetPath) {
   const relativePath = normalizeTargetPath(projectDir, targetPath);
 
@@ -286,6 +294,7 @@ function matchesProtectedDirectoryRoot(relativePath, pattern) {
   return matchGlob(relativePath, protectedRootPattern);
 }
 
+/** @stele:effects */
 function getProtectedDirectoryRootPattern(pattern) {
   const normalizedPattern = toPosixPath(pattern).replace(/\/+$/u, "");
 
@@ -308,6 +317,7 @@ function matchGlob(relativePath, pattern) {
   });
 }
 
+/** @stele:effects */
 function normalizeWindowsNamespacedPath(value) {
   const uncMatch = value.match(/^[\\/]{2}[?.][\\/]+UNC[\\/]+(.+)$/iu);
 
@@ -328,6 +338,7 @@ function getString(value, key) {
   return isObject(value) && typeof value[key] === "string" ? value[key] : null;
 }
 
+/** @stele:effects */
 function toPosixPath(value) {
   return value.replaceAll("\\", "/");
 }
@@ -340,6 +351,7 @@ function isMissingFileError(error) {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
+/** @stele:effects */
 function stripBom(value) {
   return value.replace(/^\uFEFF/u, "");
 }

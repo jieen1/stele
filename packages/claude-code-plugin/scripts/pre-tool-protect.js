@@ -108,6 +108,7 @@ async function main() {
   }
 }
 
+/** @stele:effects process */
 async function readStdin() {
   const chunks = [];
 
@@ -118,6 +119,7 @@ async function readStdin() {
   return chunks.join("");
 }
 
+/** @stele:effects fs.read */
 async function loadConfig(projectDir) {
   try {
     const raw = await readFile(path.join(projectDir, "stele.config.json"), "utf8");
@@ -171,12 +173,14 @@ function isAbsoluteLikePattern(pattern) {
   return /^(?:[A-Za-z]:|[\\/]{1,2})/.test(pattern);
 }
 
+/** @stele:effects */
 function containsParentTraversal(pattern) {
   return toPosixPath(pattern)
     .split("/")
     .some((segment) => segment === "..");
 }
 
+/** @stele:effects */
 function parseHookInput(stdin) {
   if (stdin.trim().length === 0) {
     return {};
@@ -210,6 +214,7 @@ function extractStructuredTargetPath(payload) {
   return extractFromValue(payload, new Set());
 }
 
+/** @stele:effects */
 function extractFromValue(value, seen) {
   if (typeof value === "string") {
     return null;
@@ -255,10 +260,12 @@ function extractBashCommand(payload) {
   return extractCommandFromValue(payload, new Set());
 }
 
+/** @stele:effects */
 function isBashPayload(payload) {
   return isObject(payload) && typeof payload.tool_name === "string" && payload.tool_name.toLowerCase() === "bash";
 }
 
+/** @stele:effects */
 function extractCommandFromValue(value, seen) {
   if (typeof value === "string") {
     return null;
@@ -336,6 +343,7 @@ async function getProtectedEditReason(projectDir, payload, deniedTargets) {
   return PROTECTED_REASON;
 }
 
+/** @stele:effects */
 function resolveSessionId(payload) {
   if (isObject(payload) && typeof payload.session_id === "string" && payload.session_id.trim().length > 0) {
     return payload.session_id;
@@ -355,10 +363,12 @@ async function fileExists(filePath) {
   );
 }
 
+/** @stele:effects */
 function safeFileName(value) {
   return value.replace(/[^A-Za-z0-9._-]/gu, "_");
 }
 
+/** @stele:effects */
 function toPosixPath(value) {
   return value.replaceAll("\\", "/");
 }
@@ -371,6 +381,7 @@ function isMissingFileError(error) {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
+/** @stele:effects */
 function stripBom(value) {
   return value.replace(/^\uFEFF/u, "");
 }

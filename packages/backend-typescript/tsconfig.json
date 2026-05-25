@@ -11,5 +11,10 @@
   "include": [
     "src/**/*.ts",
     "tests/**/*.ts"
+  ],
+  "exclude": [
+    "tests/call-graph/fixtures/**",
+    "tests/effect-annotation-fixtures/**",
+    "tests/type-state-fixtures/**"
   ]
 }
