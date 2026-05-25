@@ -35,7 +35,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import type { Violation } from "@stele/core";
+import type { RuleId, Violation } from "@stele/core";
 import {
   assertViolationsMatch,
   findMatchingViolation,
@@ -126,11 +126,17 @@ describe("effect-policy end-to-end fixtures", () => {
 // whether T5.2 / T5.3 are built).
 // ---------------------------------------------------------------------------
 
-function mkViolation(
-  over: Partial<Violation> & Pick<Violation, "rule_id">,
-): Violation {
+type ViolationOverrides = Partial<Omit<Violation, "rule_id">> & {
+  rule_id: RuleId | string;
+};
+
+function testRuleId(value: RuleId | string): RuleId {
+  return value as RuleId;
+}
+
+function mkViolation(over: ViolationOverrides): Violation {
   return {
-    rule_id: over.rule_id,
+    rule_id: testRuleId(over.rule_id),
     rule_kind: over.rule_kind ?? "effect_violation",
     severity: over.severity ?? "error",
     source: over.source ?? { tool: "stele", command: "check", kind: "effect" },

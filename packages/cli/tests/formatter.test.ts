@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { formatCheckReport, FORMATTERS, SUPPORTED_FORMATS } from "../src/report/formatter.js";
-import type { ViolationReport, Violation, ViolationSeverity } from "@stele/core";
+import type { RuleId, ViolationReport, Violation, ViolationSeverity } from "@stele/core";
+
+function testRuleId(value: string): RuleId {
+  return value as RuleId;
+}
 
 describe("formatCheckReport", () => {
   function makeReport(severity: ViolationSeverity = "error"): ViolationReport {
     const violation: Violation = {
-      rule_id: "TEST_RULE",
+      rule_id: testRuleId("TEST_RULE"),
       severity,
       cause: { summary: "Test violation", detail: "Test detail" },
       source: { tool: "stele", command: "check", kind: "check" },
@@ -18,6 +22,7 @@ describe("formatCheckReport", () => {
     };
     return {
       schema_version: "1",
+      rule_id: testRuleId("stele.report"),
       tool: "stele",
       command: "check",
       ok: false,

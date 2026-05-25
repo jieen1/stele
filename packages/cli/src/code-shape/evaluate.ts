@@ -102,6 +102,23 @@ type PythonFunction = {
   returnTypeMembers?: string[];
 };
 
+type TypeFieldAnalysis = {
+  name: string;
+  annotation?: string;
+  annotationNames: string[];
+  optional: boolean;
+  line: number;
+  column: number;
+};
+
+type TypeDeclarationAnalysis = {
+  name: string;
+  kind: "interface" | "type";
+  line: number;
+  column: number;
+  fields: TypeFieldAnalysis[];
+};
+
 type PythonFileAnalysis = {
   path: string;
   imports: PythonImport[];
@@ -114,6 +131,9 @@ type PythonFileAnalysis = {
   // mode uses this to enumerate sibling exports referenced by
   // `aggregate-members`.
   moduleVariables?: string[];
+  // Populated by the TS analyzer. Used by type-policy declarations that
+  // constrain fields on interface/type-alias declarations.
+  typeDeclarations?: TypeDeclarationAnalysis[];
 };
 
 type ParsedTarget = {
@@ -656,6 +676,48 @@ function evaluateTypePolicyDeclaration(
     );
   }
 
+  for (const requirement of declaration.requireFieldTypes) {
+    for (const typeDeclaration of collectTypeDeclarationsForTarget(parsedTarget, matchedFiles, fileAnalyses)) {
+      if (!ownerMatchesSuffixPolicy(typeDeclaration.name, declaration.ownerNameSuffixes)) {
+        continue;
+      }
+
+      const field = typeDeclaration.fields.find((candidate) => candidate.name === requirement.fieldName);
+      if (field === undefined) {
+        violations.push(
+          createRuleViolation({
+            declaration,
+            command,
+            contractPath,
+            filePath: typeDeclaration.filePath,
+            line: typeDeclaration.line,
+            column: typeDeclaration.column,
+            summary: `Type "${typeDeclaration.name}" must declare field "${requirement.fieldName}".`,
+            detail: `Type policy "${declaration.id}" requires "${requirement.fieldName}: ${requirement.typeName}" on matching type/interface declarations.`,
+            fixSummary: `Add field "${requirement.fieldName}: ${requirement.typeName}" to "${typeDeclaration.name}".`,
+          }),
+        );
+        continue;
+      }
+
+      if (!fieldMatchesRequiredFieldType(field, requirement.typeName)) {
+        violations.push(
+          createRuleViolation({
+            declaration,
+            command,
+            contractPath,
+            filePath: typeDeclaration.filePath,
+            line: field.line,
+            column: field.column,
+            summary: `Field "${typeDeclaration.name}.${field.name}" must use type "${requirement.typeName}".`,
+            detail: `Type policy "${declaration.id}" found "${field.annotation ?? "<missing>"}" instead.`,
+            fixSummary: `Change "${typeDeclaration.name}.${field.name}" to use "${requirement.typeName}".`,
+          }),
+        );
+      }
+    }
+  }
+
   return violations;
 }
 
@@ -951,10 +1013,12 @@ function collectModuleFunctionMatches(
  * target resolved to a free function (module function or factory).
  *
  * Dispatch order per function match:
- *   1. If the function declares a literal-object return type, run
- *      factory mode: required-method / required-field lookup checks the
- *      `returnTypeMembers` set.
- *   2. Otherwise run module-function mode: required-method /
+ *   1. If `aggregateMembers` is declared, run module-function mode so
+ *      aggregate-root contracts stay scoped to sibling exports.
+ *   2. Otherwise, if the function declares a literal-object or same-file
+ *      alias return type, run factory mode: required-method /
+ *      required-field lookup checks the `returnTypeMembers` set.
+ *   3. Otherwise run module-function mode: required-method /
  *      required-field lookup checks the names enumerated by the
  *      class-shape's `aggregateMembers`, plus the target's own name.
  *
@@ -973,7 +1037,8 @@ function evaluateFreeFunctionClassShape(
   const violations: Violation[] = [];
 
   for (const match of matches) {
-    const isFactory = (match.functionInfo.returnTypeMembers?.length ?? 0) > 0;
+    const isFactory = declaration.aggregateMembers.length === 0 &&
+      (match.functionInfo.returnTypeMembers?.length ?? 0) > 0;
     if (isFactory) {
       violations.push(...evaluateFactoryShape(declaration, match, contractPath, command));
     } else {
@@ -1219,6 +1284,40 @@ function collectAnnotationsForTarget(
       annotation,
     })),
   );
+}
+
+function fieldMatchesRequiredFieldType(field: TypeFieldAnalysis, requiredType: string): boolean {
+  if (field.optional) {
+    return false;
+  }
+  if (!field.annotationNames.includes(requiredType)) {
+    return false;
+  }
+
+  return !field.annotationNames.some((name) => name === "any" || name === "string");
+}
+
+function collectTypeDeclarationsForTarget(
+  target: ParsedTarget,
+  matchedFiles: string[],
+  fileAnalyses: Map<string, PythonFileAnalysis>,
+): Array<TypeDeclarationAnalysis & { filePath: string }> {
+  const declarations: Array<TypeDeclarationAnalysis & { filePath: string }> = [];
+
+  for (const filePath of matchedFiles) {
+    for (const declaration of fileAnalyses.get(filePath)?.typeDeclarations ?? []) {
+      if (target.selectorName !== undefined && declaration.name !== target.selectorName) {
+        continue;
+      }
+      declarations.push({ ...declaration, filePath });
+    }
+  }
+
+  return declarations;
+}
+
+function ownerMatchesSuffixPolicy(ownerName: string, suffixes: readonly string[]): boolean {
+  return suffixes.length === 0 || suffixes.some((suffix) => ownerName.endsWith(suffix));
 }
 
 async function expandTargetPattern(projectDir: string, pattern: string): Promise<string[]> {

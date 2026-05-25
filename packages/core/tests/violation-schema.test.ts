@@ -3,6 +3,7 @@ import {
   compareViolationsByPriority,
   createViolation,
   priorityRank,
+  ruleId,
   severityRank,
   sortViolations,
   type Violation,
@@ -29,7 +30,7 @@ function violation(overrides: Partial<ViolationInput> = {}): Violation {
 describe("Violation schema — Phase B Round 2 additions", () => {
   it("back-compat: a Phase-A-shape Violation literal still satisfies the type", () => {
     const v: Violation = {
-      rule_id: "typedriven.branded-id.OrderId",
+      rule_id: ruleId("typedriven.branded-id.OrderId"),
       rule_kind: "typescript-branded-id",
       severity: "error",
       source: { tool: "stele", command: "check", kind: "rule" },

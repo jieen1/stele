@@ -203,6 +203,19 @@ describe("resolveCommand", () => {
     expect(result.args).toEqual([]);
   });
 
+  it("resolves npx tool invocations to the local executable", () => {
+    (os.platform as any).mockReturnValue("linux");
+    (fs.accessSync as any).mockImplementation((path: string) => {
+      const normalized = path.replace(/\\/g, "/");
+      if (normalized.includes("node_modules/.bin/eslint")) return;
+      throw new Error("ENOENT");
+    });
+
+    const result = resolveCommand("npx eslint --format json .", "/project");
+    expect(result.command.replace(/\\/g, "/")).toMatch(/node_modules\/\.bin\/eslint$/);
+    expect(result.args).toEqual(["--format", "json", "."]);
+  });
+
   it("falls back to original command when not found locally or via package manager", () => {
     (os.platform as any).mockReturnValue("linux");
     // No local exe, no lockfile, no PATH commands

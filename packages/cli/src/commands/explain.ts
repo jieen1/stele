@@ -19,7 +19,6 @@ import {
   propagateEffects,
   type EffectAnnotationExtractor,
 } from "@stele/effect-evaluator";
-import { tsCallGraphExtractor } from "@stele/backend-typescript";
 import {
   compilePattern,
   type CallGraph,
@@ -27,6 +26,7 @@ import {
   type CallGraphNode,
   type CompiledPattern,
 } from "@stele/call-graph-core";
+import { pickEffectCallGraphExtractor } from "../backend-registry.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { profilePathExists, loadProfile } from "../design-profile/load.js";
 import { buildRuleIndex, findIndexedRule } from "./rules.js";
@@ -327,12 +327,30 @@ export async function runExplainEffect(
     return { exitCode: 2, output: diagnostic };
   }
 
+  const callGraphExtractor = pickEffectCallGraphExtractor(language);
+  if (callGraphExtractor === null) {
+    const diagnostic =
+      `stele explain effect supports targetLanguage="typescript" only; project targets "${language}".\n` +
+      `No call graph extractor is registered for this language.\n`;
+    if (options.json === true) {
+      return {
+        exitCode: 2,
+        output: `${JSON.stringify(
+          { schema_version: "1", error: "unsupported_language", language },
+          null,
+          2,
+        )}\n`,
+      };
+    }
+    return { exitCode: 2, output: diagnostic };
+  }
+
   const tsconfigPath = resolveTsconfigPath(projectDir);
 
   const extractCallGraph =
     deps.extractCallGraph ??
     (async (extractOptions): Promise<CallGraph> =>
-      tsCallGraphExtractor.extract({
+      callGraphExtractor.extract({
         projectRoot: extractOptions.projectRoot,
         tsconfigPath: extractOptions.tsconfigPath,
         cacheDir: extractOptions.cacheDir,
@@ -918,4 +936,3 @@ function buildEffectExplainJson(inspection: EffectInspection): Record<string, un
     no_policies_declared: inspection.noPolicies,
   };
 }
-

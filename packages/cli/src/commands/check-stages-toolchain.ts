@@ -1,10 +1,13 @@
-import { dirname, resolve } from "node:path";
-import { execFile } from "node:child_process";
-import { platform } from "node:os";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { spawn } from "node:child_process";
+import { platform, tmpdir } from "node:os";
 import {
   createViolationReport,
+  ruleId,
   type Violation,
   type ViolationReport,
+  type RuleId,
 } from "@stele/core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { MAX_CHILD_PROCESS_BUFFER } from "../config/defaults.js";
@@ -16,6 +19,8 @@ import { validateTsconfigPolicy } from "../toolchain/tsconfig-policy.js";
 import { parseTscOutputToViolations, DEFAULT_TSC_COMMAND } from "../toolchain/typescript.js";
 import { parseEslintReport } from "../toolchain/eslint.js";
 import type { ToolchainViolation } from "../toolchain/types.js";
+
+const TOOLCHAIN_COMMAND_TIMEOUT_MS = 10_000;
 
 export async function buildToolchainStage(
   context: PreparedCheckContext,
@@ -141,7 +146,7 @@ function toolchainViolationToViolation(
   return (t) => {
     const path = t.file.includes(projectDir) ? t.file : t.file;
     return {
-      rule_id: t.ruleId,
+      rule_id: toolchainRuleId(t.ruleId),
       rule_kind: t.ruleKind,
       severity: t.severity,
       source: { tool: "stele", command, kind: "rule" },
@@ -155,40 +160,91 @@ function toolchainViolationToViolation(
   };
 }
 
+function toolchainRuleId(value: string): RuleId {
+  return ruleId(value.replace(/[^A-Za-z0-9._:-]/g, "_"));
+}
+
 function runCommandFromShell(
   cmd: string,
   cwd: string,
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    // execFile is safe — no shell involved, so no injection risk.
+    // spawn is safe — no shell involved, so no injection risk.
     // resolveCommand already resolves to the absolute path (including .cmd/.bat
-    // on Windows), so execFile can execute directly without shell lookup.
+    // on Windows), so spawn can execute directly without shell lookup.
     const { command, args } = resolveCommand(cmd, cwd);
-    // On Windows, .CMD/.BAT wrappers need shell: true for execFile to spawn
-    // them. Args remain safe — execFile passes them as an array, not through
+    const captureDir = mkdtempSync(join(tmpdir(), "stele-toolchain-"));
+    const stdoutPath = join(captureDir, "stdout");
+    const stderrPath = join(captureDir, "stderr");
+    const stdoutFd = openSync(stdoutPath, "w");
+    const stderrFd = openSync(stderrPath, "w");
+    let closed = false;
+
+    const closeFiles = (): void => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      closeSync(stdoutFd);
+      closeSync(stderrFd);
+    };
+
+    const cleanup = (): void => {
+      rmSync(captureDir, { force: true, recursive: true });
+    };
+
+    // On Windows, .CMD/.BAT wrappers need shell: true for spawn to launch
+    // them. Args remain safe — spawn passes them as an array, not through
     // shell interpolation. resolveCommand resolves to absolute path first.
-    const child = execFile(command, args, {
+    const child = spawn(command, args, {
       cwd,
-      maxBuffer: MAX_CHILD_PROCESS_BUFFER,
       windowsHide: true,
       shell: platform() === "win32",
+      stdio: ["ignore", stdoutFd, stderrFd],
     });
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+    }, TOOLCHAIN_COMMAND_TIMEOUT_MS);
 
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout?.on("data", (data: Buffer) => { stdout += data.toString(); });
-    child.stderr?.on("data", (data: Buffer) => { stderr += data.toString(); });
-
-    child.on("error", reject);
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      closeFiles();
+      cleanup();
+      reject(error);
+    });
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     child.on("close", (_code) => {
+      clearTimeout(timeout);
       // We don't fail on non-zero exit — callers (tsc, eslint) are expected
       // to return non-zero when violations exist. We capture the output and
       // parse it ourselves.
-      resolve({ stdout, stderr });
+      try {
+        closeFiles();
+        if (timedOut) {
+          reject(new Error(`command timed out after ${TOOLCHAIN_COMMAND_TIMEOUT_MS}ms`));
+          return;
+        }
+        resolve({
+          stdout: readCaptureFile(stdoutPath),
+          stderr: readCaptureFile(stderrPath),
+        });
+      } catch (error) {
+        reject(error);
+      } finally {
+        cleanup();
+      }
     });
   });
+}
+
+function readCaptureFile(path: string): string {
+  const size = statSync(path).size;
+  if (size > MAX_CHILD_PROCESS_BUFFER) {
+    throw new Error(`tool output exceeded ${MAX_CHILD_PROCESS_BUFFER} bytes`);
+  }
+  return readFileSync(path, "utf8");
 }
 
 function createEmptyViolationReport(invariantCount: number): ViolationReport {

@@ -3,7 +3,7 @@
   "kind": "ddd-typedriven",
   "profile_id": "stele-self",
   "created_at": "2026-05-20T00:00:00Z",
-  "updated_at": "2026-05-20T00:00:00Z",
+  "updated_at": "2026-05-25T00:00:00Z",
   "decisions": [
     {
       "id": "d1",
@@ -40,7 +40,7 @@
       "packages/backend-python/src/runtime/**",
       "packages/cli/src/commands/design/fixtures/**"
     ],
-    "tsconfig": "packages/cli/tsconfig.json"
+    "tsconfig": "tsconfig.base.json"
   },
   "ddd": {
     "bounded_context_strategy": "by_business_function",
@@ -99,8 +99,17 @@
         "aggregate_roots": [
           {
             "id": "operator-registry",
-            "class": "OperatorRegistry",
-            "target": "packages/core/src/registry/operators.ts::OperatorRegistry",
+            "class": "InMemoryOperatorRegistry",
+            "target": "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry",
+            "required_methods": [
+              "register",
+              "get",
+              "has",
+              "list"
+            ],
+            "required_fields": [
+              "#operators"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 400,
@@ -119,7 +128,19 @@
           {
             "id": "invariant-validator",
             "class": "InvariantValidator",
-            "target": "packages/core/src/validator/structure-invariant.ts::validateInvariant",
+            "target": "packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration",
+            "required_methods": [
+              "parseInvariantDeclaration",
+              "readStringLiteral",
+              "readSingleText"
+            ],
+            "aggregate_members": [
+              "parseInvariantDeclaration",
+              "readStringLiteral",
+              "readSingleText",
+              "readSingleValueField",
+              "readMultiValueField"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 150,
@@ -135,6 +156,21 @@
             "id": "contract-loader",
             "class": "ContractLoader",
             "target": "packages/core/src/loader/load-contract.ts::loadContract",
+            "required_methods": [
+              "loadContract",
+              "validateContract",
+              "loadRecursive"
+            ],
+            "required_fields": [
+              "MAX_IMPORT_DEPTH"
+            ],
+            "aggregate_members": [
+              "loadContract",
+              "validateContract",
+              "loadRecursive",
+              "readContractFile",
+              "MAX_IMPORT_DEPTH"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 100,
@@ -149,7 +185,25 @@
           {
             "id": "manifest-engine",
             "class": "ManifestEngine",
-            "target": "packages/core/src/manifest/hash-manifest.ts::hashManifest",
+            "target": "packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash",
+            "required_methods": [
+              "buildTransitiveHash",
+              "writeAtomic",
+              "computeSha256"
+            ],
+            "required_fields": [
+              "HASH_MANIFEST_VERSION",
+              "HASH_MANIFEST_RELATIVE_PATH"
+            ],
+            "aggregate_members": [
+              "buildTransitiveHash",
+              "writeAtomic",
+              "computeSha256",
+              "readHashManifest",
+              "writeHashManifest",
+              "HASH_MANIFEST_VERSION",
+              "HASH_MANIFEST_RELATIVE_PATH"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 100,
@@ -205,6 +259,20 @@
             "id": "check-orchestrator",
             "class": "CheckOrchestrator",
             "target": "packages/cli/src/commands/check.ts::runCheck",
+            "required_methods": [
+              "runCheck",
+              "checkProject",
+              "prepareCheckContext",
+              "collectProtectedCheckState"
+            ],
+            "aggregate_members": [
+              "runCheck",
+              "checkProject",
+              "prepareCheckContext",
+              "prepareCheckContextWithContract",
+              "collectProtectedCheckState",
+              "buildRawCheckReport"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 400,
@@ -224,6 +292,21 @@
             "id": "code-shape-evaluator",
             "class": "CodeShapeEvaluator",
             "target": "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes",
+            "required_methods": [
+              "evaluateCodeShapes",
+              "evaluateBoundaryDeclaration",
+              "evaluateClassShapeDeclaration",
+              "evaluateFunctionShapeDeclaration"
+            ],
+            "aggregate_members": [
+              "evaluateCodeShapes",
+              "evaluateBoundaryDeclaration",
+              "evaluateClassShapeDeclaration",
+              "evaluateFunctionShapeDeclaration",
+              "evaluateTypePolicyDeclaration",
+              "evaluateFilePolicyDeclaration",
+              "evaluateFreeFunctionClassShape"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 400,
@@ -243,6 +326,26 @@
             "id": "design-diff-engine",
             "class": "DesignDiffEngine",
             "target": "packages/cli/src/commands/design/diff.ts::computeDesignDiff",
+            "required_methods": [
+              "computeDesignDiff",
+              "compareContexts",
+              "compareIntegrations",
+              "compareCoreInvariants"
+            ],
+            "required_fields": [
+              "SEVERITY"
+            ],
+            "aggregate_members": [
+              "computeDesignDiff",
+              "compareContexts",
+              "compareIntegrations",
+              "compareSharedKernels",
+              "compareCoreInvariants",
+              "compareTypeDriven",
+              "compareToolchainContracts",
+              "compareProject",
+              "SEVERITY"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 300,
@@ -257,7 +360,20 @@
           {
             "id": "cli-program-factory",
             "class": "CliProgramFactory",
-            "target": "packages/cli/src/index.ts::createSteleProgram",
+            "target": "packages/cli/src/index.ts::createProgram",
+            "required_methods": [
+              "createProgram",
+              "cmdSpec",
+              "runCli"
+            ],
+            "aggregate_members": [
+              "createProgram",
+              "cmdSpec",
+              "runCli",
+              "formatVersion",
+              "runInstallCommand",
+              "loadAgentHooksInstaller"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 200,
@@ -273,6 +389,24 @@
             "id": "design-profile-validator",
             "class": "DesignProfileValidator",
             "target": "packages/cli/src/design-profile/validate.ts::validateProfile",
+            "required_methods": [
+              "validateProfile",
+              "addDddErrors",
+              "addTypeDrivenErrors",
+              "validateTargetFormat"
+            ],
+            "aggregate_members": [
+              "validateProfile",
+              "validateTargetFormat",
+              "isPathTraversal",
+              "addSchemaVersionErrors",
+              "addProjectErrors",
+              "addDddErrors",
+              "addTypeDrivenErrors",
+              "addCoreInvariantErrors",
+              "addUniquenessErrors",
+              "addTraceErrors"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 200,
@@ -301,6 +435,23 @@
             "id": "architecture-evaluator",
             "class": "ArchitectureEvaluator",
             "target": "packages/architecture-core/src/evaluate.ts::evaluateArchitecture",
+            "required_methods": [
+              "evaluateArchitecture",
+              "findDependencyViolations",
+              "findCycleViolations",
+              "detectCycles",
+              "findLayerDirectionViolations",
+              "findPublicEntryViolations"
+            ],
+            "aggregate_members": [
+              "evaluateArchitecture",
+              "findDependencyViolations",
+              "findCycleViolations",
+              "detectCycles",
+              "findLayerDirectionViolations",
+              "findPublicEntryViolations",
+              "buildAllowMap"
+            ],
             "metrics": {
               "sloc": {
                 "ideal": 200,

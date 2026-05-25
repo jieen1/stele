@@ -13,18 +13,19 @@ import {
   type EvaluateTypeStateResult,
 } from "@stele/type-state-evaluator";
 import {
-  tsCallGraphExtractor,
-  tsTypeStateInferenceExtractor,
-} from "@stele/backend-typescript";
-import {
   buildExternAliasRegistry,
   type CallGraph,
+  type CallGraphExtractor,
   type ExternAlias,
   type ExternAliasRegistry,
   type TypedCallGraph,
 } from "@stele/call-graph-core";
 import type { TypeStateInferenceExtractor } from "@stele/type-state-evaluator";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
+import {
+  pickTypeStateCallGraphExtractor,
+  pickTypeStateInferenceExtractor,
+} from "../backend-registry.js";
 import { pickPhaseLanguage } from "../config/phase-language.js";
 import { profilePathExists } from "../design-profile/load.js";
 import { loadHashedProfile } from "../design-profile/lifecycle.js";
@@ -109,7 +110,9 @@ export async function buildTypeStateStage(
   }
 
   const language = pickPhaseLanguage(context.config, "type-state");
-  if (language !== "typescript") {
+  const callGraphExtractor = pickTypeStateCallGraphExtractor(language);
+  const inferenceExtractor = pickTypeStateInferenceExtractor(language);
+  if (callGraphExtractor === null || inferenceExtractor === null) {
     // Round 4 F-A-02: fail loud (error+ok:false) instead of silent
     // warning. See trace stage for the full rationale.
     return createViolationReport({
@@ -181,7 +184,7 @@ export async function buildTypeStateStage(
   // `TypedCallGraph<"Cached">`; `useCachedCallGraph` is the bound entry.
   let cached: TypedCallGraph<"Cached">;
   try {
-    cached = await extractOrCacheCallGraph(context, tsconfigPath, deps);
+    cached = await extractOrCacheCallGraph(context, tsconfigPath, deps, callGraphExtractor);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -215,7 +218,7 @@ export async function buildTypeStateStage(
   }
 
   const evaluate = deps.evaluate ?? evaluateTypeStates;
-  const extractor = deps.extractor ?? tsTypeStateInferenceExtractor;
+  const extractor = deps.extractor ?? inferenceExtractor;
   const strictMode = deps.strictMode ?? true;
   // Round 4 D-07: cross-language alias registry construction mirrors the
   // trace + effect stages — see those for rationale.
@@ -311,13 +314,18 @@ async function extractOrCacheCallGraph(
   context: PreparedCheckContext,
   tsconfigPath: string,
   deps: TypeStateStageDeps,
+  extractor: CallGraphExtractor,
 ): Promise<TypedCallGraph<"Cached">> {
   // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — see trace stage.
   const cached = getCachedCallGraph(context);
   if (cached !== undefined) {
     return cached;
   }
-  const extract = deps.extractCallGraph ?? defaultExtract;
+  const extract = deps.extractCallGraph ?? ((options) => extractor.extract({
+    projectRoot: options.projectRoot,
+    tsconfigPath: options.tsconfigPath,
+    cacheDir: options.cacheDir,
+  }));
   const callGraph = await extract({
     projectRoot: context.projectDir,
     tsconfigPath,
@@ -326,16 +334,4 @@ async function extractOrCacheCallGraph(
   const typed = wrapExtractedGraph(callGraph);
   setCachedCallGraph(context, typed);
   return typed;
-}
-
-async function defaultExtract(options: {
-  projectRoot: string;
-  tsconfigPath: string;
-  cacheDir: string;
-}): Promise<CallGraph> {
-  return tsCallGraphExtractor.extract({
-    projectRoot: options.projectRoot,
-    tsconfigPath: options.tsconfigPath,
-    cacheDir: options.cacheDir,
-  });
 }

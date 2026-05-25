@@ -1,5 +1,17 @@
+import {
+  pyCallGraphExtractor,
+  pyEffectAnnotationExtractor,
+} from "@stele/backend-python";
+import {
+  tsCallGraphExtractor,
+  tsEffectAnnotationExtractor,
+  tsTypeStateInferenceExtractor,
+} from "@stele/backend-typescript";
+import type { CallGraphExtractor } from "@stele/call-graph-core";
 import type { LanguageBackend } from "@stele/core";
 import { SteleError, packageName as toPackageName } from "@stele/core";
+import type { EffectAnnotationExtractor } from "@stele/effect-evaluator";
+import type { TypeStateInferenceExtractor } from "@stele/type-state-evaluator";
 
 /** Registry entry mapping language + framework to a backend npm package. */
 export interface RegisteredBackend {
@@ -115,4 +127,32 @@ export async function loadBackend(language: string, framework: string | undefine
 /** List all registered backends (used for --language validation and error messages). */
 export function listRegisteredBackends(): readonly RegisteredBackend[] {
   return REGISTERED_BACKENDS;
+}
+
+export function pickTraceCallGraphExtractor(language: string): CallGraphExtractor | null {
+  if (language === "typescript") return tsCallGraphExtractor;
+  if (language === "python") return pyCallGraphExtractor;
+  return null;
+}
+
+export function pickEffectCallGraphExtractor(language: string): CallGraphExtractor | null {
+  if (language === "typescript") return tsCallGraphExtractor;
+  if (language === "python") return pyCallGraphExtractor;
+  return null;
+}
+
+export function pickEffectAnnotationExtractor(language: string): EffectAnnotationExtractor | null {
+  if (language === "typescript") return tsEffectAnnotationExtractor;
+  if (language === "python") return pyEffectAnnotationExtractor;
+  return null;
+}
+
+export function pickTypeStateCallGraphExtractor(language: string): CallGraphExtractor | null {
+  if (language === "typescript") return tsCallGraphExtractor;
+  return null;
+}
+
+export function pickTypeStateInferenceExtractor(language: string): TypeStateInferenceExtractor | null {
+  if (language === "typescript") return tsTypeStateInferenceExtractor;
+  return null;
 }

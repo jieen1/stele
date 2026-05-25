@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { isBaselineEligibleViolation } from "../src/commands/check.js";
-import type { Violation, ViolationSource } from "@stele/core";
+import type { RuleId, Violation, ViolationSource } from "@stele/core";
+
+type ViolationOverrides = Partial<Omit<Violation, "rule_id">> & {
+  rule_id?: RuleId | string;
+};
 
 function makeSource(kind: string): ViolationSource {
   return { tool: "stele", command: "check", kind };
 }
 
-function makeViolation(overrides: Partial<Violation> = {}): Violation {
+function testRuleId(value: RuleId | string): RuleId {
+  return value as RuleId;
+}
+
+function makeViolation(overrides: ViolationOverrides = {}): Violation {
+  const { rule_id: overrideRuleId, ...rest } = overrides;
   return {
-    rule_id: "test-rule",
     rule_kind: "rule_violation",
     severity: "error",
     source: makeSource("rule"),
@@ -17,7 +25,8 @@ function makeViolation(overrides: Partial<Violation> = {}): Violation {
     status: "active",
     fingerprint: "test-fingerprint",
     scope_paths: ["src/test.ts"],
-    ...overrides,
+    ...rest,
+    rule_id: testRuleId(overrideRuleId ?? "test-rule"),
   };
 }
 

@@ -4,13 +4,10 @@ import {
   createViolation,
   createViolationReport,
   ruleId,
-  type ExternAliasDeclaration,
   type Violation,
   type ViolationReport,
 } from "@stele/core";
 import { evaluateTracePolicies } from "@stele/trace-evaluator";
-import { tsCallGraphExtractor } from "@stele/backend-typescript";
-import { pyCallGraphExtractor } from "@stele/backend-python";
 import {
   buildExternAliasRegistry,
   type CallGraph,
@@ -20,6 +17,7 @@ import {
   type TypedCallGraph,
 } from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
+import { pickTraceCallGraphExtractor } from "../backend-registry.js";
 import { pickPhaseLanguage } from "../config/phase-language.js";
 import { profilePathExists } from "../design-profile/load.js";
 import { loadHashedProfile } from "../design-profile/lifecycle.js";
@@ -80,7 +78,7 @@ export async function buildTraceStage(
   }
 
   const language = pickPhaseLanguage(context.config, "trace");
-  const extractor = pickCallGraphExtractor(language);
+  const extractor = pickTraceCallGraphExtractor(language);
   if (extractor === null) {
     // Round 4 F-A-02 / Round 14 P0: fail loud only when NO extractor
     // exists for the language. TypeScript (B.1) and Python (B.2 —
@@ -191,19 +189,33 @@ export async function buildTraceStage(
     });
   }
 
-  const evaluate = deps.evaluate ?? evaluateTracePolicies;
   // Round 3 P0-6: build the cross-language alias registry from the contract's
   // (extern-alias ...) declarations. Caller may inject a pre-built registry
   // (tests do this); production always derives it from the parsed contract.
-  const externAliases =
-    deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
+  let externAliases = deps.externAliases;
+  const externAliasDeclarations = context.contract.externAliases ?? [];
+  if (externAliases === undefined && externAliasDeclarations.length > 0) {
+    const aliases: ExternAlias[] = externAliasDeclarations.map((d) => ({
+      logicalName: d.id,
+      typescript: d.typescript,
+      python: d.python,
+      go: d.go,
+      java: d.java,
+      rust: d.rust,
+    }));
+    externAliases = buildExternAliasRegistry(aliases);
+  }
   // Closeout 4: bound consumer for the cached call graph.
   const callGraph: CallGraph = useCachedCallGraph(cached);
-  const result = evaluate({
+  const evaluationOptions = {
     contract: context.contract,
     callGraph,
     externAliases,
-  });
+  };
+  const result =
+    deps.evaluate === undefined
+      ? evaluateTracePolicies(evaluationOptions)
+      : deps.evaluate(evaluationOptions);
 
   // Merge violations + notices. Notices (e.g. path_exceeded_max_depth) are
   // warning-severity violations; including them in `violations` surfaces them
@@ -223,25 +235,6 @@ export async function buildTraceStage(
     },
     violations: allViolations,
   });
-}
-
-function buildContractExternAliasRegistry(
-  declarations: readonly ExternAliasDeclaration[] | undefined,
-): ExternAliasRegistry | undefined {
-  // Tests sometimes pass synthetic Contract values that pre-date the
-  // externAliases field. Treat missing as "no aliases declared".
-  if (declarations === undefined || declarations.length === 0) {
-    return undefined;
-  }
-  const aliases: ExternAlias[] = declarations.map((d) => ({
-    logicalName: d.id,
-    typescript: d.typescript,
-    python: d.python,
-    go: d.go,
-    java: d.java,
-    rust: d.rust,
-  }));
-  return buildExternAliasRegistry(aliases);
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {
@@ -302,17 +295,6 @@ async function extractOrCacheCallGraph(
   const typed = wrapExtractedGraph(callGraph);
   setCachedCallGraph(context, typed);
   return typed;
-}
-
-/**
- * Round 14 P0: pick the CallGraph extractor for a target language.
- * Returns null when no extractor is registered — the caller then
- * fail-louds the stage per F-A-02.
- */
-function pickCallGraphExtractor(language: string): CallGraphExtractor | null {
-  if (language === "typescript") return tsCallGraphExtractor;
-  if (language === "python") return pyCallGraphExtractor;
-  return null;
 }
 
 /**

@@ -8,6 +8,7 @@ import type {
 } from "@stele/call-graph-core";
 import type {
   Contract,
+  RuleId,
   TracePolicyDeclaration,
 } from "@stele/core";
 
@@ -303,7 +304,7 @@ describe("buildTraceStage — successful evaluation", () => {
       violations: [],
       notices: [
         {
-          rule_id: "trace.TRACE_NOTICE.path_exceeded_max_depth",
+          rule_id: "trace.TRACE_NOTICE.path_exceeded_max_depth" as RuleId,
           rule_kind: "trace_violation",
           severity: "warning" as const,
           source: { tool: "stele", command: "check", kind: "rule" },

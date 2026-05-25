@@ -29,7 +29,7 @@ import {
   runTraceFixture,
   type ExpectedViolation,
 } from "./_helpers/trace-fixture.js";
-import type { Violation } from "@stele/core";
+import type { RuleId, Violation } from "@stele/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = resolve(__dirname, "fixtures/trace-policy");
@@ -109,9 +109,17 @@ describe("trace-policy end-to-end fixtures", () => {
 // whether the trace-evaluator package is built).
 // ---------------------------------------------------------------------------
 
-function mkViolation(over: Partial<Violation> & Pick<Violation, "rule_id">): Violation {
+type ViolationOverrides = Partial<Omit<Violation, "rule_id">> & {
+  rule_id: RuleId | string;
+};
+
+function testRuleId(value: RuleId | string): RuleId {
+  return value as RuleId;
+}
+
+function mkViolation(over: ViolationOverrides): Violation {
   return {
-    rule_id: over.rule_id,
+    rule_id: testRuleId(over.rule_id),
     rule_kind: over.rule_kind ?? "trace_violation",
     severity: over.severity ?? "error",
     source: over.source ?? { tool: "stele", command: "check", kind: "trace" },

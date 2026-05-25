@@ -1,8 +1,15 @@
-import type { Violation, ViolationReport } from "@stele/core";
+import type { RuleId, Violation, ViolationReport } from "@stele/core";
 
-export function makeViolation(overrides: Partial<Violation> = {}): Violation {
+type ViolationOverrides = Partial<Omit<Violation, "rule_id">> & {
+  rule_id?: string | RuleId;
+};
+
+function testRuleId(value: string | RuleId): RuleId {
+  return value as RuleId;
+}
+
+export function makeViolation(overrides: ViolationOverrides = {}): Violation {
   return {
-    rule_id: "TEST_RULE",
     rule_kind: "invariant",
     severity: "error",
     source: { tool: "@stele/cli", command: "check", kind: "invariant" },
@@ -12,6 +19,7 @@ export function makeViolation(overrides: Partial<Violation> = {}): Violation {
     scope_paths: ["src/example.ts"],
     status: "active",
     ...overrides,
+    rule_id: testRuleId(overrides.rule_id ?? "TEST_RULE"),
   };
 }
 
@@ -28,5 +36,6 @@ export function makeReport(violations: Violation[], extras: Partial<ViolationRep
     violations,
     notices: [],
     ...extras,
+    rule_id: extras.rule_id ?? testRuleId("stele.report"),
   };
 }

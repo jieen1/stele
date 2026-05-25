@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import shutil
+import tempfile
 import textwrap
 from typing import Any
 
@@ -1495,28 +1497,64 @@ def test_package_name_uses_branded_type_catches_raw_literal():
 import subprocess  # noqa: E402  (deferred until Phase 2 tests)
 
 
+def _clear_stele_check_cache() -> None:
+    """Remove check/generation cache that can be poisoned by mutated fixtures."""
+    shutil.rmtree(sp._REPO_ROOT / "contract" / ".cache", ignore_errors=True)
+
+
+class _RuntimeDistSnapshot:
+    """Restore CLI runtime dists if a negative check's toolchain stage cleans them."""
+
+    def __init__(self) -> None:
+        self._tempdir = tempfile.TemporaryDirectory()
+        self._snapshots: list[tuple[pathlib.Path, pathlib.Path]] = []
+        for relpath in ("packages/core/dist", "packages/cli/dist"):
+            source = sp._REPO_ROOT / relpath
+            if not source.exists():
+                continue
+            snapshot = pathlib.Path(self._tempdir.name) / relpath.replace("/", "__")
+            shutil.copytree(source, snapshot)
+            self._snapshots.append((source, snapshot))
+
+    def restore(self) -> None:
+        for source, snapshot in self._snapshots:
+            if source.exists():
+                shutil.rmtree(source)
+            shutil.copytree(snapshot, source)
+        self._tempdir.cleanup()
+
+
 def _run_stele_check_expect_violation(rule_id: str) -> bool:
     """Run `stele check --format json`; return True iff a violation with
     matching rule_id appears AND exit code is non-zero."""
-    proc = subprocess.run(
-        [
-            "node",
-            str(sp._REPO_ROOT / "packages" / "cli" / "dist" / "index.js"),
-            "check",
-            "--format",
-            "json",
-        ],
-        cwd=str(sp._REPO_ROOT),
-        capture_output=True,
-        text=True,
-    )
+    _clear_stele_check_cache()
+    runtime_dist_snapshot = _RuntimeDistSnapshot()
+    try:
+        proc = subprocess.run(
+            [
+                "node",
+                str(sp._REPO_ROOT / "packages" / "cli" / "dist" / "index.js"),
+                "check",
+                "--format",
+                "json",
+            ],
+            cwd=str(sp._REPO_ROOT),
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        runtime_dist_snapshot.restore()
+        _clear_stele_check_cache()
     if proc.returncode == 0:
         print(f"  MISS: {rule_id} — stele check exited 0 (expected non-zero)")
         return False
     try:
         report = json.loads(proc.stdout)
     except json.JSONDecodeError:
-        print(f"  MISS: {rule_id} — stele check did not emit JSON: {proc.stdout[:200]}")
+        print(
+            f"  MISS: {rule_id} — stele check did not emit JSON: "
+            f"stdout={proc.stdout[:200]} stderr={proc.stderr[:200]}"
+        )
         return False
     violations = report.get("violations", [])
     matched = [v for v in violations if v.get("rule_id") == rule_id]
@@ -1531,8 +1569,11 @@ def _code_shape_negative_with_temp_file(file_relpath: str, content: str, rule_id
     """Create a temporary file, run stele check, restore, return detection result."""
     target = sp._REPO_ROOT / file_relpath
     if target.exists():
-        # We never overwrite real source — use a unique sentinel name.
-        raise RuntimeError(f"refusing to overwrite existing file {target}")
+        existing = target.read_text(encoding="utf-8")
+        if existing != content:
+            # We never overwrite real source — use a unique sentinel name.
+            raise RuntimeError(f"refusing to overwrite existing file {target}")
+        target.unlink()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
     try:
@@ -1570,6 +1611,35 @@ def test_cli_commands_no_direct_fs_write_catches_writeFileSync_call():
         content,
         "cli-commands-no-direct-fs-write",
     ), "checker did not detect violation: cli-commands-no-direct-fs-write"
+
+
+def test_backend_load_via_registry_catches_python_backend_command_import():
+    """Closeout 6 — Test A for backend-load-via-registry: a command file
+    importing a backend package directly must trip the boundary."""
+    content = (
+        'import { pyCallGraphExtractor } from "@stele/backend-python";\n'
+        "export const __closeout6BackendLeak = pyCallGraphExtractor;\n"
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/cli/src/commands/__closeout6_backend_python_import.ts",
+        content,
+        "backend-load-via-registry",
+    ), "checker did not detect violation: backend-load-via-registry (python command import)"
+
+
+def test_backend_load_via_registry_catches_typescript_backend_namespace_import():
+    """Closeout 6 — Test B for backend-load-via-registry: a namespace
+    import from a different backend package exercises a distinct import
+    shape from Test A's named import."""
+    content = (
+        'import * as tsBackend from "@stele/backend-typescript";\n'
+        "export const __closeout6BackendNamespaceLeak = tsBackend;\n"
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/cli/src/design-generator/__closeout6_backend_ts_namespace_import.ts",
+        content,
+        "backend-load-via-registry",
+    ), "checker did not detect violation: backend-load-via-registry (typescript namespace import)"
 
 
 # ---------------------------------------------------------------------------
@@ -1635,15 +1705,14 @@ def test_hook_no_network_catches_fetch_in_hook_script():
     trip HOOK_NO_NETWORK. The skip decorator was removed once Closeout
     2 enabled `allowJs:true` in the call-graph + effect-annotation
     extractors, making hook scripts visible to the analyzer."""
-    content = (
-        "/** @stele:effects network */\n"
-        "export async function phaseNegativeFetch() {\n"
-        '  await fetch("https://example.com/closeout2-negative");\n'
-        "}\n"
-    )
-    assert _code_shape_negative_with_temp_file(
-        "packages/claude-code-plugin/scripts/__closeout2_negative_fetch.js",
-        content,
+    assert _mutate_then_check(
+        "packages/claude-code-plugin/scripts/observation-hook.js",
+        lambda text: text + (
+            "\n/** @stele:effects network */\n"
+            "export async function phaseNegativeFetch() {\n"
+            '  await fetch("https://example.com/closeout2-negative");\n'
+            "}\n"
+        ),
         "effect.HOOK_NO_NETWORK.forbidden_effect",
     ), "checker did not detect violation: effect.HOOK_NO_NETWORK.forbidden_effect"
 
@@ -1665,33 +1734,57 @@ def test_hook_no_network_catches_https_request():
     shapes" regression). 'Two removals of the same kind do not count
     as two tests.'
     """
-    content = (
-        'import { request } from "node:https";\n'
-        "\n"
-        "/** @stele:effects network */\n"
-        "export function phaseNegativeHttpsRequest() {\n"
-        '  const req = request({ host: "example.com", path: "/closeout2-negative" });\n'
-        "  req.end();\n"
-        "}\n"
-    )
-    assert _code_shape_negative_with_temp_file(
-        "packages/claude-code-plugin/scripts/__closeout2_negative_https.js",
-        content,
+    assert _mutate_then_check(
+        "packages/claude-code-plugin/scripts/observation-hook.js",
+        lambda text: text.replace(
+            'import path from "node:path";\n',
+            'import path from "node:path";\nimport { request } from "node:https";\n',
+            1,
+        ) + (
+            "\n/** @stele:effects network */\n"
+            "export function phaseNegativeHttpsRequest() {\n"
+            '  const req = request({ host: "example.com", path: "/closeout2-negative" });\n'
+            "  req.end();\n"
+            "}\n"
+        ),
         "effect.HOOK_NO_NETWORK.forbidden_effect",
     ), "checker did not detect violation: effect.HOOK_NO_NETWORK.forbidden_effect"
 
 
-@pytest.mark.skip(
-    reason=(
-        "GENERATOR_NO_NETWORK_OR_CHILD_PROCESS target-scope is a single file "
-        "(packages/cli/src/commands/generate.ts::*); a negative test cannot "
-        "drop a sibling that the policy will see. Phase 7 follow-up: widen "
-        "target-scope or use _mutate_then_check on generate.ts directly."
-    )
-)
 def test_generator_no_network_or_child_process_catches_execfile():
-    """Phase 4.3: introducing an execFile call inside generate.ts must
-    trip GENERATOR_NO_NETWORK_OR_CHILD_PROCESS."""
+    """Closeout 6 — Test A for GENERATOR_NO_NETWORK_OR_CHILD_PROCESS:
+    introducing an execFile call inside design-generator must trip the
+    widened policy."""
+    content = (
+        'import { execFile } from "node:child_process";\n'
+        "\n"
+        "/** @stele:effects child-process */\n"
+        "export function __closeout6GeneratorExecFile(): void {\n"
+        '  execFile("node", ["--version"], () => undefined);\n'
+        "}\n"
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/cli/src/design-generator/__closeout6_generator_execfile.ts",
+        content,
+        "effect.GENERATOR_NO_NETWORK_OR_CHILD_PROCESS.forbidden_effect",
+    ), "checker did not detect violation: effect.GENERATOR_NO_NETWORK_OR_CHILD_PROCESS.forbidden_effect (execFile)"
+
+
+def test_generator_no_network_or_child_process_catches_fetch_call():
+    """Closeout 6 — Test B for GENERATOR_NO_NETWORK_OR_CHILD_PROCESS:
+    introducing a fetch call exercises a different forbidden effect and
+    call shape from Test A's child-process import."""
+    content = (
+        "/** @stele:effects network */\n"
+        "export async function __closeout6GeneratorFetch(): Promise<void> {\n"
+        '  await fetch("https://example.com/closeout6-generator-negative");\n'
+        "}\n"
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/cli/src/design-generator/__closeout6_generator_fetch.ts",
+        content,
+        "effect.GENERATOR_NO_NETWORK_OR_CHILD_PROCESS.forbidden_effect",
+    ), "checker did not detect violation: effect.GENERATOR_NO_NETWORK_OR_CHILD_PROCESS.forbidden_effect (fetch)"
 
 
 def test_manifest_leaves_are_pinned_catches_extra_effect():
@@ -1819,6 +1912,85 @@ def test_cli_command_error_shape_catches_missing_field():
         ),
         "cli-command-error-shape",
     ), "checker did not detect violation: cli-command-error-shape"
+
+
+def test_manifest_engine_api_shape_catches_missing_verify_export():
+    """Closeout 6 — Test A for manifest-engine-shape: removing the
+    public `verifyManifest` export from @stele/core's barrel must trip
+    the manifest API aggregate."""
+    assert _mutate_then_check(
+        "packages/core/src/index.ts",
+        lambda text: text.replace("  verifyManifest,\n", "", 1),
+        "manifest-engine-shape",
+    ), "checker did not detect violation: manifest-engine-shape (missing verifyManifest export)"
+
+
+def test_manifest_engine_api_shape_catches_renamed_write_export():
+    """Closeout 6 — Test B for manifest-engine-shape: renaming the
+    target export changes the aggregate binding itself, a different
+    evaluator path from Test A's missing sibling."""
+    assert _mutate_then_check(
+        "packages/core/src/index.ts",
+        lambda text: text.replace(
+            "  writeManifest,\n",
+            "  writeManifest as _writeManifest,\n",
+            1,
+        ),
+        "manifest-engine-shape",
+    ), "checker did not detect violation: manifest-engine-shape (renamed writeManifest export)"
+
+
+def test_violation_report_shape_catches_missing_notices_field():
+    """Closeout 6 — Test A for violation-report-shape: removing the
+    `notices` field from the report schema must trip the factory shape."""
+    assert _mutate_then_check(
+        "packages/core/src/report/types.ts",
+        lambda text: text.replace("  notices: ContractNotice[];\n", "", 1),
+        "violation-report-shape",
+    ), "checker did not detect violation: violation-report-shape (missing notices field)"
+
+
+def test_violation_report_shape_catches_changed_factory_return_alias():
+    """Closeout 6 — Test B for violation-report-shape: changing the
+    factory return alias breaks the alias-resolved factory binding, a
+    different failure shape from removing a field."""
+    assert _mutate_then_check(
+        "packages/core/src/report/types.ts",
+        lambda text: text.replace(
+            "export function createViolationReport(input: ViolationReportInput): ViolationReport {",
+            "export function createViolationReport(input: ViolationReportInput): ViolationReportInput {",
+            1,
+        ),
+        "violation-report-shape",
+    ), "checker did not detect violation: violation-report-shape (changed factory return alias)"
+
+
+def test_rule_id_fields_branded_catches_string_violation_rule_id():
+    """Closeout 6 — Test A for rule-id-fields-branded: changing the
+    Violation rule_id field back to string must trip the field-type policy."""
+    assert _mutate_then_check(
+        "packages/core/src/report/types.ts",
+        lambda text: text.replace(
+            "  rule_id: RuleId;\n  rule_kind: string;",
+            "  rule_id: string;\n  rule_kind: string;",
+            1,
+        ),
+        "rule-id-fields-branded",
+    ), "checker did not detect violation: rule-id-fields-branded (Violation.rule_id string)"
+
+
+def test_rule_id_fields_branded_catches_missing_notice_rule_id():
+    """Closeout 6 — Test B for rule-id-fields-branded: removing rule_id
+    from a Notice-shaped type is a different failure from a wrong field type."""
+    assert _mutate_then_check(
+        "packages/core/src/report/types.ts",
+        lambda text: text.replace(
+            "export type ContractNotice = {\n  rule_id: RuleId;\n",
+            "export type ContractNotice = {\n",
+            1,
+        ),
+        "rule-id-fields-branded",
+    ), "checker did not detect violation: rule-id-fields-branded (ContractNotice missing rule_id)"
 
 
 def test_hook_fail_closed_v2_catches_missing_failClosed_call():
@@ -1996,6 +2168,37 @@ def test_approve_via_resolve_approved_by_catches_bypass():
         ),
         "trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor",
     ), "checker did not detect violation: trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor"
+
+
+def test_evaluator_via_extern_registry_catches_missing_registry_call():
+    """Closeout 6 — Test A for EVALUATOR_VIA_EXTERN_REGISTRY: replacing
+    the registry construction with `undefined` leaves the evaluator call
+    present but without the required predecessor."""
+    assert _mutate_then_check(
+        "packages/cli/src/commands/check-stages-trace.ts",
+        lambda text: text.replace(
+            "    externAliases = buildExternAliasRegistry(aliases);\n",
+            "    externAliases = undefined;\n",
+            1,
+        ),
+        "trace.EVALUATOR_VIA_EXTERN_REGISTRY.missing_predecessor",
+    ), "checker did not detect violation: trace.EVALUATOR_VIA_EXTERN_REGISTRY.missing_predecessor (missing registry call)"
+
+
+def test_evaluator_via_extern_registry_catches_premature_evaluation():
+    """Closeout 6 — Test B for EVALUATOR_VIA_EXTERN_REGISTRY: adding an
+    evaluator call before registry construction is an ordering violation,
+    a different shape from removing the registry call."""
+    assert _mutate_then_check(
+        "packages/cli/src/commands/check-stages-trace.ts",
+        lambda text: text.replace(
+            "    const aliases: ExternAlias[] = externAliasDeclarations.map((d) => ({\n",
+            "    evaluateTracePolicies({ contract: context.contract, callGraph: useCachedCallGraph(cached), externAliases });\n"
+            "    const aliases: ExternAlias[] = externAliasDeclarations.map((d) => ({\n",
+            1,
+        ),
+        "trace.EVALUATOR_VIA_EXTERN_REGISTRY.missing_predecessor",
+    ), "checker did not detect violation: trace.EVALUATOR_VIA_EXTERN_REGISTRY.missing_predecessor (premature evaluation)"
 
 
 # ---------------------------------------------------------------------------
@@ -2599,9 +2802,17 @@ def main() -> int:
         # Phase 2 (self-dogfooding plan): code-shape contracts.
         ("core_no_fs_write_from_non_manifest_catches_writeFile_import", test_core_no_fs_write_from_non_manifest_catches_writeFile_import),
         ("cli_commands_no_direct_fs_write_catches_writeFileSync_call", test_cli_commands_no_direct_fs_write_catches_writeFileSync_call),
+        ("backend_load_via_registry_catches_python_backend_command_import", test_backend_load_via_registry_catches_python_backend_command_import),
+        ("backend_load_via_registry_catches_typescript_backend_namespace_import", test_backend_load_via_registry_catches_typescript_backend_namespace_import),
         ("operator_registry_shape_catches_missing_method", test_operator_registry_shape_catches_missing_method),
         ("operator_registry_shape_catches_missing_field", test_operator_registry_shape_catches_missing_field),
         ("cli_command_error_shape_catches_missing_field", test_cli_command_error_shape_catches_missing_field),
+        ("manifest_engine_api_shape_catches_missing_verify_export", test_manifest_engine_api_shape_catches_missing_verify_export),
+        ("manifest_engine_api_shape_catches_renamed_write_export", test_manifest_engine_api_shape_catches_renamed_write_export),
+        ("violation_report_shape_catches_missing_notices_field", test_violation_report_shape_catches_missing_notices_field),
+        ("violation_report_shape_catches_changed_factory_return_alias", test_violation_report_shape_catches_changed_factory_return_alias),
+        ("rule_id_fields_branded_catches_string_violation_rule_id", test_rule_id_fields_branded_catches_string_violation_rule_id),
+        ("rule_id_fields_branded_catches_missing_notice_rule_id", test_rule_id_fields_branded_catches_missing_notice_rule_id),
         ("hook_fail_closed_v2_catches_missing_failClosed_call", test_hook_fail_closed_v2_catches_missing_failClosed_call),
         ("stop_validate_fail_closed_catches_missing_blockStop_call", test_stop_validate_fail_closed_catches_missing_blockStop_call),
         ("write_atomic_has_rename_catches_missing_rename_call", test_write_atomic_has_rename_catches_missing_rename_call),
@@ -2613,10 +2824,13 @@ def main() -> int:
         ("check_prepare_via_load_contract_catches_bypass", test_check_prepare_via_load_contract_catches_bypass),
         ("generate_via_coordinator_catches_bypass", test_generate_via_coordinator_catches_bypass),
         ("approve_via_resolve_approved_by_catches_bypass", test_approve_via_resolve_approved_by_catches_bypass),
+        ("evaluator_via_extern_registry_catches_missing_registry_call", test_evaluator_via_extern_registry_catches_missing_registry_call),
+        ("evaluator_via_extern_registry_catches_premature_evaluation", test_evaluator_via_extern_registry_catches_premature_evaluation),
         # Phase 4 (self-dogfooding plan): effect-policy contracts.
         ("core_is_pure_or_fs_read_catches_random_in_core", test_core_is_pure_or_fs_read_catches_random_in_core),
         ("hook_no_network_catches_fetch_in_hook_script", test_hook_no_network_catches_fetch_in_hook_script),
         ("generator_no_network_or_child_process_catches_execfile", test_generator_no_network_or_child_process_catches_execfile),
+        ("generator_no_network_or_child_process_catches_fetch_call", test_generator_no_network_or_child_process_catches_fetch_call),
         ("manifest_leaves_are_pinned_catches_extra_effect", test_manifest_leaves_are_pinned_catches_extra_effect),
         # Phase 5 (self-dogfooding plan): type-state brand discriminator tests.
         ("manifest_lifecycle_brand_fires", test_manifest_lifecycle_brand_fires),

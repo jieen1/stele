@@ -25,10 +25,10 @@ export interface ResolvedCommand {
  *   2. Package manager exec (pnpm exec, npm exec, yarn dx)
  *   3. Original command (PATH fallback)
  *
- * If the command is itself a package manager (pnpm, npm, yarn, npx), skip the
+ * If the command is itself a package manager (pnpm, npm, yarn), skip the
  * exec wrapper — it would produce "pnpm exec pnpm ..." which is wrong.
  */
-const PACKAGE_MANAGER_CMDS = new Set(["pnpm", "npm", "yarn", "npx"]);
+const PACKAGE_MANAGER_CMDS = new Set(["pnpm", "npm", "yarn"]);
 
 export function resolveCommand(
   cmd: string,
@@ -36,6 +36,10 @@ export function resolveCommand(
 ): ResolvedCommand {
   const parts = parseShellCommand(cmd);
   const name = parts.command;
+
+  if (name === "npx") {
+    return resolveNpxCommand(parts.args, projectDir);
+  }
 
   // If the command is already a package manager, resolve to absolute path.
   // Wrapping "pnpm exec pnpm ..." is wrong, but execFile needs full path on Windows.
@@ -61,6 +65,33 @@ export function resolveCommand(
 
   // Fallback: use the command as-is (PATH lookup).
   return { command: name, args: parts.args };
+}
+
+function resolveNpxCommand(args: string[], projectDir: string): ResolvedCommand {
+  const fallbackNpx = (): ResolvedCommand => ({
+    command: resolveExecutablePath("npx", projectDir) ?? "npx",
+    args,
+  });
+
+  if (args.length === 0 || args[0]!.startsWith("-")) {
+    return fallbackNpx();
+  }
+
+  const [tool, ...toolArgs] = args;
+  const localPath = findLocalExecutable(tool, projectDir);
+  if (localPath) {
+    return { command: localPath, args: toolArgs };
+  }
+
+  const wrapper = findPackageWrapper(projectDir);
+  if (wrapper) {
+    return {
+      command: wrapper.executable,
+      args: [...wrapper.args, tool, ...toolArgs],
+    };
+  }
+
+  return fallbackNpx();
 }
 
 // ---------------------------------------------------------------------------

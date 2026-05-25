@@ -2,6 +2,7 @@ import { mkdtemp, rm, readFile, writeFile, stat as fsStat } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { ruleId } from "../src/index.js";
 import { readViolationBaseline, tryReadViolationBaseline, writeViolationBaseline } from "../src/baseline/io.js";
 import type { ViolationBaseline } from "../src/baseline/types.js";
 
@@ -12,7 +13,7 @@ function makeValidBaseline(): ViolationBaseline {
     reason: "initial",
     violations: {
       aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: {
-        rule_id: "ledger.balance_mismatch",
+        rule_id: ruleId("ledger.balance_mismatch"),
         rule_kind: "rule_violation",
         first_seen: "2026-05-07T00:00:00.000Z",
         source: { tool: "ledger-checker", command: "check", kind: "rule" },

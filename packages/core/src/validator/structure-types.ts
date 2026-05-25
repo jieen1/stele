@@ -283,6 +283,12 @@ export type FunctionShapeDeclaration = {
   mustHaveParameters: string[];
 };
 
+export type TypePolicyFieldRequirement = {
+  fieldName: string;
+  typeName: string;
+  span: SourceSpan;
+};
+
 export type TypePolicyDeclaration = {
   kind: "type-policy";
   filePath: string;
@@ -293,6 +299,8 @@ export type TypePolicyDeclaration = {
   target: string;
   denyTypes: string[];
   requireTypes: string[];
+  requireFieldTypes: TypePolicyFieldRequirement[];
+  ownerNameSuffixes: string[];
 };
 
 export type FilePolicyDeclaration = {

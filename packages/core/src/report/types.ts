@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { stableStringCompare } from "../util/array.js";
-import { sha256 as sha256SmartCtor } from "../util/branded-types.js";
+import { ruleId, sha256 as sha256SmartCtor, type RuleId } from "../util/branded-types.js";
 
 function uniqueSortedStrings(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => stableStringCompare(left, right));
@@ -74,7 +74,7 @@ export type ViolationFix = {
 export type ViolationPriority = "blocking" | "major" | "minor";
 
 export type Violation = {
-  rule_id: string;
+  rule_id: RuleId;
   rule_kind: string;
   severity: ViolationSeverity;
   source: ViolationSource;
@@ -176,7 +176,9 @@ export type EffectViolationEvidence = {
   propagation_chain: readonly string[];
 };
 
-export type ViolationInput = Omit<Violation, "fingerprint">;
+export type ViolationInput = Omit<Violation, "fingerprint" | "rule_id"> & {
+  rule_id: RuleId | string;
+};
 
 export type ViolationReportSummary = {
   message?: string;
@@ -197,6 +199,7 @@ export type ContractNoticeKind = "above-ideal";
  * non-zero exit codes.
  */
 export type ContractNotice = {
+  rule_id: RuleId;
   id: string;
   kind: ContractNoticeKind;
   nodeId: string;
@@ -210,6 +213,7 @@ export type ContractNotice = {
 
 export type ViolationReport = {
   schema_version: "1";
+  rule_id: RuleId;
   tool: string;
   command: string;
   ok: boolean;
@@ -218,7 +222,8 @@ export type ViolationReport = {
   notices: ContractNotice[];
 };
 
-export type ViolationReportInput = Omit<ViolationReport, "schema_version" | "violations" | "notices"> & {
+export type ViolationReportInput = Omit<ViolationReport, "schema_version" | "rule_id" | "violations" | "notices"> & {
+  rule_id?: RuleId;
   violations: Array<Violation | ViolationInput>;
   notices?: ContractNotice[];
 };
@@ -239,8 +244,9 @@ export type ExplainTrace = {
 };
 
 export function createViolation(input: ViolationInput): Violation {
-  const normalized: ViolationInput = {
+  const normalized: Omit<Violation, "fingerprint"> = {
     ...input,
+    rule_id: typeof input.rule_id === "string" ? ruleId(input.rule_id) : input.rule_id,
     source: {
       ...input.source,
     },
@@ -280,6 +286,7 @@ export function createViolation(input: ViolationInput): Violation {
 export function createViolationReport(input: ViolationReportInput): ViolationReport {
   return {
     schema_version: "1",
+    rule_id: input.rule_id ?? ruleId("stele.report"),
     tool: input.tool,
     command: input.command,
     ok: input.ok,

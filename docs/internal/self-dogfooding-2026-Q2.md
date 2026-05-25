@@ -85,6 +85,10 @@ decision log lives in [`docs/design/self-dogfooding/README.md`](../design/self-d
   `VIOLATION_REPORT_SHAPE`, `RULE_ID_FIELDS_BRANDED` — all target
   TypeScript type aliases, but `class-shape` evaluator only binds
   to real `class` declarations.
+  **RESOLVED in Closeout 6 (2026-05-25):** all three landed. Manifest
+  binds through public manifest barrel exports, violation reports bind
+  through `createViolationReport` return-type alias resolution, and
+  rule/report/notice IDs are enforced as branded `RuleId` fields.
 
 ### Phase 3 — Trace-policy
 
@@ -114,6 +118,10 @@ decision log lives in [`docs/design/self-dogfooding/README.md`](../design/self-d
     variable holder prevents the extractor from drawing the edge.
   - `BACKEND_LOAD_VIA_REGISTRY` — intent is an import boundary; should
     be re-landed as a `(boundary …)` declaration.
+  **RESOLVED in Closeout 6 (2026-05-25):** `buildTraceStage` now has
+  direct ordered `buildExternAliasRegistry(...)` then
+  `evaluateTracePolicies(...)` call-graph edges, and backend package
+  imports are denied outside `packages/cli/src/backend-registry.ts`.
 - **Perf baseline:** `stele check` went 11.0s → 13.8s (+2.8s, well
   inside the 30s budget).
 
@@ -132,26 +140,28 @@ decision log lives in [`docs/design/self-dogfooding/README.md`](../design/self-d
     `MANIFEST_LEAVES_ARE_PINNED`).
   - 3 `effect-suppression` declarations for the canonical atomic
     writers (`writeAtomic(2)`, `writeManifest(3)`, `writeHashManifest(2)`).
-  - 4 negative tests for the 4 policies. **As of Round 15 (commit
-    `1423559`) only 2 of the 4 are live; the other 2 are
-    `@pytest.mark.skip`-ed as dead-by-construction:**
+  - 4 negative tests for the 4 policies. Round 15 (commit `1423559`)
+    found 2 dead-by-construction tests; both are now resolved:
     - `test_core_is_pure_or_fs_read_catches_random_in_core` — LIVE,
       truly asserts.
     - `test_manifest_leaves_are_pinned_catches_extra_effect` — LIVE,
       truly asserts.
-    - `test_hook_no_network_catches_fetch_in_hook_script` — SKIPPED.
-      Root cause: HOOK_NO_NETWORK targets `*.js` files but the TS
+    - `test_hook_no_network_catches_fetch_in_hook_script` —
+      historical root cause: HOOK_NO_NETWORK targets `*.js` files but the TS
       call-graph extractor sets `allowJs: false`
       (`packages/backend-typescript/src/extractors/call-graph.ts:222`)
       and its directory walker only collects `.ts/.tsx` (line 269).
-      Policy is documentation, not enforcement. Filed as Phase 7
-      follow-up (see Step 7.9 below + README decision log entry
-      "HOOK_NO_NETWORK policy is dead by construction").
+      **RESOLVED in Closeout 2 (2026-05-25):** hook scripts are visible
+      to the analyzer and the negative test is live.
     - `test_generator_no_network_or_child_process_catches_execfile`
-      — SKIPPED. Root cause: `target-scope` is a single file so a
+      — historical root cause: `target-scope` is a single file so a
       sibling drop can never satisfy it. Phase 7 follow-up: widen
       target-scope or rewrite using `_mutate_then_check` directly
       against `generate.ts`.
+      **RESOLVED in Closeout 6 (2026-05-25):** target-scope now also
+      covers `packages/cli/src/design-generator/**::*`; the execFile
+      negative is live and a second fetch-shaped negative pins network
+      effects.
   - **(historical, RESOLVED in Closeout 1, 2026-05-25)** —
     `effectStrictMode: false` set in `stele.config.json` to downgrade
     the ~1,454 unresolved-call sites (Commander dispatch, dynamic
@@ -302,11 +312,20 @@ work can pick them up.
 - `VIOLATION_REPORT_SHAPE` (class-shape on TS type alias)
 - `RULE_ID_FIELDS_BRANDED` (type-policy on TS type alias)
 
+> **RESOLVED in Closeout 6 (2026-05-25).** These landed through the
+> TypeScript analyzer/evaluator path: manifest barrel aggregate members,
+> report return-type alias binding, and branded `rule_id: RuleId` fields.
+
 ### Phase 3 deferrals (2)
 - `EVALUATOR_VIA_EXTERN_REGISTRY` (trace through local-var-held
   imported function — extractor limitation)
 - `BACKEND_LOAD_VIA_REGISTRY` (re-land as `(boundary …)` with
   `deny-import "@stele/backend-*"`)
+
+> **RESOLVED in Closeout 6 (2026-05-25).** `EVALUATOR_VIA_EXTERN_REGISTRY`
+> landed via direct ordered trace-stage calls; `BACKEND_LOAD_VIA_REGISTRY`
+> landed as a TypeScript boundary with backend imports centralized in
+> `backend-registry.ts`.
 
 ### Phase 5 deferrals (system-wide)
 - Route ~20-30 production call sites through the typed lifecycle
@@ -398,6 +417,8 @@ aggregate class-shapes.
    deferrals.
 4. **Phase 2 type-alias targets** — `MANIFEST_ENGINE_SHAPE`,
    `VIOLATION_REPORT_SHAPE`, `RULE_ID_FIELDS_BRANDED`.
+   **RESOLVED in Closeout 6 (2026-05-25):** the TS code-shape/type-policy
+   path now binds these surfaces without migrating them to classes.
 5. **Decision-log freshness** — the Phase 4 sub-agent's decision-log
    entry says effect-policies were deferred; commit `451a1d0`
    subsequently landed them. The decision log is appended-only by

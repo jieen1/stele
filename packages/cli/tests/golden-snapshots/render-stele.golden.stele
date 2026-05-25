@@ -388,11 +388,20 @@
 (core-node "core-invariant-validator-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/core/src/validator/structure-invariant.ts::validateInvariant")
+  (target "packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration")
   (description "Generated from design profile: InvariantValidator aggregate must remain reviewable.")
   (rationale "InvariantValidator protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 150) (max 350))
   (metric public-method-count (ideal 4) (max 10))
+)
+
+(class-shape core-invariant-validator-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration")
+  (must-have-method "parseInvariantDeclaration")
+  (must-have-method "readSingleText")
+  (must-have-method "readStringLiteral")
+  (aggregate-members "parseInvariantDeclaration" "readMultiValueField" "readSingleText" "readSingleValueField" "readStringLiteral")
 )
 
 (core-node "core-contract-loader-aggregate"
@@ -405,14 +414,35 @@
   (metric public-method-count (ideal 3) (max 8))
 )
 
+(class-shape core-contract-loader-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/loader/load-contract.ts::loadContract")
+  (must-have-method "loadContract")
+  (must-have-method "loadRecursive")
+  (must-have-method "validateContract")
+  (must-have-field "MAX_IMPORT_DEPTH")
+  (aggregate-members "MAX_IMPORT_DEPTH" "loadContract" "loadRecursive" "readContractFile" "validateContract")
+)
+
 (core-node "core-manifest-engine-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/core/src/manifest/hash-manifest.ts::hashManifest")
+  (target "packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash")
   (description "Generated from design profile: ManifestEngine aggregate must remain reviewable.")
   (rationale "ManifestEngine protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 100) (max 250))
   (metric max-cyclomatic (ideal 8) (max 20))
+)
+
+(class-shape core-manifest-engine-aggregate-shape
+  (lang typescript)
+  (target "packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash")
+  (must-have-method "buildTransitiveHash")
+  (must-have-method "computeSha256")
+  (must-have-method "writeAtomic")
+  (must-have-field "HASH_MANIFEST_RELATIVE_PATH")
+  (must-have-field "HASH_MANIFEST_VERSION")
+  (aggregate-members "HASH_MANIFEST_RELATIVE_PATH" "HASH_MANIFEST_VERSION" "buildTransitiveHash" "computeSha256" "readHashManifest" "writeAtomic" "writeHashManifest")
 )
 
 (core-node "cli-check-orchestrator-aggregate"
@@ -426,6 +456,16 @@
   (metric max-cyclomatic (ideal 15) (max 30))
 )
 
+(class-shape cli-check-orchestrator-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/commands/check.ts::runCheck")
+  (must-have-method "checkProject")
+  (must-have-method "collectProtectedCheckState")
+  (must-have-method "prepareCheckContext")
+  (must-have-method "runCheck")
+  (aggregate-members "buildRawCheckReport" "checkProject" "collectProtectedCheckState" "prepareCheckContext" "prepareCheckContextWithContract" "runCheck")
+)
+
 (core-node "cli-code-shape-evaluator-aggregate"
   (lang typescript)
   (role business-core-service)
@@ -435,6 +475,16 @@
   (metric sloc (ideal 400) (max 800))
   (metric public-method-count (ideal 8) (max 20))
   (metric max-cyclomatic (ideal 15) (max 35))
+)
+
+(class-shape cli-code-shape-evaluator-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes")
+  (must-have-method "evaluateBoundaryDeclaration")
+  (must-have-method "evaluateClassShapeDeclaration")
+  (must-have-method "evaluateCodeShapes")
+  (must-have-method "evaluateFunctionShapeDeclaration")
+  (aggregate-members "evaluateBoundaryDeclaration" "evaluateClassShapeDeclaration" "evaluateCodeShapes" "evaluateFilePolicyDeclaration" "evaluateFreeFunctionClassShape" "evaluateFunctionShapeDeclaration" "evaluateTypePolicyDeclaration")
 )
 
 (core-node "cli-design-diff-engine-aggregate"
@@ -447,14 +497,34 @@
   (metric max-cyclomatic (ideal 12) (max 25))
 )
 
+(class-shape cli-design-diff-engine-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/commands/design/diff.ts::computeDesignDiff")
+  (must-have-method "compareContexts")
+  (must-have-method "compareCoreInvariants")
+  (must-have-method "compareIntegrations")
+  (must-have-method "computeDesignDiff")
+  (must-have-field "SEVERITY")
+  (aggregate-members "SEVERITY" "compareContexts" "compareCoreInvariants" "compareIntegrations" "compareProject" "compareSharedKernels" "compareToolchainContracts" "compareTypeDriven" "computeDesignDiff")
+)
+
 (core-node "cli-cli-program-factory-aggregate"
   (lang typescript)
   (role business-core-service)
-  (target "packages/cli/src/index.ts::createSteleProgram")
+  (target "packages/cli/src/index.ts::createProgram")
   (description "Generated from design profile: CliProgramFactory aggregate must remain reviewable.")
   (rationale "CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 200) (max 400))
   (metric public-method-count (ideal 4) (max 10))
+)
+
+(class-shape cli-cli-program-factory-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/index.ts::createProgram")
+  (must-have-method "cmdSpec")
+  (must-have-method "createProgram")
+  (must-have-method "runCli")
+  (aggregate-members "cmdSpec" "createProgram" "formatVersion" "loadAgentHooksInstaller" "runCli" "runInstallCommand")
 )
 
 (core-node "cli-design-profile-validator-aggregate"
@@ -467,6 +537,16 @@
   (metric max-cyclomatic (ideal 10) (max 25))
 )
 
+(class-shape cli-design-profile-validator-aggregate-shape
+  (lang typescript)
+  (target "packages/cli/src/design-profile/validate.ts::validateProfile")
+  (must-have-method "addDddErrors")
+  (must-have-method "addTypeDrivenErrors")
+  (must-have-method "validateProfile")
+  (must-have-method "validateTargetFormat")
+  (aggregate-members "addCoreInvariantErrors" "addDddErrors" "addProjectErrors" "addSchemaVersionErrors" "addTraceErrors" "addTypeDrivenErrors" "addUniquenessErrors" "isPathTraversal" "validateProfile" "validateTargetFormat")
+)
+
 (core-node "architecture-architecture-evaluator-aggregate"
   (lang typescript)
   (role business-core-service)
@@ -475,6 +555,18 @@
   (rationale "ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 200) (max 400))
   (metric max-cyclomatic (ideal 10) (max 25))
+)
+
+(class-shape architecture-architecture-evaluator-aggregate-shape
+  (lang typescript)
+  (target "packages/architecture-core/src/evaluate.ts::evaluateArchitecture")
+  (must-have-method "detectCycles")
+  (must-have-method "evaluateArchitecture")
+  (must-have-method "findCycleViolations")
+  (must-have-method "findDependencyViolations")
+  (must-have-method "findLayerDirectionViolations")
+  (must-have-method "findPublicEntryViolations")
+  (aggregate-members "buildAllowMap" "detectCycles" "evaluateArchitecture" "findCycleViolations" "findDependencyViolations" "findLayerDirectionViolations" "findPublicEntryViolations")
 )
 
 (branded-id "RuleId"

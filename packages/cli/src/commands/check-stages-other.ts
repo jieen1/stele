@@ -186,6 +186,7 @@ export async function buildComplexityStage(
 
     for (const n of result.notices) {
       notices.push({
+        rule_id: ruleId(`complexity.${result.measurement.id}.${n.metric}.above_ideal`),
         id: `notice.${result.measurement.id}.${n.metric}`,
         kind: "above-ideal",
         nodeId: n.nodeId,

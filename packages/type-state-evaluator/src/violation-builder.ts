@@ -18,6 +18,7 @@ import {
   type ViolationPriority,
   type ViolationSeverity,
   createViolation,
+  ruleId,
 } from "@stele/core";
 import type { CallGraph, CallGraphNode } from "@stele/call-graph-core";
 
@@ -135,7 +136,7 @@ export function buildDisallowedOpViolation(options: BuildDisallowedOpOptions): V
     fixHintOverride,
   } = options;
 
-  const ruleId = `typestate.${decl.id}.disallowed_op`;
+  const typeStateRuleId = ruleId(`typestate.${decl.id}.disallowed_op`);
   const receiverLabel = receiverName ?? "<receiver>";
   const summary = `Method \`${method}\` is not allowed when \`${receiverLabel}\` is in state \`${inferredState}\` (rule ${decl.id}).`;
 
@@ -158,7 +159,7 @@ export function buildDisallowedOpViolation(options: BuildDisallowedOpOptions): V
   }
 
   return createViolation({
-    rule_id: ruleId,
+    rule_id: typeStateRuleId,
     rule_kind: "type_state_violation",
     severity: severityForDisallowed(decl),
     source: {
@@ -227,7 +228,7 @@ export function buildWrongStateAtBindingViolation(
     fixHintOverride,
   } = options;
 
-  const ruleIdStr = `typestate.${decl.id}.wrong_state_at_binding`;
+  const typeStateRuleId = ruleId(`typestate.${decl.id}.wrong_state_at_binding`);
   const receiverLabel = receiverName ?? "<receiver>";
   const summary =
     `Binding for param ${paramIndex} declares state \`${declaredState}\` but ` +
@@ -251,7 +252,7 @@ export function buildWrongStateAtBindingViolation(
   ];
 
   return createViolation({
-    rule_id: ruleIdStr,
+    rule_id: typeStateRuleId,
     rule_kind: "type_state_violation",
     severity: severityForDisallowed(decl),
     source: {
@@ -294,14 +295,14 @@ export function buildInferenceFailedViolation(options: BuildInferenceFailedOptio
     fixHintOverride,
   } = options;
 
-  const ruleId = `typestate.${decl.id}.inference_failed`;
+  const typeStateRuleId = ruleId(`typestate.${decl.id}.inference_failed`);
   const receiverLabel = receiverName ?? "<receiver>";
   const summary = `Type-state inference failed for \`${receiverLabel}.${method}\` against rule \`${decl.id}\`.`;
 
   const fixSummary = fixHintOverride ?? defaultInferenceFailedFixHint(decl, callerId);
 
   return createViolation({
-    rule_id: ruleId,
+    rule_id: typeStateRuleId,
     rule_kind: "type_state_violation",
     severity: strictMode ? "error" : "warning",
     source: {

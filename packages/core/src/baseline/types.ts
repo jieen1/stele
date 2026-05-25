@@ -1,10 +1,11 @@
 import type { Violation, ViolationLocation, ViolationReport, ViolationSource } from "../report/types.js";
 import { stableStringCompare, uniqueSortedStrings } from "../util/array.js";
+import type { RuleId } from "../util/branded-types.js";
 
 export type BaselineVersion = "1";
 
 export type BaselineViolation = {
-  rule_id: string;
+  rule_id: RuleId;
   rule_kind: string;
   first_seen: string;
   source: ViolationSource;
@@ -89,18 +90,7 @@ export function createViolationBaseline(options: CreateViolationBaselineOptions)
 export function filterViolationReport(report: ViolationReport, options: FilterViolationReportOptions = {}): ViolationReport {
   const diffScopePaths = options.diffScopePaths === undefined ? undefined : new Set([...options.diffScopePaths].map(normalizePath));
   const isSuppressible = options.isSuppressible ?? (() => true);
-  const violations = report.violations.map(
-    /**
-     * Per-violation classifier: applies diff-scope and baseline-suppression
-     * via the `isSuppressible` predicate (a pure callback passed in by the
-     * caller). Itself performs no IO — only object reshaping and a
-     * predicate call. The closed-world declaration below tells the
-     * effect-evaluator that the unresolved `isSuppressible(...)` callee is
-     * accounted for and contributes no effects to this lambda's set.
-     *
-     * @stele:effects
-     */
-    (violation) => {
+  const violations = report.violations.map((violation) => {
     const normalized = {
       ...violation,
       source: { ...violation.source },
@@ -115,10 +105,11 @@ export function filterViolationReport(report: ViolationReport, options: FilterVi
       scope_paths: uniqueSortedStrings(violation.scope_paths),
       fix: violation.fix === undefined ? undefined : { ...violation.fix },
     };
+    const suppressible = applySuppressiblePredicate(isSuppressible, normalized);
 
     if (
       diffScopePaths !== undefined &&
-      isSuppressible(normalized) &&
+      suppressible &&
       normalized.scope_paths.length > 0 &&
       !normalized.scope_paths.some((path) => diffScopePaths.has(normalizePath(path)))
     ) {
@@ -129,7 +120,7 @@ export function filterViolationReport(report: ViolationReport, options: FilterVi
       };
     }
 
-    if (options.baseline?.violations[normalized.fingerprint] !== undefined && isSuppressible(normalized)) {
+    if (options.baseline?.violations[normalized.fingerprint] !== undefined && suppressible) {
       return {
         ...normalized,
         status: "suppressed" as const,
@@ -165,3 +156,13 @@ function normalizePath(path: string): string {
   return path.replaceAll("\\", "/");
 }
 
+/**
+ * The predicate is supplied by CLI filtering code and is expected to be pure.
+ * This wrapper gives the effect analyzer a named, closed-world node for the
+ * otherwise dynamic callback invocation.
+ *
+ * @stele:effects
+ */
+function applySuppressiblePredicate(predicate: (violation: Violation) => boolean, violation: Violation): boolean {
+  return predicate(violation);
+}

@@ -101,6 +101,23 @@ export interface TsFunction {
   returnTypeMembers?: string[];
 }
 
+export interface TsTypeField {
+  name: string;
+  annotation?: string;
+  annotationNames: string[];
+  optional: boolean;
+  line: number;
+  column: number;
+}
+
+export interface TsTypeDeclaration {
+  name: string;
+  kind: "interface" | "type";
+  line: number;
+  column: number;
+  fields: TsTypeField[];
+}
+
 export interface TsFileAnalysis {
   path: string;
   imports: TsImport[];
@@ -108,6 +125,7 @@ export interface TsFileAnalysis {
   annotations: TsAnnotation[];
   classes: TsClass[];
   functions: TsFunction[];
+  typeDeclarations: TsTypeDeclaration[];
   /**
    * Closeout 3a (2026-05-25): names of all top-level value declarations in
    * the file. Includes:
@@ -195,6 +213,7 @@ function analyzeSourceFile(sourceFile: ts.SourceFile, relativePath: string): TsF
     annotations: [],
     classes: [],
     functions: [],
+    typeDeclarations: [],
     // Closeout 3a (2026-05-25): every top-level value declaration name —
     // const/let/var, function, class — collected during the same statement
     // walk below.
@@ -203,6 +222,8 @@ function analyzeSourceFile(sourceFile: ts.SourceFile, relativePath: string): TsF
 
   const fileLevelCalls: TsCall[] = [];
   const fileLevelAnnotations: TsAnnotation[] = [];
+  out.typeDeclarations = collectTypeDeclarations(sourceFile);
+  const typeMembers = collectNamedTypeMembers(out.typeDeclarations);
 
   // Walk top-level statements.
   for (const statement of sourceFile.statements) {
@@ -216,7 +237,7 @@ function analyzeSourceFile(sourceFile: ts.SourceFile, relativePath: string): TsF
       out.classes.push(readClassDeclaration(sourceFile, statement));
       out.moduleVariables.push(statement.name.text);
     } else if (ts.isFunctionDeclaration(statement) && statement.name) {
-      out.functions.push(readFunctionDeclaration(sourceFile, statement));
+      out.functions.push(readFunctionDeclaration(sourceFile, statement, typeMembers));
       out.moduleVariables.push(statement.name.text);
     } else if (ts.isVariableStatement(statement)) {
       // Top-level `const x = () => {...}` arrow function; record as
@@ -229,9 +250,11 @@ function analyzeSourceFile(sourceFile: ts.SourceFile, relativePath: string): TsF
         }
         out.moduleVariables.push(decl.name.text);
         if (decl.initializer && (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))) {
-          out.functions.push(readArrowFunction(sourceFile, decl.name.text, decl.initializer));
+          out.functions.push(readArrowFunction(sourceFile, decl.name.text, decl.initializer, typeMembers));
         }
       }
+    } else if (ts.isExportDeclaration(statement)) {
+      readNamedValueReExports(sourceFile, statement, out);
     }
   }
 
@@ -243,6 +266,44 @@ function analyzeSourceFile(sourceFile: ts.SourceFile, relativePath: string): TsF
   out.annotations = fileLevelAnnotations;
 
   return out;
+}
+
+function readNamedValueReExports(
+  sourceFile: ts.SourceFile,
+  node: ts.ExportDeclaration,
+  out: TsFileAnalysis,
+): void {
+  if (node.isTypeOnly || node.exportClause === undefined || !ts.isNamedExports(node.exportClause)) {
+    return;
+  }
+
+  for (const specifier of node.exportClause.elements) {
+    if (specifier.isTypeOnly) {
+      continue;
+    }
+    const name = specifier.name.text;
+    out.moduleVariables.push(name);
+    out.functions.push(readSyntheticExportedFunction(sourceFile, name, specifier));
+  }
+}
+
+function readSyntheticExportedFunction(
+  sourceFile: ts.SourceFile,
+  name: string,
+  node: ts.ExportSpecifier,
+): TsFunction {
+  const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+  return {
+    name,
+    qualname: name,
+    line: line + 1,
+    column: character + 1,
+    decorators: [],
+    parameters: [],
+    calls: [],
+    annotations: [],
+    fastapiRoute: false,
+  };
 }
 
 function readImportDeclaration(sourceFile: ts.SourceFile, node: ts.ImportDeclaration): TsImport | null {
@@ -318,7 +379,11 @@ function readClassDeclaration(sourceFile: ts.SourceFile, node: ts.ClassDeclarati
   };
 }
 
-function readFunctionDeclaration(sourceFile: ts.SourceFile, node: ts.FunctionDeclaration): TsFunction {
+function readFunctionDeclaration(
+  sourceFile: ts.SourceFile,
+  node: ts.FunctionDeclaration,
+  typeMembers: ReadonlyMap<string, string[]>,
+): TsFunction {
   const name = node.name?.text ?? "<anonymous>";
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
   const parameters = node.parameters.map((p) => p.name.getText(sourceFile));
@@ -342,7 +407,7 @@ function readFunctionDeclaration(sourceFile: ts.SourceFile, node: ts.FunctionDec
     calls,
     annotations,
     fastapiRoute: false,
-    returnTypeMembers: extractReturnTypeMembers(node.type),
+    returnTypeMembers: extractReturnTypeMembers(node.type, typeMembers),
   };
 }
 
@@ -350,6 +415,7 @@ function readArrowFunction(
   sourceFile: ts.SourceFile,
   name: string,
   node: ts.ArrowFunction | ts.FunctionExpression,
+  typeMembers: ReadonlyMap<string, string[]>,
 ): TsFunction {
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
   const parameters = node.parameters.map((p) => p.name.getText(sourceFile));
@@ -370,34 +436,115 @@ function readArrowFunction(
     calls,
     annotations,
     fastapiRoute: false,
-    returnTypeMembers: extractReturnTypeMembers(node.type),
+    returnTypeMembers: extractReturnTypeMembers(node.type, typeMembers),
   };
 }
 
 /**
  * Closeout 3a (2026-05-25): if `typeNode` is a literal object type
  * (`{ a(): void; b: number }`), return the names of its property /
- * method members. Otherwise return `undefined` — the evaluator's factory
- * mode treats `undefined` as "not a factory" and falls through to the
- * "not found" violation path.
+ * method members. Closeout 6 also resolves same-file interface and
+ * type-literal aliases so factories like `createViolationReport(): Report`
+ * can bind to the actual report shape. Otherwise return `undefined` —
+ * the evaluator's factory mode treats `undefined` as "not a factory" and
+ * falls through to the "not found" violation path.
  *
  * Index signatures and call signatures contribute no named member; they
  * are skipped silently.
  */
-function extractReturnTypeMembers(typeNode: ts.TypeNode | undefined): string[] | undefined {
-  if (typeNode === undefined) return undefined;
-  if (!ts.isTypeLiteralNode(typeNode)) return undefined;
-  const names: string[] = [];
-  for (const member of typeNode.members) {
+function collectNamedTypeMembers(typeDeclarations: readonly TsTypeDeclaration[]): Map<string, string[]> {
+  const typeMembers = new Map<string, string[]>();
+  for (const declaration of typeDeclarations) {
+    typeMembers.set(declaration.name, declaration.fields.map((field) => field.name));
+  }
+  return typeMembers;
+}
+
+function collectTypeDeclarations(sourceFile: ts.SourceFile): TsTypeDeclaration[] {
+  const declarations: TsTypeDeclaration[] = [];
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isInterfaceDeclaration(statement)) {
+      declarations.push(readTypeDeclaration(sourceFile, statement.name.text, "interface", statement, statement.members));
+    } else if (ts.isTypeAliasDeclaration(statement) && ts.isTypeLiteralNode(statement.type)) {
+      declarations.push(readTypeDeclaration(sourceFile, statement.name.text, "type", statement, statement.type.members));
+    }
+  }
+
+  return declarations;
+}
+
+function readTypeDeclaration(
+  sourceFile: ts.SourceFile,
+  name: string,
+  kind: "interface" | "type",
+  node: ts.Node,
+  members: ts.NodeArray<ts.TypeElement>,
+): TsTypeDeclaration {
+  const { line, column } = lineColumnOf(sourceFile, node);
+  return {
+    name,
+    kind,
+    line,
+    column,
+    fields: readTypeFields(sourceFile, members),
+  };
+}
+
+function readTypeFields(sourceFile: ts.SourceFile, members: ts.NodeArray<ts.TypeElement>): TsTypeField[] {
+  const fields: TsTypeField[] = [];
+  for (const member of members) {
     let memberName: string | undefined;
+    let annotation: string | undefined;
+    let annotationNames: string[] = [];
+    let optional = false;
     if (ts.isPropertySignature(member) && member.name) {
       memberName = propertyKeyText(member.name);
+      optional = member.questionToken !== undefined;
+      if (member.type) {
+        annotation = member.type.getText(sourceFile);
+        annotationNames = extractTypeNames(annotation);
+      }
     } else if (ts.isMethodSignature(member) && member.name) {
       memberName = propertyKeyText(member.name);
+      optional = member.questionToken !== undefined;
+      if (member.type) {
+        annotation = member.type.getText(sourceFile);
+        annotationNames = extractTypeNames(annotation);
+      }
     }
-    if (memberName !== undefined) names.push(memberName);
+    if (memberName !== undefined) {
+      const { line, column } = lineColumnOf(sourceFile, member);
+      fields.push({
+        name: memberName,
+        annotation,
+        annotationNames,
+        optional,
+        line,
+        column,
+      });
+    }
   }
-  return names;
+  return fields;
+}
+
+function readTypeMembers(sourceFile: ts.SourceFile, members: ts.NodeArray<ts.TypeElement>): string[] {
+  return readTypeFields(sourceFile, members).map((field) => field.name);
+}
+
+function extractReturnTypeMembers(
+  typeNode: ts.TypeNode | undefined,
+  typeMembers: ReadonlyMap<string, string[]>,
+): string[] | undefined {
+  if (typeNode === undefined) return undefined;
+  if (ts.isTypeLiteralNode(typeNode)) {
+    return readTypeMembers(typeNode.getSourceFile(), typeNode.members);
+  }
+  if (ts.isTypeReferenceNode(typeNode) && ts.isIdentifier(typeNode.typeName)) {
+    const members = typeMembers.get(typeNode.typeName.text);
+    return members === undefined ? undefined : [...members];
+  }
+  return undefined;
 }
 
 function propertyKeyText(name: ts.PropertyName): string | undefined {

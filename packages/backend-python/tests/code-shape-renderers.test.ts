@@ -77,6 +77,8 @@ describe("renderCodeShapeTest", () => {
       target: "src/**/*.py",
       denyTypes: [],
       requireTypes: [],
+      requireFieldTypes: [],
+      ownerNameSuffixes: [],
       node: { kind: "list" as const, head: "type-policy", items: [], span: { file: "", line: 1, column: 1 } },
       span: { file: "", line: 1, column: 1 },
     };

@@ -282,7 +282,9 @@ function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
   // not participate in cross-rule grouping.
   const violations = annotateCrossRuleViolations(rawViolations);
   const notices = reports.flatMap((report) => report.notices);
-  const activeViolationCount = violations.filter((violation) => (violation.status ?? "active") === "active").length;
+  const activeViolations = violations.filter((violation) => (violation.status ?? "active") === "active");
+  const activeViolationCount = activeViolations.length;
+  const activeBlockingViolationCount = activeViolations.filter(isBlockingViolation).length;
   const suppressedViolationCount = violations.filter((violation) => violation.status === "suppressed").length;
   const outOfScopeViolationCount = violations.filter((violation) => violation.status === "out_of_scope").length;
   const lastSummary = [...reports]
@@ -292,7 +294,7 @@ function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
   return createViolationReport({
     tool: reports[reports.length - 1]?.tool ?? "stele",
     command: reports[reports.length - 1]?.command ?? "check",
-    ok: activeViolationCount === 0,
+    ok: activeBlockingViolationCount === 0,
     summary: {
       invariant_count: lastSummary?.invariant_count,
       generated_file_count: lastSummary?.generated_file_count,
@@ -325,10 +327,14 @@ function withCheckSummary(report: ViolationReport, summary: CheckSummary): Viola
 }
 
 function getCheckExitCode(report: ViolationReport): ExitCode {
-  const activeViolations = report.violations.filter((violation) => (violation.status ?? "active") === "active");
+  const activeViolations = report.violations.filter((violation) => (violation.status ?? "active") === "active" && isBlockingViolation(violation));
   return activeViolations.length > 0 && activeViolations.every((violation) => violation.rule_kind === "generated_drift")
     ? ExitCode.CONTRACT_FAIL
     : ExitCode.TAMPER_DETECTED;
+}
+
+function isBlockingViolation(violation: Violation): boolean {
+  return violation.severity !== "warning" && violation.severity !== "info";
 }
 
 export function formatCheckSummary(summary: CheckSummary, report?: ViolationReport): string {

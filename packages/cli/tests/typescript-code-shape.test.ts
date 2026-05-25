@@ -109,6 +109,37 @@ describe("analyzeTypeScriptFiles", () => {
     ]);
   });
 
+  it("captures named value re-exports as module aggregate members", async () => {
+    const root = await mkProject({
+      "src/index.ts":
+        'export { writeManifest, verifyManifest as checkManifest } from "./manifest.js";\n' +
+        'export type { ContractManifest } from "./manifest.js";\n',
+    });
+    const r = await analyzeTypeScriptFiles(root, ["src/index.ts"]);
+    const file = r.files[0]!;
+
+    expect(file.moduleVariables).toEqual(["writeManifest", "checkManifest"]);
+    expect(file.functions.map((fn) => fn.name)).toEqual(["writeManifest", "checkManifest"]);
+  });
+
+  it("resolves same-file return type aliases as factory members", async () => {
+    const root = await mkProject({
+      "src/report.ts":
+        "type Report = {\n" +
+        "  schema_version: '1';\n" +
+        "  ok: boolean;\n" +
+        "  finalize(): Report;\n" +
+        "};\n" +
+        "export function createReport(): Report {\n" +
+        "  throw new Error('fixture');\n" +
+        "}\n",
+    });
+    const r = await analyzeTypeScriptFiles(root, ["src/report.ts"]);
+    const fn = r.files[0]!.functions.find((item) => item.name === "createReport");
+
+    expect(fn?.returnTypeMembers).toEqual(["schema_version", "ok", "finalize"]);
+  });
+
   it("captures type annotations on parameters + return + fields with name list", async () => {
     const root = await mkProject({
       "src/types.ts":

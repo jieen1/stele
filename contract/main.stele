@@ -500,12 +500,29 @@
   (allow-target "packages/cli/src/commands/init.ts")
   (allow-target "packages/cli/src/commands/design/**"))
 
+; Closeout 6 — all CLI backend package access goes through backend-registry.ts.
+; Stage implementations may depend on registry-level extractor selectors, but
+; must not import backend packages directly.
+(boundary backend-load-via-registry
+  (lang typescript)
+  (target "packages/cli/src/**/*.ts")
+  (deny-import "@stele/backend-python")
+  (deny-import "@stele/backend-typescript")
+  (deny-import "@stele/backend-go")
+  (deny-import "@stele/backend-rust")
+  (deny-import "@stele/backend-java")
+  (allow-target "packages/cli/src/backend-registry.ts"))
+
 ; --- §2.2 class-shape contracts -----------------------------------------------
 ; The TS analyzer only recognises real `class` declarations (not `interface` or
 ; type aliases), so each class-shape targets a concrete class. The phase doc's
 ; `OperatorRegistry`/`Manifest`/`ViolationReport` types are interfaces or type
-; aliases; `MANIFEST_ENGINE_SHAPE` and `VIOLATION_REPORT_SHAPE` are deferred to
-; Phase 7 (see decision log).
+; aliases. Closeout 6 binds the manifest API surface through the public
+; @stele/core barrel exports because the actual manifest engine spans
+; manifest.ts and lifecycle.ts. It also binds the report API through
+; createViolationReport's same-file return type alias. The actual report
+; shape is a factory returning fields, not a builder object with lifecycle
+; methods.
 ;
 ; Phase 6 self-dogfooding (2026-05-25): the operator-registry class-shape
 ; previously written here as `operator-registry-shape` is now emitted from
@@ -519,6 +536,43 @@
   (target "packages/cli/src/errors.ts::CliCommandError")
   (must-extend "Error")
   (must-have-field "exitCode"))
+
+(class-shape manifest-engine-shape
+  (lang typescript)
+  (target "packages/core/src/index.ts::writeManifest")
+  (must-have-method "buildContractManifest")
+  (must-have-method "writeContractManifestObject")
+  (must-have-method "writeManifest")
+  (must-have-method "verifyManifest")
+  (must-have-method "asLoaded")
+  (must-have-method "buildLoadedManifestForPaths")
+  (must-have-method "lockManifest")
+  (must-have-method "verifyLockedManifest")
+  (must-have-method "verifyManifestToVerified")
+  (must-have-method "writeLockedManifest")
+  (aggregate-members
+    "buildContractManifest"
+    "writeContractManifestObject"
+    "writeManifest"
+    "verifyManifest"
+    "asLoaded"
+    "buildLoadedManifestForPaths"
+    "lockManifest"
+    "verifyLockedManifest"
+    "verifyManifestToVerified"
+    "writeLockedManifest"))
+
+(class-shape violation-report-shape
+  (lang typescript)
+  (target "packages/core/src/report/types.ts::createViolationReport")
+  (must-have-field "schema_version")
+  (must-have-field "rule_id")
+  (must-have-field "tool")
+  (must-have-field "command")
+  (must-have-field "ok")
+  (must-have-field "summary")
+  (must-have-field "violations")
+  (must-have-field "notices"))
 
 ; --- §2.3 function-shape contracts --------------------------------------------
 ; Hook scripts are .js but live in a TypeScript monorepo and are parsed
@@ -541,17 +595,16 @@
   (must-have-call "rename"))
 
 ; --- §2.4 type-policy contracts -----------------------------------------------
-; `rule-id-fields-branded` from the phase document is deferred to Phase 7 —
-; it targets `packages/core/src/report/types.ts::Violation`, but Violation is
-; a TypeScript type alias; the TS analyzer's class-shape / class-aware
-; selectors only resolve to real `class` declarations. Retyping
-; `Violation.rule_id` from `string` to `RuleId` would also cascade through
-; many call sites + vitest fixtures, exceeding Phase 2 scope.
-
 (type-policy no-any-in-core
   (lang typescript)
   (target "packages/core/src/**/*.ts")
   (deny-type "any"))
+
+(type-policy rule-id-fields-branded
+  (lang typescript)
+  (target "packages/core/src/**/*.ts")
+  (owner-name-suffix "Violation" "Notice" "Report")
+  (require-field-type "rule_id" "RuleId"))
 
 ; --- §2.5 file-policy contracts -----------------------------------------------
 ; Targets only the hook ENTRYPOINT scripts (not the shared helper modules
@@ -632,6 +685,18 @@
   (scope "packages/cli/src/commands/design/approve.ts")
   (fix-hint "[A] Approve flow MUST gate through `resolveApprovedBy` in `packages/cli/src/commands/design/approve.ts:180` before any `writeFileSync`. [B] If you're replacing the identity gate, write a new policy first."))
 
+; Closeout 6 — trace-policy evaluator must receive the extern-alias registry
+; built from the contract before evaluation. This protects cross-language
+; `extern:<logical-name>::...` scopes from silently falling back to package
+; names.
+(trace-policy EVALUATOR_VIA_EXTERN_REGISTRY
+  (description "buildTraceStage must build the extern-alias registry before evaluating trace policies.")
+  (severity "error")
+  (target "extern:stele-trace-evaluator::evaluateTracePolicies(*)")
+  (must-be-preceded-by "extern:stele-call-graph-core::buildExternAliasRegistry(*)")
+  (scope "packages/cli/src/commands/check-stages-trace.ts")
+  (fix-hint "[A] Keep `buildExternAliasRegistry(...)` before `evaluateTracePolicies(...)` in `buildTraceStage`. [B] If evaluation moves behind another boundary, add a contract that proves the same ordering there before refactoring."))
+
 ; ============================================================================
 ; Phase 4 — Effect-policy adoption.
 ;
@@ -687,7 +752,7 @@
 (effect-policy GENERATOR_NO_NETWORK_OR_CHILD_PROCESS
   (description "stele generate must be self-contained — no network, no shelling out. Determinism requires that generation is hermetic.")
   (severity "error")
-  (target-scope "packages/cli/src/commands/generate.ts::*")
+  (target-scope "packages/cli/src/commands/generate.ts::*" "packages/cli/src/design-generator/**::*")
   (forbid "network" "child-process"))
 
 (effect-policy MANIFEST_LEAVES_ARE_PINNED

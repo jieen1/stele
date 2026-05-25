@@ -10,6 +10,7 @@ import type {
   FilePolicyDeclaration,
   FunctionShapeDeclaration,
   TypePolicyDeclaration,
+  TypePolicyFieldRequirement,
 } from "./structure-types.js";
 
 // -- Entry point --
@@ -70,6 +71,8 @@ export function parseCodeShapeDeclaration(filePath: string, node: ListNode): Cod
         kind: "type-policy",
         denyTypes: (collected.get("deny-type") as string[]) ?? [],
         requireTypes: (collected.get("require-type") as string[]) ?? [],
+        requireFieldTypes: (collected.get("require-field-type") as TypePolicyFieldRequirement[]) ?? [],
+        ownerNameSuffixes: (collected.get("owner-name-suffix") as string[]) ?? [],
       };
 
     case "file-policy":
@@ -156,6 +159,44 @@ function readFieldRequirements(node: ListNode, label: string): ClassShapeFieldRe
   return [parseClassShapeFieldRequirement(node, id)];
 }
 
+function readTypePolicyFieldRequirements(node: ListNode, label: string): TypePolicyFieldRequirement[] {
+  if (node.items.length !== 2) {
+    throw validationError(
+      "E0318",
+      `${label} expects exactly a field name and required type.`,
+      node.span,
+      `Found ${node.items.length} value(s).`,
+      'Use (require-field-type "field_name" "TypeName").',
+    );
+  }
+
+  const [fieldNode, typeNode] = node.items;
+  if (fieldNode?.kind !== "string" && fieldNode?.kind !== "identifier") {
+    throw validationError(
+      "E0318",
+      `${label} field name must be an identifier or string literal.`,
+      fieldNode?.span ?? node.span,
+      `Found ${fieldNode === undefined ? "nothing" : describeNode(fieldNode)} instead.`,
+      'Use (require-field-type "field_name" "TypeName").',
+    );
+  }
+  if (typeNode?.kind !== "string" && typeNode?.kind !== "identifier") {
+    throw validationError(
+      "E0318",
+      `${label} type name must be an identifier or string literal.`,
+      typeNode?.span ?? node.span,
+      `Found ${typeNode === undefined ? "nothing" : describeNode(typeNode)} instead.`,
+      'Use (require-field-type "field_name" "TypeName").',
+    );
+  }
+
+  return [{
+    fieldName: fieldNode.value,
+    typeName: typeNode.value,
+    span: node.span,
+  }];
+}
+
 const CODE_SHAPE_REGISTRY: Record<CodeShapeDeclaration["kind"], DeclarationConfig> = {
   boundary: {
     kind: "boundary",
@@ -199,6 +240,8 @@ const CODE_SHAPE_REGISTRY: Record<CodeShapeDeclaration["kind"], DeclarationConfi
     fields: [
       { key: "deny-type", reader: readStrings },
       { key: "require-type", reader: readStrings },
+      { key: "require-field-type", reader: readTypePolicyFieldRequirements },
+      { key: "owner-name-suffix", reader: readStrings },
     ],
   },
   "file-policy": {

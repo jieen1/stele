@@ -14,14 +14,6 @@ import {
   type EvaluateEffectResult,
 } from "@stele/effect-evaluator";
 import {
-  tsCallGraphExtractor,
-  tsEffectAnnotationExtractor,
-} from "@stele/backend-typescript";
-import {
-  pyCallGraphExtractor,
-  pyEffectAnnotationExtractor,
-} from "@stele/backend-python";
-import {
   buildExternAliasRegistry,
   type CallGraph,
   type CallGraphExtractor,
@@ -30,6 +22,10 @@ import {
   type TypedCallGraph,
 } from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
+import {
+  pickEffectAnnotationExtractor,
+  pickEffectCallGraphExtractor,
+} from "../backend-registry.js";
 import { pickPhaseLanguage } from "../config/phase-language.js";
 import { profilePathExists } from "../design-profile/load.js";
 import { loadHashedProfile } from "../design-profile/lifecycle.js";
@@ -344,21 +340,4 @@ async function extractOrCacheCallGraph(
   const typed = wrapExtractedGraph(callGraph);
   setCachedCallGraph(context, typed);
   return typed;
-}
-
-/**
- * Round 14 P0: pick the per-language CallGraph extractor for the
- * effect stage. Returns null when the target language has no Phase B
- * coverage yet.
- */
-function pickEffectCallGraphExtractor(language: string): CallGraphExtractor | null {
-  if (language === "typescript") return tsCallGraphExtractor;
-  if (language === "python") return pyCallGraphExtractor;
-  return null;
-}
-
-function pickEffectAnnotationExtractor(language: string): EffectAnnotationExtractor | null {
-  if (language === "typescript") return tsEffectAnnotationExtractor;
-  if (language === "python") return pyEffectAnnotationExtractor;
-  return null;
 }

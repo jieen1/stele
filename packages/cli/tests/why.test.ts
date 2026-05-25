@@ -23,13 +23,13 @@ describe("stele why with failure witness", () => {
 
   it("renders failure witness fields in human output when last report contains one", async () => {
     const projectDir = await createWitnessFixtureProject();
-    await persistFailingReportWithWitness(projectDir, { ruleId: "BALANCE_NON_NEGATIVE" });
+    await persistFailingReportWithWitness(projectDir, { ruleId: "balance-non-negative" });
     const stdout = captureStdout();
 
-    await runWhy(projectDir, "BALANCE_NON_NEGATIVE", {});
+    await runWhy(projectDir, "balance-non-negative", {});
 
     const output = stdout.read();
-    expect(output).toContain("Rule: BALANCE_NON_NEGATIVE");
+    expect(output).toContain("Rule: balance-non-negative");
     expect(output).toContain("Last check:");
     expect(output).toContain("(failed)");
     expect(output).toContain("Failure witness:");
@@ -42,10 +42,10 @@ describe("stele why with failure witness", () => {
 
   it("falls back to summary/detail when failure_witness is absent", async () => {
     const projectDir = await createWitnessFixtureProject();
-    await persistFailingReportWithoutWitness(projectDir, { ruleId: "BALANCE_NON_NEGATIVE" });
+    await persistFailingReportWithoutWitness(projectDir, { ruleId: "balance-non-negative" });
     const stdout = captureStdout();
 
-    await runWhy(projectDir, "BALANCE_NON_NEGATIVE", {});
+    await runWhy(projectDir, "balance-non-negative", {});
 
     const output = stdout.read();
     expect(output).toContain("Cause: balance dropped below zero");
@@ -55,21 +55,21 @@ describe("stele why with failure witness", () => {
 
   it("emits cli-output §4.2 schema in --json mode with embedded witness", async () => {
     const projectDir = await createWitnessFixtureProject();
-    const generatedAt = await persistFailingReportWithWitness(projectDir, { ruleId: "BALANCE_NON_NEGATIVE" });
+    const generatedAt = await persistFailingReportWithWitness(projectDir, { ruleId: "balance-non-negative" });
     const stdout = captureStdout();
 
-    await runWhy(projectDir, "BALANCE_NON_NEGATIVE", { json: true });
+    await runWhy(projectDir, "balance-non-negative", { json: true });
 
     const parsed = JSON.parse(stdout.read());
     expect(parsed.schema_version).toBe("1");
     expect(parsed.tool).toBe("@stele/cli");
     expect(parsed.command).toBe("why");
-    expect(parsed.rule_id).toBe("BALANCE_NON_NEGATIVE");
+    expect(parsed.rule_id).toBe("balance-non-negative");
     expect(parsed.severity).toBe("high");
     expect(parsed.last_check_at).toBe(generatedAt);
     expect(parsed.last_check_status).toBe("failed");
     expect(parsed.violation).toBeDefined();
-    expect(parsed.violation.rule_id).toBe("BALANCE_NON_NEGATIVE");
+    expect(parsed.violation.rule_id).toBe("balance-non-negative");
     expect(parsed.violation.cause.failure_witness).toMatchObject({
       operator: "forall",
       collection_size: 47,
@@ -85,7 +85,7 @@ describe("stele why with failure witness", () => {
     const projectDir = await createWitnessFixtureProject();
     const stdout = captureStdout();
 
-    await runWhy(projectDir, "BALANCE_NON_NEGATIVE", { json: true });
+    await runWhy(projectDir, "balance-non-negative", { json: true });
 
     const parsed = JSON.parse(stdout.read());
     expect(parsed.last_check_status).toBe("no-report");
@@ -97,7 +97,7 @@ describe("stele why with failure witness", () => {
     const projectDir = await createWitnessFixtureProject();
     const stdout = captureStdout();
 
-    await runWhy(projectDir, "BALANCE_NON_NEGATIVE", {});
+    await runWhy(projectDir, "balance-non-negative", {});
 
     const output = stdout.read();
     expect(output).toContain("Last check: no recent report");
@@ -107,10 +107,10 @@ describe("stele why with failure witness", () => {
 
   it("surfaces witness for baseline-suppressed violations with status=suppressed", async () => {
     const projectDir = await createWitnessFixtureProject();
-    const generatedAt = await persistSuppressedReportWithWitness(projectDir, { ruleId: "BALANCE_NON_NEGATIVE" });
+    const generatedAt = await persistSuppressedReportWithWitness(projectDir, { ruleId: "balance-non-negative" });
     const humanStdout = captureStdout();
 
-    await runWhy(projectDir, "BALANCE_NON_NEGATIVE", {});
+    await runWhy(projectDir, "balance-non-negative", {});
     const humanOutput = humanStdout.read();
     expect(humanOutput).toContain("(suppressed)");
     expect(humanOutput).toContain("Failure witness:");
@@ -118,7 +118,7 @@ describe("stele why with failure witness", () => {
 
     vi.restoreAllMocks();
     const jsonStdout = captureStdout();
-    await runWhy(projectDir, "BALANCE_NON_NEGATIVE", { json: true });
+    await runWhy(projectDir, "balance-non-negative", { json: true });
     const parsed = JSON.parse(jsonStdout.read());
     expect(parsed.last_check_at).toBe(generatedAt);
     expect(parsed.last_check_status).toBe("suppressed");
@@ -129,7 +129,7 @@ describe("stele why with failure witness", () => {
   it("matches by fingerprint when an unknown id is provided", async () => {
     const projectDir = await createWitnessFixtureProject();
     const violation = createViolation({
-      rule_id: "BALANCE_NON_NEGATIVE",
+      rule_id: "balance-non-negative",
       rule_kind: "rule_violation",
       severity: "error",
       source: { tool: "stele", command: "check", kind: "rule" },
@@ -167,7 +167,7 @@ async function createWitnessFixtureProject(): Promise<string> {
     projectDir,
     "contract/main.stele",
     [
-      "(invariant BALANCE_NON_NEGATIVE",
+      "(invariant balance-non-negative",
       "  (severity high)",
       '  (description "Account balance must be non-negative.")',
       '  (rationale "Banking regulation forbids negative balances.")',

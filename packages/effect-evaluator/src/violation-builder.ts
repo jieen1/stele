@@ -19,6 +19,7 @@ import {
   type ViolationPriority,
   type ViolationSeverity,
   createViolation,
+  ruleId,
   stableStringCompare,
 } from "@stele/core";
 import type { CallGraph, CallGraphNode, UnresolvedCall } from "@stele/call-graph-core";
@@ -174,7 +175,7 @@ export function buildForbiddenEffectViolation(
     directOnNode,
   } = options;
 
-  const ruleId = `effect.${policy.id}.forbidden_effect`;
+  const effectRuleId = ruleId(`effect.${policy.id}.forbidden_effect`);
   const callerFile = node.filePath;
   const callerLine = node.span.line;
 
@@ -196,7 +197,7 @@ export function buildForbiddenEffectViolation(
     );
 
   return createViolation({
-    rule_id: ruleId,
+    rule_id: effectRuleId,
     rule_kind: "effect_violation",
     severity: severityFromPolicy(policy),
     source: {
@@ -251,7 +252,7 @@ export function buildDisallowedEffectViolation(
     directOnNode,
   } = options;
 
-  const ruleId = `effect.${policy.id}.disallowed_effect`;
+  const effectRuleId = ruleId(`effect.${policy.id}.disallowed_effect`);
   const callerFile = node.filePath;
   const callerLine = node.span.line;
 
@@ -277,7 +278,7 @@ export function buildDisallowedEffectViolation(
     );
 
   return createViolation({
-    rule_id: ruleId,
+    rule_id: effectRuleId,
     rule_kind: "effect_violation",
     severity: severityFromPolicy(policy),
     source: {
@@ -350,7 +351,7 @@ export function buildUnresolvedCallViolation(
   options: BuildUnresolvedCallOptions,
 ): Violation {
   const { policy, node, unresolved, callGraph, fixHintOverride } = options;
-  const ruleId = "effect.unresolved_call_blocks_evaluation";
+  const effectRuleId = ruleId("effect.unresolved_call_blocks_evaluation");
   const callerFile = node.filePath;
   const callerLine = unresolved.callSite.line;
 
@@ -364,7 +365,7 @@ export function buildUnresolvedCallViolation(
     defaultUnresolvedCallFixHint(policy, node.id, callerFile, callerLine);
 
   return createViolation({
-    rule_id: ruleId,
+    rule_id: effectRuleId,
     rule_kind: "effect_violation",
     severity: "error",
     source: {

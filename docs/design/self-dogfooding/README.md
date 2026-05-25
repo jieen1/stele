@@ -373,6 +373,16 @@ All three are tracked here as Phase 7 follow-ups; no source change
 to `Violation` / `ContractManifest` / `ViolationReport` was applied
 in Phase 2.
 
+**RESOLVED in Closeout 6 (2026-05-25).** `MANIFEST_ENGINE_SHAPE`
+landed as a free-function class-shape over the `@stele/core` manifest
+barrel exports, backed by two paired negatives. `VIOLATION_REPORT_SHAPE`
+landed through `createViolationReport` return-type alias binding, also
+with two paired negatives. `RULE_ID_FIELDS_BRANDED` landed as a
+type-policy over `@stele/core` `*Violation` / `*Notice` / `*Report`
+types requiring non-optional `rule_id: RuleId` and rejecting `string`
+or `any`; production report/baseline types and builders now use the
+brand.
+
 ### 2026-05-24 — Phase 3 sub-agent
 
 - **Re-grounded trace-policy semantics against the @stele/trace-evaluator
@@ -435,6 +445,15 @@ graph the TS extractor produces does not model the necessary edges:
    pattern; the boundary stage already handles deny-import correctly.
 
 Both are tracked here as Phase 7 follow-ups.
+
+**RESOLVED in Closeout 6 (2026-05-25).** `EVALUATOR_VIA_EXTERN_REGISTRY`
+landed after refactoring `buildTraceStage` so the call graph contains
+direct, ordered edges from `buildTraceStage` to
+`buildExternAliasRegistry(...)` and then `evaluateTracePolicies(...)`.
+`BACKEND_LOAD_VIA_REGISTRY` landed as the intended `(boundary ...)`
+contract: CLI source denies direct `@stele/backend-*` imports except
+`packages/cli/src/backend-registry.ts`, and the trace/effect/type-state/
+explain call-graph users now route through registry selectors.
 
 ### Phase 3 perf baseline
 
@@ -985,6 +1004,13 @@ closed-world (the author's `@stele:effects` declaration overrides
 analyzer uncertainty about unresolvable callees). All 4 effect
 policies remain bound; `stele check` reports zero unresolved-call
 errors on the live tree.
+
+**RESOLVED in Closeout 6 (2026-05-25).** The remaining
+`GENERATOR_NO_NETWORK_OR_CHILD_PROCESS` coverage gap was closed by
+widening the policy from `packages/cli/src/commands/generate.ts::*`
+to include `packages/cli/src/design-generator/**::*`. The previously
+skipped execFile negative is live, and a second fetch-shaped negative
+pins the network effect path.
 
 ---
 

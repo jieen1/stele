@@ -9,6 +9,7 @@ import type {
 import type {
   Contract,
   EffectPolicyDeclaration,
+  RuleId,
   Violation,
 } from "@stele/core";
 import type {
@@ -150,11 +151,17 @@ function mkContext(opts: {
   };
 }
 
-function mkViolation(
-  over: Partial<Violation> & Pick<Violation, "rule_id">,
-): Violation {
+type ViolationOverrides = Partial<Omit<Violation, "rule_id">> & {
+  rule_id: RuleId | string;
+};
+
+function testRuleId(value: RuleId | string): RuleId {
+  return value as RuleId;
+}
+
+function mkViolation(over: ViolationOverrides): Violation {
   return {
-    rule_id: over.rule_id,
+    rule_id: testRuleId(over.rule_id),
     rule_kind: over.rule_kind ?? "forbidden_effect",
     severity: over.severity ?? "error",
     source: over.source ?? { tool: "stele", command: "check", kind: "rule" },

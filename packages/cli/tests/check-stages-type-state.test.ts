@@ -8,6 +8,7 @@ import type {
 } from "@stele/call-graph-core";
 import type {
   Contract,
+  RuleId,
   TypeStateDeclaration,
   Violation,
 } from "@stele/core";
@@ -147,9 +148,17 @@ function mkContext(opts: {
   };
 }
 
-function mkViolation(over: Partial<Violation> & Pick<Violation, "rule_id">): Violation {
+type ViolationOverrides = Partial<Omit<Violation, "rule_id">> & {
+  rule_id: RuleId | string;
+};
+
+function testRuleId(value: RuleId | string): RuleId {
+  return value as RuleId;
+}
+
+function mkViolation(over: ViolationOverrides): Violation {
   return {
-    rule_id: over.rule_id,
+    rule_id: testRuleId(over.rule_id),
     rule_kind: over.rule_kind ?? "type_state_violation",
     severity: over.severity ?? "error",
     source: over.source ?? { tool: "stele", command: "check", kind: "rule" },
