@@ -805,6 +805,22 @@ Either path keeps the prohibition on editing source-to-satisfy-CDL
 intact. The Phase 7 follow-up should pick (1) or (2) before
 attempting the 9 deferrals again.
 
+**RESOLVED in Closeout 3 (2026-05-25, commits `8158af6` + `123ed56` +
+`225deee` + `694972a` + `310dd07`).** Closeout 3 took path (2): the TS
+class-shape evaluator gained first-class module-function and factory
+binding (3a, commits `8158af6` + `123ed56`), and all 9 deferred
+aggregates were then populated with real `required_methods` /
+`required_fields` / `aggregate_members` against the live source (3b,
+commits `225deee` + `694972a` + `310dd07`). Targets that pointed at
+re-export aliases (`validateInvariant`, `hashManifest`,
+`createSteleProgram`) were switched to the underlying function
+declaration names so the analyzer can bind; the aliases survive in
+source for the complexity-evaluator's existing usage. Every aggregate
+class-shape now binds to a real top-level declaration. 18 new paired
+negative tests (2 per aggregate, structurally different per CC-13)
+plus the operator-registry's pre-existing 2 = 20 total negative tests
+on aggregate class-shapes.
+
 ### 2026-05-25 — Round 15 reviewer T (independent audit)
 
 **Single most important finding:** every one of the 88 `def test_*`

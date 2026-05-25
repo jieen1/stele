@@ -335,6 +335,19 @@ Affected aggregates:
 | `cli-design-profile-validator` | `.../design-profile/validate.ts::validateProfile` |
 | `architecture-architecture-evaluator` | `.../architecture-core/src/evaluate.ts::evaluateArchitecture` |
 
+**RESOLVED in Closeout 3 (2026-05-25, commits `8158af6` + `123ed56` +
+`225deee` + `694972a` + `310dd07`).** Closeout 3 chose path 2 — the TS
+class-shape evaluator gained first-class module-function and factory
+binding (3a) and all 9 free-function aggregates were populated with
+real `required_methods` / `required_fields` / `aggregate_members`
+against the live source (3b). Targets that previously pointed at
+re-export aliases (`validateInvariant`, `hashManifest`,
+`createSteleProgram`) were switched to the underlying function
+declaration names; the aliases survive in source. 18 new paired
+negative tests (2 per aggregate, structurally different per CC-13)
+plus the operator-registry's pre-existing 2 = 20 negative tests on
+aggregate class-shapes.
+
 ### Phase 4 deferrals (long-term effect-evaluator improvements)
 - Per-policy scoping for unresolved-call emission in
   `@stele/effect-evaluator` (skip `buildUnresolvedCallViolation` for

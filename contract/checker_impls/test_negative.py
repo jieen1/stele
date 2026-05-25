@@ -2505,6 +2505,7 @@ def main() -> int:
         ("core_no_fs_write_from_non_manifest_catches_writeFile_import", test_core_no_fs_write_from_non_manifest_catches_writeFile_import),
         ("cli_commands_no_direct_fs_write_catches_writeFileSync_call", test_cli_commands_no_direct_fs_write_catches_writeFileSync_call),
         ("operator_registry_shape_catches_missing_method", test_operator_registry_shape_catches_missing_method),
+        ("operator_registry_shape_catches_missing_field", test_operator_registry_shape_catches_missing_field),
         ("cli_command_error_shape_catches_missing_field", test_cli_command_error_shape_catches_missing_field),
         ("hook_fail_closed_v2_catches_missing_failClosed_call", test_hook_fail_closed_v2_catches_missing_failClosed_call),
         ("stop_validate_fail_closed_catches_missing_blockStop_call", test_stop_validate_fail_closed_catches_missing_blockStop_call),
