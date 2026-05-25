@@ -1,5 +1,17 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync } from "node:fs";
+// `writeFileSync` is re-imported (unused locally — production callers
+// go through `writeSignedApproval`) so the
+// `trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor` negative
+// test can inject a bypass function calling `writeFileSync` directly
+// and prove the trace policy still catches it. The `void writeFileSync`
+// below keeps strict noUnusedLocals quiet.
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+void writeFileSync;
 import { resolve } from "node:path";
 import * as yaml from "js-yaml";
 
