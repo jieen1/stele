@@ -655,6 +655,19 @@ on this 9.3k-node × 41k-edge graph.
   re-land the `writeAtomic` rename call that Phase 4 inadvertently
   regressed in commit `451a1d0` (see
   `packages/core/src/manifest/hash-manifest.ts:218`).
+  - **RESOLVED in closeout-5 (2026-05-25):**
+    `trace.FS_WRITES_VIA_WRITE_ATOMIC.path_exceeded_max_depth`
+    eliminated by adding depth-tagged negative partial-path
+    memoization to `@stele/trace-evaluator`'s DFS path enumeration.
+    The exhaustive-walk dump at
+    `docs/design/self-dogfooding-closeout/closeout-5-exhaustive-walk.md`
+    establishes Case (A): `loadContract` does not transitively reach
+    `extern:node-fs::writeFile(*)` at all; the cap was hiding a
+    legitimate "no violation" conclusion. `maxDepth` default is
+    unchanged; the FS_WRITES_VIA_WRITE_ATOMIC policy now has a
+    second CC-13 negative test
+    (`test_fs_writes_via_write_atomic_catches_deep_chain`) exercising
+    a 3-level call chain that ends in a direct `writeFile`.
 
 ### Phase 5 deferred items (re-scope to Phase 7)
 

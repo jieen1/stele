@@ -1911,6 +1911,42 @@ def test_fs_writes_via_write_atomic_catches_direct_writeFile():
     ), "checker did not detect violation: trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit"
 
 
+def test_fs_writes_via_write_atomic_catches_deep_chain():
+    """Closeout 5 (2026-05-25) — CC-13 paired test for
+    FS_WRITES_VIA_WRITE_ATOMIC at non-trivial path depth.
+
+    The existing test (above) exercises a 1-level violation: a single
+    function in @stele/core directly invokes `writeFile`. This test
+    exercises a 3-level call chain ending in a direct `writeFile` —
+    `leakOuter` → `leakMid` → `leakInner` → `writeFile` — so the
+    trace evaluator must walk the chain via the partial-path
+    memoization landed in this closeout. The assertion is the same
+    `missing_transit` rule_id fires; the SHAPE difference is the
+    call-chain depth and the multi-function definition (Test B per
+    CC-13: 'mutation that violates the constraint in a different
+    way')."""
+    content = (
+        'import { writeFile } from "node:fs/promises";\n'
+        "\n"
+        "export async function __c5_leakInner(p: string): Promise<void> {\n"
+        '  await writeFile(p, "leak", "utf8");\n'
+        "}\n"
+        "\n"
+        "export async function __c5_leakMid(p: string): Promise<void> {\n"
+        "  await __c5_leakInner(p);\n"
+        "}\n"
+        "\n"
+        "export async function __c5_leakOuter(p: string): Promise<void> {\n"
+        "  await __c5_leakMid(p);\n"
+        "}\n"
+    )
+    assert _code_shape_negative_with_temp_file(
+        "packages/core/src/__c5_negative_deep_chain.ts",
+        content,
+        "trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit",
+    ), "checker did not detect violation: trace.FS_WRITES_VIA_WRITE_ATOMIC.missing_transit (deep chain)"
+
+
 def test_check_prepare_via_load_contract_catches_bypass():
     """Phase 3.2: appending a function to check.ts that calls
     prepareCheckContextWithContract without first calling loadContract
@@ -2173,6 +2209,7 @@ def main() -> int:
         ("hook_scripts_shebang_catches_missing_shebang", test_hook_scripts_shebang_catches_missing_shebang),
         # Phase 3 (self-dogfooding plan): trace-policy contracts.
         ("fs_writes_via_write_atomic_catches_direct_writeFile", test_fs_writes_via_write_atomic_catches_direct_writeFile),
+        ("fs_writes_via_write_atomic_catches_deep_chain", test_fs_writes_via_write_atomic_catches_deep_chain),
         ("check_prepare_via_load_contract_catches_bypass", test_check_prepare_via_load_contract_catches_bypass),
         ("generate_via_coordinator_catches_bypass", test_generate_via_coordinator_catches_bypass),
         ("approve_via_resolve_approved_by_catches_bypass", test_approve_via_resolve_approved_by_catches_bypass),

@@ -359,6 +359,14 @@ Affected aggregates:
    Was already firing when Phase 5 began. Fix options:
    (a) raise `maxDepth` for this policy, (b) narrow `(scope …)`,
    (c) intermediate caching of partial paths in the evaluator.
+   **RESOLVED in Closeout 5 (2026-05-25):** picked option (c) —
+   added depth-tagged negative partial-path memoization to
+   `@stele/trace-evaluator`. The exhaustive-walk dump at
+   `docs/design/self-dogfooding-closeout/closeout-5-exhaustive-walk.md`
+   proves Case (A): the cap was hiding a legitimate "no violation"
+   conclusion (no simple path from `loadContract` reaches
+   `writeFile` at all). `maxDepth=10` default preserved; the
+   policy now has 2 paired CC-13 negative tests of different shape.
 2. **9 aggregate-root class-shapes** — see the table above.
 3. **Type-state evaluator binds zero call sites** — see Phase 5
    deferrals.
