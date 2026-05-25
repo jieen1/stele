@@ -792,4 +792,43 @@
   (allowed-ops Locked verifyLockedManifest)
   (fix-hint "Route the manifest through `asLoaded()` then `lockManifest()` then `verifyLockedManifest()` from `packages/core/src/manifest/lifecycle.ts`; skipping a transition is what trips this rule. If the lifecycle itself is wrong, propose an update via `stele design propose --type-state MANIFEST_LIFECYCLE` — do NOT edit the contract directly."))
 
+; ============================================================================
+; Closeout 4 (self-dogfooding plan): type-state-binding declarations.
+;
+; Each binding pins the FIRST parameter of a typed lifecycle wrapper to
+; the lifecycle's expected state. The TS extractor uses these bindings
+; to inform receiver-state inference inside the wrapper's body; the
+; evaluator (extended in this closeout) emits
+;   typestate.<LIFECYCLE>.wrong_state_at_binding
+; when the inferred state of the same param disagrees with the binding.
+;
+; The functions referenced below are the single sanctioned entry points
+; for their respective lifecycles' terminal/consumable operations:
+;
+;   - writeLockedManifest      → MANIFEST_LIFECYCLE persist
+;   - writeSignedApproval      → APPROVAL_LIFECYCLE persist
+;   - loadHashedProfile        → DESIGN_PROFILE_LIFECYCLE terminal construct
+;   - wrapExtractedGraph       → CALLGRAPH_LIFECYCLE terminal wrap
+;
+; Removing or short-circuiting the typed chain inside any of these
+; (Test B of step 4.7) trips wrong_state_at_binding at the call site
+; that disagrees with the binding's declared state.
+; ============================================================================
+
+(type-state-binding
+  (function "packages/core/src/manifest/lifecycle.ts::writeLockedManifest(2)")
+  (param 0 state Locked))
+
+(type-state-binding
+  (function "packages/cli/src/commands/design/approval-lifecycle.ts::writeSignedApproval(2)")
+  (param 0 state Signed))
+
+(type-state-binding
+  (function "packages/cli/src/design-profile/lifecycle.ts::useHashedProfile(1)")
+  (param 0 state Hashed))
+
+(type-state-binding
+  (function "packages/cli/src/commands/check-stages-call-graph-cache.ts::useCachedCallGraph(1)")
+  (param 0 state Cached))
+
 (import "generated/ddd-typedriven.stele")

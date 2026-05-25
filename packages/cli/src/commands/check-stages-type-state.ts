@@ -21,6 +21,7 @@ import {
   type CallGraph,
   type ExternAlias,
   type ExternAliasRegistry,
+  type TypedCallGraph,
 } from "@stele/call-graph-core";
 import type { TypeStateInferenceExtractor } from "@stele/type-state-evaluator";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
@@ -30,6 +31,7 @@ import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import {
   getCachedCallGraph,
   setCachedCallGraph,
+  useCachedCallGraph,
   wrapExtractedGraph,
 } from "./check-stages-call-graph-cache.js";
 
@@ -175,9 +177,11 @@ export async function buildTypeStateStage(
     });
   }
 
-  let callGraph: CallGraph;
+  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — cache returns
+  // `TypedCallGraph<"Cached">`; `useCachedCallGraph` is the bound entry.
+  let cached: TypedCallGraph<"Cached">;
   try {
-    callGraph = await extractOrCacheCallGraph(context, tsconfigPath, deps);
+    cached = await extractOrCacheCallGraph(context, tsconfigPath, deps);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -217,6 +221,7 @@ export async function buildTypeStateStage(
   // trace + effect stages — see those for rationale.
   const externAliases =
     deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
+  const callGraph: CallGraph = useCachedCallGraph(cached);
 
   let result: EvaluateTypeStateResult;
   try {
@@ -306,7 +311,7 @@ async function extractOrCacheCallGraph(
   context: PreparedCheckContext,
   tsconfigPath: string,
   deps: TypeStateStageDeps,
-): Promise<CallGraph> {
+): Promise<TypedCallGraph<"Cached">> {
   // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — see trace stage.
   const cached = getCachedCallGraph(context);
   if (cached !== undefined) {

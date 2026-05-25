@@ -17,6 +17,7 @@ import {
   type CallGraphExtractor,
   type ExternAlias,
   type ExternAliasRegistry,
+  type TypedCallGraph,
 } from "@stele/call-graph-core";
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import { pickPhaseLanguage } from "../config/phase-language.js";
@@ -26,6 +27,7 @@ import {
   _clearCallGraphCacheForTests as _clearSharedCallGraphCacheForTests,
   getCachedCallGraph,
   setCachedCallGraph,
+  useCachedCallGraph,
   wrapExtractedGraph,
 } from "./check-stages-call-graph-cache.js";
 
@@ -151,9 +153,12 @@ export async function buildTraceStage(
     });
   }
 
-  let callGraph: CallGraph;
+  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — the cache returns a
+  // `TypedCallGraph<"Cached">`; `useCachedCallGraph` is the bound entry
+  // that param 0 must be `Cached` to consume.
+  let cached: TypedCallGraph<"Cached">;
   try {
-    callGraph = await extractOrCacheCallGraph(context, tsconfigPath, deps, extractor);
+    cached = await extractOrCacheCallGraph(context, tsconfigPath, deps, extractor);
   } catch (error) {
     return createViolationReport({
       tool: "stele",
@@ -192,6 +197,8 @@ export async function buildTraceStage(
   // (tests do this); production always derives it from the parsed contract.
   const externAliases =
     deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
+  // Closeout 4: bound consumer for the cached call graph.
+  const callGraph: CallGraph = useCachedCallGraph(cached);
   const result = evaluate({
     contract: context.contract,
     callGraph,
@@ -269,7 +276,7 @@ async function extractOrCacheCallGraph(
   tsconfigPath: string | null,
   deps: TraceStageDeps,
   extractor: CallGraphExtractor,
-): Promise<CallGraph> {
+): Promise<TypedCallGraph<"Cached">> {
   // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — return the cached
   // value directly (it is `TypedCallGraph<"Cached">`); otherwise wrap a
   // fresh extraction through `wrapExtractedGraph` so the typestate

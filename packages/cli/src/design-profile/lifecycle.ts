@@ -88,3 +88,17 @@ export function loadHashedProfile(
   const contentHash = hashFile(resolve(projectDir, profilePath));
   return hashValidatedProfile(validated, contentHash);
 }
+
+/**
+ * Closeout 4: typed consumer for a Hashed profile. Accepts only a
+ * `TypedDesignProfile<"Hashed">` (the phantom-branded profile inside a
+ * HashedDesignProfile), so a caller cannot pass a Raw/Validated brand.
+ * The matching `(type-state-binding ...)` in `contract/main.stele`
+ * pins param 0 to state `Hashed`; the evaluator's
+ * wrong_state_at_binding rule fires if the inferred state disagrees.
+ */
+export function useHashedProfile(
+  profile: TypedDesignProfile<"Hashed">,
+): DesignProfile {
+  return profile as DesignProfile;
+}
