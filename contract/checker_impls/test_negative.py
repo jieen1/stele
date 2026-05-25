@@ -1607,8 +1607,8 @@ def test_core_is_pure_or_fs_read_catches_unresolved_dynamic_call_in_core():
     (`packages/core/src/**::*`), so the per-policy gate emits.
 
     Without the per-policy scoping mechanism this fixture would be
-    silenced globally (the prior `effectStrictMode: false` behaviour).
-    Without Category B's closed-world override gating, adding any
+    silenced globally (the prior strict-mode behaviour Closeout 1
+    replaced). Without Category B's closed-world override gating, adding any
     `@stele:effects` annotation to the caller would still emit the
     violation. Both gates are exercised by this test:
       (1) caller is in scope → emission gate fires
