@@ -117,13 +117,14 @@ concrete effect-evaluator improvements that the original Phase 4
 plan did not anticipate. Both should be tracked as discrete future
 work rather than rolled into a single "Phase 4 done" claim.
 
-**7.9.1 — Per-policy unresolved-call scoping.** Today the effect
-evaluator's `unresolved_call_blocks_evaluation` errors fire for the
-WHOLE call graph the moment any unresolved call exists, regardless
-of whether the unresolved call falls inside any policy's
-`target-scope`. This forced Phase 4 to ship `effectStrictMode: false`
-in `stele.config.json` to downgrade ~1,454 such errors to warnings.
-The principled fix:
+**7.9.1 — Per-policy unresolved-call scoping.** **RESOLVED in
+Closeout 1 (2026-05-25).** (Historical: the effect evaluator's
+`unresolved_call_blocks_evaluation` errors fired for the WHOLE call
+graph the moment any unresolved call existed, regardless of whether
+the unresolved call fell inside any policy's `target-scope`. This
+forced Phase 4 to ship `effectStrictMode: false` in
+`stele.config.json` to downgrade ~1,454 such errors to warnings.)
+The principled fix (now implemented):
 
 - In `@stele/effect-evaluator`, change the unresolved-call check so
   it only emits a violation when the unresolved call node falls

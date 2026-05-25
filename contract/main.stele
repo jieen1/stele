@@ -660,11 +660,16 @@
 ; ============================================================================
 ; §4.3 — Effect policies on Stele's own source.
 ;
-; `effectStrictMode: false` in stele.config.json downgrades the
-; (~344) unresolved-call sites (Commander dispatch, dynamic
-; `await import()`, etc.) to advisory notices rather than errors.
-; That's the only way to land real effect-policies on this repo
-; without first refactoring all the dynamic-dispatch surface.
+; Closeout 1 (2026-05-25): the effect evaluator now gates the
+; `effect.unresolved_call_blocks_evaluation` rule on per-policy
+; `target-scope` membership at the caller site. Out-of-scope unresolved
+; calls emit nothing (no policy cares); in-scope ones are unconditionally
+; error-severity. Authors of nodes whose callees the static extractor
+; genuinely cannot resolve (function-typed parameters, interface dispatch,
+; dynamic `await import(...)`) declare the node's complete effect set via
+; `@stele:effects ...` in source — that declaration is closed-world and
+; suppresses the unresolved-call check for that node. The prior global
+; strict-mode knob (which silenced everything indiscriminately) is gone.
 ; ============================================================================
 
 (effect-policy CORE_IS_PURE_OR_FS_READ

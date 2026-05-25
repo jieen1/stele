@@ -63,16 +63,6 @@ export type SteleConfig = {
   /** Path to tsconfig.json, relative to project root. Defaults to "tsconfig.json".
    *  Required when any phaseLanguages.* is "typescript" and the default doesn't exist. */
   tsconfig?: string;
-  /**
-   * Phase 4 self-dogfooding follow-up: when set to `false`, the effect
-   * evaluator treats every unresolved call as an advisory NOTICE rather
-   * than an error-severity VIOLATION. Default `true` (strict — Round 2
-   * D-CG-1). Stele's own repo sets this to `false` because dynamic
-   * dispatch via Commander chains + `await import(...)` produces
-   * legitimate unresolved calls the call-graph extractor cannot
-   * statically model.
-   */
-  effectStrictMode?: boolean;
 };
 
 export const DEFAULT_CONFIG: SteleConfig = {

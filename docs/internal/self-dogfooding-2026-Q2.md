@@ -152,13 +152,14 @@ decision log lives in [`docs/design/self-dogfooding/README.md`](../design/self-d
       sibling drop can never satisfy it. Phase 7 follow-up: widen
       target-scope or rewrite using `_mutate_then_check` directly
       against `generate.ts`.
-  - `effectStrictMode: false` set in `stele.config.json` to downgrade
+  - **(historical, RESOLVED in Closeout 1, 2026-05-25)** —
+    `effectStrictMode: false` set in `stele.config.json` to downgrade
     the ~1,454 unresolved-call sites (Commander dispatch, dynamic
-    `await import()`) to advisory notices. **This is a policy
+    `await import()`) to advisory notices. **This was a policy
     degradation**, not a principled fix — see README decision log
     entry "effectStrictMode: false is a policy degradation". Filed
     as Phase 7 follow-up (Step 7.9: implement per-policy
-    unresolved-call scoping).
+    unresolved-call scoping), closed by Closeout 1.
 - **Key decisions:**
   - Only leaf effect-producers in `@stele/core` are annotated; effects
     propagate through the call graph to downstream callers.
@@ -338,8 +339,16 @@ Affected aggregates:
 - Per-policy scoping for unresolved-call emission in
   `@stele/effect-evaluator` (skip `buildUnresolvedCallViolation` for
   `fromId` nodes outside any policy's `target-scope`).
-- Or: configurable `strictMode` per-policy in `stele.config.json`.
-  Today's workaround is the global `effectStrictMode: false`.
+  **RESOLVED in Closeout 1 (2026-05-25):** the evaluator now gates
+  emission on per-policy `target-scope` membership; out-of-scope
+  unresolved calls emit nothing. Source-annotated nodes are treated
+  as closed-world (author's effect declaration overrides analyzer
+  uncertainty).
+- Or: configurable per-policy severity in `stele.config.json`.
+  Today's workaround was a global config flag.
+  **RESOLVED in Closeout 1 (2026-05-25):** no new knob added; severity
+  is unconditionally `error` for in-scope unresolved calls. The
+  workaround flag was deleted everywhere.
 
 ## Open Phase 7 follow-ups
 
@@ -391,6 +400,7 @@ Affected aggregates:
    unresolved-call scoping in `@stele/effect-evaluator` (emit
    unresolved-call errors only for nodes inside a policy's
    `target-scope`), then remove the knob from `stele.config.json`.
+   **RESOLVED in Closeout 1 (2026-05-25).**
    See README decision log entry "effectStrictMode: false is a
    policy degradation, not a fix".
 

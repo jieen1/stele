@@ -550,6 +550,18 @@ on `packages/core/src/**`. The intent of `CORE_IS_PURE_OR_FS_READ` is
 already covered functionally, just not via the effect-policy
 mechanism, until the evaluator gap is closed.
 
+**RESOLVED in Closeout 1 (2026-05-25).** Option (1) — per-policy
+scoping for unresolved-call emission — landed in
+`@stele/effect-evaluator`. Out-of-scope unresolved calls emit nothing
+(no policy cares); in-scope ones are unconditionally error-severity
+per Round 2 D-CG-5. The `effectStrictMode` knob (option 2) was NOT
+added; instead, source-level `@stele:effects` annotations on caller
+nodes act as closed-world declarations that override analyzer
+uncertainty for unresolvable callee categories the static extractor
+cannot model (function-typed parameters, interface dispatch, dynamic
+`await import(...)`). All 4 effect-policies remain bound and green;
+0 unresolved-call errors on the live tree.
+
 ### Phase 4 perf baseline
 
 Wall-clock for `time node packages/cli/dist/index.js check` (warm
@@ -906,6 +918,17 @@ fix as a Phase 7 follow-up.** Reasoning:
 in `@stele/effect-evaluator`, then remove `effectStrictMode: false`
 from `stele.config.json`. Until then the decision log states clearly
 what was traded.
+
+**RESOLVED in Closeout 1 (2026-05-25).** Per-policy unresolved-call
+scoping landed in `@stele/effect-evaluator`. The `effectStrictMode`
+field was deleted from `SteleConfig`, `loadConfig`, the CLI plumbing,
+and `stele.config.json` with no replacement knob. Severity is
+unconditionally `error` for in-scope unresolved calls; out-of-scope
+sites emit nothing. Source-annotated nodes are treated as
+closed-world (the author's `@stele:effects` declaration overrides
+analyzer uncertainty about unresolvable callees). All 4 effect
+policies remain bound; `stele check` reports zero unresolved-call
+errors on the live tree.
 
 ---
 

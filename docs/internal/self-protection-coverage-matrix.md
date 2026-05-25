@@ -150,16 +150,20 @@ package and is excluded.
   - `DESIGN_PROFILE_LIFECYCLE` — `@stele/cli` (`Raw→Validated→Hashed`)
   - `CALLGRAPH_LIFECYCLE` — `@stele/call-graph-core` (`Empty→Building→Built→Cached`)
 
-- **effect-policy** — 4 policies, enabled with
-  `effectStrictMode: false` so the ~344 unresolved-call sites in
-  `@stele/cli` downgrade to advisory notices (not errors). Policies:
+- **effect-policy** — 4 policies, fail-closed per-policy by
+  `target-scope` membership (Closeout 1, 2026-05-25). Unresolved-call
+  sites OUTSIDE every policy's scope emit nothing because no policy
+  cares; sites INSIDE an active scope are unconditionally error-severity.
+  Policies:
   - `CORE_IS_PURE_OR_FS_READ` — `@stele/core` `(allow-only fs.read fs.write crypto.hash)`
   - `MANIFEST_LEAVES_ARE_PINNED` — `@stele/core/manifest/hash-manifest.ts`
   - `HOOK_NO_NETWORK` — `@stele/claude-code-plugin/scripts/*.js`
   - `GENERATOR_NO_NETWORK_OR_CHILD_PROCESS` — `@stele/cli/commands/generate.ts`
-  Plus 1 `effect-declarations` block (9 effects), 13 JSDoc
-  `@stele:effects` annotations across `@stele/core` source, and 3
-  `effect-suppression` declarations (the 3 atomic-writer leaves).
+  Plus 1 `effect-declarations` block (9 effects), `@stele:effects`
+  JSDoc annotations across `@stele/core` and `@stele/cli/commands/generate.ts`
+  source (including 6 Closeout 1 Category B closed-world declarations
+  added 2026-05-25), and 3 `effect-suppression` declarations (the 3
+  atomic-writer leaves).
 
 ## Coverage summary
 
