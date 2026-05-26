@@ -29,6 +29,26 @@ export interface OperatorRegistry {
 class InMemoryOperatorRegistry implements OperatorRegistry {
   readonly #operators = new Map<string, OperatorSpec>();
 
+  register(spec: OperatorSpec): void {
+    const incoming = normalizeOperatorSpec(spec);
+    const existing = this.#operators.get(incoming.name);
+
+    if (existing !== undefined) {
+      const existingSignature = formatOperatorSignature(existing);
+      const incomingSignature = formatOperatorSignature(incoming);
+
+      throw new SteleError(
+        "E_DUPLICATE_OPERATOR",
+        "Registry",
+        `Operator "${incoming.name}" is already registered.`,
+        undefined,
+        `existing: ${existingSignature}\nincoming: ${incomingSignature}`,
+        "Reuse the existing operator spec or pick a different name.",
+      );
+    }
+
+    this.#operators.set(incoming.name, incoming);
+  }
 
   get(name: string): OperatorSpec | undefined {
     const spec = this.#operators.get(name);

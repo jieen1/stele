@@ -13,15 +13,15 @@ helper). The 2026-Q2 self-dogfooding plan closed that gap by adopting
 every advertised mechanism against this repository's own TypeScript,
 hook scripts, and design profile.
 
-| | Before plan | After Phase 6 close-out |
+| | Before plan | After Closeout 6 (2026-05-25) |
 |---|---|---|
 | Mechanisms in use | 2 (`invariant`, `checker`) | **14** (all rows have ≥ 1 ✅) |
 | Invariants in `contract/main.stele` | 35 | **48** |
-| Non-invariant declarations | 0 | ~100 (matrix breakdown) |
-| Negative tests (`contract/checker_impls/test_negative.py`) | 59 | **88** |
+| Non-invariant declarations | 0 | ~110 (5 new in Closeout 6) |
+| Negative tests (`contract/checker_impls/test_negative.py`) | 59 | **125** |
 | Pytest `tests/contract/` | 35 | **48** |
 | Branded-ID call-site coverage | 0 real sites | 5 brands × ~140 wrapped sites |
-| Aggregate-root class-shapes | 0 | 1 landed + 9 deferred |
+| Aggregate-root class-shapes | 0 | **10/10 bound** (operator-registry + 9 free-function aggregates via Closeout 3a's evaluator extension) |
 
 ## Phase-by-phase ledger
 
