@@ -459,15 +459,71 @@ aggregate class-shapes.
    See README decision log entry "effectStrictMode: false is a
    policy degradation, not a fix".
 
+## Closeout 2026-Q2 — final wrap-up (2026-05-26)
+
+The 7-phase plan above left 7 substantive gaps (effectStrictMode
+downgrade, HOOK_NO_NETWORK dead policy, 9 unbound class-shapes,
+type-state zero-binding, trace depth-cap error, 5 deferred
+contracts, missing reviewer rounds). The closeout plan
+([`docs/design/self-dogfooding-closeout/`](../design/self-dogfooding-closeout/))
+closed every one with mechanism-level upgrades, comprehensive test
+coverage, and zero opt-out knobs.
+
+### Gap-by-gap closure
+
+| # | Gap | Closing commit | Mechanism upgrade |
+|---|---|---|---|
+| 1 | `effectStrictMode: false` global downgrade | Closeout 1 (`a977265`..`eaff487`) | Per-policy `target-scope`-bounded unresolved-call enforcement in `@stele/effect-evaluator`; `effectStrictMode` field deleted entirely |
+| 2 | HOOK_NO_NETWORK dead by construction | Closeout 2 (`9a011b4`..`f169e93`) | `allowJs: true` in TS extractor + `.ts/.tsx/.js/.cjs/.mjs` walker; 2 paired negative tests |
+| 3 | 9 aggregate class-shapes deferred | Closeout 3a (`8158af6`, `123ed56`) + Closeout 3b (`225deee`..`826a49a`) | Class-shape evaluator first-class free-function + factory target support with `(aggregate-members …)` enumeration; 10/10 aggregates bound; 18 paired negative tests |
+| 4 | Type-state evaluator zero production binding | Closeout 4 (`9a7dbf7`..`9f26a40`) | 24 production callers routed through 4 typed lifecycle methods + new `typestate.*.wrong_state_at_binding` evaluator violation; 4 `type-state-binding` declarations |
+| 5 | Trace depth-cap error | Closeout 5 (`95e1e86`, `68f6761`, `0b53a4a`) | Case (A) per gated decision: partial-path memoization in `@stele/trace-evaluator` (gated behind exhaustive-walk proof) |
+| 6 | 5 deferred contracts + GENERATOR widening | Closeout 6 (`fa8cf68`, `1a27bb0`) | 5 new contracts (`backend-load-via-registry` boundary, `manifest-engine-shape` + `violation-report-shape` class-shapes, `rule-id-fields-branded` type-policy with new `(owner-name-suffix …)` + `(require-field-type …)` selectors, `EVALUATOR_VIA_EXTERN_REGISTRY` trace-policy) + GENERATOR scope widening; ≥2 paired negative tests per CC-13 |
+| 7 | Reviewer rounds | Closeout 7 (Rounds 17/18/19) | Round 17 found 1 HIGH (operator-registry validation deletion, fixed in `1a27bb0`) + 1 LOW (stale doc table, fixed in same commit). Round 18 + Round 19 both returned 0 HIGH/MED — two consecutive clean rounds per CC-10 |
+
+### Final counts (post-closeout)
+
+| | Before plan | After Phase 6 | After closeout |
+|---|---|---|---|
+| Mechanisms in use | 2 | 14 | 14 |
+| Invariants in `contract/main.stele` | 35 | 48 | 48 |
+| Non-invariant declarations | 0 | ~100 | ~110 (5 new in Closeout 6) |
+| Negative tests | 59 | 88 | **125** |
+| Pytest `tests/contract/` | 35 | 48 | 48 |
+| Aggregate-root class-shapes bound | 0 | 1/10 | **10/10** |
+| Type-state lifecycles bound to production | 0 | 0 | **4/4** |
+| `effectStrictMode` opt-out knob | n/a | true (downgrade) | **deleted** |
+| `stele check` exit | 3 (depth-cap error) | 3 (depth-cap error) | **0** |
+
+### Closing commits and reviewer rounds
+
+- **Closeout 1 (effect-evaluator scoping):** `a977265 ac9fe20 ee506b4 7fea520 bbe6794 eaff487` — 6 commits.
+- **Closeout 2 (allowJs):** `9a011b4 3a434d2 f169e93` — 3 commits.
+- **Closeout 3a (class-shape evaluator):** `8158af6 123ed56` — 2 commits.
+- **Closeout 3b (9 aggregates):** `225deee 694972a 310dd07 826a49a` — 4 commits.
+- **Closeout 4 (type-state production binding):** 10 commits on worktree (`9a7dbf7`..`9f26a40`) merged via `7cd9a6a`.
+- **Closeout 5 (trace depth-cap):** `95e1e86 68f6761 0b53a4a` (worktree) merged via `7b37af4`.
+- **Closeout 6 (5 contracts + GENERATOR widening):** `fa8cf68` + Round 17 fix `1a27bb0`.
+- **Closeout 7 (reviewer rounds):** Round 17 + 18 + 19, two consecutive clean.
+
+### Open LOW items (deliberately not addressed)
+
+- **Test execution infrastructure hardening.** When `pytest contract/checker_impls/test_negative.py` is killed mid-run, the failing test's `finally` block does not execute, leaving source files in a mutated state. `git checkout <file>` restores. Round 19 recommends a `conftest.py` `autouse` fixture that captures file checksums and forcibly restores any modified files. Tracked as a future hardening pass; not a structural defect.
+
 ## Reading order for future maintainers
 
 1. [`README.md`](../design/self-dogfooding/README.md) — the plan +
    cross-cutting rules (CC-1 ... CC-11) + the full decision log.
-2. [Coverage matrix](self-protection-coverage-matrix.md) — what's
+2. [Closeout README](../design/self-dogfooding-closeout/README.md)
+   — the closeout plan + 10-item forbidden anti-pattern list +
+   CC-12..CC-14.
+3. [Coverage matrix](self-protection-coverage-matrix.md) — what's
    actually exercised today.
-3. [Phase docs 0-7](../design/self-dogfooding/) — per-phase
+4. [Phase docs 0-7](../design/self-dogfooding/) — per-phase
    intent and acceptance criteria.
-4. [`docs/spec/cdl.md`](../spec/cdl.md) — authoritative semantics
+5. [Closeout docs 1-7](../design/self-dogfooding-closeout/) —
+   per-closeout scope + gated decision trees.
+6. [`docs/spec/cdl.md`](../spec/cdl.md) — authoritative semantics
    for every mechanism listed above.
-5. `contract/main.stele` + `contract/generated/ddd-typedriven.stele`
+7. `contract/main.stele` + `contract/generated/ddd-typedriven.stele`
    — the live contracts.
