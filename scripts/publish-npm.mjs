@@ -7,16 +7,33 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dependencyManifestFields = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+// Listed in topological-dependency order (depend-on-X packages appear AFTER X
+// for human readability; `pnpm pack` resolves workspace:* against the workspace
+// at pack time regardless of array order). All 17 are non-private + MIT +
+// publishConfig.access=public.
 const publishPackageDirs = [
+  // foundations (no @stele/* deps)
+  join(repoRoot, "packages", "architecture-core"),
+  join(repoRoot, "packages", "call-graph-core"),
   join(repoRoot, "packages", "core"),
+  // language backends (depend on core)
   join(repoRoot, "packages", "backend-python"),
   join(repoRoot, "packages", "backend-go"),
   join(repoRoot, "packages", "backend-rust"),
   join(repoRoot, "packages", "backend-java"),
   join(repoRoot, "packages", "backend-typescript"),
+  // hook SDK (depends on core)
   join(repoRoot, "packages", "agent-hooks"),
+  // Phase B evaluators (depend on core + call-graph-core)
+  join(repoRoot, "packages", "trace-evaluator"),
+  join(repoRoot, "packages", "type-state-evaluator"),
+  join(repoRoot, "packages", "effect-evaluator"),
+  join(repoRoot, "packages", "type-driven-evaluator"),
+  // MCP server (depends on core + cli surface)
   join(repoRoot, "packages", "mcp-server"),
+  // CLI (depends on most of the above)
   join(repoRoot, "packages", "cli"),
+  // editor / CI integrations (depend on cli + agent-hooks)
   join(repoRoot, "packages", "claude-code-plugin"),
   // Note: the GitHub Action is distributed via git tag + Marketplace, not npm.
   // We still publish the npm artifact for name-squat / build provenance.

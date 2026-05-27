@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-25T15:55:30.859Z",
+  "generated_at": "2026-05-27T08:29:15.331Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -224,8 +224,8 @@
       "size": 51
     },
     "scripts/publish-npm.mjs": {
-      "sha256": "504d955a6f6afdff10699601e808ad2944ebac525afd9d02200675fe2801cf65",
-      "size": 9456
+      "sha256": "9ef96c3cae8301a64926e502ba729fdaef0c7afe9a7c43a3fdc39d94f63c803c",
+      "size": 10346
     },
     "scripts/verify-packed-adoption.mjs": {
       "sha256": "1c9925cfa19a508291b73ff314d2ed3a191089e716fe29623e94738ffbf6817c",
