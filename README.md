@@ -60,16 +60,53 @@ Stele adds structure where discipline can't: **contracts the agent can read, tes
 
 ## Quickstart
 
+> **v0.1 install path:** Stele is **not yet on the public npm registry**. Use one of the local-tarball install paths below. The npm-registry form will work once we publish — see [`docs/guides/installation.md`](docs/guides/installation.md) for the full path-by-OS matrix and troubleshooting.
+
 ### Install
 
+**Linux / macOS:**
+
 ```bash
-npm install --save-dev @stele/cli
+# from the Stele repo, against your app
+./scripts/install-stele-local.sh /path/to/your/app
+
+# or from your app repo, pointing at the Stele clone
+/path/to/stele/scripts/install-stele-local.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+& 'C:\path\to\stele\local-packages\install-stele-local.ps1'
+```
+
+Both scripts:
+- pack `@stele/{core,backend-python,cli,claude-code-plugin}` if needed
+- `npm install --save-dev` all four tarballs
+- wire `npm run stele:{init,generate,lock,check,list}` shortcuts
+- verify the CLI resolves five different ways
+
+**Manual tarball install** (any OS):
+
+```bash
+npm install --save-dev \
+  /abs/path/stele-core-0.1.0.tgz \
+  /abs/path/stele-backend-python-0.1.0.tgz \
+  /abs/path/stele-cli-0.1.0.tgz \
+  /abs/path/stele-claude-code-plugin-0.1.0.tgz
+npx stele --version   # → 0.1.0
+```
+
+**After npm publish** (future):
+
+```bash
+npm install --save-dev @stele/cli @stele/claude-code-plugin
 ```
 
 ### Initialize
 
 ```bash
-# Python + pytest
+# Python + pytest   (default v0.1 backend)
 npx stele init --language python
 
 # TypeScript + vitest
@@ -83,9 +120,15 @@ npx stele init --language rust
 
 # Java + JUnit 5
 npx stele init --language java
+
+# Optional flags:
+#   --ci github-actions    write .github/workflows/stele.yml
+#   --ci gitlab-ci         write .gitlab-ci.yml
+#   --pre-commit           install a git pre-commit hook
+#   --dry-run              print files without writing
 ```
 
-This creates `contract/main.stele` (your contracts) and `tests/contract/` (generated tests).
+This creates `stele.config.json`, `contract/main.stele` (your contracts), `contract/checker_impls/` (custom Python checkers, if any), and `tests/contract/` (generated tests + `conftest.py` for fixture wiring).
 
 ### Write Your First Contract
 
@@ -204,7 +247,29 @@ Full spec: [`docs/spec/cdl.md`](docs/spec/cdl.md)
 
 **Subagents**: `contract-author` (write new contracts), `contract-fixer` (fix violations), `contract-reviewer` (review changes)
 
-Setup: [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md)
+### Activate the plugin
+
+The install script puts the tarball under `node_modules/@stele/claude-code-plugin/`. Two more edits make Claude Code load it:
+
+1. `~/.claude/plugins/installed_plugins.json`:
+   ```json
+   {
+     "stele@local": [
+       {
+         "scope": "project",
+         "projectPath": "/absolute/path/to/your/app",
+         "installPath": "/absolute/path/to/your/app/node_modules/@stele/claude-code-plugin"
+       }
+     ]
+   }
+   ```
+2. `~/.claude/settings.json`:
+   ```json
+   { "enabledPlugins": { "stele@local": true } }
+   ```
+3. Restart Claude Code.
+
+Full hook + slash-command reference: [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md). One-page install: [`docs/guides/installation.md`](docs/guides/installation.md).
 
 ## CLI Commands
 
@@ -299,9 +364,14 @@ The contract is verified by the same toolchain. Every commit is checked.
 
 | Topic | Link |
 |-------|------|
+| **Installation (start here)** | [`docs/guides/installation.md`](docs/guides/installation.md) |
 | Architecture | [`docs/architecture.md`](docs/architecture.md) |
 | CDL Language Spec | [`docs/spec/cdl.md`](docs/spec/cdl.md) |
 | Python Integration Guide | [`docs/guides/python-integration.md`](docs/guides/python-integration.md) |
+| TypeScript Integration Guide | [`docs/guides/typescript-integration.md`](docs/guides/typescript-integration.md) |
+| Go Integration Guide | [`docs/guides/go-integration.md`](docs/guides/go-integration.md) |
+| Rust Integration Guide | [`docs/guides/rust-integration.md`](docs/guides/rust-integration.md) |
+| Java Integration Guide | [`docs/guides/java-integration.md`](docs/guides/java-integration.md) |
 | Claude Code Plugin | [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md) |
 | Contributing | [`docs/contributing/`](docs/contributing/) |
 | Roadmap & Strategy | [`docs/strategy/`](docs/strategy/) |

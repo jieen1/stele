@@ -16,6 +16,41 @@ The hooks first look for project-local installs, including `node_modules/.bin/st
 
 After installing the package, register the package directory that contains `.claude-plugin/plugin.json` as a Claude Code plugin root.
 
+### Register the plugin
+
+The plugin tarball lands at `<app>/node_modules/@stele/claude-code-plugin/` after `npm install`. To make Claude Code actually load it, you need two edits in your user-level Claude Code config (NOT in the app repo).
+
+1. Add a project-scoped plugin entry in `~/.claude/plugins/installed_plugins.json` (create the file if it doesn't exist):
+
+   ```json
+   {
+     "stele@local": [
+       {
+         "scope": "project",
+         "projectPath": "/absolute/path/to/your/app",
+         "installPath": "/absolute/path/to/your/app/node_modules/@stele/claude-code-plugin"
+       }
+     ]
+   }
+   ```
+
+   - `projectPath` — your application's repo root (the directory that contains `stele.config.json`).
+   - `installPath` — the directory containing `.claude-plugin/plugin.json`. Under normal `npm install` this is `<projectPath>/node_modules/@stele/claude-code-plugin`.
+
+2. Enable the plugin in `~/.claude/settings.json`:
+
+   ```json
+   {
+     "enabledPlugins": {
+       "stele@local": true
+     }
+   }
+   ```
+
+3. Restart Claude Code (close and reopen, or start a new session) so the plugin manifest is loaded.
+
+You can verify activation by opening a session in your application repo and confirming a `SessionStart` context injection appears. If nothing happens, the most common cause is `installPath` pointing at the wrong directory — it must be the dir that contains `.claude-plugin/plugin.json`, not the package's `src/` or `dist/`.
+
 ## What the plugin ships
 
 - `.claude-plugin/plugin.json`
