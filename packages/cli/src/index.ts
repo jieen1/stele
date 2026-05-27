@@ -64,6 +64,8 @@ import { unlockProject, type UnlockOptions, type UnlockSummary } from "./command
 import { runComplexitySuggest, runComplexityMeasure, type ComplexityOptions } from "./commands/complexity.js";
 import { getExitCode } from "./errors.js";
 import { runScore } from "./commands/score.js";
+import { runPluginInstall, type PluginInstallOptions } from "./commands/plugin-install.js";
+import { runDoctor, type DoctorOptions } from "./commands/doctor.js";
 import { STELE_VERSION } from "./version.js";
 
 type ProgramDependencies = {
@@ -462,6 +464,29 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .action(async (options: { agent: string; enableShell?: boolean; uninstall?: boolean; force?: boolean }) => {
       await runInstallCommand(cwd(), options);
     });
+  const pluginCommand = program
+    .command(cmdSpec("plugin"))
+    .description("Manage Stele editor plugin integrations.");
+
+  pluginCommand
+    .command(cmdSpec("install"))
+    .description("Install Stele integration for an editor.")
+    .option("--claude-code", "register the @stele/claude-code-plugin with Claude Code", false)
+    .option("--user-config-dir <dir>", "override ~/.claude (default: $HOME/.claude)")
+    .option("--project-dir <dir>", "project root to register (default: cwd)")
+    .option("--dry-run", "show what files would be modified without writing")
+    .action(async (options: PluginInstallOptions) => {
+      await runPluginInstall(cwd(), options);
+    });
+
+  program
+    .command(cmdSpec("doctor"))
+    .description("Diagnose your Stele setup.")
+    .option("--json", "emit findings as JSON instead of human-readable")
+    .action(async (options: DoctorOptions) => {
+      await runDoctor(cwd(), options);
+    });
+
   addDesignCommand(program);
 
   const cacheCommand = program
