@@ -204,7 +204,9 @@ npx stele check     # exit 0 = clean, 2 = drift, 3 = tamper
 (invariant USER_STATUS_ENUM
   (severity error)
   (description "User status must be one of the defined states.")
-  (assert (in (path user status) ["active" "suspended" "deleted"])))
+  (assert (or (eq (path user status) "active")
+              (eq (path user status) "suspended")
+              (eq (path user status) "deleted"))))
 ```
 
 ## CDL — The Contract Definition Language
@@ -219,8 +221,8 @@ CDL is a small S-expression language. No indentation rules, no braces, no boiler
   (assert (gt (path x y) 0)))
 
 ; Collections
-(assert (forall :item (collection orders)
-               (gt (path :item total) 0)))
+(assert (forall item (collection orders)
+               (gt (path item total) 0)))
 
 ; Logic
 (assert (and

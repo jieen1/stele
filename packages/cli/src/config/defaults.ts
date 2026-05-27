@@ -116,3 +116,35 @@ export const DEFAULT_CONFIG: SteleConfig = {
     "tsconfig.base.json",
   ],
 };
+
+/**
+ * Slim protected list written into a USER PROJECT's `stele.config.json`
+ * by `stele init`. Distinct from `DEFAULT_CONFIG.protected` which is the
+ * RUNTIME list (also enforced at evaluator/hook layer regardless of what
+ * a user config says — see `loadConfig::mergeProtected` which UNIONS).
+ *
+ * The runtime list is byte-locked by the `default-protected-consistent`
+ * self-checker across core + cli + plugin hooks. If you change the
+ * runtime list, that checker fires. This init list is decoupled on
+ * purpose: a fresh user project doesn't have @stele's monorepo internals
+ * (`packages/claude-code-plugin/...`, `scripts/publish-npm.mjs`, etc.),
+ * so writing those globs into a user `stele.config.json` is noise.
+ *
+ * Runtime defense-in-depth is preserved: when the CLI loads the user
+ * config, `loadConfig::mergeProtected` UNIONs `DEFAULT_CONFIG.protected`
+ * with whatever the user wrote. A user can ONLY GROW the protected set
+ * via their config, never shrink it. Writing a slim list here just
+ * means the user's config file looks clean — the runtime protection
+ * surface stays full.
+ */
+export const INIT_PROTECTED_PATTERNS: readonly string[] = [
+  "contract/**/*.stele",
+  "contract/checker_impls/**/*",
+  "contract/.baseline.json",
+  "contract/.manifest.json",
+  "contract/design/**/*",
+  "contract/generated/**/*",
+  "tests/contract/**/*",
+  "stele.config.json",
+  ".stele/stop-state.json",
+];
