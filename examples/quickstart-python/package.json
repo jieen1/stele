@@ -1,0 +1,15 @@
+{
+  "name": "quickstart-python",
+  "version": "0.1.0",
+  "description": "Stele quickstart — e-commerce demo for Python",
+  "private": true,
+  "scripts": {
+    "generate": "stele generate",
+    "check": "stele check",
+    "test": "python -m pytest tests/contract -q"
+  },
+  "devDependencies": {
+    "@stele/cli": "*",
+    "@stele/claude-code-plugin": "*"
+  }
+}

@@ -10,6 +10,7 @@ export type InitOptions = {
   dryRun?: boolean;
   preCommit?: boolean;
   ci?: "github-actions" | "gitlab-ci";
+  withExampleFixtures?: boolean;
 };
 
 export const SUPPORTED_LANGUAGES: readonly string[] = Array.from(
@@ -26,7 +27,7 @@ export async function runInit(projectDir: string, options: InitOptions): Promise
 
   const config = buildConfig(options.language);
   const projectInfo = await detectProject(projectDir);
-  const files = buildFilesToCreate(projectDir, config, projectInfo);
+  const files = buildFilesToCreate(projectDir, config, projectInfo, options.withExampleFixtures);
 
   if (options.dryRun) {
     printDryRun(files);
@@ -94,25 +95,41 @@ function getGeneratedDirForLanguage(language: string): string {
   }
 }
 
-function buildFilesToCreate(projectDir: string, config: SteleConfig, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
+function buildFilesToCreate(projectDir: string, config: SteleConfig, projectInfo: DetectedProject, withExampleFixtures?: boolean): Array<{ path: string; content: string }> {
   const language = config.targetLanguage;
+
+  let contractSource: string;
+  if (withExampleFixtures && (language === "python" || language === "typescript")) {
+    contractSource = getExampleFixturesContractSource();
+  } else if (projectInfo.framework !== "unknown") {
+    contractSource = getFrameworkContractSource(projectInfo);
+  } else {
+    contractSource = DEFAULT_CONTRACT_SOURCE;
+  }
+
   const files: Array<{ path: string; content: string }> = [
     { path: join(projectDir, STELE_CONFIG_FILE), content: `${JSON.stringify(config, null, 2)}\n` },
-    { path: join(projectDir, "contract", "main.stele"), content: projectInfo.framework !== "unknown" ? getFrameworkContractSource(projectInfo) : DEFAULT_CONTRACT_SOURCE },
+    { path: join(projectDir, "contract", "main.stele"), content: contractSource },
     { path: join(projectDir, "contract", "checker_impls", ".gitkeep"), content: "" },
-    ...buildScaffoldFiles(projectDir, language, projectInfo),
+    ...buildScaffoldFiles(projectDir, language, projectInfo, withExampleFixtures),
     { path: join(projectDir, ".gitignore"), content: buildGitignoreContent() },
   ];
+
+  if (withExampleFixtures && (language === "python" || language === "typescript")) {
+    files.push(...buildExampleCheckerFiles(projectDir, language));
+  } else if (withExampleFixtures) {
+    process.stdout.write(`[stele] Note: --with-example-fixtures is a no-op for language "${language}" (only python and typescript are supported).\n`);
+  }
 
   return files;
 }
 
-function buildScaffoldFiles(projectDir: string, language: string, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
+function buildScaffoldFiles(projectDir: string, language: string, projectInfo: DetectedProject, withExampleFixtures?: boolean): Array<{ path: string; content: string }> {
   switch (language) {
     case "python":
-      return buildPythonScaffold(projectDir, projectInfo);
+      return buildPythonScaffold(projectDir, projectInfo, withExampleFixtures);
     case "typescript":
-      return buildTypeScriptScaffold(projectDir);
+      return buildTypeScriptScaffold(projectDir, withExampleFixtures);
     case "go":
       return buildGoScaffold(projectDir);
     case "rust":
@@ -120,7 +137,7 @@ function buildScaffoldFiles(projectDir: string, language: string, projectInfo: D
     case "java":
       return buildJavaScaffold(projectDir);
     default:
-      return buildPythonScaffold(projectDir, projectInfo);
+      return buildPythonScaffold(projectDir, projectInfo, withExampleFixtures);
   }
 }
 
@@ -128,18 +145,19 @@ function buildScaffoldFiles(projectDir: string, language: string, projectInfo: D
 // Language-specific scaffolding
 // ---------------------------------------------------------------------------
 
-function buildPythonScaffold(projectDir: string, projectInfo: DetectedProject): Array<{ path: string; content: string }> {
+function buildPythonScaffold(projectDir: string, projectInfo: DetectedProject, withExampleFixtures?: boolean): Array<{ path: string; content: string }> {
+  const conftestContent = withExampleFixtures ? buildRichPythonConftest() : projectInfo.conftestSource;
   return [
-    { path: join(projectDir, "tests", "contract", "conftest.py"), content: projectInfo.conftestSource },
+    { path: join(projectDir, "tests", "contract", "conftest.py"), content: conftestContent },
     { path: join(projectDir, "tests", "contract", "__init__.py"), content: "" },
   ];
 }
 
-function buildTypeScriptScaffold(projectDir: string): Array<{ path: string; content: string }> {
+function buildTypeScriptScaffold(projectDir: string, withExampleFixtures?: boolean): Array<{ path: string; content: string }> {
   return [
     {
-      path: join(projectDir, "tests", "contract", "conftest.ts"),
-      content: buildTypeScriptConftest(),
+      path: join(projectDir, "tests", "contract", "stele_context.ts"),
+      content: withExampleFixtures ? buildRichTypeScriptContext() : buildTypeScriptConftest(),
     },
   ];
 }
@@ -186,6 +204,314 @@ function buildTypeScriptConftest(): string {
     "// });",
     "",
     "export default defineConfig({});",
+    "",
+  ].join("\n");
+}
+
+function buildRichPythonConftest(): string {
+  return [
+    "import pytest",
+    "from decimal import Decimal",
+    "from importlib.util import module_from_spec, spec_from_file_location",
+    "from pathlib import Path",
+    "",
+    "",
+    "def _load_checker(name):",
+    '    """Load a checker module from contract/checker_impls/<name>.py."""',
+    "    project_root = Path(__file__).resolve().parents[2]",
+    "    path = project_root / 'contract' / 'checker_impls' / f'{name}.py'",
+    "    spec = spec_from_file_location(name, path)",
+    "    mod = module_from_spec(spec)",
+    "    spec.loader.exec_module(mod)",
+    "    return mod.check",
+    "",
+    "",
+    "# ---------------------------------------------------------------------------",
+    "# This conftest.py wires a realistic e-commerce fixture into Stele contracts.",
+    "#",
+    "# The keys below map directly to (path …) expressions in contract/main.stele.",
+    "# Replace the stub values with real data from your application or test DB.",
+    "# ---------------------------------------------------------------------------",
+    "",
+    "",
+    "@pytest.fixture",
+    "def stele_context():",
+    "    user = {",
+    '        "id": "usr-001",',
+    '        "email": "alice@example.com",',
+    '        "status": "active",',
+    "    }",
+    "    account = {",
+    '        "id": "acct-001",',
+    '        "balance": Decimal("250.00"),',
+    '        "currency": "USD",',
+    "    }",
+    "    orders = [",
+    "        {",
+    '            "id": "ord-001",',
+    '            "total": Decimal("49.99"),',
+    "        },",
+    "        {",
+    '            "id": "ord-002",',
+    '            "total": Decimal("14.50"),',
+    "        },",
+    "    ]",
+    "    # Flat items collection — referenced by the SKU_FORMAT invariant.",
+    "    items = [",
+    '        {"sku": "WIDGET-A1", "price": Decimal("29.99"), "qty": 1},',
+    '        {"sku": "WIDGET-B2", "price": Decimal("20.00"), "qty": 1},',
+    '        {"sku": "GADGET-C3", "price": Decimal("14.50"), "qty": 1},',
+    "    ]",
+    "    return {",
+    '        "user": user,',
+    '        "account": account,',
+    '        "orders": orders,',
+    '        "items": items,',
+    "        # _stele_checkers maps checker IDs (as declared in contract/main.stele)",
+    "        # to Python callables. Each callable receives (stele_context, **kwargs).",
+    '        "_stele_checkers": {',
+    '            "validate-sku": _load_checker("validate_sku"),',
+    '            "validate-email": _load_checker("validate_email"),',
+    "        },",
+    "    }",
+    "",
+    "",
+    "@pytest.fixture",
+    "def stele_sandbox():",
+    '    """Scenario sandbox. Only needed if you use (scenario …) contracts."""',
+    "    return None",
+    "",
+  ].join("\n");
+}
+
+function buildRichTypeScriptContext(): string {
+  return [
+    'import type { SteleContext } from "../contract/_stele_runtime.js";',
+    "",
+    "// ---------------------------------------------------------------------------",
+    "// Wire your application data here for contract testing.",
+    "// The keys below map directly to (path …) expressions in contract/main.stele.",
+    "// ---------------------------------------------------------------------------",
+    "",
+    "export const steleContext: SteleContext = {",
+    "  user: {",
+    '    id: "usr-001",',
+    '    email: "alice@example.com",',
+    '    status: "active",',
+    "  },",
+    "  account: {",
+    '    id: "acct-001",',
+    "    balance: 250.0,",
+    '    currency: "USD",',
+    "  },",
+    "  orders: [",
+    "    { id: 'ord-001', total: 49.99 },",
+    "    { id: 'ord-002', total: 14.5 },",
+    "  ],",
+    "  // Flat items collection — referenced by the SKU_FORMAT invariant.",
+    "  items: [",
+    '    { sku: "WIDGET-A1", price: 29.99, qty: 1 },',
+    '    { sku: "WIDGET-B2", price: 20.0, qty: 1 },',
+    '    { sku: "GADGET-C3", price: 14.5, qty: 1 },',
+    "  ],",
+    "  _stele_checkers: {},",
+    "};",
+    "",
+  ].join("\n");
+}
+
+function getExampleFixturesContractSource(): string {
+  return [
+    "; ============================================================================",
+    "; Example fixtures contract — generated by stele init --with-example-fixtures",
+    ";",
+    "; Five realistic e-commerce invariants covering a fake order domain.",
+    "; Companion context is in tests/contract/conftest.py (Python) or",
+    "; tests/contract/stele_context.ts (TypeScript).",
+    "; ============================================================================",
+    "",
+    "(metadata",
+    '  (stele-version "0.1")',
+    '  (project "my-app"))',
+    "",
+    "; --- 1. Order totals must be positive ---",
+    "",
+    "(invariant ORDER_TOTAL_POSITIVE",
+    "  (severity error)",
+    '  (description "Every order total must be greater than zero.")',
+    "  (assert (forall order (collection orders)",
+    "                  (gt (path order total) 0))))",
+    "",
+    "; --- 2. All orders have non-null IDs ----------------------------------------",
+    "",
+    "(invariant ORDER_ID_PRESENT",
+    "  (severity error)",
+    '  (description "Every order must have a non-null ID.")',
+    "  (assert (forall order (collection orders)",
+    "                  (not-null (path order id)))))",
+    "",
+    "; --- 3. User status must be an allowed enum value ---",
+    "",
+    "(invariant USER_STATUS_ENUM",
+    "  (severity error)",
+    '  (description "User status must be active, suspended, or deleted.")',
+    '  (assert (or (eq (path user status) "active")',
+    '              (eq (path user status) "suspended")',
+    '              (eq (path user status) "deleted"))))',
+    "",
+    "; --- 4. SKU format (custom checker) ---",
+    ";",
+    "; validate-sku is implemented in contract/checker_impls/validate_sku.py",
+    "; (Python) or validate-sku.ts (TypeScript).",
+    "; The checker receives stele_context and validates all SKUs in items.",
+    "",
+    "(checker validate-sku",
+    '  (description "SKU must match ^[A-Z]+-[A-Z0-9]+$ format."))',
+    "",
+    "(invariant SKU_FORMAT",
+    "  (severity warning)",
+    '  (description "All item SKUs must match the expected format.")',
+    "  (uses-checker validate-sku))",
+    "",
+    "; --- 5. Email format (custom checker) ---",
+    ";",
+    "; validate-email is implemented in contract/checker_impls/validate_email.py",
+    "; (Python) or validate-email.ts (TypeScript).",
+    "",
+    "(checker validate-email",
+    '  (description "Email must be RFC-shaped (user@domain.tld)."))',
+    "",
+    "(invariant EMAIL_FORMAT",
+    "  (severity warning)",
+    '  (description "User email must be RFC-shaped.")',
+    "  (uses-checker validate-email))",
+    "",
+  ].join("\n");
+}
+
+function buildExampleCheckerFiles(projectDir: string, language: string): Array<{ path: string; content: string }> {
+  if (language === "python") {
+    return [
+      {
+        path: join(projectDir, "contract", "checker_impls", "validate_sku.py"),
+        content: buildPythonSkuChecker(),
+      },
+      {
+        path: join(projectDir, "contract", "checker_impls", "validate_email.py"),
+        content: buildPythonEmailChecker(),
+      },
+    ];
+  }
+  if (language === "typescript") {
+    return [
+      {
+        path: join(projectDir, "contract", "checker_impls", "validate-sku.ts"),
+        content: buildTypeScriptSkuChecker(),
+      },
+      {
+        path: join(projectDir, "contract", "checker_impls", "validate-email.ts"),
+        content: buildTypeScriptEmailChecker(),
+      },
+    ];
+  }
+  return [];
+}
+
+function buildPythonSkuChecker(): string {
+  return [
+    "import re",
+    "",
+    "# SKU format: UPPERCASE-ALPHANUMERIC e.g. WIDGET-A1, GADGET-123",
+    "SKU_PATTERN = re.compile(r'^[A-Z]+-[A-Z0-9]+$')",
+    "",
+    "",
+    "def check(stele_context, **_kwargs):",
+    "    \"\"\"",
+    "    Custom checker: validates all SKUs in stele_context['items'].",
+    "    Returns {passed: bool, message: str}.",
+    "    \"\"\"",
+    "    items = stele_context.get('items', [])",
+    "    for item in items:",
+    "        sku = item.get('sku', '') if isinstance(item, dict) else getattr(item, 'sku', '')",
+    "        if not SKU_PATTERN.match(str(sku)):",
+    "            return {",
+    "                'passed': False,",
+    "                'message': f'SKU {sku!r} does not match ^[A-Z]+-[A-Z0-9]+$',",
+    "            }",
+    "    return {'passed': True, 'message': None}",
+    "",
+  ].join("\n");
+}
+
+function buildPythonEmailChecker(): string {
+  return [
+    "import re",
+    "",
+    "# Minimal RFC-shaped email pattern: local@domain.tld",
+    "EMAIL_PATTERN = re.compile(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')",
+    "",
+    "",
+    "def check(stele_context, **_kwargs):",
+    "    \"\"\"",
+    "    Custom checker: validates user.email from stele_context.",
+    "    Returns {passed: bool, message: str}.",
+    "    \"\"\"",
+    "    user = stele_context.get('user', {})",
+    "    email = user.get('email', '') if isinstance(user, dict) else getattr(user, 'email', '')",
+    "    if EMAIL_PATTERN.match(str(email)):",
+    "        return {'passed': True, 'message': None}",
+    "    return {",
+    "        'passed': False,",
+    "        'message': f'Email {email!r} is not RFC-shaped (expected user@domain.tld)',",
+    "    }",
+    "",
+  ].join("\n");
+}
+
+function buildTypeScriptSkuChecker(): string {
+  return [
+    "// SKU format: UPPERCASE-ALPHANUMERIC e.g. WIDGET-A1, GADGET-123",
+    "const SKU_PATTERN = /^[A-Z]+-[A-Z0-9]+$/;",
+    "",
+    "export function check(",
+    "  steleContext: Record<string, unknown>,",
+    "  _kwargs: Record<string, unknown>,",
+    "): { passed: boolean; message: string | null } {",
+    "  const items = Array.isArray(steleContext['items']) ? steleContext['items'] as Record<string, unknown>[] : [];",
+    "  for (const item of items) {",
+    "    const sku = String(item['sku'] ?? '');",
+    "    if (!SKU_PATTERN.test(sku)) {",
+    "      return {",
+    "        passed: false,",
+    "        message: `SKU ${JSON.stringify(sku)} does not match ^[A-Z]+-[A-Z0-9]+$`,",
+    "      };",
+    "    }",
+    "  }",
+    "  return { passed: true, message: null };",
+    "}",
+    "",
+  ].join("\n");
+}
+
+function buildTypeScriptEmailChecker(): string {
+  return [
+    "// Minimal RFC-shaped email pattern: local@domain.tld",
+    "const EMAIL_PATTERN = /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/;",
+    "",
+    "export function check(",
+    "  steleContext: Record<string, unknown>,",
+    "  _kwargs: Record<string, unknown>,",
+    "): { passed: boolean; message: string | null } {",
+    "  const user = (steleContext['user'] ?? {}) as Record<string, unknown>;",
+    "  const email = String(user['email'] ?? '');",
+    "  if (EMAIL_PATTERN.test(email)) {",
+    "    return { passed: true, message: null };",
+    "  }",
+    "  return {",
+    "    passed: false,",
+    "    message: `Email ${JSON.stringify(email)} is not RFC-shaped (expected user@domain.tld)`,",
+    "  };",
+    "}",
     "",
   ].join("\n");
 }

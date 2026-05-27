@@ -48,7 +48,7 @@ import {
   type ExplainOptions,
 } from "./commands/explain.js";
 import { runGenerate, runGenerateRecursive, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
-import { runInit, SUPPORTED_LANGUAGES } from "./commands/init.js";
+import { runInit, SUPPORTED_LANGUAGES, type InitOptions } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { lockProject, runLockRecursive, type LockOptions, type LockSummary } from "./commands/lock.js";
 import { runMaintenanceSummary, type MaintenanceSummaryOptions } from "./commands/maintenance.js";
@@ -385,7 +385,8 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--dry-run", "show what files would be created without writing")
     .option("--pre-commit", "install Stele hooks into .pre-commit-config.yaml", false)
     .option("--ci <provider>", "add CI workflow (github-actions|gitlab-ci)")
-    .action((options) => init(cwd(), options));
+    .option("--with-example-fixtures", "scaffold example checker implementations and richer context fixture (python + typescript only)", false)
+    .action((options: InitOptions) => init(cwd(), options));
   program
     .command(cmdSpec("dev"))
     .description("Watch for contract changes and auto-regenerate")

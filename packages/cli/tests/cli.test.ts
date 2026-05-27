@@ -724,7 +724,7 @@ describe("stele CLI", () => {
     expect(handlers.baselineUpdate).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved legacy fix" });
     expect(handlers.generate).toHaveBeenCalledWith("E:/tmp/project", { force: true, recursive: false });
     expect(handlers.lock).toHaveBeenCalledWith("E:/tmp/project", { reason: "approved", recursive: false });
-    expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python", preCommit: false });
+    expect(handlers.init).toHaveBeenCalledWith("E:/tmp/project", { language: "python", preCommit: false, withExampleFixtures: false });
   });
 
   it("CLI lock and check print success summaries for operators", async () => {

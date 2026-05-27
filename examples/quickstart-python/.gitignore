@@ -1,0 +1,20 @@
+# Stele runtime artifacts
+contract/.manifest.json
+contract/.baseline.json
+contract/.unlock-log.jsonl
+contract/.last-check-report.json
+contract/proposals/
+
+# NOTE: tests/contract/ is intentionally committed in this example so it
+# works out of the box without running `npx stele generate` first.
+# In your own project you would typically add tests/contract/ here.
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.egg-info/
+
+# Node
+node_modules/

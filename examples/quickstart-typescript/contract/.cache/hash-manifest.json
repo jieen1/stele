@@ -1,0 +1,22 @@
+{
+  "version": "1",
+  "generated_at": "2026-05-27T09:48:31.080Z",
+  "stele_version": "0.1.0",
+  "backend": "typescript",
+  "operator_registry_hash": "5b9a125e10ae70fc2e13ec59e698e58eb05817a6047e22d8fe67dd96c794d3a4",
+  "config_hash": "8c4e444671b4e38023c8a6c775d5420a5c59ba1325fc6086c974eb8111d8c566",
+  "files": {
+    "contract/main.stele": {
+      "own_hash": "177212821f0c0cf1494f1a87f5ac5b26a5661c6320477338d00eebd74af72f47",
+      "transitive_hash": "5e118837054cf30ed10a750140ffaf1cd0a2c7b7992c6bee341b88ba2bfd46f2",
+      "deps": [],
+      "output_paths": [],
+      "output_hashes": {}
+    }
+  },
+  "output_hashes_global": {
+    "tests/contract/_stele_runtime.ts": "55aaff45f1a4b0a57002cf314e17512fc83d8797a7ade4cc639c6aeb2f9f9e61",
+    "tests/contract/_stele_setup.ts": "69946c44979d6139ba6b251a83d30534cba1163326058564866fd932ee565cfc",
+    "tests/contract/test_contract.ts": "77fe38c035b81bfaf3c99caf4ddea52a0f96d43e2d6ceab751fe346b4994f05d"
+  }
+}

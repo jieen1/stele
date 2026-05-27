@@ -1,0 +1,18 @@
+{
+  "name": "quickstart-typescript",
+  "version": "0.1.0",
+  "description": "Stele quickstart — e-commerce demo for TypeScript",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "stele generate",
+    "check": "stele check",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@stele/cli": "*",
+    "@stele/claude-code-plugin": "*",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

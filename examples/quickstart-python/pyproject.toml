@@ -1,0 +1,8 @@
+[project]
+name = "quickstart-python"
+version = "0.1.0"
+description = "Stele quickstart — e-commerce demo for Python"
+requires-python = ">=3.10"
+dependencies = [
+    "pytest>=8.0",
+]

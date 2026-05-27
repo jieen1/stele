@@ -1,0 +1,64 @@
+; ============================================================================
+; Stele quickstart — e-commerce demo contracts (TypeScript)
+;
+; Same five invariants as examples/quickstart-python for parity.
+; Rule IDs are identical so behaviour is comparable across backends.
+; Run:
+;   npx stele generate
+;   npx vitest run
+; ============================================================================
+
+(metadata
+  (stele-version "0.1")
+  (project "quickstart-typescript"))
+
+; --- 1. Order totals are positive --------------------------------------------
+
+(invariant ORDER_TOTAL_POSITIVE
+  (severity error)
+  (description "Every order total must be greater than zero.")
+  (assert (forall order (collection orders)
+                  (gt (path order total) 0))))
+
+; --- 2. Every order has a non-null ID ----------------------------------------
+
+(invariant ORDER_ID_PRESENT
+  (severity error)
+  (description "Every order must have a non-null ID.")
+  (assert (forall order (collection orders)
+                  (not-null (path order id)))))
+
+; --- 3. User status is one of the allowed enum values ------------------------
+
+(invariant USER_STATUS_ENUM
+  (severity error)
+  (description "User status must be active, suspended, or deleted.")
+  (assert (or (eq (path user status) "active")
+              (eq (path user status) "suspended")
+              (eq (path user status) "deleted"))))
+
+; --- 4. SKU format (custom checker) ------------------------------------------
+;
+; validate-sku.ts reads stele_context.items and checks each SKU against
+; ^[A-Z]+-[A-Z0-9]+$ (e.g. WIDGET-A1, GADGET-123).
+
+(checker validate-sku
+  (description "SKU must match ^[A-Z]+-[A-Z0-9]+$ format."))
+
+(invariant SKU_FORMAT
+  (severity warning)
+  (description "All item SKUs must match the expected format.")
+  (uses-checker validate-sku))
+
+; --- 5. Email format (custom checker) ----------------------------------------
+;
+; validate-email.ts reads stele_context.user.email and checks it
+; looks like user@domain.tld.
+
+(checker validate-email
+  (description "Email must be RFC-shaped (user@domain.tld)."))
+
+(invariant EMAIL_FORMAT
+  (severity warning)
+  (description "User email must be RFC-shaped.")
+  (uses-checker validate-email))

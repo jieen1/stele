@@ -1,0 +1,17 @@
+# Stele runtime artifacts
+contract/.manifest.json
+contract/.baseline.json
+contract/.unlock-log.jsonl
+contract/.last-check-report.json
+contract/proposals/
+
+# NOTE: tests/contract/ is intentionally committed in this example so it
+# works out of the box without running `npx stele generate` first.
+# In your own project you would typically add tests/contract/ here.
+
+# TypeScript
+dist/
+*.tsbuildinfo
+
+# Node
+node_modules/
