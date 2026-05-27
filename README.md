@@ -2,13 +2,7 @@
 
 **AI agents write code. Stele makes sure they can't break your rules.**
 
-Stele is a contract management framework that protects your project's business invariants from AI-assisted code changes. It works by combining three layers:
-
-1. **Write contracts in a simple DSL** (`.stele` files) that declare what must always be true
-2. **Generate tests from those contracts** — deterministically, reproducibly
-3. **Block the agent from editing protected files** — at the editor level, in Claude Code
-
-An agent can write code, refactor, add features — but it physically cannot violate the contracts you've locked down. Not because it promises to behave, but because the tooling won't let it.
+You declare business invariants in a small DSL. Stele turns them into deterministic tests, locks the contract files with SHA-256 hashes, and registers a Claude Code plugin that **physically refuses** to let the agent edit those files. Not "promises to behave" — the tooling won't allow it.
 
 ```
 Agent writes code  →  Generated contract tests run  →  Stele verifies integrity  →  Pass or block
@@ -16,7 +10,7 @@ Agent writes code  →  Generated contract tests run  →  Stele verifies integr
 
 |  | |
 |---|---|
-| **Contracts** | Declared in [CDL](docs/spec/cdl.md), a small S-expression DSL — 70+ built-in operators |
+| **Contracts** | Small S-expression DSL ([CDL](docs/spec/cdl.md)) — 70+ built-in operators |
 | **Backends** | Python (pytest), TypeScript (vitest), Go, Rust, Java (JUnit 5) |
 | **Integration** | Claude Code plugin with pre/post hooks, subagents, slash commands |
 | **Security** | SHA-256 manifest locking, path-traversal protection, agent-edit interception |
@@ -24,69 +18,60 @@ Agent writes code  →  Generated contract tests run  →  Stele verifies integr
 
 ---
 
-## Why
+## Quickstart — 5 commands to working contracts
 
-AI agents are productive but unreliable. They:
-
-- Don't know your project's implicit business rules
-- Fix one bug and silently break another invariant
-- Regenerate or "clean up" code in ways that change behavior
-
-Stele adds structure where discipline can't: **contracts the agent can read, tests it must pass, and files it cannot edit.**
-
-## How It Works
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│ Editor Hooks (Claude Code)                                   │
-│  Blocks writes to protected paths · Runs checks on exit      │
-└──────────────────────────────────────────────────────────────┘
-                            │
-┌──────────────────────────────────────────────────────────────┐
-│ CLI  (init · generate · check · lock)                        │
-│  Human & agent interface                                     │
-└──────────────────────────────────────────────────────────────┘
-                            │
-┌──────────────────────────────────────────────────────────────┐
-│ Core Engine (pure, deterministic)                            │
-│  lexer → parser → validator → normalizer → manifest → report │
-└──────────────────────────────────────────────────────────────┘
-                            │
-┌──────────────────────────────────────────────────────────────┐
-│ Language Backends                                            │
-│  Python  ·  TypeScript  ·  Go  ·  Rust  ·  Java             │
-└──────────────────────────────────────────────────────────────┘
-```
-
-## Quickstart
-
-> **v0.1 install path:** Stele is **not yet on the public npm registry**. Use one of the local-tarball install paths below. The npm-registry form will work once we publish — see [`docs/guides/installation.md`](docs/guides/installation.md) for the full path-by-OS matrix and troubleshooting.
-
-### Install
-
-**Linux / macOS:**
+> **Heads up:** v0.1 is **not yet on the public npm registry**. Step 1 uses local tarballs. After we publish, step 1 becomes `npm install --save-dev @stele/cli @stele/claude-code-plugin`.
 
 ```bash
-# from the Stele repo, against your app
+# 1. Install Stele into your application repo
 ./scripts/install-stele-local.sh /path/to/your/app
+cd /path/to/your/app
 
-# or from your app repo, pointing at the Stele clone
-/path/to/stele/scripts/install-stele-local.sh
+# 2. Scaffold contracts (--with-example-fixtures gives a working demo out-of-the-box)
+npx stele init --language python --with-example-fixtures
+
+# 3. Generate the test suite from CDL
+npx stele generate
+
+# 4. Run it — green out-of-the-box
+python -m pytest tests/contract -q     # → 5 passed
+
+# 5. Lock + verify
+npx stele lock --reason "initial baseline"
+npx stele check                        # → OK 5 invariants checked
 ```
 
-**Windows (PowerShell):**
+That's it. You now have 5 contracts auto-generating 5 tests against starter data. Edit `contract/main.stele` to add your real rules; edit `tests/contract/conftest.py` to point at your real state.
+
+---
+
+## Install
+
+Pick the path for your environment. All five land at the same `npx stele init` step.
+
+### Path A — Linux / macOS bash script
+
+```bash
+# Run from your application repo, pointing at the Stele clone:
+/path/to/stele/scripts/install-stele-local.sh
+
+# Or from the Stele repo against a target app:
+./scripts/install-stele-local.sh /path/to/your/app
+```
+
+### Path B — Windows PowerShell
 
 ```powershell
 & 'C:\path\to\stele\local-packages\install-stele-local.ps1'
 ```
 
 Both scripts:
-- pack `@stele/{core,backend-python,cli,claude-code-plugin}` if needed
+- Pack `@stele/{core,backend-python,cli,claude-code-plugin}` if `local-packages/*.tgz` is empty
 - `npm install --save-dev` all four tarballs
-- wire `npm run stele:{init,generate,lock,check,list}` shortcuts
-- verify the CLI resolves five different ways
+- Wire `npm run stele:{init,generate,lock,check,list}` shortcuts
+- Verify `npx stele --version` resolves five different ways
 
-**Manual tarball install** (any OS):
+### Path C — manual tarball install (any OS)
 
 ```bash
 npm install --save-dev \
@@ -97,190 +82,178 @@ npm install --save-dev \
 npx stele --version   # → 0.1.0
 ```
 
-**After npm publish** (future):
+### Path D — after npm publish (future)
 
 ```bash
 npm install --save-dev @stele/cli @stele/claude-code-plugin
 ```
 
-### Initialize
+Full path matrix + troubleshooting: [`docs/guides/installation.md`](docs/guides/installation.md).
+
+---
+
+## Initialize
 
 ```bash
-# Python + pytest   (default v0.1 backend)
-npx stele init --language python
-
-# TypeScript + vitest
-npx stele init --language typescript
-
-# Go
-npx stele init --language go
-
-# Rust
-npx stele init --language rust
-
-# Java + JUnit 5
-npx stele init --language java
+npx stele init --language <python|typescript|go|rust|java>
 
 # Optional flags:
-#   --ci github-actions    write .github/workflows/stele.yml
-#   --ci gitlab-ci         write .gitlab-ci.yml
-#   --pre-commit           install a git pre-commit hook
-#   --dry-run              print files without writing
+#   --with-example-fixtures   include working e-commerce demo (python+typescript)
+#   --ci github-actions       also write .github/workflows/stele.yml
+#   --ci gitlab-ci            also write .gitlab-ci.yml
+#   --pre-commit              install a pre-commit hook running `stele check`
+#   --dry-run                 print files without writing them
 ```
 
-This creates `stele.config.json`, `contract/main.stele` (your contracts), `contract/checker_impls/` (custom Python checkers, if any), and `tests/contract/` (generated tests + `conftest.py` for fixture wiring).
+### What gets created
 
-### Write Your First Contract
+```
+your-app/
+├── stele.config.json          ← paths, target language, protected globs
+├── contract/
+│   ├── main.stele             ← YOUR CONTRACTS — edit this
+│   └── checker_impls/         ← custom Python/TS checkers go here
+└── tests/
+    └── contract/
+        ├── conftest.py        ← WIRE YOUR DATA — edit this to expose app state
+        └── _stele_runtime.py  ← generated; do not edit
+```
 
-In `contract/main.stele`:
+### What you edit
+
+**`contract/main.stele`** — Each `(invariant …)` becomes one test. The default scaffold ships three teaching examples (balance check, forall over collection, status enum) you delete or modify:
 
 ```lisp
-(invariant ORDER_TOTAL_IS_POSITIVE
-  (severity high)
-  (description "Order total must be positive after taxes are applied.")
-  (assert (gt (path order total-with-tax) 0)))
+(invariant ACCOUNT_BALANCE_NON_NEGATIVE
+  (severity error)
+  (description "Account balance must never go below zero.")
+  (assert (gte (path account balance) 0)))
 ```
 
-### Wire Your Data
-
-In `tests/contract/conftest.py`:
+**`tests/contract/conftest.py`** — The `stele_context` fixture is the bridge between your app and the generated tests. Return whatever shape your contracts assert against:
 
 ```python
 @pytest.fixture
 def stele_context():
     return {
-        "order": load_sample_order(),  # your application state
-        "_stele_checkers": {},
+        "account": load_account_from_db(),     # your real data
+        "user": load_user_from_db(),
+        "orders": fetch_recent_orders(),
+        "_stele_checkers": {},                 # custom checkers, if any
     }
 ```
 
 Stele reads whatever your fixture returns — it doesn't invent objects.
 
-### Generate, Run, Lock
+### Verify your setup
 
 ```bash
-npx stele generate               # generate tests from CDL
-python -m pytest tests/contract  # run the tests
-npx stele lock                   # lock SHA-256 hashes of protected files
+npx stele doctor
 ```
 
-### Verify (CI or local)
+Runs 10 self-checks (config, scaffold, generated drift, backend toolchain, manifest, Claude Code plugin registration, custom checker imports). Output:
+
+```
+[stele doctor]
+  ✓ @stele/cli 0.1.0 resolves
+  ✓ stele.config.json is valid
+  ✓ contract/main.stele parses (3 invariants)
+  ✓ Generated tests are in sync (no drift)
+  ⚠ No contract/.manifest.json — run `stele lock --reason "initial baseline"`
+  ⚠ Claude Code plugin not registered for this project
+    → run `stele plugin install --claude-code` to fix
+
+Summary: 7 OK, 2 warnings, 0 errors.
+```
+
+---
+
+## Claude Code plugin (optional but recommended)
+
+The plugin adds editor-level enforcement: blocks direct writes to `contract/**`, runs `stele check` on `Stop`, injects contract context at `SessionStart`.
 
 ```bash
-npx stele check     # exit 0 = clean, 2 = drift, 3 = tamper
+# Activate in one command
+npx stele plugin install --claude-code
+
+# Then restart Claude Code (close + reopen)
 ```
-
-## A Real Contract Example
-
-```lisp
-; contract/main.stele
-
-(metadata
-  (stele-version "0.1")
-  (project "my-service"))
-
-; --- checkers ---
-
-(checker validate-email
-  (description "Validate email format using custom Python checker."))
-
-; --- invariants ---
-
-(invariant USER_EMAIL_MUST_BE_VALID
-  (severity error)
-  (description "All user emails must match the service email pattern.")
-  (uses-checker validate-email))
-
-(invariant ACCOUNT_BALANCE_NON_NEGATIVE
-  (severity error)
-  (description "Account balance must never go below zero.")
-  (assert (gte (path account balance) 0)))
-
-(invariant ORDERS_HAVE_AT_LEAST_ONE_ITEM
-  (severity warning)
-  (description "An order must contain at least one line item.")
-  (assert (not (is-empty (path order items)))))
-
-(invariant USER_STATUS_ENUM
-  (severity error)
-  (description "User status must be one of the defined states.")
-  (assert (or (eq (path user status) "active")
-              (eq (path user status) "suspended")
-              (eq (path user status) "deleted"))))
-```
-
-## CDL — The Contract Definition Language
-
-CDL is a small S-expression language. No indentation rules, no braces, no boilerplate.
-
-```lisp
-; Comment (starts with ;)
-(invariant NAME
-  (severity error)           ; error or warning
-  (description "...")
-  (assert (gt (path x y) 0)))
-
-; Collections
-(assert (forall item (collection orders)
-               (gt (path item total) 0)))
-
-; Logic
-(assert (and
-  (eq (path user role) "admin")
-  (not-null (path user mfa-secret))))
-```
-
-**70+ operators**: comparison (`eq`, `gt`, `gte`, `lt`, `lte`), arithmetic (`add`, `sub`, `mul`, `div`, `sum`, `avg`), logic (`and`, `or`, `not`, `implies`, `iff`), collections (`where`, `forall`, `exists`, `unique`, `distinct`, `map`, `sort-by`), strings (`matches`, `contains`, `starts-with`, `ends-with`), and more.
-
-Full spec: [`docs/spec/cdl.md`](docs/spec/cdl.md)
-
-## Claude Code Integration
-
-`@stele/claude-code-plugin` adds editor-level enforcement:
 
 | Hook | What It Does |
-|------|-------------|
+|---|---|
 | **PreToolUse** | Blocks direct writes to contract files, generated tests, and manifest |
 | **Stop** | Runs `stele check` + contract tests before the session ends |
 | **SessionStart** | Injects contract context so the agent knows the rules |
 | **PostToolUse** | Records source edits for maintenance review |
 
-**Slash commands**: `/stele:check`, `/stele:rules`, `/stele:context`, `/stele:why`, `/stele:explain`, `/stele:maintain`
+**Slash commands:** `/stele:check`, `/stele:rules`, `/stele:context`, `/stele:why`, `/stele:explain`, `/stele:maintain`
 
-**Subagents**: `contract-author` (write new contracts), `contract-fixer` (fix violations), `contract-reviewer` (review changes)
+**Subagents:** `contract-author`, `contract-fixer`, `contract-reviewer`
 
-### Activate the plugin
+Manual fallback + full hook reference: [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md).
 
-The install script puts the tarball under `node_modules/@stele/claude-code-plugin/`. Register it with Claude Code in one command:
+---
 
-```bash
-npx stele plugin install --claude-code
+## Working demos
+
+If you'd rather see Stele working in a complete app before integrating it, clone these:
+
+| Demo | What it shows |
+|---|---|
+| [`examples/quickstart-python/`](examples/quickstart-python/) | E-commerce Python app with 5 invariants + 2 custom checkers (SKU regex + email format) |
+| [`examples/quickstart-typescript/`](examples/quickstart-typescript/) | Same e-commerce model in TypeScript + vitest |
+| [`examples/finance-guard/`](examples/finance-guard/) | Larger finance-domain example |
+| [`examples/cursor-demo/`](examples/cursor-demo/) | Cursor IDE integration sample |
+
+---
+
+## CDL — Contract Definition Language
+
+Small S-expression DSL. No indentation rules, no braces, no boilerplate.
+
+```lisp
+(invariant NAME
+  (severity error)           ; error or warning
+  (description "...")
+  (assert (gt (path x y) 0)))
+
+; Quantify over a collection from stele_context["orders"]
+(assert (forall item (collection orders)
+               (gt (path item total) 0)))
+
+; Boolean logic
+(assert (and (eq (path user role) "admin")
+             (not-null (path user mfa-secret))))
 ```
 
-Then restart Claude Code (close + reopen, or start a new session).
+**70+ operators**: comparison (`eq` / `gt` / `gte` / `lt` / `lte`), arithmetic (`add` / `sub` / `mul` / `div` / `sum` / `avg`), logic (`and` / `or` / `not` / `implies` / `iff`), collections (`where` / `forall` / `exists` / `unique` / `distinct` / `map` / `sort-by`), strings (`matches` / `contains` / `starts-with` / `ends-with`), and more.
 
-If you prefer to edit the JSON files manually, see [`docs/guides/claude-code-plugin.md § Register the plugin`](docs/guides/claude-code-plugin.md#register-the-plugin) for the manual fallback.
+Full spec: [`docs/spec/cdl.md`](docs/spec/cdl.md).
 
-Full hook + slash-command reference: [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md). One-page install: [`docs/guides/installation.md`](docs/guides/installation.md).
+---
 
-## CLI Commands
+## CLI reference
 
 ```
-Human commands
+Setup
   stele init --language <lang>     Scaffold contract/ and tests/contract/
+  stele plugin install --claude-code   Register the Claude Code plugin
+  stele doctor                     Self-check: did everything install right?
+
+Daily flow
   stele generate [--force]         Regenerate test suite from CDL
   stele check [--diff-from main]   Verify generated drift, manifest integrity
   stele lock --reason "..."        Snapshot SHA-256 hashes of protected files
   stele unlock                     Temporarily unlock protected paths
   stele baseline-init              Suppress known legacy violations
-  stele add-checker <id>           Scaffold a Python custom checker
+  stele add-checker <id>           Scaffold a custom checker
 
-Agent commands (read-only or append-only)
+Agent-facing (read-only / append-only)
   stele rules --json               List all contract rules
   stele agent-context --focus <f>  Get focused contract context
   stele explain <id>               Explain a rule or violation
   stele why <fingerprint>          Show why a violation was suppressed
-  stele propose invariant --apply  Append new invariant (never modifies existing rules)
+  stele propose invariant --apply  Append a new invariant (never modifies)
 
 Reference
   stele doc <topic>                Show CDL documentation
@@ -288,11 +261,12 @@ Reference
   stele dev                        Developer mode helpers
 ```
 
-## CI Integration
+---
 
-Add this to your CI workflow:
+## CI integration
 
 ```yaml
+# .github/workflows/stele.yml — `stele init --ci github-actions` writes this for you
 - name: Verify contracts
   run: |
     npx stele generate
@@ -300,85 +274,78 @@ Add this to your CI workflow:
     npx stele check
 ```
 
-`stele check` exit codes:
-
-| Code | Meaning |
-|------|---------|
+| Exit code | Meaning |
+|---|---|
 | `0` | Clean — all contracts satisfied |
-| `2` | Generated drift — tests don't match CDL |
+| `2` | Generated drift — committed tests don't match CDL |
 | `3` | Tamper detected — manifest hashes don't match |
 
-For focused branch checks, scope to your changes:
+Focused branch check: `npx stele check --diff-from main` (only changed files).
 
-```bash
-npx stele check --diff-from main  # only report violations in changed files
-```
+---
 
-## Supported Languages
+## Supported languages
 
-| Language | Test Framework | Phase A | Phase B |
-|----------|---------------|---------|---------|
-| Python | pytest | ✅ Stable | ✅ trace / effect / architecture / core-node (Round 14); type-state / branded-id TS-only |
-| TypeScript | vitest | ✅ Stable | ✅ Full |
-| Go | testing | ✅ Stable | ❌ fail-loud (F-A-02) |
-| Rust | cargo test | ✅ Stable | ❌ fail-loud (F-A-02) |
-| Java | JUnit 5 | ✅ Stable | ❌ fail-loud (F-A-02) |
+| Language | Phase A (`invariant`/`scenario`/`checker`) | Phase B (`trace`/`effect`/`type-state` …) | Code-shape (`class-shape`/`boundary` …) |
+|---|---|---|---|
+| **TypeScript** | ✅ | ✅ full | ✅ |
+| **Python** | ✅ | ✅ trace + effect + architecture + core-node (Round 14); `type-state` / `branded-id` still TS-only | ✅ |
+| Go | ✅ | ❌ fail-loud | ❌ |
+| Rust | ✅ | ❌ fail-loud | ❌ |
+| Java | ✅ | ❌ fail-loud | ❌ |
 
-## Self-Protection
+Per-language guides: [Python](docs/guides/python-integration.md) · [TypeScript](docs/guides/typescript-integration.md) · [Go](docs/guides/go-integration.md) · [Rust](docs/guides/rust-integration.md) · [Java](docs/guides/java-integration.md).
 
-Stele protects itself. The project's `contract/main.stele` contains **35+ invariants** (see `stele list` for the live count) that verify:
+---
 
-- Backend registry integrity (all 5 languages present)
-- Operator registry (70+ operators, consistent specs)
-- Exit code alignment with spec (all 8 codes: 0/1/2/3/4/5/6/99)
-- Manifest hashing algorithm (SHA-256 enforced)
-- Type system stability (9 structural types)
-- Hook security (fail-closed, complete registration)
-- Version synchronization across packages
-- No hardcoded secrets in source
+## Self-protection
 
-The contract is verified by the same toolchain. Every commit is checked.
+Stele protects itself with **48 invariants** (run `stele list` for live count) using 14 of its own mechanisms — backend registry integrity, operator-spec consistency, exit code alignment, manifest hashing (SHA-256), hook fail-closed, version sync, no hardcoded secrets, and more. The contract is verified by the same toolchain on every commit. Coverage matrix: [`docs/internal/self-protection-coverage-matrix.md`](docs/internal/self-protection-coverage-matrix.md).
+
+---
 
 ## Packages
 
 | Package | Purpose |
-|---------|---------|
+|---|---|
 | `@stele/core` | Lexer, parser, validator, normalizer, registry, manifest, generator coordinator |
-| `@stele/backend-python` | CDL → pytest translator + Python runtime |
-| `@stele/backend-typescript` | CDL → vitest translator |
-| `@stele/backend-go` | CDL → Go testing translator |
-| `@stele/backend-rust` | CDL → cargo test translator |
-| `@stele/backend-java` | CDL → JUnit 5 translator |
 | `@stele/cli` | The `stele` executable |
+| `@stele/backend-{python,typescript,go,rust,java}` | CDL → test-framework translators + runtimes |
+| `@stele/{trace,type-state,effect,type-driven}-evaluator` | Phase B static analyzers (TS source + Python where applicable) |
+| `@stele/{architecture-core,call-graph-core}` | Phase B foundations |
+| `@stele/agent-hooks` | Shared editor-hook SDK |
 | `@stele/claude-code-plugin` | Claude Code hooks, commands, subagents, skills |
+| `@stele/mcp-server` | MCP bridge for Cursor / other agents |
+| `@stele/github-action` | Stele as a GitHub Action |
+
+---
 
 ## Documentation
 
-| Topic | Link |
-|-------|------|
-| **Installation (start here)** | [`docs/guides/installation.md`](docs/guides/installation.md) |
-| Architecture | [`docs/architecture.md`](docs/architecture.md) |
-| CDL Language Spec | [`docs/spec/cdl.md`](docs/spec/cdl.md) |
-| Python Integration Guide | [`docs/guides/python-integration.md`](docs/guides/python-integration.md) |
-| TypeScript Integration Guide | [`docs/guides/typescript-integration.md`](docs/guides/typescript-integration.md) |
-| Go Integration Guide | [`docs/guides/go-integration.md`](docs/guides/go-integration.md) |
-| Rust Integration Guide | [`docs/guides/rust-integration.md`](docs/guides/rust-integration.md) |
-| Java Integration Guide | [`docs/guides/java-integration.md`](docs/guides/java-integration.md) |
-| Claude Code Plugin | [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md) |
-| Contributing | [`docs/contributing/`](docs/contributing/) |
-| Roadmap & Strategy | [`docs/strategy/`](docs/strategy/) |
+| Start here | |
+|---|---|
+| **Installation (one-page start)** | [`docs/guides/installation.md`](docs/guides/installation.md) |
+| **Architecture** | [`docs/architecture.md`](docs/architecture.md) |
+| **CDL spec** | [`docs/spec/cdl.md`](docs/spec/cdl.md) |
+| **Claude Code plugin** | [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md) |
+| **Contributing** | [`docs/contributing/`](docs/contributing/) |
+| **Roadmap & strategy** | [`docs/strategy/`](docs/strategy/) |
 
-## Development
+---
+
+## Development (working on Stele itself)
 
 ```bash
 pnpm install
 pnpm build                    # build all packages
-pnpm test                     # run tests across all packages
-pnpm typecheck                # TypeScript type checking
-pnpm test:packed-adoption     # full end-to-end adoption verification
+pnpm test                     # vitest in each package + python runtime tests
+pnpm typecheck                # tsc --noEmit per package
+pnpm test:packed-adoption     # end-to-end: pack → install fixture → init → check
 ```
 
 See [`docs/contributing/development.md`](docs/contributing/development.md) for conventions and [`docs/contributing/release.md`](docs/contributing/release.md) for the release process.
+
+---
 
 ## License
 
