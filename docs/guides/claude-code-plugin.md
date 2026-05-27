@@ -18,7 +18,26 @@ After installing the package, register the package directory that contains `.cla
 
 ### Register the plugin
 
-The plugin tarball lands at `<app>/node_modules/@stele/claude-code-plugin/` after `npm install`. To make Claude Code actually load it, you need two edits in your user-level Claude Code config (NOT in the app repo).
+The plugin tarball lands at `<app>/node_modules/@stele/claude-code-plugin/` after `npm install`. To make Claude Code actually load it, run:
+
+```bash
+# from your application's repo root
+npx stele plugin install --claude-code
+```
+
+This command writes the two JSON entries Claude Code needs and prints a confirmation with file paths. After it completes, restart Claude Code (close and reopen, or start a new session) so the plugin manifest is loaded.
+
+You can verify activation by opening a session in your application repo and confirming a `SessionStart` context injection appears. If nothing happens, the most common cause is `installPath` pointing at the wrong directory — it must be the dir that contains `.claude-plugin/plugin.json`, not the package's `src/` or `dist/`.
+
+Options:
+
+- `--user-config-dir <dir>` — override `~/.claude` (useful for non-default Claude installs)
+- `--project-dir <dir>` — register a different project root (default: cwd)
+- `--dry-run` — print what would change without writing
+
+#### Manual registration (fallback)
+
+If you prefer to edit the JSON files yourself:
 
 1. Add a project-scoped plugin entry in `~/.claude/plugins/installed_plugins.json` (create the file if it doesn't exist):
 
@@ -48,8 +67,6 @@ The plugin tarball lands at `<app>/node_modules/@stele/claude-code-plugin/` afte
    ```
 
 3. Restart Claude Code (close and reopen, or start a new session) so the plugin manifest is loaded.
-
-You can verify activation by opening a session in your application repo and confirming a `SessionStart` context injection appears. If nothing happens, the most common cause is `installPath` pointing at the wrong directory — it must be the dir that contains `.claude-plugin/plugin.json`, not the package's `src/` or `dist/`.
 
 ## What the plugin ships
 

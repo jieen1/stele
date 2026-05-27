@@ -251,25 +251,15 @@ Full spec: [`docs/spec/cdl.md`](docs/spec/cdl.md)
 
 ### Activate the plugin
 
-The install script puts the tarball under `node_modules/@stele/claude-code-plugin/`. Two more edits make Claude Code load it:
+The install script puts the tarball under `node_modules/@stele/claude-code-plugin/`. Register it with Claude Code in one command:
 
-1. `~/.claude/plugins/installed_plugins.json`:
-   ```json
-   {
-     "stele@local": [
-       {
-         "scope": "project",
-         "projectPath": "/absolute/path/to/your/app",
-         "installPath": "/absolute/path/to/your/app/node_modules/@stele/claude-code-plugin"
-       }
-     ]
-   }
-   ```
-2. `~/.claude/settings.json`:
-   ```json
-   { "enabledPlugins": { "stele@local": true } }
-   ```
-3. Restart Claude Code.
+```bash
+npx stele plugin install --claude-code
+```
+
+Then restart Claude Code (close + reopen, or start a new session).
+
+If you prefer to edit the JSON files manually, see [`docs/guides/claude-code-plugin.md § Register the plugin`](docs/guides/claude-code-plugin.md#register-the-plugin) for the manual fallback.
 
 Full hook + slash-command reference: [`docs/guides/claude-code-plugin.md`](docs/guides/claude-code-plugin.md). One-page install: [`docs/guides/installation.md`](docs/guides/installation.md).
 

@@ -189,9 +189,21 @@ Exit codes:
 
 If you use Claude Code, the plugin adds editor-level enforcement (blocks direct writes to `contract/**`, runs `stele check` on `Stop`, etc.).
 
-The plugin tarball was already installed in paths A–C. To activate it:
+The plugin tarball was already installed in paths A–C. To activate it, run:
 
-1. Register the package directory as a project-scoped plugin. Edit (or create) `~/.claude/plugins/installed_plugins.json`:
+```bash
+npx stele plugin install --claude-code
+```
+
+This command writes the two JSON entries Claude Code needs (see below) and prints a summary with paths. After it completes, restart Claude Code (close + reopen, or start a new session) so the plugin manifest is loaded.
+
+Verify the hooks ran by opening a session in your app and watching for the Stele context injection. See [`docs/guides/claude-code-plugin.md`](claude-code-plugin.md) for the full hook lifecycle reference and slash-command catalog.
+
+### Manual registration (fallback)
+
+If you prefer to edit the JSON files yourself, the two changes are:
+
+1. Edit (or create) `~/.claude/plugins/installed_plugins.json`:
 
    ```json
    {
@@ -218,8 +230,6 @@ The plugin tarball was already installed in paths A–C. To activate it:
    ```
 
 3. Restart Claude Code (close + reopen, or start a new session) so the plugin manifest is loaded.
-
-Verify the hooks ran by opening a session in your app and watching for the Stele context injection. See [`docs/guides/claude-code-plugin.md`](claude-code-plugin.md) for the full hook lifecycle reference and slash-command catalog.
 
 ### What the plugin enforces (recap)
 
