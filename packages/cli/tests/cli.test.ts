@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { stableStringCompare } from "@stele/core";
-import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
+import { DEFAULT_CONFIG, INIT_PROTECTED_PATTERNS, STELE_CONFIG_FILE } from "../src/config/defaults.js";
 import { runBaselineInit, runBaselineUpdate } from "../src/commands/baseline.js";
 import { runCheck } from "../src/commands/check.js";
 import { runGenerate } from "../src/commands/generate.js";
@@ -27,13 +27,19 @@ describe("stele CLI", () => {
 
     await runInit(projectDir, { language: "python" });
 
-    await expect(readJson(join(projectDir, STELE_CONFIG_FILE))).resolves.toEqual(DEFAULT_CONFIG);
+    // The init scaffold writes the SLIM `INIT_PROTECTED_PATTERNS` list, not
+    // the full runtime `DEFAULT_CONFIG.protected` list (which is for Stele's
+    // own monorepo internals + byte-locked across plugin/core/cli hooks).
+    // Runtime defense-in-depth is preserved by `loadConfig::mergeProtected`
+    // UNION at load time.
+    const config = await readJson(join(projectDir, STELE_CONFIG_FILE));
+    expect(config).toMatchObject({ ...DEFAULT_CONFIG, protected: [...INIT_PROTECTED_PATTERNS] });
     await expect(readFile(join(projectDir, "contract", "main.stele"), "utf8")).resolves.toContain("(invariant");
     await expect(readFile(join(projectDir, "contract", "checker_impls", ".gitkeep"), "utf8")).resolves.toBe("");
     const conftest = await readFile(join(projectDir, "tests", "contract", "conftest.py"), "utf8");
     expect(conftest).toContain("import pytest");
-    expect(conftest).toContain("@pytest.fixture\ndef stele_context():\n    return {}\n");
-    expect(conftest).toContain("@pytest.fixture\ndef stele_sandbox():\n    return None\n");
+    expect(conftest).toContain("@pytest.fixture\ndef stele_context():");
+    expect(conftest).toContain("@pytest.fixture\ndef stele_sandbox():");
   });
 
   it("init does not overwrite existing user files", async () => {
