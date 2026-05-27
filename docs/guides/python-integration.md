@@ -342,23 +342,34 @@ npx stele check
 - the current contract hash still matches the locked manifest
 - no new protected files were added without a fresh lock
 
-## Phase B contracts on Python projects (F-A-02 fail-loud)
+## Phase B contracts on Python projects (Round 14)
 
-A Python project that adopts Stele can author **scenario / invariant / code-shape** contracts and have them enforced today. The Phase B contracts that ship with the `@stele/trace-evaluator`, `@stele/type-state-evaluator`, and `@stele/effect-evaluator` packages — namely `trace-policy`, `type-state`, `type-state-binding`, `effect-policy`, `effect-annotation`, `effect-declarations`, and `effect-suppression` — are **TypeScript-only** at v0.1. They reach into the TypeScript call graph and type checker, and the equivalent Python implementation has not landed.
+Python has full Phase B evaluator coverage for most mechanisms. The supported matrix for Python projects is:
 
-To avoid a fail-open surface where these contracts could be merged on a Python project and silently succeed, the runtime intentionally fails loud (Round 4 F-A-02):
+| Mechanism | Python support |
+|---|---|
+| `invariant` / `checker` / `scenario` / `group` / `metadata` / `import` | ✅ Full |
+| `boundary` / `class-shape` / `function-shape` / `type-policy` / `file-policy` | ✅ Full |
+| `trace-policy` | ✅ Full (Round 14) |
+| `effect-policy` / `effect-annotation` / `effect-declarations` / `effect-suppression` | ✅ Full (Round 14) |
+| `architecture` / `core-node` | ✅ Full (Round 14) |
+| `type-state` / `type-state-binding` | ❌ TypeScript only (v0.1) |
+| `branded-id` / `smart-ctor` | ❌ TypeScript only (v0.1) |
+
+Round 14 (commit `2dda82f`, 2026-05-24) added Python call-graph and effect-annotation extractors — `pyCallGraphExtractor` and `pyEffectAnnotationExtractor` — so the trace, effect, and architecture evaluators can now run against Python source.
+
+The **F-A-02 fail-loud** behaviour is still active, but it now applies only to the genuinely unsupported subset: `type-state`, `type-state-binding`, `branded-id`, and `smart-ctor`. If your Python project uses any of those, `stele check` fails loud:
 
 ```text
-[error] trace-policy not yet supported for targetLanguage="python".
+[error] type-state not yet supported for targetLanguage="python".
         Round 4 F-A-02: failing loud so the contract surface matches the
         enforcement surface.
 ```
 
 If you see this on `stele check`, the fix is one of:
 
-1. Remove the Phase B form from your contract (`trace-policy`, `type-state`, etc) and replace it with a regular `invariant` + `checker` if the property can be expressed as runtime data.
-2. Wait for the Python evaluator (tracked under `docs/strategy/roadmap.md`).
-3. As an opt-in escape hatch, scope the contract to TypeScript subprojects only and run those through the TypeScript backend instead.
+1. Remove the unsupported Phase B form (`type-state`, `branded-id`, etc.) and replace it with a regular `invariant` + `checker` if the property can be expressed as runtime data.
+2. As an opt-in escape hatch, scope the contract to TypeScript subprojects only via `phaseLanguages` in `stele.config.json` and run those through the TypeScript backend.
 
 `stele check` exits non-zero in this case (`SCORE_BELOW_THRESHOLD` or `CONTRACT_FAIL` depending on configuration). It does **not** silently downgrade to success — that distinction is part of the project contract and is exercised by the self-protection test suite.
 

@@ -2,7 +2,7 @@
 
 Stele attaches to an existing TypeScript application via `vitest`. Your application owns runtime state through a `stele_context` fixture returned from a setup helper; generated Stele tests read that state directly and never fabricate domain objects.
 
-TypeScript is also Stele's **fullest-coverage backend**: in addition to Phase A `invariant` / `scenario` checks, Phase B `trace-policy` / `type-state` / `effect-policy` / `branded-id` / `smart-ctor` evaluators consume TypeScript call graphs, type-state inference, and effect annotations. Non-TypeScript projects fail-loud on Phase B forms (see `python-integration.md` for the same flow on Python).
+TypeScript is Stele's **fullest-coverage backend**: in addition to Phase A `invariant` / `scenario` checks, Phase B `trace-policy` / `type-state` / `effect-policy` / `branded-id` / `smart-ctor` evaluators consume TypeScript call graphs, type-state inference, and effect annotations. Python also supports most Phase B forms (see `python-integration.md`); Go, Rust, and Java fail loud on Phase B forms (Round 4 F-A-02).
 
 ## Install and adopt
 
@@ -86,9 +86,9 @@ npx stele lock --reason "initial baseline"
 npx stele check             # 0 = clean, 2 = drift, 3 = tamper
 ```
 
-## Phase B (TypeScript-only forms)
+## Phase B
 
-TypeScript is the only language today with full Phase B evaluator coverage. You can write:
+TypeScript has full Phase B evaluator coverage. You can write:
 
 - `(trace-policy …)` — assert call-chain rules via `@stele/trace-evaluator`
 - `(type-state …)` — assert phantom-type state machines via `@stele/type-state-evaluator`
@@ -97,7 +97,15 @@ TypeScript is the only language today with full Phase B evaluator coverage. You 
 
 Each uses the TypeScript compiler API to walk your `tsconfig.json`-rooted source tree. See `docs/spec/cdl.md` for grammar and `docs/design/phase-b/` for design notes.
 
-If you move these contracts to a Go/Rust/Java/Python project, `stele check` will fail loud (Round 4 F-A-02):
+Python also supports `trace-policy`, `effect-policy`, `effect-annotation`, `effect-declarations`, `effect-suppression`, `architecture`, and `core-node` (Round 14). The forms that remain TypeScript-only are `type-state`, `type-state-binding`, `branded-id`, and `smart-ctor`.
+
+If you move TypeScript-only contracts (`type-state`, `branded-id`, `smart-ctor`) to a Python, Go, Rust, or Java project, `stele check` will fail loud (Round 4 F-A-02):
+
+```text
+[error] type-state not yet supported for targetLanguage="<lang>".
+```
+
+If you move `trace-policy` / `effect-policy` / `architecture` contracts to a Go, Rust, or Java project, those also fail loud:
 
 ```text
 [error] trace-policy not yet supported for targetLanguage="<lang>".

@@ -2,7 +2,7 @@
 
 Stele attaches to an existing Go application via the standard `testing` package. Your application owns runtime state through a `SteleContext()` helper; generated Stele tests read that state directly and never fabricate domain objects.
 
-> **Phase A only.** Go has the Phase A pipeline (CDL → `_test.go` via `go test`). Phase B forms (`trace-policy`, `type-state`, `effect-policy`) are TypeScript-only today and will fail loud on Go projects (Round 4 F-A-02). See the bottom of this guide for the workaround.
+> **Phase A only.** Go has the Phase A pipeline (CDL → `_test.go` via `go test`). Phase B forms (`trace-policy`, `type-state`, `effect-policy`) are supported on TypeScript and Python projects only; Go projects fail loud (Round 4 F-A-02). See the bottom of this guide for the workaround.
 
 ## Install and adopt
 
@@ -120,7 +120,7 @@ Identical across languages — see `docs/guides/python-integration.md` § "Contr
 
 ## Phase B contracts on Go projects (F-A-02 fail-loud)
 
-Stele will refuse to silently no-op `trace-policy` / `type-state` / `effect-policy` declarations on Go projects:
+Stele will refuse to silently no-op `trace-policy` / `type-state` / `effect-policy` declarations on Go projects. TypeScript and Python projects use the Phase B evaluator; Go does not:
 
 ```text
 [error] trace-policy not yet supported for targetLanguage="go".
@@ -132,7 +132,7 @@ Three workarounds:
 
 1. **Remove the Phase B form** and replace with an `invariant` + Go `checker` that performs the equivalent runtime check.
 2. **Wait for the Go Phase B evaluator** (tracked in `docs/strategy/roadmap.md`).
-3. **Scope Phase B contracts to a TypeScript subproject** if your repo has one.
+3. **Scope Phase B contracts to a TypeScript or Python subproject** if your repo has one.
 
 ## Packed adoption caveat
 

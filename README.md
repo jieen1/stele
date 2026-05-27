@@ -324,13 +324,13 @@ npx stele check --diff-from main  # only report violations in changed files
 
 ## Supported Languages
 
-| Language | Test Framework | Status |
-|----------|---------------|--------|
-| Python | pytest | Stable |
-| TypeScript | vitest | Stable |
-| Go | testing | Stable |
-| Rust | cargo test | Stable |
-| Java | JUnit 5 | Stable |
+| Language | Test Framework | Phase A | Phase B |
+|----------|---------------|---------|---------|
+| Python | pytest | ✅ Stable | ✅ trace / effect / architecture / core-node (Round 14); type-state / branded-id TS-only |
+| TypeScript | vitest | ✅ Stable | ✅ Full |
+| Go | testing | ✅ Stable | ❌ fail-loud (F-A-02) |
+| Rust | cargo test | ✅ Stable | ❌ fail-loud (F-A-02) |
+| Java | JUnit 5 | ✅ Stable | ❌ fail-loud (F-A-02) |
 
 ## Self-Protection
 

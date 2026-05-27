@@ -2,7 +2,7 @@
 
 Stele attaches to an existing Rust application via `cargo test`. Your application owns runtime state through a `stele_context()` helper; generated Stele tests read that state directly and never fabricate domain objects.
 
-> **Phase A only.** Rust has the Phase A pipeline (CDL → `tests/contract/*.rs` via `cargo test`). Phase B forms are TypeScript-only today and fail loud on Rust (Round 4 F-A-02).
+> **Phase A only.** Rust has the Phase A pipeline (CDL → `tests/contract/*.rs` via `cargo test`). Phase B forms are supported on TypeScript and Python projects only; Rust projects fail loud (Round 4 F-A-02).
 
 ## Install and adopt
 
@@ -114,7 +114,7 @@ See `docs/guides/python-integration.md` § "Controlled contract-change flow".
 
 ## Phase B contracts on Rust projects (F-A-02 fail-loud)
 
-`trace-policy` / `type-state` / `effect-policy` / `branded-id` / `smart-ctor` fail loud on Rust:
+`trace-policy` / `type-state` / `effect-policy` / `branded-id` / `smart-ctor` fail loud on Rust. TypeScript and Python projects use the Phase B evaluator; Rust does not:
 
 ```text
 [error] trace-policy not yet supported for targetLanguage="rust".
@@ -124,7 +124,7 @@ Workarounds:
 
 1. **Remove the Phase B form** and use an `invariant` + Rust `checker` for the runtime equivalent.
 2. **Wait for the Rust Phase B evaluator** (the `branded-id` form is the most natural Rust fit — newtype pattern — and is on the roadmap).
-3. **Scope Phase B to a TypeScript subproject.**
+3. **Scope Phase B to a TypeScript or Python subproject.**
 
 ## Packed adoption caveat
 

@@ -2,7 +2,7 @@
 
 Stele attaches to an existing Java application via JUnit 5. Your application owns runtime state through a `SteleContext.build()` helper; generated Stele tests read that state directly and never fabricate domain objects.
 
-> **Phase A only.** Java has the Phase A pipeline (CDL → JUnit 5 tests). Phase B forms are TypeScript-only today and fail loud on Java (Round 4 F-A-02).
+> **Phase A only.** Java has the Phase A pipeline (CDL → JUnit 5 tests). Phase B forms are supported on TypeScript and Python projects only; Java projects fail loud (Round 4 F-A-02).
 
 ## Install and adopt
 
@@ -125,7 +125,7 @@ See `docs/guides/python-integration.md` § "Controlled contract-change flow".
 
 ## Phase B contracts on Java projects (F-A-02 fail-loud)
 
-`trace-policy` / `type-state` / `effect-policy` fail loud on Java:
+`trace-policy` / `type-state` / `effect-policy` fail loud on Java. TypeScript and Python projects use the Phase B evaluator; Java does not:
 
 ```text
 [error] trace-policy not yet supported for targetLanguage="java".
@@ -135,7 +135,7 @@ Workarounds:
 
 1. **Remove the Phase B form** and use an `invariant` + Java `checker`.
 2. **Wait for the Java Phase B evaluator** (JavaParser-based extractor on roadmap).
-3. **Scope Phase B to a TypeScript subproject** if you have one.
+3. **Scope Phase B to a TypeScript or Python subproject** if you have one.
 
 ## Packed adoption caveat
 
