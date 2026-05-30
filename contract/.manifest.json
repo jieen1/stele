@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-27T08:29:15.331Z",
+  "generated_at": "2026-05-29T14:34:45.470Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -16,12 +16,12 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "6a939cbcbb40f56eedc8a905e2e10f6e77e303877381136d1c3cbd18522b0f8f",
-      "size": 154229
+      "sha256": "f8db0eb7a9bebd3b383f347840cd7edf47019c7c61bca23545dc29f58685c066",
+      "size": 166443
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "e4d952029a4e3fccf086bda1cbc1a361ae01e8d35a8f912aa878862aa01f460d",
-      "size": 139494
+      "sha256": "808f62935840bdddfa41694636de25b1f01b3df20c585edba15aaab6b28e1502",
+      "size": 144172
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
@@ -76,8 +76,8 @@
       "size": 25150
     },
     "contract/main.stele": {
-      "sha256": "a137edf7394620599098eed3da93a50c60eb080d8e002ff08c361c13e4e48a6f",
-      "size": 47786
+      "sha256": "2448fbff82cedc580ba295e77d9bd226bdd785a55402d92058846138668d25c5",
+      "size": 52399
     },
     "package.json": {
       "sha256": "4cd157c4a07307f29229c884d4d3c6a1ac08104eaf2f37cc9758ee543eeb46e6",
@@ -160,8 +160,8 @@
       "size": 4029
     },
     "packages/claude-code-plugin/scripts/stop-validate.js": {
-      "sha256": "d24d56423f25e639a0a9b7c8881eee74c95f96cb3c2e006108e8a957b9afaac6",
-      "size": 23251
+      "sha256": "d656503446f1741e441428204f2c4959273416546b606299cde241c115332c29",
+      "size": 22508
     },
     "packages/cli/package.json": {
       "sha256": "5b0dae678a4ae78e0ea64d7ae8d1aa60209cd049848b5a3184a255e817837788",
@@ -248,13 +248,13 @@
       "size": 7213
     },
     "tests/contract/test_contract.py": {
-      "sha256": "97741e4261dbcbf78fbf80ebb53768b7ca76665569f3fd344fe378c2826fb2ca",
-      "size": 10970
+      "sha256": "c7e3215cc08849c9c23dd0318ad70e6cc750b5b91afeb87d09285cbcbe6823ae",
+      "size": 11882
     },
     "tsconfig.base.json": {
       "sha256": "14e86fc4216dd21efaadba41d3e644d1417b53209eb0faa76a4f082f0aa2bb02",
       "size": 381
     }
   },
-  "contract_hash": "f85a3dedca203fafc83c6fcea62164077b3ca8bc82561890270b6e3ac02ef3d4"
+  "contract_hash": "9cb3ac4baa68ca8af3c5dbde49c5a3f1b65f4dbf6b24bbc563a3257cc00c59c4"
 }

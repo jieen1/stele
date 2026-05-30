@@ -138,38 +138,12 @@ async function main() {
   }
   }
 
-  // Run TypeScript tests (pnpm). Gracefully skip if pnpm is not available —
-  // not all Stele projects are pnpm monorepos.
-  const pnpmCommandPath = await resolveCommandOnPath(
-    process.platform === "win32" ? ["pnpm.cmd", "pnpm.bat"] : ["pnpm"],
-    pathValue,
-  );
-
-  // Only run pnpm test if this looks like a Node.js project (has package.json).
-  // Not all Stele-protected projects are pnpm monorepos.
-  const packageJsonPath = path.join(projectDir, "package.json");
-  const hasPackageJson = await fileExists(packageJsonPath);
-
-  if (pnpmCommandPath !== null && hasPackageJson) {
-    const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-    const pnpmResult = await runCommand({
-      stageName: "pnpm test",
-      commandPath: pnpmCommand,
-      args: ["test"],
-      cwd: projectDir,
-      env: { STELE_CONFORMANCE_ALLOW_SKIP: "1" },
-    });
-
-    if (pnpmResult.code !== 0) {
-      await blockStopWithLoopGuard(
-        "pnpm test",
-        pnpmResult.code,
-        `pnpm test failed with exit code ${pnpmResult.code}.\n${CONTRACT_RECOVERY_GUIDANCE}`,
-        `${pnpmResult.stderr}\n${pnpmResult.stdout}`,
-      );
-      return;
-    }
-  }
+  // The Stop hook runs ONLY what Stele owns and is bounded: `stele check`
+  // (above) + the generated contract tests (`pytest tests/contract`, above).
+  // The project's full test suite is intentionally NOT run here — it is
+  // unbounded, paid on every Stop, and belongs in CI (detective), not in the
+  // preventive Stop gate. (Stele's own repo runs the full suite in CI:
+  // `pnpm -r test` in .github/workflows/ci.yml.)
 
   await maybeRequestMaintenanceReview(hookPayload, steleCommandPath);
 

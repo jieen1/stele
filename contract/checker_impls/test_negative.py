@@ -2891,3 +2891,117 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# ---------------------------------------------------------------------------
+# Lock 1 negative tests: C2 scratch (2) + C3 (2) + C4a (1) + C4b (2).
+# Each tampers the real repo in place and restores in finally. The Lock-1
+# checkers read files fresh per call, so _reset_caches is a no-op for them but
+# kept for consistency with the file's idiom.
+# ---------------------------------------------------------------------------
+
+
+def test_scratch_never_hashed_config_glob():
+    _reset_caches()
+    cfg = sp._REPO_ROOT / "stele.config.json"
+    original = cfg.read_text(encoding="utf-8")
+    data = json.loads(original)
+    data["protected"].append(".stele/incident/**")
+    cfg.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    try:
+        result = sp.scratch_never_hashed({})
+    finally:
+        cfg.write_text(original, encoding="utf-8")
+    assert _pass_if_false(result, "scratch_never_hashed_config_glob"), result
+
+
+def test_scratch_never_hashed_cache_key():
+    _reset_caches()
+    cache = sp._REPO_ROOT / "contract" / ".cache" / "hash-manifest.json"
+    existed = cache.exists()
+    original = cache.read_text(encoding="utf-8") if existed else None
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps({"files": {".stele/proofs/draft.json": "deadbeef"}}), encoding="utf-8")
+    try:
+        result = sp.scratch_never_hashed({})
+    finally:
+        if existed:
+            cache.write_text(original, encoding="utf-8")
+        else:
+            cache.unlink()
+    assert _pass_if_false(result, "scratch_never_hashed_cache_key"), result
+
+
+def test_stop_hook_no_full_suite_runner_pnpm_test():
+    _reset_caches()
+    hook = sp._REPO_ROOT / "packages" / "claude-code-plugin" / "scripts" / "stop-validate.js"
+    original = hook.read_text(encoding="utf-8")
+    tampered = original.replace(
+        "  await maybeRequestMaintenanceReview(",
+        '  await runCommand({ stageName: "pnpm test", commandPath: "pnpm", args: ["test"], cwd: projectDir });\n  await maybeRequestMaintenanceReview(',
+        1,
+    )
+    assert tampered != original, "anchor not found in stop-validate.js"
+    hook.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.stop_hook_no_full_suite_runner({})
+    finally:
+        hook.write_text(original, encoding="utf-8")
+    assert _pass_if_false(result, "stop_hook_no_full_suite_runner_pnpm_test"), result
+
+
+def test_stop_hook_no_full_suite_runner_allow_skip():
+    _reset_caches()
+    hook = sp._REPO_ROOT / "packages" / "claude-code-plugin" / "scripts" / "stop-validate.js"
+    original = hook.read_text(encoding="utf-8")
+    tampered = original.replace(
+        "  await maybeRequestMaintenanceReview(",
+        "  if (process.env.STELE_CONFORMANCE_ALLOW_SKIP) { return; }\n  await maybeRequestMaintenanceReview(",
+        1,
+    )
+    assert tampered != original, "anchor not found in stop-validate.js"
+    hook.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.stop_hook_no_full_suite_runner({})
+    finally:
+        hook.write_text(original, encoding="utf-8")
+    assert _pass_if_false(result, "stop_hook_no_full_suite_runner_allow_skip"), result
+
+
+def test_cli_exit_code_count_exact_ninth_code():
+    _reset_caches()
+    errors_ts = sp._PACKAGES_DIR / "cli" / "src" / "errors.ts"
+    original = errors_ts.read_text(encoding="utf-8")
+    tampered = original.replace(
+        "  INTERNAL_ERROR: 99,",
+        "  INTERNAL_ERROR: 99,\n  /** extra */\n  NEW_CODE: 7,",
+    )
+    assert tampered != original, "anchor not found in errors.ts"
+    errors_ts.write_text(tampered, encoding="utf-8")
+    try:
+        result = sp.cli_exit_code_count_exact({})
+    finally:
+        errors_ts.write_text(original, encoding="utf-8")
+    assert _pass_if_false(result, "cli_exit_code_count_exact_ninth_code"), result
+
+
+def test_cli_no_raw_exit_codes_planted_literal():
+    _reset_caches()
+    planted = sp._PACKAGES_DIR / "cli" / "src" / "__lock1_tamper__.ts"
+    planted.write_text("export function boom() { process.exit(7); }\n", encoding="utf-8")
+    try:
+        result = sp.cli_no_raw_exit_codes({})
+    finally:
+        planted.unlink(missing_ok=True)
+    assert _pass_if_false(result, "cli_no_raw_exit_codes_planted_literal"), result
+
+
+def test_cli_no_raw_exit_codes_exitcode_assignment():
+    _reset_caches()
+    planted = sp._PACKAGES_DIR / "cli" / "src" / "__lock1_tamper2__.ts"
+    planted.write_text("export const f = () => { process.exitCode = 8; };\n", encoding="utf-8")
+    try:
+        result = sp.cli_no_raw_exit_codes({})
+    finally:
+        planted.unlink(missing_ok=True)
+    assert _pass_if_false(result, "cli_no_raw_exit_codes_exitcode_assignment"), result

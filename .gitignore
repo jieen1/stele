@@ -81,3 +81,8 @@ examples/**/.stele/maintenance/
 # Cursor rules (IDE-specific, not tracked)
 .cursor/
 packages/**/.cursor/
+
+# Stele Lock-1 negative-test tamper artifacts (never tracked; a hard-killed
+# test could otherwise leak these as real off-contract CLI source files)
+packages/cli/src/__lock1_tamper__.ts
+packages/cli/src/__lock1_tamper2__.ts

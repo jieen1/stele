@@ -45,6 +45,37 @@ describe("stop-validate hook", () => {
     );
   });
 
+  it("never runs the project's full test suite (pnpm), even with package.json + pnpm present", async () => {
+    const projectDir = await createTempDir();
+    // A Node project whose `test` script, if ever invoked by the Stop hook,
+    // would taint the run — the hook must NOT touch it (unbounded, belongs in CI).
+    await writeFile(
+      join(projectDir, "package.json"),
+      JSON.stringify({ name: "adopter", scripts: { test: "exit 1" } }),
+      "utf8",
+    );
+    const binDir = await createFakeToolchain({
+      stele: { stdout: "stele ok", stderr: "", exitCode: 0 },
+      python: { stdout: "pytest ok", stderr: "", exitCode: 0 },
+    });
+    // A pnpm on PATH that screams if invoked. The Stop hook must ignore it.
+    await writeToolScript(binDir, "pnpm", {
+      stdout: "PNPM WAS INVOKED",
+      stderr: "",
+      exitCode: 0,
+      cwdFile: "pnpm-cwd.txt",
+      argsFile: "pnpm-args.txt",
+    });
+
+    const result = runStopHook(projectDir, binDir);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toContain("PNPM WAS INVOKED");
+    // The pnpm stub records its invocation by writing pnpm-args.txt in its cwd.
+    // Absence proves the Stop hook never spawned the full-suite runner.
+    await expect(readFile(join(projectDir, "pnpm-args.txt"), "utf8")).rejects.toThrow();
+  });
+
   it("after successful validation asks for one maintenance review when material source edits were observed", { timeout: 15000 }, async () => {
     const projectDir = await createTempDir();
     await writeObservation(projectDir, {

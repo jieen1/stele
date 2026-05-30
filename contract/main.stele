@@ -513,6 +513,37 @@
   (deny-import "@stele/backend-java")
   (allow-target "packages/cli/src/backend-registry.ts"))
 
+; --- incident-wedge design lock (Lock 1) -------------------------------------
+; C1 (G1): @stele/core import purity. The EFFECT half (no network/process
+; effect in core) is already locked by CORE_IS_PURE_OR_FS_READ. This boundary
+; adds the IMPORT half: core must never import child_process, a git client, or
+; the incident/propose wedge modules. deny-import is hand-maintained -- any
+; newly adopted git/LLM client specifier MUST be added here. Dynamic
+; import()/require() are caught by the effect-policy backstop, not this boundary.
+(boundary core-no-incident-or-process-imports
+  (lang typescript)
+  (target "packages/core/src/**/*.ts")
+  (deny-import "node:child_process")
+  (deny-import "child_process")
+  (deny-import "simple-git")
+  (deny-import "isomorphic-git")
+  (deny-import "@stele/incident")
+  (deny-import "@stele/propose"))
+
+; C2 (G2) KEYSTONE: the probabilistic incident draft writes only to
+; .stele/incident/ and teeth proofs to .stele/proofs/. Neither may EVER be
+; hashed -- not via a protected glob, the protected manifest, or the canonical
+; cache hash-manifest (contract/.cache/hash-manifest.json). Implemented by
+; scratch_never_hashed in self_protection.py (fail-closed).
+(checker scratch-never-hashed
+  (description "Scratch dirs .stele/incident and .stele/proofs never enter the hash boundary."))
+
+(invariant SCRATCH_NEVER_HASHED
+  (severity error)
+  (description "G2: incident/proof scratch is never hashed -- no protected glob, manifest key, or cache key resolves under .stele/incident or .stele/proofs.")
+  (rationale "The incident wedge's LLM/probabilistic step must stay outside the deterministic hash boundary; hashing scratch would let nondeterministic drafts corrupt the manifest.")
+  (uses-checker scratch-never-hashed))
+
 ; --- §2.2 class-shape contracts -----------------------------------------------
 ; The TS analyzer only recognises real `class` declarations (not `interface` or
 ; type aliases), so each class-shape targets a concrete class. The phase doc's
@@ -895,5 +926,50 @@
 (type-state-binding
   (function "packages/cli/src/commands/check-stages-call-graph-cache.ts::useCachedCallGraph(1)")
   (param 0 state Cached))
+
+
+; ============================================================================
+; Lock 1 -- Stop-hook scope + CLI exit-code surface (incident-wedge design lock)
+; ============================================================================
+
+; C3: the Stop hook (stop-validate.js) runs ONLY Stele-owned bounded stages --
+; `stele check` + `pytest tests/contract`. It must NEVER reintroduce a
+; full-project test-suite runner or the STELE_CONFORMANCE_ALLOW_SKIP escape
+; hatch removed in Phase 1. Implemented by stop_hook_no_full_suite_runner
+; (comment-aware, fail-closed) in self_protection.py.
+(checker stop-hook-no-full-suite-runner
+  (description "The Stop hook never runs a full project test suite -- only stele check + pytest tests/contract."))
+
+(invariant STOP_HOOK_NO_FULL_SUITE_RUNNER
+  (severity error)
+  (description "stop-validate.js runs only `stele check` and `pytest tests/contract`; no pnpm/npm/yarn test, vitest, jest, or STELE_CONFORMANCE_ALLOW_SKIP may reappear.")
+  (rationale "The Stop gate must stay bounded and preventive; an unbounded full-suite runner is paid on every Stop and belongs in CI, not the hook. The skip env-var was an escape hatch that defeats the gate.")
+  (uses-checker stop-hook-no-full-suite-runner))
+
+; C4a: the ExitCode const in packages/cli/src/errors.ts must define EXACTLY 8
+; integer-literal members. Complements exit-codes-valid (values/names) by
+; capping the COUNT, rejecting an additive 9th code. Fail-closed on read/parse.
+(checker cli-exit-code-count-exact
+  (description "The ExitCode const object defines exactly 8 integer-literal members -- no additive 9th code."))
+
+(invariant CLI_EXIT_CODE_COUNT_EXACT
+  (severity error)
+  (description "packages/cli/src/errors.ts ExitCode must contain exactly 8 integer-literal members {0,1,2,3,4,5,6,99}.")
+  (rationale "CLI exit codes are part of the user contract; silently adding a 9th code widens the contract surface unobserved.")
+  (uses-checker cli-exit-code-count-exact))
+
+; C4b: no CLI source under packages/cli/src may call process.exit(N) or assign
+; process.exitCode = N with an integer literal outside the contracted set
+; {0,1,2,3,4,5,6,99}. Complements exit-codes-valid (DEFINITION) by pinning
+; call-site USAGE. Symbolic forms (ExitCode.X, variables) pass. Scans whole-file
+; over *.ts/*.mts/*.cts/*.tsx; fail-closed on IO.
+(checker cli-no-raw-exit-codes
+  (description "No CLI call site exits with an integer literal outside the 8 contracted exit values."))
+
+(invariant CLI_NO_RAW_EXIT_CODES
+  (severity error)
+  (description "process.exit(N) / process.exitCode = N in packages/cli/src must use only the contracted exit values {0,1,2,3,4,5,6,99}.")
+  (rationale "An off-contract exit literal at a call site silently introduces an undocumented exit code even when the exit-code definition is intact.")
+  (uses-checker cli-no-raw-exit-codes))
 
 (import "generated/ddd-typedriven.stele")
