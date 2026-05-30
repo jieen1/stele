@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -17,13 +17,59 @@ const publishPackageDirs = [
   join(repoRoot, "packages", "cli"),
   join(repoRoot, "packages", "claude-code-plugin"),
 ];
-// adoptionPackageDirs must include CLI, core, and backend-python for a
-// complete init → generate → check loop in a fresh project.
-const adoptionPackageDirs = [
-  publishPackageDirs[0],  // core
-  publishPackageDirs[1], // backend-python
-  publishPackageDirs[6], // cli
-];
+
+// adoptionPackageDirs is the FULL workspace-dependency closure of the adoption
+// entrypoints {core, backend-python, cli}. `npm pack` rewrites each tarball's
+// `workspace:*` deps to a concrete `@0.1.0`; if any transitive @stele dep is not
+// also handed to `npm install`, npm 404s it against the public registry (this is
+// what silently broke once core grew a `@stele/call-graph-core` dependency in
+// Phase B). Deriving the closure from package.json keeps the install set honest
+// as the dependency graph evolves, instead of a hand-maintained index list.
+const adoptionEntrypoints = ["@stele/core", "@stele/backend-python", "@stele/cli"];
+const adoptionPackageDirs = computeWorkspaceClosureDirs(adoptionEntrypoints);
+
+function computeWorkspaceClosureDirs(entrypointNames) {
+  const nameToDir = new Map();
+  const nameToWorkspaceDeps = new Map();
+  for (const entry of readdirSync(join(repoRoot, "packages"), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const pkgJsonPath = join(repoRoot, "packages", entry.name, "package.json");
+    if (!existsSync(pkgJsonPath)) continue;
+    const manifest = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+    nameToDir.set(manifest.name, join(repoRoot, "packages", entry.name));
+    const deps = [];
+    for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
+      for (const [depName, range] of Object.entries(manifest[field] ?? {})) {
+        if (typeof range === "string" && range.startsWith("workspace:")) deps.push(depName);
+      }
+    }
+    nameToWorkspaceDeps.set(manifest.name, deps);
+  }
+  const seen = new Set();
+  const stack = [...entrypointNames];
+  while (stack.length > 0) {
+    const name = stack.pop();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    for (const dep of nameToWorkspaceDeps.get(name) ?? []) {
+      if (!seen.has(dep)) stack.push(dep);
+    }
+  }
+  const dirs = [];
+  for (const name of seen) {
+    const dir = nameToDir.get(name);
+    if (!dir) throw new Error(`Adoption closure references ${name}, which is not a workspace package.`);
+    dirs.push(dir);
+  }
+  return dirs.sort();
+}
+
+// Every adoption tarball must also be packed/release-verified: extend the pack
+// set with any closure member not already listed above.
+for (const dir of adoptionPackageDirs) {
+  if (!publishPackageDirs.includes(dir)) publishPackageDirs.push(dir);
+}
+
 const pnpmTool = resolveTool("pnpm", ["node_modules", "pnpm", "bin", "pnpm.cjs"]);
 const npmTool = resolveTool("npm", ["node_modules", "npm", "bin", "npm-cli.js"]);
 const npxTool = resolveTool("npx", ["node_modules", "npm", "bin", "npx-cli.js"]);
@@ -121,7 +167,7 @@ async function main() {
     );
 
     const generateResult = await runTool(npxTool, ["stele", "generate"], sanitizedNpmOptions({ cwd: projectDir, capture: true }));
-    assertIncludes(generateResult.stdout, "OK generated 3 files in tests/contract.", "generate success summary");
+    assertIncludes(generateResult.stdout, "OK generated 3 files in tests/contract", "generate success summary");
     await run(pythonCommand, ["-m", "pytest", "tests/contract", "-q"], { cwd: projectDir });
     const lockResult = await runTool(
       npxTool,
