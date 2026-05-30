@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 const VALID_INVARIANT = `(invariant no-double-charge
   (severity error)
   (description "Payments must not double-charge on retry")
-  (assert true))`;
+  (assert (eq 1 1)))`;
 
 const GIT_ENV = {
   ...process.env,
@@ -201,5 +201,49 @@ describe("runIncidentDraft", () => {
     );
     expect(process.exitCode).toBe(1);
     expect(await pathExists(join(repo, ".stele/incident/root-commit-incident"))).toBe(false);
+  });
+
+  it("rejects a parseable-but-non-compiling invariant (no assert/check) with exit 1 and no scratch", async () => {
+    // This invariant PARSES fine as an S-expression (so the OLD parse-only gate
+    // would have passed it on to approve), but it does NOT compile: loadContract
+    // requires exactly one of (assert ...) / (uses-checker ...). The full compile
+    // gate must reject it at draft time.
+    const before = await snapshotDir(join(repo, "contract"));
+    const draftFrom = await writeDraftFile({
+      invariantCdl:
+        "(invariant inc-noassert\n  (severity error)\n  (description \"missing assert\"))",
+      negativeTest: "def test_x():\n    assert False\n",
+    });
+    await runIncidentDraft(
+      repo,
+      { intent: "No assert incident", fix: "HEAD", draftFrom, id: "noassert-incident" },
+      { stdout: captureStdout().stdout },
+    );
+    expect(process.exitCode).toBe(1);
+    expect(await pathExists(join(repo, ".stele/incident/noassert-incident"))).toBe(false);
+    // contract/ untouched and the throwaway compile-check file is cleaned up.
+    expect(await snapshotDir(join(repo, "contract"))).toEqual(before);
+    expect(
+      await pathExists(join(repo, ".stele-incident-compile-check-noassert-incident.stele")),
+    ).toBe(false);
+  });
+
+  it("accepts an invariant that compiles", async () => {
+    // VALID_INVARIANT has an (assert ...); it compiles cleanly standalone, so the
+    // full compile gate passes and the draft is written.
+    const draftFrom = await writeDraftFile({
+      invariantCdl: VALID_INVARIANT,
+      negativeTest: "def test_x():\n    assert False\n",
+    });
+    await runIncidentDraft(
+      repo,
+      { intent: "Compiles fine", fix: "HEAD", draftFrom, id: "compiles-fine" },
+      { stdout: captureStdout().stdout },
+    );
+    expect(process.exitCode).toBeUndefined();
+    expect(await pathExists(join(repo, ".stele/incident/compiles-fine/draft.json"))).toBe(true);
+    expect(
+      await pathExists(join(repo, ".stele-incident-compile-check-compiles-fine.stele")),
+    ).toBe(false);
   });
 });

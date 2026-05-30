@@ -32,10 +32,6 @@ export function createIncidentTeethTool(): ToolDef {
           type: "string",
           description: "Incident id (from incident_draft)",
         },
-        runLocal: {
-          type: "boolean",
-          description: "Reserved; teeth always runs in isolated worktrees",
-        },
       },
       required: ["id"],
     },
@@ -46,10 +42,9 @@ export function createIncidentTeethTool(): ToolDef {
       }
       const projectDir = resolved.path;
       const id = String(args.id ?? "");
-      const runLocal = args.runLocal === true;
 
       try {
-        const result = await runIncidentTeeth(projectDir, { id, runLocal });
+        const result = await runIncidentTeeth(projectDir, { id });
         const text =
           `Teeth verdict: ${result.verdict}\n` +
           `  parent  exit=${result.parentRun.exit}  outputSha256=${result.parentRun.outputSha256}\n` +

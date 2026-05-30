@@ -36,10 +36,10 @@ describe("incident_teeth tool", () => {
     mockValidateProjectDir.mockReturnValue({ path: "/project" });
     mockRunIncidentTeeth.mockResolvedValue(PROVEN);
 
-    await tool.handler({ projectDir: "/project", id: "inc", runLocal: true });
+    await tool.handler({ projectDir: "/project", id: "inc" });
 
     expect(mockRunIncidentTeeth).toHaveBeenCalledTimes(1);
-    expect(mockRunIncidentTeeth).toHaveBeenCalledWith("/project", { id: "inc", runLocal: true });
+    expect(mockRunIncidentTeeth).toHaveBeenCalledWith("/project", { id: "inc" });
   });
 
   it("TEETH_PROVEN -> isError:false with verdict + testSha256 + runs in content", async () => {

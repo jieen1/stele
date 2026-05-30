@@ -19,7 +19,7 @@ import {
   writeCandidateTest,
   writeDraftJson,
 } from "../src/commands/incident/shared.js";
-import { runIncidentTeeth } from "../src/commands/incident/teeth.js";
+import { normalizeTeethOutput, runIncidentTeeth } from "../src/commands/incident/teeth.js";
 
 const OLD_DATE = "2021-01-02T03:04:05+00:00";
 
@@ -256,6 +256,96 @@ describePy("runIncidentTeeth — determinism", () => {
 
     const teeth = readTeeth(f.dir, id);
     expect(teeth.testSha256).toBe(sha256Hex(test));
+  });
+
+  it("outputSha256 is byte-reproducible across two runs (F2); teeth.json byte-identical", async () => {
+    const f = makeProvenFixture();
+    track(f.dir);
+    const id = "reproducible";
+    const test = "from src.calc import add\n\ndef test_add():\n    assert add(1, 2) == 3\n";
+    await seedDraft(f.dir, id, f, test);
+
+    const teethPath = join(f.dir, ".stele", "proofs", id, "teeth.json");
+
+    await runIncidentTeeth(f.dir, { id }, { python: TEST_PYTHON });
+    const firstBytes = readFileSync(teethPath, "utf8");
+    const first = JSON.parse(firstBytes) as {
+      parentRun: { outputSha256: string };
+      fixRun: { outputSha256: string };
+    };
+
+    await runIncidentTeeth(f.dir, { id }, { python: TEST_PYTHON });
+    const secondBytes = readFileSync(teethPath, "utf8");
+    const second = JSON.parse(secondBytes) as {
+      parentRun: { outputSha256: string };
+      fixRun: { outputSha256: string };
+    };
+
+    // The two runs execute in DIFFERENT mkdtemp worktrees with run-varying pytest
+    // durations; normalizeTeethOutput must strip both so the hashes match. If
+    // normalizeTeethOutput were reverted, the absolute worktree path + durations
+    // would differ and these would fail.
+    expect(second.parentRun.outputSha256).toBe(first.parentRun.outputSha256);
+    expect(second.fixRun.outputSha256).toBe(first.fixRun.outputSha256);
+    // Whole-file byte identity (producedAtFromGit + testSha256 + both runs).
+    expect(secondBytes).toBe(firstBytes);
+  });
+});
+
+describe("normalizeTeethOutput (pure, F2)", () => {
+  const worktree = "/tmp/stele-incident-foo-XYZ/parent-deadbeef";
+
+  it("canonicalizes 'in N.NNs' session durations", () => {
+    const out = normalizeTeethOutput("1 passed in 0.12s\n", worktree);
+    expect(out).toBe("1 passed in <duration>\n");
+    expect(out).not.toContain("0.12s");
+  });
+
+  it("canonicalizes bare duration tokens (e.g. setup/teardown rows)", () => {
+    const out = normalizeTeethOutput("0.30s call test_x\n1.30s setup test_y\n", worktree);
+    expect(out).toBe("<duration> call test_x\n<duration> setup test_y\n");
+    expect(out).not.toMatch(/\d+\.\d+s/);
+  });
+
+  it("canonicalizes the absolute worktree path", () => {
+    const out = normalizeTeethOutput(`collected from ${worktree}/test_x.py\n`, worktree);
+    expect(out).toBe("collected from <worktree>/test_x.py\n");
+    expect(out).not.toContain(worktree);
+  });
+
+  it("two outputs differing ONLY in duration + worktree path hash equal", () => {
+    const a =
+      `rootdir: /tmp/stele-incident-foo-AAA/parent-1\n` +
+      `1 passed in 0.12s\n0.05s call\n`;
+    const b =
+      `rootdir: /tmp/stele-incident-foo-BBB/parent-2\n` +
+      `1 passed in 9.87s\n2.41s call\n`;
+    const ha = sha256Hex(normalizeTeethOutput(a, "/tmp/stele-incident-foo-AAA/parent-1"));
+    const hb = sha256Hex(normalizeTeethOutput(b, "/tmp/stele-incident-foo-BBB/parent-2"));
+    expect(ha).toBe(hb);
+  });
+
+  it("does NOT collapse genuinely different content", () => {
+    const ha = sha256Hex(normalizeTeethOutput("AssertionError: 4 != 3\n", worktree));
+    const hb = sha256Hex(normalizeTeethOutput("AssertionError: 5 != 3\n", worktree));
+    expect(ha).not.toBe(hb);
+  });
+
+  it("canonicalizes hex object-repr memory addresses (F2 residual)", () => {
+    // pytest's assertion-rewrite prints default object reprs with the heap
+    // address, which varies every process. Two failing runs differing ONLY in
+    // that address must hash equal, else teeth.json is not byte-reproducible for
+    // any test whose failure references an object without a stable __repr__.
+    const a =
+      "E   +  where False = <function exists at 0x7fdc229dbe20>('x')\n";
+    const b =
+      "E   +  where False = <function exists at 0x7f00deadbeef>('x')\n";
+    expect(normalizeTeethOutput(a, worktree)).toBe(
+      "E   +  where False = <function exists at <addr>>('x')\n",
+    );
+    expect(sha256Hex(normalizeTeethOutput(a, worktree))).toBe(
+      sha256Hex(normalizeTeethOutput(b, worktree)),
+    );
   });
 });
 

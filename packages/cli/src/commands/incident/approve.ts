@@ -87,10 +87,27 @@ function extractFormBody(cdl: string, op: string): string | null {
   }
   let depth = 0;
   let i = start;
+  let inString = false;
   for (; i < cdl.length; i++) {
     const ch = cdl[i];
-    if (ch === "(") depth++;
-    else if (ch === ")") {
+    if (inString) {
+      // Inside a CDL string literal, parens are DATA, not structure. Skip a
+      // backslash-escaped char (e.g. \" or \\) so an escaped quote does not
+      // prematurely close the string. This is what makes the extractor string-
+      // literal-aware: a ')' inside `"...)..."` no longer mis-terminates the
+      // form, so a description/rationale/assert containing ')' extracts correctly.
+      if (ch === "\\") {
+        i++;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
       depth--;
       if (depth === 0) break;
     }
@@ -401,7 +418,14 @@ export async function runIncidentApprove(
   const tags = gate.teethUnavailable
     ? [PROVENANCE_TAG, TEETH_UNPROVEN_TAG]
     : [PROVENANCE_TAG];
-  const rationaleSuffix = `fix:${draft.fixSha}`;
+  // When teeth could not be proven, the operator-supplied reason is part of the
+  // permanent record: it is woven into BOTH the locked invariant's rationale
+  // (here) AND the signed approval record's `reason` (below), so a teeth:unproven
+  // invariant carries its justification wherever it is read, not only in the gate
+  // predicate.
+  const rationaleSuffix = gate.teethUnavailable
+    ? `fix:${draft.fixSha}; teeth-unavailable: ${gate.unavailableReason}`
+    : `fix:${draft.fixSha}`;
   const rationale = invariant.rationale
     ? `${invariant.rationale} (${rationaleSuffix})`
     : `incident ${id} ${rationaleSuffix}`;

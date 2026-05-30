@@ -59,7 +59,7 @@ export type TeethProof = {
   producedAtFromGit: string;
 };
 
-export type IncidentTeethOptions = { id: string; runLocal?: boolean };
+export type IncidentTeethOptions = { id: string };
 
 const TEST_FILENAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_.-]*\.py$/;
 
@@ -233,11 +233,35 @@ function runTestInWorktree(
     stderr = err.stderr ? err.stderr.toString() : "";
   }
 
-  const combined = Buffer.concat([
-    Buffer.from(stdout, "utf8"),
-    Buffer.from(stderr, "utf8"),
-  ]);
-  return { exit, outputSha256: sha256Hex(combined) };
+  const combined = normalizeTeethOutput(`${stdout}${stderr}`, worktreeDir);
+  return { exit, outputSha256: sha256Hex(Buffer.from(combined, "utf8")) };
+}
+
+/**
+ * Make the pytest output byte-reproducible BEFORE hashing it, so two runs of the
+ * same test in different throwaway worktrees yield an identical outputSha256 and
+ * a byte-identical teeth.json (F2). pytest emits run-varying fragments: per-test
+ * and session DURATIONS ("... in 0.12s", "1.30s setup"), the ABSOLUTE worktree
+ * path (a fresh mkdtemp dir every run), and OBJECT MEMORY ADDRESSES in default
+ * reprs ("<function exists at 0x7fdc229dbe20>") which pytest's assertion-rewrite
+ * introspection prints whenever a failing assert references an object without a
+ * stable __repr__. We canonicalize all of them. The verdict never depends on this
+ * text — it is derived from the exit code — but a stable hash turns teeth.json
+ * into a reproducible artifact.
+ */
+export function normalizeTeethOutput(raw: string, worktreeDir: string): string {
+  const escaped = worktreeDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return raw
+    .replace(/\r\n/g, "\n")
+    .replace(new RegExp(escaped, "g"), "<worktree>")
+    // "1 passed in 0.12s", "in 0.12s", "in 1.3s ===" -> "in <duration>"
+    .replace(/\bin\s+\d+(?:\.\d+)?s\b/g, "in <duration>")
+    // any remaining bare "0.12s" timing token (durations report rows)
+    .replace(/\b\d+(?:\.\d+)?s\b/g, "<duration>")
+    // hex memory addresses in default object reprs ("at 0x7fdc229dbe20") — the
+    // process heap location varies every run and would otherwise leak into the
+    // hash for any failing assert that prints an object repr.
+    .replace(/0x[0-9a-fA-F]+/g, "<addr>");
 }
 
 function serializeTeeth(proof: TeethProof): string {
@@ -348,6 +372,16 @@ export async function runIncidentTeeth(
   let parentAdded = false;
   let fixAdded = false;
   try {
+    // Defense-in-depth (F5): prune stale worktree registrations left by a
+    // previous crash BEFORE adding. `git worktree add` refuses a path whose
+    // registration still lingers, so an orphaned entry from an interrupted run
+    // could otherwise block re-running teeth for the same id. The finally below
+    // also prunes after removal, so registrations are cleaned on both ends.
+    try {
+      git(projectDir, ["worktree", "prune"]);
+    } catch {
+      // best-effort
+    }
     addWorktree(projectDir, parentDir, parentSha);
     parentAdded = true;
     addWorktree(projectDir, fixDir, fixSha);
@@ -421,8 +455,7 @@ export function registerIncidentTeeth(incident: Command): void {
       "Prove the candidate negative test FAILS at <fix>^ AND PASSES at <fix> in isolated worktrees. Writes only to .stele/proofs/<id>/.",
     )
     .requiredOption("--id <id>", "incident id (from `stele incident draft`)")
-    .option("--run-local", "reserved; teeth always runs in isolated worktrees")
-    .action(async (opts: { id: string; runLocal?: boolean }) => {
-      await runIncidentTeeth(process.cwd(), { id: opts.id, runLocal: opts.runLocal });
+    .action(async (opts: { id: string }) => {
+      await runIncidentTeeth(process.cwd(), { id: opts.id });
     });
 }

@@ -528,7 +528,8 @@
   (deny-import "simple-git")
   (deny-import "isomorphic-git")
   (deny-import "@stele/incident")
-  (deny-import "@stele/propose"))
+  (deny-import "@stele/propose")
+  (deny-import "@stele/cli"))
 
 ; C2 (G2) KEYSTONE: the probabilistic incident draft writes only to
 ; .stele/incident/ and teeth proofs to .stele/proofs/. Neither may EVER be
