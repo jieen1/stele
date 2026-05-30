@@ -8,6 +8,9 @@ import { createExplainViolationTool } from "./explain-violation.js";
 import { createWhyTool } from "./why.js";
 import { createProposeContractTool } from "./propose-contract.js";
 import { createObserveTool } from "./observe.js";
+import { createIncidentDraftTool } from "./incident-draft.js";
+import { createIncidentTeethTool } from "./incident-teeth.js";
+import { createIncidentApproveTool } from "./incident-approve.js";
 import type { ToolDef } from "../types.js";
 
 /**
@@ -30,5 +33,8 @@ export function registerTools(): ToolDef[] {
     createWhyTool(),
     createProposeContractTool(),
     createObserveTool(),
+    createIncidentDraftTool(),
+    createIncidentTeethTool(),
+    createIncidentApproveTool(),
   ];
 }

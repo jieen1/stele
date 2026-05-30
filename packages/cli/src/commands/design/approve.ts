@@ -87,7 +87,7 @@ const _APPROVED_BY_FORBIDDEN_PATTERNS: readonly RegExp[] = [
   /^iter\d+$/i,
 ];
 
-function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; reason: string } {
+export function resolveApprovedBy(): { ok: true; approvedBy: string } | { ok: false; reason: string } {
   const explicit = process.env.STELE_APPROVED_BY;
   if (typeof explicit === "string") {
     const trimmed = explicit.trim();

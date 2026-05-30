@@ -17,6 +17,7 @@ export type ProposeOptions = {
   assert: string;
   category?: string;
   rationale?: string;
+  tags?: string[];
   apply?: boolean;
 };
 
@@ -55,6 +56,9 @@ async function buildInvariantProposal(projectDir: string, options: ProposeOption
     `  (description ${JSON.stringify(options.description)})`,
     ...(options.category === undefined ? [] : [`  (category ${formatCdlValue(options.category)})`]),
     ...(options.rationale === undefined ? [] : [`  (rationale ${JSON.stringify(options.rationale)})`]),
+    ...(options.tags === undefined || options.tags.length === 0
+      ? []
+      : [`  (tags ${options.tags.map((tag) => JSON.stringify(tag)).join(" ")})`]),
     `  (assert ${options.assert}))`,
     "",
   ];

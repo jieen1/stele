@@ -250,6 +250,9 @@ importers:
       '@stele/agent-hooks':
         specifier: workspace:*
         version: link:../agent-hooks
+      '@stele/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@stele/core':
         specifier: workspace:*
         version: link:../core

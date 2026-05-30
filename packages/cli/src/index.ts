@@ -60,6 +60,18 @@ import { runWhy, type WhyOptions } from "./commands/why.js";
 import { runDev, type DevOptions } from "./commands/dev.js";
 import { runDoc, type DocOptions } from "./commands/doc.js";
 import { addDesignCommand } from "./commands/design/index.js";
+import { addIncidentCommand } from "./commands/incident/index.js";
+export {
+  runIncidentDraft,
+  runIncidentTeeth,
+  runIncidentApprove,
+  type IncidentDraftResult,
+  type IncidentTeethResult,
+  type IncidentApproveResult,
+} from "./commands/incident/lib.js";
+export type { IncidentDraftOptions } from "./commands/incident/draft.js";
+export type { IncidentTeethOptions } from "./commands/incident/teeth.js";
+export type { IncidentApproveOptions } from "./commands/incident/approve.js";
 import { unlockProject, type UnlockOptions, type UnlockSummary } from "./commands/unlock.js";
 import { runComplexitySuggest, runComplexityMeasure, type ComplexityOptions } from "./commands/complexity.js";
 import { getExitCode } from "./errors.js";
@@ -489,6 +501,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     });
 
   addDesignCommand(program);
+  addIncidentCommand(program);
 
   const cacheCommand = program
     .command(cmdSpec("cache"))

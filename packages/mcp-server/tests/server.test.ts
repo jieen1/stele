@@ -7,10 +7,10 @@ describe("SteleMcpServer", () => {
     expect(server).toBeDefined();
   });
 
-  it("registers all 10 tools", () => {
+  it("registers all 13 tools", () => {
     const server = new SteleMcpServer();
     const tools = server.getToolList();
-    expect(tools.length).toBe(10);
+    expect(tools.length).toBe(13);
   });
 
   it("has expected tool names", () => {
@@ -28,6 +28,9 @@ describe("SteleMcpServer", () => {
     expect(names).toContain("stele-why");
     expect(names).toContain("stele-propose-contract");
     expect(names).toContain("stele-observe");
+    expect(names).toContain("incident_draft");
+    expect(names).toContain("incident_teeth");
+    expect(names).toContain("incident_approve");
   });
 
   it("each tool has name, description, inputSchema, and handler", () => {

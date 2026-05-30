@@ -23,6 +23,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "~1.29.0",
     "@stele/agent-hooks": "workspace:*",
+    "@stele/cli": "workspace:*",
     "@stele/core": "workspace:*"
   },
   "devDependencies": {

@@ -12,6 +12,7 @@ Welcome. This is the index for everything outside the [project README](../README
 | [guides/rust-integration.md](guides/rust-integration.md) | Adopt Stele in a Rust + `cargo test` project. Phase A only. |
 | [guides/java-integration.md](guides/java-integration.md) | Adopt Stele in a Java + JUnit 5 project. Phase A only. |
 | [guides/claude-code-plugin.md](guides/claude-code-plugin.md) | Install and use the Claude Code plugin. Hook lifecycle, slash commands, protected paths, the controlled contract-change flow. |
+| [guides/incident-driven-contracts.md](guides/incident-driven-contracts.md) | Turn an incident + its fix into a locked, provenance-tagged invariant: the draft → teeth → approve loop, the injected-draft architecture, the `draft.json` / `teeth.json` schemas, a worked example, the teeth gate, and the scratch-never-hashed + git-committer-date determinism rules. |
 | [spec/cdl.md](spec/cdl.md) | Complete reference for CDL: grammar, top-level forms, invariant fields, scenario syntax, all 51 operators, error codes (E0001–E0606), exit codes. The narrow spec, grounded in the shipped implementation. |
 | [spec/cli-output.md](spec/cli-output.md) | JSON output schemas for CLI commands (`stele check --json`, `stele why --json`, `stele impact --json`). Used by CI integrations, VS Code extension, agent-hooks SDK. |
 

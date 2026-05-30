@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-05-30T03:36:21.242Z",
+  "generated_at": "2026-05-30T08:54:34.943Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -188,8 +188,8 @@
       "size": 1013
     },
     "packages/mcp-server/package.json": {
-      "sha256": "08d172ad20db1270dc83221c36e488f2c0baf5ff73260e738adbbeb250089809",
-      "size": 920
+      "sha256": "d902783a6338556e50e5bb9e84c014a58d1b0874bc629bc23fb50c051107537b",
+      "size": 953
     },
     "packages/trace-evaluator/package.json": {
       "sha256": "1dff6b9ef105d94250833303df59e2b0cd67e06fede731f50a602d24ae7e9abc",
@@ -216,8 +216,8 @@
       "size": 220
     },
     "pnpm-lock.yaml": {
-      "sha256": "44d4a29a28154cc0b37158779db2905c377c66657edaadd768d94453c42b5f98",
-      "size": 112723
+      "sha256": "1748f65c6e64a1372e7de6f3cd00cad7cda54df9e9582d1fca46a811d4247487",
+      "size": 112803
     },
     "pnpm-workspace.yaml": {
       "sha256": "0e316502859ceee6cd5180c9cdef463274c2531f518d2a9d73e31b4af12c1acf",

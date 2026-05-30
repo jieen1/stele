@@ -183,7 +183,7 @@ Allowed fields:
 - `uses-checker`
 - `uses-scenario`
 - `category`
-- `tags`
+- `tags` — also the **provenance carrier**: `stele incident approve` writes `(tags "provenance:incident")` on every invariant it locks (plus `"teeth:unproven"` when approved without a teeth proof via `--teeth-unavailable-reason`). A convention over the existing `tags` field — no new grammar, operator, or error code. See [the incident-driven contracts guide](../guides/incident-driven-contracts.md).
 - `when`
 - `tolerance`
 - `depends-on`
