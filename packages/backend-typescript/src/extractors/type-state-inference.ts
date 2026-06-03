@@ -206,6 +206,16 @@ function unwrapPromise(type: ts.Type, checker: ts.TypeChecker): ts.Type | null {
 }
 
 function getTypeArguments(type: ts.Type, checker: ts.TypeChecker): readonly ts.Type[] {
+  // Alias type arguments first. The real lifecycles encode state via an
+  // INTERSECTION alias — `type Approval<S> = ApprovalPayload & Brand<S>` —
+  // which is not an Object/Reference type, so the object-flag paths below
+  // never see it. But the checker keeps the state in `aliasTypeArguments`
+  // (`["Drafting"]`), so reading that slot first is what lets brand-encoded
+  // phantom state (Approval/DesignProfile/Manifest) be inferred at all.
+  const alias = (type.aliasTypeArguments ?? []) as readonly ts.Type[];
+  if (alias.length > 0) {
+    return alias;
+  }
   // Prefer the public API (`getTypeArguments`) over reading the
   // internal `typeArguments` property — the public API handles type
   // reference indirection consistently across TS versions.
@@ -214,10 +224,7 @@ function getTypeArguments(type: ts.Type, checker: ts.TypeChecker): readonly ts.T
   if ((type.flags & ts.TypeFlags.Object) === 0) return [];
   const objectFlags = (ref as unknown as { objectFlags?: number }).objectFlags ?? 0;
   if ((objectFlags & ts.ObjectFlags.Reference) === 0) {
-    // Some inferred shapes are objects but not refs; the type arguments
-    // are stored on the `aliasTypeArguments` slot via type aliases.
-    const alias = (type.aliasTypeArguments ?? []) as readonly ts.Type[];
-    return alias;
+    return [];
   }
   try {
     return checker.getTypeArguments(ref);
@@ -279,6 +286,29 @@ function receiverMatchesTarget(
 }
 
 /**
+ * Cross-package fallback for `receiverMatchesTarget`: does `t` (or the
+ * type it wraps via Promise) carry the target type's NAME? Used only in the
+ * free-function transition path, which is already scoped by the callee being
+ * a declared transition of this lifecycle — so a name match on the argument
+ * type is a sound binding even when the type was imported from another
+ * workspace package (where symbol identity breaks across the dist boundary).
+ */
+function typeNameMatchesTarget(
+  t: ts.Type,
+  typeName: string,
+  checker: ts.TypeChecker,
+): boolean {
+  if (t.aliasSymbol?.getName() === typeName) return true;
+  if (t.getSymbol()?.getName() === typeName) return true;
+  const unwrapped = unwrapPromise(t, checker);
+  if (unwrapped !== null) {
+    if (unwrapped.aliasSymbol?.getName() === typeName) return true;
+    if (unwrapped.getSymbol()?.getName() === typeName) return true;
+  }
+  return false;
+}
+
+/**
  * Given a function-like declaration that is the lexical caller of a
  * call site, return the binding that targets it (if any). We match on
  * full NodeId and also tolerate the agent-friendly form without a
@@ -319,13 +349,19 @@ function inferReceiverStateAt(
   checker: ts.TypeChecker,
   binding: TypeStateBindingDeclaration | null,
   targetSymbol: ts.Symbol,
+  targetTypeName: string,
 ): { state: string | null; reason: string; flowSteps: string[] } {
   const receiverType = checker.getTypeAtLocation(receiver);
 
   // Make sure we're talking about the target type at all. If not, we
   // shouldn't be inferring — that's a guard against ambiguous
-  // PropertyAccessExpressions where receiver isn't really the target.
-  if (!receiverMatchesTarget(receiverType, targetSymbol, checker)) {
+  // PropertyAccessExpressions where receiver isn't really the target. The
+  // name fallback admits cross-package lifecycle types (imported through a
+  // sibling package's dist, where symbol identity breaks).
+  if (
+    !receiverMatchesTarget(receiverType, targetSymbol, checker) &&
+    !typeNameMatchesTarget(receiverType, targetTypeName, checker)
+  ) {
     return {
       state: null,
       reason: "receiver type does not match the type-state target",
@@ -432,6 +468,25 @@ function findEnclosingFunction(node: ts.Node): ts.FunctionLikeDeclaration | null
 }
 
 /**
+ * Every method name that participates in `decl`'s state machine: each
+ * transition `via` plus every allowed-op. Production code drives most
+ * lifecycles through FREE functions (`lockManifest(m)`, `signApproval(a)`),
+ * not `receiver.method()`; these names let us recognise those call sites.
+ */
+function transitionMethodNames(decl: TypeStateDeclaration): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const t of decl.transitions) {
+    names.add(t.via);
+  }
+  for (const ops of decl.allowedOps.values()) {
+    for (const op of ops) {
+      names.add(op);
+    }
+  }
+  return names;
+}
+
+/**
  * Walk every CallExpression in `sourceFile` and emit an
  * InferredStateAtCallSite per receiver-method call against the target
  * type. We do NOT filter by allowed-ops here — the evaluator does that.
@@ -441,10 +496,12 @@ function inferInSourceFile(
   ctx: ExtractorContext,
   decl: TypeStateDeclaration,
   targetSymbol: ts.Symbol,
+  targetTypeName: string,
   bindings: readonly TypeStateBindingDeclaration[],
   out: InferredStateAtCallSite[],
 ): void {
   const checker = ctx.checker;
+  const transitionMethods = transitionMethodNames(decl);
 
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
@@ -453,19 +510,18 @@ function inferInSourceFile(
     ts.forEachChild(node, visit);
   };
 
-  const maybeRecord = (call: ts.CallExpression): void => {
-    const expr = call.expression;
-    if (!ts.isPropertyAccessExpression(expr)) return;
-
-    const receiver = expr.expression;
-    const method = expr.name.text;
-
-    const receiverType = checker.getTypeAtLocation(receiver);
-    if (!receiverMatchesTarget(receiverType, targetSymbol, checker)) return;
-
-    const caller = findEnclosingFunction(call);
-    if (caller === null) return;
-
+  /**
+   * Shared recorder: emit one InferredStateAtCallSite for a `receiver`
+   * expression of the target type, reached via `method`. Used by BOTH the
+   * `receiver.method()` path and the free-function transition path.
+   */
+  const record = (
+    receiver: ts.Expression,
+    method: string,
+    call: ts.CallExpression,
+    caller: ts.FunctionLikeDeclaration,
+    viaFreeFunction: boolean,
+  ): void => {
     let callerId: string;
     try {
       callerId = buildNodeIdForDeclaration(caller, ctx);
@@ -487,21 +543,20 @@ function inferInSourceFile(
       checker,
       binding,
       targetSymbol,
+      targetTypeName,
     );
 
-    const origin = (() => {
-      // Origin = where the receiver expression itself lives. For
-      // call-expression receivers this points to the inner call; for
-      // identifiers it points to the identifier's use site. We don't
-      // chase back to the original `const x = ...` decl in B.1 — the
-      // identifier site is sufficient for the violation report.
-      const pos = spanOf(sourceFile, receiver);
-      return {
-        path: toRelativePosix(sourceFile.fileName, ctx.projectRoot),
-        line: pos.line,
-        column: pos.column,
-      };
-    })();
+    // Origin = where the receiver expression itself lives. For
+    // call-expression receivers this points to the inner call; for
+    // identifiers it points to the identifier's use site. We don't chase
+    // back to the original `const x = ...` decl in B.1 — the identifier
+    // site is sufficient for the violation report.
+    const pos = spanOf(sourceFile, receiver);
+    const origin = {
+      path: toRelativePosix(sourceFile.fileName, ctx.projectRoot),
+      line: pos.line,
+      column: pos.column,
+    };
 
     // Closeout 4: when the receiver is the identifier of a parameter of
     // the enclosing caller, report the parameter index so the evaluator
@@ -519,10 +574,53 @@ function inferInSourceFile(
       declarationId: decl.id,
       inferredState: inferred.state ?? undefined,
       receiverParamIndex,
+      viaFreeFunction,
       inferenceReason: inferred.reason,
       inferenceOrigin: origin,
       flowSteps: Object.freeze(inferred.flowSteps.slice()),
     });
+  };
+
+  const maybeRecord = (call: ts.CallExpression): void => {
+    const expr = call.expression;
+
+    // Path 1: `receiver.method(...)` — receiver's type instantiates target.
+    if (ts.isPropertyAccessExpression(expr)) {
+      const receiver = expr.expression;
+      const receiverType = checker.getTypeAtLocation(receiver);
+      if (!receiverMatchesTarget(receiverType, targetSymbol, checker)) return;
+      const caller = findEnclosingFunction(call);
+      if (caller === null) return;
+      record(receiver, expr.name.text, call, caller, false);
+      return;
+    }
+
+    // Path 2: free-function transition `transitionFn(receiver, ...)` — the
+    // callee name is a declared transition `via` / allowed-op AND one
+    // argument is typed as the target. This is how production code drives
+    // most lifecycles (`lockManifest(m)`, `signApproval(a)`), invisible to
+    // Path 1. The FIRST target-typed argument is the lifecycle receiver.
+    if (ts.isIdentifier(expr) && transitionMethods.has(expr.text)) {
+      const caller = findEnclosingFunction(call);
+      if (caller === null) return;
+      for (const arg of call.arguments) {
+        const argType = checker.getTypeAtLocation(arg);
+        // Symbol identity OR name match. Name match is the cross-package
+        // path: when the lifecycle type is imported from another workspace
+        // package it resolves through that package's dist `.d.ts`, so its
+        // symbol differs from the target declaration's symbol in `src`. The
+        // name fallback is safe here because this branch is already scoped
+        // by the callee being one of THIS declaration's transition names.
+        if (
+          receiverMatchesTarget(argType, targetSymbol, checker) ||
+          typeNameMatchesTarget(argType, targetTypeName, checker)
+        ) {
+          record(arg, expr.text, call, caller, true);
+          break;
+        }
+      }
+      return;
+    }
   };
 
   visit(sourceFile);
@@ -577,7 +675,7 @@ export const tsTypeStateInferenceExtractor: TypeStateInferenceExtractor = {
 
       for (const sourceFile of program.getSourceFiles()) {
         if (!shouldVisit(sourceFile, projectRoot)) continue;
-        inferInSourceFile(sourceFile, ctx, decl, targetSymbol, options.bindings, out);
+        inferInSourceFile(sourceFile, ctx, decl, targetSymbol, parsed.typeName, options.bindings, out);
       }
     }
 

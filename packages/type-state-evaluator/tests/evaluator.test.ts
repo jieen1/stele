@@ -90,6 +90,99 @@ describe("evaluateTypeStates — empty inputs", () => {
   });
 });
 
+describe("evaluateTypeStates — free-function transitions (cross-package binding)", () => {
+  // A cross-package transition call (`pay(order)`) lands on an extern node
+  // the file-path-scoped declarationCoversNode does NOT cover. With
+  // viaFreeFunction the evaluator trusts the extractor's binding and still
+  // evaluates the call — this is what makes MANIFEST/CALLGRAPH genuinely
+  // bind in the real repo.
+  const EXTERN_PAY = "extern:other-pkg::pay(1)";
+
+  it("evaluates a free-function transition whose edge target is an extern node", async () => {
+    const graph = baseCallGraph([
+      mkEdge({ from: CALLER, to: EXTERN_PAY, line: 80, column: 5 }),
+    ]);
+    const result = await evaluateTypeStates({
+      contract: mkContract({ typeStates: [ORDER_DECL] }),
+      callGraph: graph,
+      extractor: new StubExtractor([
+        mkInference({
+          callerId: CALLER,
+          line: 80,
+          column: 5,
+          method: "pay", // pay is Submitted→Paid; receiver is Draft → disallowed
+          declarationId: "ORDER_LIFECYCLE",
+          inferredState: "Draft",
+          viaFreeFunction: true,
+          reason: 'free-function pay(order) with order: Order<"Draft">',
+        }),
+      ]),
+    });
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]!.rule_id).toBe("typestate.ORDER_LIFECYCLE.disallowed_op");
+  });
+
+  it("does NOT evaluate the same extern call site when viaFreeFunction is false", async () => {
+    // Proves the flag is load-bearing: without it, an extern edge target is
+    // (correctly) treated as not belonging to the declaration.
+    const graph = baseCallGraph([
+      mkEdge({ from: CALLER, to: EXTERN_PAY, line: 80, column: 5 }),
+    ]);
+    const result = await evaluateTypeStates({
+      contract: mkContract({ typeStates: [ORDER_DECL] }),
+      callGraph: graph,
+      extractor: new StubExtractor([
+        mkInference({
+          callerId: CALLER,
+          line: 80,
+          column: 5,
+          method: "pay",
+          declarationId: "ORDER_LIFECYCLE",
+          inferredState: "Draft",
+          viaFreeFunction: false,
+        }),
+      ]),
+    });
+    expect(result.violations).toHaveLength(0);
+  });
+
+  it("reports per-declaration coverage so the zero-binding guard can fire", async () => {
+    const graph = baseCallGraph([
+      mkEdge({ from: CALLER, to: EXTERN_PAY, line: 80, column: 5 }),
+    ]);
+    const result = await evaluateTypeStates({
+      contract: mkContract({ typeStates: [ORDER_DECL] }),
+      callGraph: graph,
+      extractor: new StubExtractor([
+        mkInference({
+          callerId: CALLER,
+          line: 80,
+          column: 5,
+          method: "submit", // legitimate Draft→Submitted
+          declarationId: "ORDER_LIFECYCLE",
+          inferredState: "Draft",
+          viaFreeFunction: true,
+        }),
+      ]),
+    });
+    const cov = result.coverage.find((c) => c.declarationId === "ORDER_LIFECYCLE");
+    expect(cov).toBeDefined();
+    expect(cov!.callSitesAnalyzed).toBe(1);
+    expect(cov!.severity).toBe("error");
+  });
+
+  it("reports 0 coverage for a declaration with no matching call sites", async () => {
+    const result = await evaluateTypeStates({
+      contract: mkContract({ typeStates: [ORDER_DECL] }),
+      callGraph: baseCallGraph(),
+      extractor: new StubExtractor([]),
+    });
+    const cov = result.coverage.find((c) => c.declarationId === "ORDER_LIFECYCLE");
+    expect(cov).toBeDefined();
+    expect(cov!.callSitesAnalyzed).toBe(0);
+  });
+});
+
 describe("evaluateTypeStates — disallowed-op detection", () => {
   it("flags addItem on Paid order", async () => {
     const graph = baseCallGraph([

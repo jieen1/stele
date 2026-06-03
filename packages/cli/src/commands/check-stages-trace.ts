@@ -217,10 +217,12 @@ export async function buildTraceStage(
       ? evaluateTracePolicies(evaluationOptions)
       : deps.evaluate(evaluationOptions);
 
-  // Merge violations + notices. Notices (e.g. path_exceeded_max_depth) are
-  // warning-severity violations; including them in `violations` surfaces them
-  // through normal report formatting but does not flip `ok` to false because
-  // we key `ok` off the error-severity count.
+  // Merge violations + notices. In strict mode (the default) an incomplete
+  // enumeration (`path_exceeded_max_depth`, Round 3 P0-5) is already pushed to
+  // `result.violations` — a policy that cannot be proven fails CLOSED, not as
+  // a silent warning. `result.notices` only carries genuinely advisory items
+  // (and the lenient-mode demotion of the depth cap); they surface through the
+  // report but do not flip `ok`, which keys off the error-severity count.
   const allViolations: Violation[] = [...result.violations, ...result.notices];
 
   return createViolationReport({

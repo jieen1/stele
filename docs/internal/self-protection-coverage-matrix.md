@@ -1,8 +1,11 @@
 # Self-Protection Coverage Matrix
 
-**Status:** generated 2026-05-25 (Phase 7 step 7.1)
+**Status:** generated 2026-05-25 (Phase 7 step 7.1); **type-state row + open
+follow-ups updated 2026-06-03** (runtime binding closeout — see the §Type-state
+runtime binding note below).
 **Owner:** self-dogfooding plan (`docs/design/self-dogfooding/`)
-**Live counts:** 48 invariants · 88 negative tests · 48 pytest tests/contract
+**Live counts:** 52 invariants · 132 negative tests · run `stele list` for the
+live invariant count. (The 48 / 88 figures below were the 2026-05-25 snapshot.)
 
 This document tracks which of Stele's **14 advertised contract mechanisms**
 are exercised against which **workspace packages**, in this repository's
@@ -58,7 +61,7 @@ package and is excluded.
 | **branded-id**           | ✅ 4   | ✅ 1   | ❌     | ❌       | ❌     | ❌    | 5     |
 | **smart-ctor**           | ✅ 4   | ✅ 1   | ❌     | ❌       | ❌     | ❌    | 5     |
 | **trace-policy**         | ✅ 1   | ✅ 3   | ❌     | ❌       | ❌     | ❌    | 4     |
-| **type-state**           | ⚠️ 1   | ⚠️ 2   | ❌     | ❌       | ⚠️ 1   | ❌    | 4     |
+| **type-state**           | ✅ 1   | ✅ 2   | ❌     | ❌       | ✅ 1   | ❌    | 4     |
 | **effect-policy**        | ✅ 2   | ✅ 1   | ✅ 1   | ❌       | ❌     | ❌    | 4     |
 | **TOTAL declarations**   | —      | —      | —      | —        | —      | —     | 153   |
 
@@ -140,11 +143,19 @@ package and is excluded.
   - `APPROVE_VIA_RESOLVE_APPROVED_BY` — `@stele/cli`'s design-approve
     must call `resolveApprovedBy` before any `writeFileSync`.
 
-- **type-state** — 4 lifecycles. Marked `⚠️ partial` because the
-  declarations carry **compile-time** enforcement via state-keyed
-  `StateBrand<S>` (`*.test-d.ts` pinning), but the type-state evaluator
-  finds 0 matching call sites until production callers route through
-  the typed methods. Targets:
+- **type-state** — 4 lifecycles. **As of 2026-06-03 all four genuinely
+  bind at runtime** (✅, not ⚠️). Two enforcement layers now hold: (1)
+  **compile-time** state-keyed `StateBrand<S>` (`*.test-d.ts` pinning), and
+  (2) the **runtime** call-graph evaluator, which previously found 0 call
+  sites. The runtime gap was closed by teaching the TS extractor to record
+  FREE-FUNCTION transition calls (`lockManifest(m)`, `signApproval(a)`) — not
+  just `receiver.method()` — to read intersection-alias brand state via
+  `aliasTypeArguments`, and to match the lifecycle type by name across the
+  package boundary (cross-package imports resolve through a sibling's dist
+  `.d.ts`, so symbol identity breaks). The evaluator trusts these
+  `viaFreeFunction` inferences (the extractor already verified callee-name +
+  argument-type), so cross-package transition calls whose call-graph edge
+  target is an `extern:` node are no longer dropped. Targets:
   - `MANIFEST_LIFECYCLE` — `@stele/core` (`Unloaded→Loaded→Locked→Verified`)
   - `APPROVAL_LIFECYCLE` — `@stele/cli` (`Drafting→IdentityChecked→Signed`)
   - `DESIGN_PROFILE_LIFECYCLE` — `@stele/cli` (`Raw→Validated→Hashed`)
@@ -172,10 +183,12 @@ After Phase 6 close-out:
 - **14 / 14 mechanisms have at least one ✅** (the goal of the plan).
 - 153 total declarations across the contract surface (was 35 invariants
   before the plan).
-- 2 mechanisms (`type-state`) are `⚠️ partial`: declarations validate
-  structurally and compile-time `.test-d.ts` pinning is active, but the
-  type-state evaluator matches 0 call sites pending the production-caller
-  refactor deferred to Phase 7.
+- As of 2026-06-03 **no mechanism is `⚠️ partial`**. `type-state` was the
+  last partial row; all 4 lifecycles now bind at runtime (see the type-state
+  note above). A **zero-binding guard** in `check-stages-type-state.ts` now
+  emits `typestate.<id>.zero_binding` (error) for any error-severity
+  declaration the evaluator binds to 0 call sites — a runtime structural
+  constraint can no longer report a silent green while protecting nothing.
 
 ## Open Phase 7 follow-ups (declarations not yet landed)
 
@@ -187,13 +200,14 @@ After Phase 6 close-out:
   module-level functions. See `phase-6-aggregate-root-shapes.md` + the
   README decision log close-out for the per-aggregate target list.
 
-- **Type-state evaluator binds zero call sites.** The 4 lifecycles
-  document the state machines but `@stele/type-state-evaluator` only
-  fires on `receiver.method(...)` calls — production code currently uses
-  free-function APIs (`writeManifest`, `verifyManifest`, `loadProfile`,
-  `hashFile`, the call-graph builder). Phase 7 must route these
-  ~20-30 call sites through the typed methods (`asLoaded`, `lockManifest`,
-  `verifyLockedManifest`, etc.).
+- **Type-state evaluator binds zero call sites.** ✅ **RESOLVED 2026-06-03.**
+  The evaluator now fires on free-function transition calls in addition to
+  `receiver.method(...)`, reads intersection-alias brand state, and matches
+  the lifecycle type by name across the package boundary. All 4 lifecycles
+  bind at runtime; `stele check` is green honestly (not vacuously). No
+  production refactor was needed — the existing free-function lifecycle APIs
+  (`lockManifest`, `signApproval`, `startBuilding`, …) are the bound call
+  sites. A zero-binding guard prevents silent regression to 0 bindings.
 
 - **Phase 2 deferred class-shapes / type-policy** — `MANIFEST_ENGINE_SHAPE`,
   `VIOLATION_REPORT_SHAPE`, `RULE_ID_FIELDS_BRANDED` all target

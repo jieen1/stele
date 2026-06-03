@@ -217,12 +217,14 @@ export function mkInference(opts: {
   readonly reason?: string;
   readonly origin?: { readonly path: string; readonly line: number; readonly column: number };
   readonly flowSteps?: readonly string[];
+  readonly viaFreeFunction?: boolean;
 }): InferredStateAtCallSite {
   return {
     callerId: opts.callerId,
     callSite: { line: opts.line ?? 10, column: opts.column ?? 3 },
     receiverName: opts.receiverName ?? "order",
     receiverParamIndex: opts.receiverParamIndex,
+    viaFreeFunction: opts.viaFreeFunction,
     method: opts.method,
     declarationId: opts.declarationId,
     inferredState: opts.inferredState,

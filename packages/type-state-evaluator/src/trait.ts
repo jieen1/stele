@@ -56,6 +56,18 @@ export interface InferredStateAtCallSite {
    * `typestate.<id>.wrong_state_at_binding`.
    */
   readonly receiverParamIndex?: number;
+  /**
+   * True when this inference came from a free-function transition call
+   * (`lockManifest(m)`) rather than a `receiver.method()` call. The
+   * extractor has already verified the callee name is one of the
+   * declaration's transition/allowed-op names AND the argument is typed as
+   * the declaration's target. The evaluator therefore trusts the binding
+   * and does NOT additionally require the call-graph edge target to be an
+   * in-package node — that check only works for `receiver.method()` sites
+   * and would drop cross-package transition calls (whose edge target is an
+   * `extern:` node) even though they genuinely drive the lifecycle.
+   */
+  readonly viaFreeFunction?: boolean;
   /** Why the state was inferred (for inference_source in violations). */
   readonly inferenceReason: string | undefined;
   /** Where the inference originated (e.g. the createOrder() return site). */

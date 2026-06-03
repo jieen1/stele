@@ -193,6 +193,7 @@ function okResult(): EvaluateTypeStateResult {
   return {
     violations: Object.freeze([]),
     notices: Object.freeze([]),
+    coverage: Object.freeze([]),
     stats: {
       declarationsEvaluated: 0,
       callSitesAnalyzed: 0,
@@ -297,6 +298,7 @@ describe("buildTypeStateStage — successful evaluation", () => {
       async (): Promise<EvaluateTypeStateResult> => ({
         violations: Object.freeze([violation]),
         notices: Object.freeze([]),
+        coverage: Object.freeze([]),
         stats: {
           declarationsEvaluated: 1,
           callSitesAnalyzed: 1,
@@ -321,6 +323,95 @@ describe("buildTypeStateStage — successful evaluation", () => {
     _clearCallGraphCacheForTests(context);
   });
 
+  it("zero-binding guard: an error-severity decl bound to 0 call sites fails the build", async () => {
+    const decl = mkTypeState({ id: "ORDER" });
+    const context = mkContext({
+      contract: mkContract([decl]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const evaluate = vi.fn(
+      async (): Promise<EvaluateTypeStateResult> => ({
+        violations: Object.freeze([]),
+        notices: Object.freeze([]),
+        coverage: Object.freeze([
+          { declarationId: "ORDER", severity: "error", callSitesAnalyzed: 0, filePath: "contract/main.stele" },
+        ]),
+        stats: { declarationsEvaluated: 1, callSitesAnalyzed: 0, inferenceFailures: 0 },
+      }),
+    );
+    const extract = vi.fn(async () => mkCallGraph({}));
+
+    const report = await buildTypeStateStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+      evaluate,
+      extractor: STUB_EXTRACTOR,
+    });
+
+    expect(report.ok).toBe(false);
+    const guard = report.violations.find((v) => v.rule_id === "typestate.ORDER.zero_binding");
+    expect(guard).toBeDefined();
+    expect(guard!.severity).toBe("error");
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("zero-binding guard: a warning-severity 0-binding decl does NOT fail the build", async () => {
+    const decl = mkTypeState({ id: "ORDER" });
+    const context = mkContext({
+      contract: mkContract([decl]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const evaluate = vi.fn(
+      async (): Promise<EvaluateTypeStateResult> => ({
+        violations: Object.freeze([]),
+        notices: Object.freeze([]),
+        coverage: Object.freeze([
+          { declarationId: "ORDER", severity: "warning", callSitesAnalyzed: 0, filePath: "contract/main.stele" },
+        ]),
+        stats: { declarationsEvaluated: 1, callSitesAnalyzed: 0, inferenceFailures: 0 },
+      }),
+    );
+    const extract = vi.fn(async () => mkCallGraph({}));
+
+    const report = await buildTypeStateStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+      evaluate,
+      extractor: STUB_EXTRACTOR,
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.violations.map((v) => v.rule_id)).not.toContain("typestate.ORDER.zero_binding");
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("zero-binding guard: a decl that binds >0 sites does NOT trigger the guard", async () => {
+    const decl = mkTypeState({ id: "ORDER" });
+    const context = mkContext({
+      contract: mkContract([decl]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const evaluate = vi.fn(
+      async (): Promise<EvaluateTypeStateResult> => ({
+        violations: Object.freeze([]),
+        notices: Object.freeze([]),
+        coverage: Object.freeze([
+          { declarationId: "ORDER", severity: "error", callSitesAnalyzed: 3, filePath: "contract/main.stele" },
+        ]),
+        stats: { declarationsEvaluated: 1, callSitesAnalyzed: 3, inferenceFailures: 0 },
+      }),
+    );
+    const extract = vi.fn(async () => mkCallGraph({}));
+
+    const report = await buildTypeStateStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+      evaluate,
+      extractor: STUB_EXTRACTOR,
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.violations.map((v) => v.rule_id)).not.toContain("typestate.ORDER.zero_binding");
+    _clearCallGraphCacheForTests(context);
+  });
+
   it("surfaces multiple violations across declarations", async () => {
     const decl1 = mkTypeState({ id: "ORDER" });
     const decl2 = mkTypeState({ id: "FILE", target: "src/file.ts::FileHandle" });
@@ -335,6 +426,7 @@ describe("buildTypeStateStage — successful evaluation", () => {
       async (): Promise<EvaluateTypeStateResult> => ({
         violations: Object.freeze([v1, v2, v3]),
         notices: Object.freeze([]),
+        coverage: Object.freeze([]),
         stats: {
           declarationsEvaluated: 2,
           callSitesAnalyzed: 3,
@@ -392,6 +484,7 @@ describe("buildTypeStateStage — successful evaluation", () => {
       async (): Promise<EvaluateTypeStateResult> => ({
         violations: Object.freeze([]),
         notices: Object.freeze([notice]),
+        coverage: Object.freeze([]),
         stats: {
           declarationsEvaluated: 1,
           callSitesAnalyzed: 1,

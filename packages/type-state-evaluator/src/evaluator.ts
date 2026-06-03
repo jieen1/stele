@@ -96,10 +96,19 @@ export interface EvaluateTypeStateStats {
   readonly inferenceFailures: number;
 }
 
+/** Per-declaration binding coverage — drives the zero-binding guard. */
+export interface TypeStateCoverage {
+  readonly declarationId: string;
+  readonly severity: string;
+  readonly callSitesAnalyzed: number;
+  readonly filePath: string;
+}
+
 export interface EvaluateTypeStateResult {
   readonly violations: readonly Violation[];
   readonly notices: readonly Violation[];
   readonly stats: EvaluateTypeStateStats;
+  readonly coverage: readonly TypeStateCoverage[];
 }
 
 interface TargetMatcher {
@@ -337,6 +346,30 @@ interface CompiledDeclaration {
   readonly targetMatcher: TargetMatcher;
   /** Optional secondary matcher for state-type-mapping entries (Go). */
   readonly stateTypeMatcher: TargetMatcher | null;
+  /** Transition `via` + allowed-op names — free-function transition sites. */
+  readonly transitionNames: ReadonlySet<string>;
+  /** File path of decl.target; free transition functions live in this file. */
+  readonly targetFilePath: string | null;
+}
+
+/** Names of every transition `via` and allowed-op for a declaration. */
+function transitionNamesOf(decl: TypeStateDeclaration): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const t of decl.transitions) {
+    names.add(t.via);
+  }
+  for (const ops of decl.allowedOps.values()) {
+    for (const op of ops) {
+      names.add(op);
+    }
+  }
+  return names;
+}
+
+/** The `path` portion of a `path::Type` target, or null when malformed. */
+function targetFilePathOf(target: string): string | null {
+  const sepIdx = target.lastIndexOf("::");
+  return sepIdx <= 0 ? null : target.slice(0, sepIdx);
 }
 
 function compileDeclarations(
@@ -350,6 +383,8 @@ function compileDeclarations(
       decl,
       targetMatcher: buildTargetMatcher(decl.target, callGraphLanguage, externAliases),
       stateTypeMatcher: buildStateTypeMappingMatcher(decl, callGraphLanguage, externAliases),
+      transitionNames: transitionNamesOf(decl),
+      targetFilePath: targetFilePathOf(decl.target),
     });
   }
   return Object.freeze(out);
@@ -364,6 +399,20 @@ function declarationCoversNode(
   }
   if (compiled.stateTypeMatcher !== null && compiled.stateTypeMatcher.matches(nodeId)) {
     return true;
+  }
+  // Free-function transition: a node whose symbol is one of this decl's
+  // transition/allowed-op names AND that lives in the target's file. The
+  // extractor reports the lifecycle argument as the receiver; the call lands
+  // on the free function, so the edge target is the function, not the type.
+  if (compiled.targetFilePath !== null && compiled.transitionNames.size > 0) {
+    const parsed = parseNodeId(nodeId);
+    if (
+      parsed !== null &&
+      parsed.filePath === compiled.targetFilePath &&
+      compiled.transitionNames.has(parsed.symbolName)
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -421,6 +470,7 @@ export async function evaluateTypeStates(
         callSitesAnalyzed: 0,
         inferenceFailures: 0,
       },
+      coverage: Object.freeze([]),
     };
   }
 
@@ -435,12 +485,14 @@ export async function evaluateTypeStates(
 
   const violations: Violation[] = [];
   const notices: Violation[] = [];
+  const coverage: TypeStateCoverage[] = [];
   let callSitesAnalyzed = 0;
   let inferenceFailures = 0;
 
   for (const c of compiled) {
     const decl = c.decl;
     const bucket = inferIndex.get(decl.id) ?? [];
+    let declSitesAnalyzed = 0;
 
     for (const inference of bucket) {
       // Defensive: skip inferences that the backend produced for an edge
@@ -457,12 +509,19 @@ export async function evaluateTypeStates(
         continue;
       }
 
-      // Must target a method that belongs to this declaration.
-      if (!declarationCoversNode(c, edge.toId)) {
+      // Must target a method that belongs to this declaration. Free-function
+      // transition inferences (`lockManifest(m)`) are exempt from this check:
+      // the extractor already verified the callee name is one of the decl's
+      // transition/allowed-op names AND the argument is typed as the target,
+      // so the binding is sound. The edge's `toId` for a cross-package call
+      // is an `extern:` node that declarationCoversNode (file-path scoped)
+      // would wrongly reject, dropping a genuine lifecycle driver.
+      if (!inference.viaFreeFunction && !declarationCoversNode(c, edge.toId)) {
         continue;
       }
 
       callSitesAnalyzed += 1;
+      declSitesAnalyzed += 1;
 
       const method = inference.method.length > 0
         ? inference.method
@@ -564,6 +623,13 @@ export async function evaluateTypeStates(
         }),
       );
     }
+
+    coverage.push({
+      declarationId: decl.id,
+      severity: decl.severity,
+      callSitesAnalyzed: declSitesAnalyzed,
+      filePath: decl.filePath ?? "contract",
+    });
   }
 
   // Round 4 F-C-08: emit a notice for any state declared in `decl.states`
@@ -601,5 +667,6 @@ export async function evaluateTypeStates(
       callSitesAnalyzed,
       inferenceFailures,
     },
+    coverage: Object.freeze(coverage),
   };
 }

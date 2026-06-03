@@ -267,23 +267,72 @@ export async function buildTypeStateStage(
     });
   }
 
+  // Zero-binding guard: an error-severity `(type-state ...)` declaration that
+  // the call-graph evaluator binds to ZERO call sites enforces nothing at
+  // runtime. Previously such a declaration passed silently (a green check
+  // that protects nothing). We now surface it as an error so a contract
+  // author must either (a) route a real call site through the lifecycle's
+  // transition functions, or (b) drop the runtime declaration and rely on
+  // an explicitly-documented compile-time backstop. See zeroBindingViolations.
+  const zeroBindingViolations = buildZeroBindingViolations(result.coverage, command);
+
   // Merge violations + notices. Notices (e.g. lenient-mode inference_failed)
   // are warning-severity findings that surface through the report but do not
   // flip `ok` to false because we key `ok` off the error-severity count.
-  const allViolations: Violation[] = [...result.violations, ...result.notices];
+  const errorViolations: Violation[] = [...result.violations, ...zeroBindingViolations];
+  const allViolations: Violation[] = [...errorViolations, ...result.notices];
 
   return createViolationReport({
     tool: "stele",
     command,
-    ok: result.violations.length === 0,
+    ok: errorViolations.length === 0,
     summary: {
       invariant_count: protectedState.summary.invariantCount,
       generated_file_count: protectedState.summary.generatedFileCount,
       protected_file_count: protectedState.summary.protectedFileCount,
-      violation_count: result.violations.length,
+      violation_count: errorViolations.length,
     },
     violations: allViolations,
   });
+}
+
+/**
+ * Build a `typestate.<id>.zero_binding` error for every error-severity
+ * declaration the evaluator bound to no call sites. This is the keystone of
+ * the "no decorative green" guard: a runtime structural constraint that
+ * matches nothing must not report success.
+ */
+function buildZeroBindingViolations(
+  coverage: readonly { declarationId: string; severity: string; callSitesAnalyzed: number; filePath: string }[],
+  command: string,
+): Violation[] {
+  const out: Violation[] = [];
+  for (const c of coverage) {
+    if (c.severity !== "error") continue;
+    if (c.callSitesAnalyzed > 0) continue;
+    out.push(
+      createViolation({
+        rule_id: ruleId(`typestate.${c.declarationId}.zero_binding`),
+        rule_kind: "typestate_zero_binding",
+        severity: "error",
+        source: { tool: "stele", command, kind: "rule" },
+        location: { path: c.filePath },
+        cause: {
+          summary:
+            `Type-state \`${c.declarationId}\` (severity=error) bound to 0 call sites — it enforces nothing at runtime. ` +
+            `A green check that protects nothing is not allowed.`,
+        },
+        scope_paths: [c.filePath],
+        status: "active",
+        fix: {
+          summary:
+            `Route a real call site through the lifecycle's transition functions so the evaluator can bind it, ` +
+            `or remove the runtime (type-state …) declaration if its only enforcement is the compile-time brand.`,
+        },
+      }),
+    );
+  }
+  return out;
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {
