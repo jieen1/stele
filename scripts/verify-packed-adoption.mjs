@@ -185,7 +185,7 @@ async function main() {
       { language: "go", expectedFiles: ["go.mod", "tests/contract/setup_test.go"] },
       { language: "rust", expectedFiles: ["Cargo.toml", "src/lib.rs", "tests/contract/mod.rs"] },
       { language: "java", expectedFiles: ["pom.xml", "src/test/java/contract/SteleConftest.java"] },
-      { language: "typescript", expectedFiles: ["tests/contract/conftest.ts"] },
+      { language: "typescript", expectedFiles: ["tests/contract/stele_context.ts"] },
     ];
 
     for (const { language, expectedFiles } of languageChecks) {

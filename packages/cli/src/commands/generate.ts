@@ -461,7 +461,7 @@ export async function verifyManagedGeneratedFiles(
     projectRoot: projectDir,
     outputDir: generatedDir,
   });
-  const allowedExtras = new Set([posix.join(generatedDir, "conftest.py")]);
+  const allowedExtras = new Set(companionExtras(backend.name, generatedDir));
   const files = verification.files.filter(
     (file) => !(file.status === "extra" && (allowedExtras.has(file.path) || isIgnoredGeneratedArtifact(file.path, generatedDir))),
   );
@@ -714,6 +714,27 @@ function isIgnoredArtifactWithinBase(projectRelativePath: string, baseDirectory:
   }
 
   return isIgnoredPythonCacheArtifact(normalizedPath.slice(normalizedBase.length + 1));
+}
+
+/**
+ * Test-runner companion files that `stele init` scaffolds INTO the generated
+ * dir but that `stele generate` does NOT manage. They must not be reported as
+ * drift ("extra"). One source of truth per language, mirroring the per-language
+ * scaffolds in `commands/init.ts` (`buildPythonScaffold` etc.). Keyed by
+ * `LanguageBackend.name`. Names are relative to each language's own generated
+ * dir (Java's is `src/test/java/contract`, where its `SteleConftest.java`
+ * companion lives; the others are `tests/contract`).
+ */
+function companionExtras(language: string, generatedDir: string): string[] {
+  const byLanguage: Record<string, readonly string[]> = {
+    python: ["conftest.py", "__init__.py"],
+    typescript: ["stele_context.ts"],
+    go: ["setup_test.go"],
+    rust: ["mod.rs"],
+    java: ["SteleConftest.java"],
+  };
+  const names = byLanguage[language] ?? ["conftest.py"];
+  return names.map((name) => posix.join(generatedDir, name));
 }
 
 function isIgnoredGeneratedArtifact(projectRelativePath: string, generatedDir: string): boolean {
