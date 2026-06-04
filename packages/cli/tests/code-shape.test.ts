@@ -98,6 +98,30 @@ describe("code-shape evaluation", () => {
     expect(jsonReport).toContain('"path": "src/api/handlers.py"');
   });
 
+  it("type-policy zero-binding guard: requireFieldTypes with 0 matching owner types fails", async () => {
+    // The src file has NO type whose name ends in Violation/Report, so the
+    // owner set is empty. Before the 2026-06-04 guard the requirement loop ran
+    // zero times and the policy passed silently; now it must error.
+    const projectDir = await createCodeShapeProject({
+      contractSource: [
+        "(type-policy rule_id_fields_branded_probe",
+        "  (lang typescript)",
+        '  (target "src/**/*.ts")',
+        '  (owner-name-suffix "Violation" "Report")',
+        '  (require-field-type "rule_id" "RuleId"))',
+      ].join("\n"),
+      files: {
+        "src/thing.ts": "export interface Widget {\n  id: string;\n}\n",
+      },
+    });
+
+    const contract = await loadContract(join(projectDir, "contract", "main.stele"));
+    const violations = await evaluateCodeShapes(projectDir, contract, "check");
+    const guard = violations.find((v) => v.rule_id === "rule_id_fields_branded_probe");
+    expect(guard).toBeDefined();
+    expect(guard!.cause.summary).toContain("matched no owner types");
+  });
+
   it("evaluates advanced Python code-shapes through the integrated evaluator", async () => {
     const projectDir = await createCodeShapeProject({
       contractSource: [

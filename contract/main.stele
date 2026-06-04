@@ -174,7 +174,7 @@
 ; ============================================================================
 
 (invariant CDL_NO_SINGLE_QUOTES
-  (severity warning)
+  (severity error)
   (description "All .stele contract files must use double-quoted strings only.")
   (uses-checker cdl-no-single-quotes))
 
@@ -188,12 +188,12 @@
 ; ============================================================================
 
 (invariant VERSIONS_PINNED_TOGETHER
-  (severity warning)
+  (severity error)
   (description "All packages must release at the same version.")
   (uses-checker versions-pinned-together))
 
 (invariant INLINE_VERSION_SYNC
-  (severity warning)
+  (severity error)
   (description "Inline version strings in source must match package.json versions.")
   (uses-checker inline-version-sync))
 
@@ -272,7 +272,7 @@
 
 (invariant DETERMINISTIC_GENERATION
   (severity error)
-  (description "Generated test output must be byte-stable across runs.")
+  (description "Generated test files must contain no obvious nondeterminism markers (timestamps, UUIDs, epoch, random ids). This is a heuristic content scan; true byte-stability across runs is enforced separately by the SHA-256 manifest hash and the pure generator coordinator.")
   (uses-checker generation-deterministic))
 
 ; ============================================================================

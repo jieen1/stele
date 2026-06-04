@@ -2704,6 +2704,131 @@ def test_usecachedcallgraph_brand_fires():
 
 
 # ---------------------------------------------------------------------------
+# Vacuity sweep 2026-06-04: negative tests for the 6 previously-untested
+# invariants + DETERMINISTIC_GENERATION. Each plants/mutates a real violation,
+# runs the checker directly, and asserts it returns passed=False — proving the
+# checker genuinely bites (it was "binds-real-target but unproven" before).
+# ---------------------------------------------------------------------------
+
+def test_versions_pinned_together_mismatch():
+    """Bumping one package.json version out of lockstep must trip the checker."""
+    _reset_caches()
+    core_pkg = sp._PACKAGES_DIR / "core" / "package.json"
+    result = _inject_then_run(
+        core_pkg,
+        '"version": "0.1.0"',
+        '"version": "0.2.0"',
+        sp.versions_pinned_together,
+    )
+    assert _pass_if_false(result, "versions_pinned_together_mismatch"), "checker did not detect violation: versions_pinned_together_mismatch"
+
+
+def _backend_missing(language: str, checker) -> dict[str, Any]:
+    """Temporarily rename a language out of the backend registry, run `checker`."""
+    registry_ts = sp._PACKAGES_DIR / "cli" / "src" / "backend-registry.ts"
+    original = registry_ts.read_text(encoding="utf-8")
+    tampered = original.replace(f'language: "{language}"', f'language: "{language}-removed"')
+    if tampered == original:
+        raise RuntimeError(f'language marker not found: {language}')
+    registry_ts.write_text(tampered, encoding="utf-8")
+    try:
+        return checker({})
+    finally:
+        registry_ts.write_text(original, encoding="utf-8")
+
+
+def test_backend_contains_python_missing():
+    _reset_caches()
+    assert _pass_if_false(_backend_missing("python", sp.backend_contains_python), "backend_contains_python_missing"), "checker did not detect violation: backend_contains_python_missing"
+
+
+def test_backend_contains_typescript_missing():
+    _reset_caches()
+    assert _pass_if_false(_backend_missing("typescript", sp.backend_contains_typescript), "backend_contains_typescript_missing"), "checker did not detect violation: backend_contains_typescript_missing"
+
+
+def test_backend_contains_rust_missing():
+    _reset_caches()
+    assert _pass_if_false(_backend_missing("rust", sp.backend_contains_rust), "backend_contains_rust_missing"), "checker did not detect violation: backend_contains_rust_missing"
+
+
+def test_backend_contains_java_missing():
+    _reset_caches()
+    assert _pass_if_false(_backend_missing("java", sp.backend_contains_java), "backend_contains_java_missing"), "checker did not detect violation: backend_contains_java_missing"
+
+
+def test_all_backends_compile_missing_dist():
+    """Removing a backend's dist/index.d.ts must trip the compile checker."""
+    _reset_caches()
+    dts = sp._PACKAGES_DIR / "backend-go" / "dist" / "index.d.ts"
+    backup = dts.parent / "index.d.ts.neg-bak"
+    dts.rename(backup)
+    try:
+        result = sp.all_backends_compile({})
+    finally:
+        backup.rename(dts)
+    assert _pass_if_false(result, "all_backends_compile_missing_dist"), "checker did not detect violation: all_backends_compile_missing_dist"
+
+
+def test_no_secrets_in_source_planted_key():
+    """A planted OpenAI-style key in a real source dir must trip the scanner."""
+    _reset_caches()
+    planted = sp._PACKAGES_DIR / "core" / "src" / "__neg_secret_probe.ts"
+    planted.write_text('export const k = "sk-0123456789abcdefghij";\n', encoding="utf-8")
+    try:
+        result = sp.no_secrets_in_source({})
+    finally:
+        planted.unlink(missing_ok=True)
+    assert _pass_if_false(result, "no_secrets_in_source_planted_key"), "checker did not detect violation: no_secrets_in_source_planted_key"
+
+
+def test_no_bare_locale_compare_planted_call():
+    """A planted `.localeCompare(` in a scanned src dir must trip the checker."""
+    _reset_caches()
+    planted = sp._PACKAGES_DIR / "core" / "src" / "__neg_locale_probe.ts"
+    planted.write_text("export const c = (a: string, b: string): number => a.localeCompare(b);\n", encoding="utf-8")
+    try:
+        result = sp.no_bare_locale_compare({})
+    finally:
+        planted.unlink(missing_ok=True)
+    assert _pass_if_false(result, "no_bare_locale_compare_planted_call"), "checker did not detect violation: no_bare_locale_compare_planted_call"
+
+
+def _generated_probe(filename: str, body: str, checker) -> dict[str, Any]:
+    """Plant a throwaway file in the generated dir, run `checker`, remove it."""
+    config = sp._read_config()
+    generated_dir = sp._REPO_ROOT / config.get("generatedDir", "tests/contract")
+    probe = generated_dir / filename
+    probe.write_text(body, encoding="utf-8")
+    try:
+        return checker({})
+    finally:
+        probe.unlink(missing_ok=True)
+
+
+def test_generation_deterministic_planted_timestamp():
+    """A timestamp in a generated file must trip the determinism heuristic."""
+    _reset_caches()
+    result = _generated_probe(
+        "__neg_determinism_probe.txt",
+        "generated_at = 2026-01-01T00:00:00\n",
+        sp.generation_deterministic,
+    )
+    assert _pass_if_false(result, "generation_deterministic_planted_timestamp"), "checker did not detect violation: generation_deterministic_planted_timestamp"
+
+
+def test_path_no_traversal_planted_traversal():
+    """A URL-encoded traversal sequence in a generated file must trip the checker."""
+    _reset_caches()
+    result = _generated_probe(
+        "__neg_traversal_probe.txt",
+        "path = %2e%2e/etc/passwd\n",
+        sp.path_no_traversal,
+    )
+    assert _pass_if_false(result, "path_no_traversal_planted_traversal"), "checker did not detect violation: path_no_traversal_planted_traversal"
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 

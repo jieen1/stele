@@ -199,8 +199,27 @@ After Phase 6 close-out:
   before the plan; -5 smart-ctor removed 2026-06-04).
 - As of 2026-06-04 **no mechanism is vacuous**: the 9 all-zero core-node
   aggregates now measure real values, and every error-severity structural
-  family (type-state, trace-policy, class/function/type/file-shape, boundary)
-  fails on a zero-binding target rather than passing green.
+  family (type-state, trace-policy, effect-policy, class/function/type/file-shape,
+  boundary) fails on a zero-binding target rather than passing green.
+
+**Decisions 2026-06-04 (maintainer-adjudicated):**
+- 3 invariants promoted warning→error: `CDL_NO_SINGLE_QUOTES`,
+  `VERSIONS_PINNED_TOGETHER`, `INLINE_VERSION_SYNC` (all currently green).
+- `DETERMINISTIC_GENERATION` description aligned to its heuristic implementation
+  (true byte-stability is enforced by the manifest hash + pure generator, not by
+  this scan); + negative test added.
+- Negative tests backfilled for the 6 previously-unproven invariants
+  (ALL_BACKENDS_COMPILE, NO_HARDCODED_SECRETS, PATH_NO_TRAVERSAL,
+  VERSIONS_PINNED_TOGETHER, NO_BARE_LOCALE_COMPARE, BACKEND_REGISTRY_HAS_*×4) and
+  for the trace/effect/type-policy zero-binding guards.
+- **Accepted WEAK (deliberately not changed):** (a) `branded-id` entity-scope
+  NOT activated — field/param misuse detection is heuristic + noisy and is
+  already covered genuinely by the 5 `*_USES_BRANDED_TYPE` invariants; the
+  branded-id declarations still bite on type deletion/rename. (b) 4 thin-wrapper
+  `core-node` thresholds left generous — the metric binds the delegating entry
+  symbol, not the aggregate body; the paired class-shape companion enforces the
+  member set, so these are coarse growth-guards, not vacuous. Retargeting to the
+  load-bearing symbol is a future design improvement.
 - As of 2026-06-03 **no mechanism is `⚠️ partial`**. `type-state` was the
   last partial row; all 4 lifecycles now bind at runtime (see the type-state
   note above). A **zero-binding guard** in `check-stages-type-state.ts` now
