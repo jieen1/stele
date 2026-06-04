@@ -104,6 +104,28 @@ describe("extractBashWriteTarget", () => {
     });
   });
 
+  describe("rm/rmdir/unlink/shred (deletion) commands", () => {
+    it("extracts target from rm", () => {
+      expect(extractBashWriteTarget("rm contract/main.stele")).toBe("contract/main.stele");
+    });
+
+    it("extracts target from rm -rf with flags", () => {
+      expect(extractBashWriteTarget("rm -rf tests/contract")).toBe("tests/contract");
+    });
+
+    it("extracts target from rmdir", () => {
+      expect(extractBashWriteTarget("rmdir somedir")).toBe("somedir");
+    });
+
+    it("extracts target from unlink", () => {
+      expect(extractBashWriteTarget("unlink contract/.manifest.json")).toBe("contract/.manifest.json");
+    });
+
+    it("honours -- separator for rm", () => {
+      expect(extractBashWriteTarget("rm -- -weird-name.txt")).toBe("-weird-name.txt");
+    });
+  });
+
   describe("no write target", () => {
     it("returns null for ls command", () => {
       expect(extractBashWriteTarget("ls -la")).toBeNull();

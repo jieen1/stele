@@ -531,6 +531,43 @@
   (deny-import "@stele/propose")
   (deny-import "@stele/cli"))
 
+; C1b: the incident-wedge command logic (draft/teeth/approve) is new
+; security-critical code that shells out (git worktrees) and writes approval
+; records. It must never gain a network dependency — an exfiltration vector in
+; the incident path would let a drafted "contract" phone home. deny-import is
+; hand-maintained; add any new network client specifier here.
+(boundary incident-no-network
+  (lang typescript)
+  (target "packages/cli/src/commands/incident/**/*.ts")
+  (deny-import "node:http")
+  (deny-import "node:https")
+  (deny-import "node:net")
+  (deny-import "node:tls")
+  (deny-import "node:dgram")
+  (deny-import "http")
+  (deny-import "https")
+  (deny-import "node-fetch")
+  (deny-import "axios")
+  (deny-import "undici"))
+
+; C1c: the MCP server bridges an agent fleet to Stele and shells out to the
+; stele binary. It is a prime exfiltration surface — it must never import a
+; network client in its own source (the stdio transport is not a network
+; import). Anti-exfil import boundary over the whole MCP source tree.
+(boundary mcp-no-network
+  (lang typescript)
+  (target "packages/mcp-server/src/**/*.ts")
+  (deny-import "node:http")
+  (deny-import "node:https")
+  (deny-import "node:net")
+  (deny-import "node:tls")
+  (deny-import "node:dgram")
+  (deny-import "http")
+  (deny-import "https")
+  (deny-import "node-fetch")
+  (deny-import "axios")
+  (deny-import "undici"))
+
 ; C2 (G2) KEYSTONE: the probabilistic incident draft writes only to
 ; .stele/incident/ and teeth proofs to .stele/proofs/. Neither may EVER be
 ; hashed -- not via a protected glob, the protected manifest, or the canonical

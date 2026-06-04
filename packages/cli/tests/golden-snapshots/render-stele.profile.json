@@ -112,16 +112,16 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 400,
-                "max": 800
+                "ideal": 60,
+                "max": 120
               },
               "public-method-count": {
                 "ideal": 8,
-                "max": 20
+                "max": 14
               },
               "max-cyclomatic": {
-                "ideal": 10,
-                "max": 25
+                "ideal": 6,
+                "max": 12
               }
             }
           },
@@ -143,8 +143,8 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 150,
-                "max": 350
+                "ideal": 260,
+                "max": 340
               },
               "public-method-count": {
                 "ideal": 4,
@@ -173,8 +173,8 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 100,
-                "max": 250
+                "ideal": 40,
+                "max": 100
               },
               "public-method-count": {
                 "ideal": 3,
@@ -206,11 +206,11 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 100,
-                "max": 250
+                "ideal": 90,
+                "max": 160
               },
               "max-cyclomatic": {
-                "ideal": 8,
+                "ideal": 12,
                 "max": 20
               }
             }
@@ -275,16 +275,16 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 400,
-                "max": 700
+                "ideal": 50,
+                "max": 120
               },
               "public-method-count": {
                 "ideal": 6,
-                "max": 15
+                "max": 12
               },
               "max-cyclomatic": {
-                "ideal": 15,
-                "max": 30
+                "ideal": 8,
+                "max": 16
               }
             }
           },
@@ -309,16 +309,16 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 400,
-                "max": 800
+                "ideal": 120,
+                "max": 200
               },
               "public-method-count": {
-                "ideal": 8,
-                "max": 20
+                "ideal": 6,
+                "max": 14
               },
               "max-cyclomatic": {
-                "ideal": 15,
-                "max": 35
+                "ideal": 22,
+                "max": 32
               }
             }
           },
@@ -348,12 +348,12 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 300,
-                "max": 600
+                "ideal": 60,
+                "max": 140
               },
               "max-cyclomatic": {
-                "ideal": 12,
-                "max": 25
+                "ideal": 8,
+                "max": 18
               }
             }
           },
@@ -376,12 +376,12 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 200,
-                "max": 400
+                "ideal": 450,
+                "max": 600
               },
               "public-method-count": {
-                "ideal": 4,
-                "max": 10
+                "ideal": 6,
+                "max": 12
               }
             }
           },
@@ -409,12 +409,12 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 200,
-                "max": 400
+                "ideal": 60,
+                "max": 140
               },
               "max-cyclomatic": {
                 "ideal": 10,
-                "max": 25
+                "max": 20
               }
             }
           }
@@ -454,12 +454,12 @@
             ],
             "metrics": {
               "sloc": {
-                "ideal": 200,
-                "max": 400
+                "ideal": 70,
+                "max": 150
               },
               "max-cyclomatic": {
                 "ideal": 10,
-                "max": 25
+                "max": 20
               }
             }
           }
@@ -948,36 +948,6 @@
           "name": "CommandName",
           "base_type": "string",
           "invariant": "matches /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/"
-        }
-      ]
-    },
-    "smart_constructors": {
-      "mode": "hard",
-      "value_objects": [
-        {
-          "name": "RuleId",
-          "constructor": "parseRuleId(input: string): RuleId",
-          "deny_raw": true
-        },
-        {
-          "name": "ContractPath",
-          "constructor": "parseContractPath(input: string): ContractPath",
-          "deny_raw": true
-        },
-        {
-          "name": "Sha256",
-          "constructor": "parseSha256(input: string): Sha256",
-          "deny_raw": true
-        },
-        {
-          "name": "PackageName",
-          "constructor": "parsePackageName(input: string): PackageName",
-          "deny_raw": true
-        },
-        {
-          "name": "CommandName",
-          "constructor": "parseCommandName(input: string): CommandName",
-          "deny_raw": true
         }
       ]
     },

@@ -85,6 +85,33 @@ export function extractBashWriteTarget(command: string | undefined): string | nu
     }
   }
 
+  // rm / rmdir / unlink / shred: deleting a protected file is as damaging as
+  // overwriting it. Every positional is a delete target; return the first
+  // parseable literal so a protected target is caught (best-effort: this
+  // minimal helper returns a single target — the Claude Code plugin's richer
+  // extractor checks every arg).
+  const deleteOps = new Set(["rm", "rmdir", "unlink", "shred"]);
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (!deleteOps.has(tokens[index]!)) {
+      continue;
+    }
+    let sawDoubleDash = false;
+    for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
+      const value = tokens[cursor]!;
+      if (!sawDoubleDash && value === "--") {
+        sawDoubleDash = true;
+        continue;
+      }
+      if (!sawDoubleDash && value.startsWith("-")) {
+        continue;
+      }
+      const literal = parseLiteral(value);
+      if (literal !== null) {
+        return literal;
+      }
+    }
+  }
+
   return null;
 }
 

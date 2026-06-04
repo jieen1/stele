@@ -370,9 +370,9 @@
   (target "packages/core/src/registry/operators.ts::InMemoryOperatorRegistry")
   (description "Generated from design profile: InMemoryOperatorRegistry aggregate must remain reviewable.")
   (rationale "InMemoryOperatorRegistry protects core core invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 400) (max 800))
-  (metric public-method-count (ideal 8) (max 20))
-  (metric max-cyclomatic (ideal 10) (max 25))
+  (metric sloc (ideal 60) (max 120))
+  (metric public-method-count (ideal 8) (max 14))
+  (metric max-cyclomatic (ideal 6) (max 12))
 )
 
 (class-shape core-operator-registry-aggregate-shape
@@ -391,7 +391,7 @@
   (target "packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration")
   (description "Generated from design profile: InvariantValidator aggregate must remain reviewable.")
   (rationale "InvariantValidator protects core core invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 150) (max 350))
+  (metric sloc (ideal 260) (max 340))
   (metric public-method-count (ideal 4) (max 10))
 )
 
@@ -410,7 +410,7 @@
   (target "packages/core/src/loader/load-contract.ts::loadContract")
   (description "Generated from design profile: ContractLoader aggregate must remain reviewable.")
   (rationale "ContractLoader protects core core invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 100) (max 250))
+  (metric sloc (ideal 40) (max 100))
   (metric public-method-count (ideal 3) (max 8))
 )
 
@@ -430,8 +430,8 @@
   (target "packages/core/src/manifest/hash-manifest.ts::buildTransitiveHash")
   (description "Generated from design profile: ManifestEngine aggregate must remain reviewable.")
   (rationale "ManifestEngine protects core core invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 100) (max 250))
-  (metric max-cyclomatic (ideal 8) (max 20))
+  (metric sloc (ideal 90) (max 160))
+  (metric max-cyclomatic (ideal 12) (max 20))
 )
 
 (class-shape core-manifest-engine-aggregate-shape
@@ -451,9 +451,9 @@
   (target "packages/cli/src/commands/check.ts::runCheck")
   (description "Generated from design profile: CheckOrchestrator aggregate must remain reviewable.")
   (rationale "CheckOrchestrator protects core cli invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 400) (max 700))
-  (metric public-method-count (ideal 6) (max 15))
-  (metric max-cyclomatic (ideal 15) (max 30))
+  (metric sloc (ideal 50) (max 120))
+  (metric public-method-count (ideal 6) (max 12))
+  (metric max-cyclomatic (ideal 8) (max 16))
 )
 
 (class-shape cli-check-orchestrator-aggregate-shape
@@ -472,9 +472,9 @@
   (target "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes")
   (description "Generated from design profile: CodeShapeEvaluator aggregate must remain reviewable.")
   (rationale "CodeShapeEvaluator protects core cli invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 400) (max 800))
-  (metric public-method-count (ideal 8) (max 20))
-  (metric max-cyclomatic (ideal 15) (max 35))
+  (metric sloc (ideal 120) (max 200))
+  (metric public-method-count (ideal 6) (max 14))
+  (metric max-cyclomatic (ideal 22) (max 32))
 )
 
 (class-shape cli-code-shape-evaluator-aggregate-shape
@@ -493,8 +493,8 @@
   (target "packages/cli/src/commands/design/diff.ts::computeDesignDiff")
   (description "Generated from design profile: DesignDiffEngine aggregate must remain reviewable.")
   (rationale "DesignDiffEngine protects core cli invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 300) (max 600))
-  (metric max-cyclomatic (ideal 12) (max 25))
+  (metric sloc (ideal 60) (max 140))
+  (metric max-cyclomatic (ideal 8) (max 18))
 )
 
 (class-shape cli-design-diff-engine-aggregate-shape
@@ -514,8 +514,8 @@
   (target "packages/cli/src/index.ts::createProgram")
   (description "Generated from design profile: CliProgramFactory aggregate must remain reviewable.")
   (rationale "CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 200) (max 400))
-  (metric public-method-count (ideal 4) (max 10))
+  (metric sloc (ideal 450) (max 600))
+  (metric public-method-count (ideal 6) (max 12))
 )
 
 (class-shape cli-cli-program-factory-aggregate-shape
@@ -533,8 +533,8 @@
   (target "packages/cli/src/design-profile/validate.ts::validateProfile")
   (description "Generated from design profile: DesignProfileValidator aggregate must remain reviewable.")
   (rationale "DesignProfileValidator protects core cli invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 200) (max 400))
-  (metric max-cyclomatic (ideal 10) (max 25))
+  (metric sloc (ideal 60) (max 140))
+  (metric max-cyclomatic (ideal 10) (max 20))
 )
 
 (class-shape cli-design-profile-validator-aggregate-shape
@@ -553,8 +553,8 @@
   (target "packages/architecture-core/src/evaluate.ts::evaluateArchitecture")
   (description "Generated from design profile: ArchitectureEvaluator aggregate must remain reviewable.")
   (rationale "ArchitectureEvaluator protects core architecture invariants; complexity drift makes agent changes risky.")
-  (metric sloc (ideal 200) (max 400))
-  (metric max-cyclomatic (ideal 10) (max 25))
+  (metric sloc (ideal 70) (max 150))
+  (metric max-cyclomatic (ideal 10) (max 20))
 )
 
 (class-shape architecture-architecture-evaluator-aggregate-shape
@@ -597,29 +597,4 @@
   (target "packages/core/src/util/branded-types.ts::CommandName")
   (base-type "string")
   (pattern "/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/")
-)
-
-(smart-ctor "RuleId"
-  (constructor "parseRuleId")
-  (deny-raw "true")
-)
-
-(smart-ctor "ContractPath"
-  (constructor "parseContractPath")
-  (deny-raw "true")
-)
-
-(smart-ctor "Sha256"
-  (constructor "parseSha256")
-  (deny-raw "true")
-)
-
-(smart-ctor "PackageName"
-  (constructor "parsePackageName")
-  (deny-raw "true")
-)
-
-(smart-ctor "CommandName"
-  (constructor "parseCommandName")
-  (deny-raw "true")
 )

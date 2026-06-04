@@ -95,11 +95,6 @@ export type ArchitectureRuntimeResult = {
 };
 
 /**
- * @deprecated Renamed to {@link ArchitectureRuntimeResult}. Removal scheduled when this repo's package versions cross 0.4.x (no fixed quarter); the alias is harmless until then.
- */
-export type ArchitectureEvaluationResult = ArchitectureRuntimeResult;
-
-/**
  * Evaluate an architecture declaration against the project's TypeScript source
  * tree. Returns a structured result with every violation kind. Single source of
  * truth for file discovery, graph building, and evaluation.
@@ -262,11 +257,6 @@ export async function evaluateArchitectureRuntime(
 // ----------------------------------------------------------------
 // Deprecated re-exports (one-version back-compat for external callers)
 // ----------------------------------------------------------------
-
-/**
- * @deprecated Use {@link evaluateArchitectureRuntime} instead. Removal scheduled when this repo's package versions cross 0.4.x (no fixed quarter); the alias is harmless until then.
- */
-export const evaluateArchitectureFull = evaluateArchitectureRuntime;
 
 /**
  * @deprecated Use {@link evaluateArchitectureRuntime} and flatten the structured

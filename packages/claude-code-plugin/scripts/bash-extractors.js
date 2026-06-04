@@ -46,11 +46,21 @@ const _INTERPRETER_WRITE_HINTS = [
 const _FILE_OP_COMMANDS = new Set([
   "cp", "mv", "install",
   "ln", "rsync", "truncate", "chmod", "chown",
+  // Deletion commands: removing a protected file is as damaging as
+  // overwriting it. Every positional arg is a deletion target (see
+  // _ALL_ARGS_FILE_OPS below).
+  "rm", "rmdir", "unlink", "shred",
 ]);
+
+// File-op commands where EVERY positional arg is a write/delete target (not
+// just the last). `ln` shares an inode across all args; the deletion commands
+// destroy every arg. cp/mv/install/rsync keep "last = destination".
+const _ALL_ARGS_FILE_OPS = new Set(["ln", "rm", "rmdir", "unlink", "shred"]);
 
 const _REAL_CMD_BASENAMES = new Set([
   "git", "cp", "mv", "ln", "rsync", "install", "truncate", "chmod", "chown",
   "dd", "tee",
+  "rm", "rmdir", "unlink", "shred",
 ]);
 
 /**
@@ -195,8 +205,9 @@ function extractFileOperationTargetsFromSegment(tokens) {
     positionalArgs.push(token);
   }
   // Round 5 J-03: `ln` source AND destination both matter (hardlink
-  // creates a shared inode); other commands keep "last = destination".
-  if (path.posix.basename(commandToken.value) === "ln") {
+  // creates a shared inode); deletion commands (rm/rmdir/unlink/shred) destroy
+  // EVERY positional arg; other commands keep "last = destination".
+  if (_ALL_ARGS_FILE_OPS.has(path.posix.basename(commandToken.value))) {
     for (const tok of positionalArgs) {
       const literalPath = parseLiteralShellPath(tok.value);
       if (literalPath !== null) {

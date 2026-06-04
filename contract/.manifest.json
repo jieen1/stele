@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-06-04T03:15:36.259Z",
+  "generated_at": "2026-06-04T05:40:34.377Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -76,8 +76,8 @@
       "size": 24739
     },
     "contract/main.stele": {
-      "sha256": "fd4c22afec10172a95fa4cbb114fbe185db3013365cc4ad1ce1b50bffd777213",
-      "size": 52629
+      "sha256": "a7b7f9b5b73de190e198173d0da9be19c6b1ab8cd41b5f4751988170fad70c78",
+      "size": 54023
     },
     "package.json": {
       "sha256": "4cd157c4a07307f29229c884d4d3c6a1ac08104eaf2f37cc9758ee543eeb46e6",
@@ -136,8 +136,8 @@
       "size": 1113
     },
     "packages/claude-code-plugin/scripts/bash-extractors.js": {
-      "sha256": "71981d6c77babcc17dfb4de7b8b05bfd8150f7d3dc8ee263173d633ab4525d6f",
-      "size": 13008
+      "sha256": "15417c2b5f318d74a324e99c98d0ba693bf141f0fc3aec0daa0de8289b044d38",
+      "size": 13644
     },
     "packages/claude-code-plugin/scripts/lifecycle-context.js": {
       "sha256": "99f3f2f2195284f10b926ae89275293c2da4004dff47177fb328fe561ef7b08d",
@@ -256,5 +256,5 @@
       "size": 381
     }
   },
-  "contract_hash": "3d72848b76b30fe79c3a3a14c0e76819c1d2198b38fa8c2cb08fed5376ba47b1"
+  "contract_hash": "80bada3ca2149e7079bb110c9e21d361d34b2fd091ccde818ded4ef37e609a7a"
 }
