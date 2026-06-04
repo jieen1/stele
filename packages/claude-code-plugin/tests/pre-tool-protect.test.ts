@@ -463,6 +463,36 @@ describe("pre-tool-protect hook", () => {
     );
   });
 
+  it("denies protected-file DELETION / move-away vectors (rm, mv, git rm, clobber, find)", async () => {
+    const projectDir = await createProject();
+    const deny = (command: string) =>
+      expectDenied(runHook(projectDir, { tool_name: "Bash", tool_input: { command } }));
+
+    deny("rm -f contract/main.stele");
+    deny("rm -rf contract/checker_impls");
+    deny("rm a.txt contract/.manifest.json"); // protected not last → all-args scan
+    deny("rmdir tests/contract");
+    deny("unlink contract/.manifest.json");
+    deny("mv contract/main.stele /tmp/evil"); // moving a protected file away = delete
+    deny("git rm -f contract/main.stele");
+    deny("git mv contract/main.stele /tmp/x");
+    deny("echo x >| contract/main.stele"); // force-clobber redirect
+    deny("rm -rf contract/generated"); // fully-protected subtree root
+    deny("find contract/generated -delete"); // find -delete over a fully-protected root
+  });
+
+  it("does NOT over-deny deletion of non-protected paths", async () => {
+    const projectDir = await createProject();
+    const allow = (command: string) =>
+      expectAllowed(runHook(projectDir, { tool_name: "Bash", tool_input: { command } }));
+
+    allow("rm -f /tmp/scratch.txt");
+    allow("rm -rf docs");
+    allow("mv a.txt b.txt");
+    allow("find docs -name x -delete");
+    allow("find contract -name x.stele"); // read-only find (no -delete/-exec)
+  });
+
   it("denies protected Bash write targets when the path is quoted", async () => {
     const projectDir = await createProject();
 

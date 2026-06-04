@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-06-04T05:40:34.377Z",
+  "generated_at": "2026-06-04T07:04:28.658Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -136,8 +136,8 @@
       "size": 1113
     },
     "packages/claude-code-plugin/scripts/bash-extractors.js": {
-      "sha256": "15417c2b5f318d74a324e99c98d0ba693bf141f0fc3aec0daa0de8289b044d38",
-      "size": 13644
+      "sha256": "29ebcddece581b4ba6d3f056967a5f3e10f1c4a608f17217609589d50b2ae316",
+      "size": 16157
     },
     "packages/claude-code-plugin/scripts/lifecycle-context.js": {
       "sha256": "99f3f2f2195284f10b926ae89275293c2da4004dff47177fb328fe561ef7b08d",

@@ -54,13 +54,15 @@ const _FILE_OP_COMMANDS = new Set([
 
 // File-op commands where EVERY positional arg is a write/delete target (not
 // just the last). `ln` shares an inode across all args; the deletion commands
-// destroy every arg. cp/mv/install/rsync keep "last = destination".
-const _ALL_ARGS_FILE_OPS = new Set(["ln", "rm", "rmdir", "unlink", "shred"]);
+// destroy every arg; `mv` is destructive to its SOURCE too (moving a protected
+// file away deletes it), so unlike `cp` it must check all args. cp/install/rsync
+// keep "last = destination" (source is only read).
+const _ALL_ARGS_FILE_OPS = new Set(["ln", "rm", "rmdir", "unlink", "shred", "mv"]);
 
 const _REAL_CMD_BASENAMES = new Set([
   "git", "cp", "mv", "ln", "rsync", "install", "truncate", "chmod", "chown",
   "dd", "tee",
-  "rm", "rmdir", "unlink", "shred",
+  "rm", "rmdir", "unlink", "shred", "find",
 ]);
 
 /**
@@ -104,18 +106,72 @@ export function extractWriteTargetsFromLine(line) {
     ...extractFileOperationTargets(tokens),
     ...extractDdTargets(tokens),
     ...extractGitCheckoutTargets(tokens),
+    ...extractFindTargets(tokens),
     ...extractInterpreterScriptTargets(tokens, line),
   ];
+}
+
+/**
+ * `find <root...> ... -delete` / `-exec rm` destroys files under the search
+ * roots. We can't enumerate matches statically, so when a destructive primary
+ * is present we surface the search roots as targets — the protected-path
+ * matcher's ancestor logic then denies any root that contains protected files.
+ * @stele:effects
+ */
+export function extractFindTargets(tokens) {
+  const targets = [];
+  let segmentStart = 0;
+  for (let index = 0; index <= tokens.length; index += 1) {
+    const token = tokens[index];
+    if (index === tokens.length || (token.type === "operator" && COMMAND_SEPARATOR_TOKENS.has(token.value))) {
+      targets.push(...extractFindTargetsFromSegment(tokens.slice(segmentStart, index)));
+      segmentStart = index + 1;
+    }
+  }
+  return targets;
+}
+
+/** @stele:effects */
+function extractFindTargetsFromSegment(tokens) {
+  const wordTokens = tokens.filter((t) => t.type === "word");
+  const realCmdIdx = _firstRealCommandIndex(wordTokens);
+  if (realCmdIdx < 0) return [];
+  if (path.posix.basename(wordTokens[realCmdIdx].value) !== "find") return [];
+  const rest = wordTokens.slice(realCmdIdx + 1);
+  const destructive = rest.some(
+    (t) => t.value === "-delete" || t.value === "-exec" || t.value === "-execdir",
+  );
+  if (!destructive) return [];
+  // Path operands are the leading words before the first primary (`-name`,
+  // `-type`, `-delete`, ...). Surface each as a search root.
+  const targets = [];
+  for (const t of rest) {
+    if (t.value.startsWith("-") || t.value === "(" || t.value === "!") break;
+    const literal = parseLiteralShellPath(t.value);
+    if (literal !== null) targets.push(literal);
+  }
+  return targets;
 }
 
 export function extractRedirectTargets(tokens) {
   const targets = [];
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
-    if (token.type !== "operator" || (token.value !== ">" && token.value !== ">>")) {
+    if (
+      token.type !== "operator" ||
+      (token.value !== ">" && token.value !== ">>" && token.value !== ">|")
+    ) {
       continue;
     }
-    const nextToken = tokens[index + 1];
+    // `>|` (force-clobber, overriding noclobber) may tokenize as a single
+    // `>|` operator OR as `>` followed by a `|` operator — skip the pipe so
+    // the destination word is still captured (else `echo x >| protected` slips
+    // through as if it were a pipe).
+    let nextIdx = index + 1;
+    if (tokens[nextIdx]?.type === "operator" && tokens[nextIdx]?.value === "|") {
+      nextIdx += 1;
+    }
+    const nextToken = tokens[nextIdx];
     const literalPath = nextToken?.type === "word" ? parseLiteralShellPath(nextToken.value) : null;
     if (literalPath !== null) {
       targets.push(literalPath);
@@ -292,7 +348,9 @@ function extractGitCheckoutFromSegment(tokens) {
   if (path.posix.basename(wordTokens[realCmdIdx].value) !== "git") return [];
   if (wordTokens.length <= realCmdIdx + 1) return [];
   const sub = wordTokens[realCmdIdx + 1].value;
-  if (sub !== "checkout" && sub !== "restore") return [];
+  // checkout/restore overwrite working-tree files; rm deletes them; mv removes
+  // the source. All destroy/overwrite tracked files, so all are write targets.
+  if (sub !== "checkout" && sub !== "restore" && sub !== "rm" && sub !== "mv") return [];
   const targets = [];
   let sawDoubleDash = false;
   for (const tok of wordTokens.slice(realCmdIdx + 2)) {

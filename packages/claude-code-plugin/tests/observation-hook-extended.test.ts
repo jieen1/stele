@@ -172,7 +172,7 @@ describe("observation hook -- extended", () => {
     expect(observation.material_change).toBe(false);
   });
 
-  it("detects mv to protected files and marks material_change: false", async () => {
+  it("detects mv targets — both the protected dest AND the moved source", async () => {
     const projectDir = await createProject();
 
     const result = runHook(projectDir, {
@@ -189,8 +189,13 @@ describe("observation hook -- extended", () => {
     const observation = JSON.parse(
       (await readFile(join(projectDir, ".stele", "agent", "session-observations.jsonl"), "utf8")).trim(),
     );
+    // `mv` now surfaces BOTH endpoints: the protected dest is overwritten and
+    // the source `old_name` is removed. Moving a source file is a material
+    // change, so material_change is true; the protection layer denies the
+    // protected dest separately.
     expect(observation.target_paths).toContain("contract/main.stele");
-    expect(observation.material_change).toBe(false);
+    expect(observation.target_paths).toContain("old_name");
+    expect(observation.material_change).toBe(true);
   });
 
   it("detects dd of= to protected files and marks material_change: false", async () => {
