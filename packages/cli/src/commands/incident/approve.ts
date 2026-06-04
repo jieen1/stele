@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { parseFile } from "@stele/core";
+import { commandName, parseFile } from "@stele/core";
 import type { Command } from "commander";
 
 import { loadConfig } from "../../config/loadConfig.js";
@@ -509,7 +509,7 @@ export async function runIncidentApprove(
  */
 export function registerIncidentApprove(incident: Command): void {
   incident
-    .command("approve")
+    .command(commandName("approve"))
     .description(
       "Approve an incident: enforce the teeth gate, then atomically apply→generate→lock the provenance-tagged invariant.",
     )

@@ -2772,7 +2772,10 @@ def test_no_secrets_in_source_planted_key():
     """A planted OpenAI-style key in a real source dir must trip the scanner."""
     _reset_caches()
     planted = sp._PACKAGES_DIR / "core" / "src" / "__neg_secret_probe.ts"
-    planted.write_text('export const k = "sk-0123456789abcdefghij";\n', encoding="utf-8")
+    # Split the literal so THIS file's source does not itself match the secret
+    # pattern (no_secrets_in_source scans the whole repo, this file included);
+    # the written probe file still contains a contiguous secret to trip on.
+    planted.write_text('export const k = "sk-' + '0123456789abcdefghij";\n', encoding="utf-8")
     try:
         result = sp.no_secrets_in_source({})
     finally:

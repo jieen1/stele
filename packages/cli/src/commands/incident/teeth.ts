@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, delimiter, join } from "node:path";
 
+import { commandName } from "@stele/core";
 import type { Command } from "commander";
 
 import { ExitCode } from "../../errors.js";
@@ -450,7 +451,7 @@ export async function runIncidentTeeth(
  */
 export function registerIncidentTeeth(incident: Command): void {
   incident
-    .command("teeth")
+    .command(commandName("teeth"))
     .description(
       "Prove the candidate negative test FAILS at <fix>^ AND PASSES at <fix> in isolated worktrees. Writes only to .stele/proofs/<id>/.",
     )

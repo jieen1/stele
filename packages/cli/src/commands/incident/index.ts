@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { commandName } from "@stele/core";
 
 import { registerIncidentApprove } from "./approve.js";
 import { runIncidentDraft } from "./draft.js";
@@ -11,13 +12,13 @@ import { registerIncidentTeeth } from "./teeth.js";
  */
 export function addIncidentCommand(program: Command): void {
   const incident = program
-    .command("incident")
+    .command(commandName("incident"))
     .description(
       "Incident-to-contract wedge: turn an incident + fix into a locked invariant with a teeth proof.",
     );
 
   incident
-    .command("draft")
+    .command(commandName("draft"))
     .description(
       "Draft a candidate invariant + negative test from an injected draft (--draft-from). Writes only to .stele/incident/<id>/.",
     )

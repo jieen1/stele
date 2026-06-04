@@ -2,6 +2,14 @@
 
 Imports checker implementations and registers them in _stele_checkers
 so generated tests can invoke them via (uses-checker ...) forms.
+
+Checker registration is AUTO-DISCOVERED from the loaded module: every
+public function (no leading underscore) defined in self_protection.py or
+one of its sp_* submodules is registered under its hyphenated CDL name
+(``foo_bar`` -> ``foo-bar``). This is the single naming convention the
+contract uses, so a hand-maintained name list can only drift out of it —
+which is exactly how the Lock-1 checkers (scratch-never-hashed, etc.)
+ended up unregistered and raising KeyError. Auto-discovery cannot drift.
 """
 import pytest
 
@@ -13,7 +21,9 @@ def _lazy_load_checkers():
     if _checkers:
         return
     import importlib.util
+    import inspect
     import pathlib
+    import sys
 
     spec_path = (
         pathlib.Path(__file__).resolve().parent.parent.parent
@@ -23,150 +33,29 @@ def _lazy_load_checkers():
     )
     mod_name = "stele_self_protection"
     spec = importlib.util.spec_from_file_location(mod_name, str(spec_path))
-    if spec and spec.loader:
-        mod = importlib.util.module_from_spec(spec)
-        import sys
-        sys.modules[mod_name] = mod
-        spec.loader.exec_module(mod)
+    if not (spec and spec.loader):
+        return
 
-        # All checker function names in self_protection.py
-        for name in (
-            # Original checkers
-            "backend_registries",
-            "backend_contains_python",
-            "backend_contains_typescript",
-            "backend_contains_go",
-            "backend_contains_rust",
-            "backend_contains_java",
-            "config_schema_valid",
-            "manifest_version_stable",
-            "exit_codes_valid",
-            "cdl_no_single_quotes",
-            "cdl_utf8_valid",
-            "versions_pinned_together",
-            "no_secrets_in_source",
-            "generation_deterministic",
-            "path_no_traversal",
-            # New checkers
-            "operator_count_stable",
-            "operator_spec_consistent",
-            "manifest_hash_algorithm",
-            "structural_types_stable",
-            "hooks_fail_closed",
-            "hooks_registration_complete",
-            "required_commands_exist",
-            "config_manifest_path_safe",
-            "error_code_families_present",
-            "cli_exit_code_enum_complete",
-            "protected_pattern_safe",
-            "inline_version_sync",
-            # Round 3 Phase B self-protection checkers
-            "all_evaluators_compile",
-            "all_backends_compile",
-            "strict_mode_default_in_ci",
-            "fix_hint_requires_analysis_branch",
-            # Round 4 D-13
-            "default_protected_consistent",
-            # Round 4 Phase 3 dogfood
-            "esm_relative_imports_keep_js",
-            "hook_entrypoints_fail_closed",
-            "core_has_no_stele_deps",
-            # Round 7 — Round 5 deferred dogfood opportunities
-            "no_cjs_require_in_ts_source",
-            "tsconfig_base_strict_mode",
-            "no_backward_compat_shims",
-            "core_engine_purity",
-            "cli_io_through_path_utils",
-            # Round 9 P-01 — locale-independent string compare
-            "no_bare_locale_compare",
-            # Round 13 L-05/P-04 — shared bash extractor module
-            "bash_extractors_shared",
-            # Phase 0 (self-dogfooding plan) — per-phase language config
-            "phase_language_config_valid",
-            # Phase 1 (self-dogfooding plan) — branded-id call-site enforcement
-            "rule_id_uses_branded_type",
-            "sha256_uses_branded_type",
-            "contract_path_uses_branded_type",
-            "command_name_uses_branded_type",
-            "package_name_uses_branded_type",
-        ):
-            _checkers[name] = getattr(mod, name, None)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
 
-
-# Map CDL hyphenated checker names to Python function names.
-_CHECKER_NAME_MAP = {
-    # Original checkers
-    "backend-registries": "backend_registries",
-    "backend-contains-python": "backend_contains_python",
-    "backend-contains-typescript": "backend_contains_typescript",
-    "backend-contains-go": "backend_contains_go",
-    "backend-contains-rust": "backend_contains_rust",
-    "backend-contains-java": "backend_contains_java",
-    "config-schema-valid": "config_schema_valid",
-    "manifest-version-stable": "manifest_version_stable",
-    "exit-codes-valid": "exit_codes_valid",
-    "cdl-no-single-quotes": "cdl_no_single_quotes",
-    "cdl-utf8-valid": "cdl_utf8_valid",
-    "versions-pinned-together": "versions_pinned_together",
-    "no-secrets-in-source": "no_secrets_in_source",
-    "generation-deterministic": "generation_deterministic",
-    "path-no-traversal": "path_no_traversal",
-    # New checkers
-    "operator-count-stable": "operator_count_stable",
-    "operator-spec-consistent": "operator_spec_consistent",
-    "manifest-hash-algorithm": "manifest_hash_algorithm",
-    "structural-types-stable": "structural_types_stable",
-    "hooks-fail-closed": "hooks_fail_closed",
-    "hooks-registration-complete": "hooks_registration_complete",
-    "required-commands-exist": "required_commands_exist",
-    "config-manifest-path-safe": "config_manifest_path_safe",
-    "error-code-families-present": "error_code_families_present",
-    "cli-exit-code-enum-complete": "cli_exit_code_enum_complete",
-    "protected-pattern-safe": "protected_pattern_safe",
-    "inline-version-sync": "inline_version_sync",
-    # Round 3 Phase B self-protection checkers (Round 4 D-04 fix —
-    # without these mappings pytest tests/contract fails with KeyError
-    # on every run, silently neutering the P0-2 CI enforcement claim).
-    "all-evaluators-compile": "all_evaluators_compile",
-    "all-backends-compile": "all_backends_compile",
-    "strict-mode-default-in-ci": "strict_mode_default_in_ci",
-    "fix-hint-requires-analysis-branch": "fix_hint_requires_analysis_branch",
-    # Round 4 D-13
-    "default-protected-consistent": "default_protected_consistent",
-    # Round 4 Phase 3 dogfood
-    "esm-relative-imports-keep-js": "esm_relative_imports_keep_js",
-    "hook-entrypoints-fail-closed": "hook_entrypoints_fail_closed",
-    "core-has-no-stele-deps": "core_has_no_stele_deps",
-    # Round 7 — Round 5 deferred dogfood opportunities
-    "no-cjs-require-in-ts-source": "no_cjs_require_in_ts_source",
-    "tsconfig-base-strict-mode": "tsconfig_base_strict_mode",
-    "no-backward-compat-shims": "no_backward_compat_shims",
-    "core-engine-purity": "core_engine_purity",
-    "cli-io-through-path-utils": "cli_io_through_path_utils",
-    # Round 9 P-01 — locale-independent string compare
-    "no-bare-locale-compare": "no_bare_locale_compare",
-    # Round 13 L-05/P-04 — shared bash extractor module
-    "bash-extractors-shared": "bash_extractors_shared",
-    # Phase 0 (self-dogfooding plan) — per-phase language config
-    "phase-language-config-valid": "phase_language_config_valid",
-    # Phase 1 (self-dogfooding plan) — branded-id call-site enforcement
-    "rule-id-uses-branded-type": "rule_id_uses_branded_type",
-    "sha256-uses-branded-type": "sha256_uses_branded_type",
-    "contract-path-uses-branded-type": "contract_path_uses_branded_type",
-    "command-name-uses-branded-type": "command_name_uses_branded_type",
-    "package-name-uses-branded-type": "package_name_uses_branded_type",
-}
+    # Register every public checker function under its hyphenated CDL name.
+    # Restrict to functions defined in the self_protection module family
+    # (the entry module re-exports its sp_* submodules via `import *`), so
+    # stdlib functions pulled in at module scope are never registered.
+    for py_name, fn in inspect.getmembers(mod, inspect.isfunction):
+        if py_name.startswith("_"):
+            continue
+        owner = getattr(fn, "__module__", "") or ""
+        if owner == mod_name or owner.startswith("sp_"):
+            _checkers[py_name.replace("_", "-")] = fn
 
 
 @pytest.fixture
 def stele_context():
     _lazy_load_checkers()
-    return {
-        "_stele_checkers": {
-            cdl_name: _checkers.get(py_name)
-            for cdl_name, py_name in _CHECKER_NAME_MAP.items()
-        }
-    }
+    return {"_stele_checkers": dict(_checkers)}
 
 
 @pytest.fixture
