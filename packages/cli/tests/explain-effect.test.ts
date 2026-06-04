@@ -25,7 +25,7 @@ import type { CallGraph } from "@stele/call-graph-core";
 import {
   runExplainEffect,
   type ExplainEffectDeps,
-} from "../src/commands/explain.js";
+} from "../src/commands/explain-effect.js";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
 
 const tempDirs: string[] = [];

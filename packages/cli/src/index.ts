@@ -41,12 +41,8 @@ import {
 import { runCheckRecursive } from "./commands/check-recursive.js";
 import { formatCheckReport } from "./report/formatter.js";
 import { runAgentContext, type AgentContextOptions } from "./commands/agentContext.js";
-import {
-  runExplain,
-  runExplainEffect,
-  type ExplainEffectOptions,
-  type ExplainOptions,
-} from "./commands/explain.js";
+import { runExplain, type ExplainOptions } from "./commands/explain.js";
+import { runExplainEffect, type ExplainEffectOptions } from "./commands/explain-effect.js";
 import { runGenerate, runGenerateRecursive, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES, type InitOptions } from "./commands/init.js";
 import { runList } from "./commands/list.js";
