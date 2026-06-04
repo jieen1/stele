@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-06-04T07:04:28.658Z",
+  "generated_at": "2026-06-04T08:59:54.714Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -20,8 +20,8 @@
       "size": 166443
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "3878ea955742b6db41b75234d6f5c4ee49ba8023fbcfb1671d47fb94d49ea85a",
-      "size": 149818
+      "sha256": "2502bcdb1f118d5559ef56bfe10db9ffc185778722f0040b632c716839eaeab9",
+      "size": 149827
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
@@ -60,20 +60,20 @@
       "size": 2109
     },
     "contract/design/manifest.json": {
-      "sha256": "80f429b031bd587ccbb42272da9f41b877c9e418e2347993944b5a773725a8a6",
-      "size": 51542
+      "sha256": "c82878932a2bf8b409aa813d759abe2e937ddd55151e996149fd01656a6df3d9",
+      "size": 51420
     },
     "contract/design/profile.yaml": {
-      "sha256": "9588891cf4dd07b2a6a03d754d4d730a71c2a25b62f13fb3a957b93c45d0f294",
-      "size": 26143
+      "sha256": "ca762944d2b6ae9b850a1602dd3a330b638d75dc772679c81cf39ebe684bc334",
+      "size": 26322
     },
     "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml": {
       "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601",
       "size": 2615
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "c36c1752ba280cec0784d39680412ec536ffdf7c17763e980d8fd354944b25af",
-      "size": 24739
+      "sha256": "9a46eccbc80f306e15c5e680f0d39758b2f0fd65793ad9f08e4bf325ab323fff",
+      "size": 24619
     },
     "contract/main.stele": {
       "sha256": "a7b7f9b5b73de190e198173d0da9be19c6b1ab8cd41b5f4751988170fad70c78",
@@ -256,5 +256,5 @@
       "size": 381
     }
   },
-  "contract_hash": "80bada3ca2149e7079bb110c9e21d361d34b2fd091ccde818ded4ef37e609a7a"
+  "contract_hash": "daf55e2b54fa67676a7de60af02783d9c6fcf1c68ba34299600eae2668644b9f"
 }

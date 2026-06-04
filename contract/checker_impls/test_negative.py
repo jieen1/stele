@@ -2478,13 +2478,13 @@ def test_check_orchestrator_shape_catches_missing_aggregate_member():
 
 
 def test_code_shape_evaluator_shape_catches_missing_method():
-    """Closeout 3b — Test A for cli-code-shape-evaluator: deleting the
-    `evaluateBoundaryDeclaration` function body must trip the
-    must-have-method check."""
+    """Test A for cli-code-shape-evaluator: deleting the `requiresSourceAnalysis`
+    function body (a required_method of the orchestrator aggregate, post-
+    2026-06-04 evaluate.ts split) must trip the must-have-method check."""
     assert _mutate_then_check(
         "packages/cli/src/code-shape/evaluate.ts",
         lambda text: re.sub(
-            r"\nfunction evaluateBoundaryDeclaration\([\s\S]*?\n\}\n",
+            r"\nfunction requiresSourceAnalysis\([\s\S]*?\n\}\n",
             "\n",
             text,
             count=1,
@@ -2494,16 +2494,15 @@ def test_code_shape_evaluator_shape_catches_missing_method():
 
 
 def test_code_shape_evaluator_shape_catches_missing_aggregate_member():
-    """Closeout 3b — Test B for cli-code-shape-evaluator: renaming
-    `evaluateFreeFunctionClassShape` (an aggregate_members entry not in
-    required_methods) so the listed sibling name no longer matches any
-    module-level declaration must trip the aggregate-member coherence
-    check."""
+    """Test B for cli-code-shape-evaluator: renaming `walkRoot` (an
+    aggregate_members entry not in required_methods, post-2026-06-04 evaluate.ts
+    split) so the listed sibling name no longer matches any module-level
+    declaration must trip the aggregate-member coherence check."""
     assert _mutate_then_check(
         "packages/cli/src/code-shape/evaluate.ts",
         lambda text: text.replace(
-            "function evaluateFreeFunctionClassShape",
-            "function evaluateFreeFunctionClassShapeRenamedForTest",
+            "function walkRoot",
+            "function walkRootRenamedForTest",
             1,
         ),
         "cli-code-shape-evaluator-aggregate-shape",

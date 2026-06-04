@@ -238,22 +238,25 @@ ddd:
             public-method-count: { ideal: 6, max: 12 }
             max-cyclomatic: { ideal: 8, max: 16 }
         - id: code-shape-evaluator
+          # 2026-06-04: evaluate.ts was split into per-mechanism modules
+          # (eval-{boundary,class-shape,function-shape,type-policy,file-policy}.ts
+          # + code-shape-common.ts). evaluate.ts is now the ORCHESTRATOR, so the
+          # aggregate members track the orchestration functions that remain
+          # there; the per-mechanism evaluators live in their own modules.
           class: CodeShapeEvaluator
           target: "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes"
           required_methods:
             - evaluateCodeShapes
-            - evaluateBoundaryDeclaration
-            - evaluateClassShapeDeclaration
-            - evaluateFunctionShapeDeclaration
+            - requiresSourceAnalysis
+            - analyzePythonFiles
+            - resolvePythonRuntime
           aggregate_members:
             - evaluateCodeShapes
-            - evaluateBoundaryDeclaration
-            - evaluateClassShapeDeclaration
-            - evaluateFunctionShapeDeclaration
-            - evaluateTypePolicyDeclaration
-            - evaluateFilePolicyDeclaration
-            - evaluateFreeFunctionClassShape
-          # Re-tuned 2026-06-04 vs real (sloc 71 / pub-method 0 / cyclo 17).
+            - requiresSourceAnalysis
+            - analyzePythonFiles
+            - resolvePythonRuntime
+            - expandTargetPattern
+            - walkRoot
           metrics:
             sloc: { ideal: 120, max: 200 }
             public-method-count: { ideal: 6, max: 14 }

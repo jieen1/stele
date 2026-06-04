@@ -480,11 +480,11 @@
 (class-shape cli-code-shape-evaluator-aggregate-shape
   (lang typescript)
   (target "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes")
-  (must-have-method "evaluateBoundaryDeclaration")
-  (must-have-method "evaluateClassShapeDeclaration")
+  (must-have-method "analyzePythonFiles")
   (must-have-method "evaluateCodeShapes")
-  (must-have-method "evaluateFunctionShapeDeclaration")
-  (aggregate-members "evaluateBoundaryDeclaration" "evaluateClassShapeDeclaration" "evaluateCodeShapes" "evaluateFilePolicyDeclaration" "evaluateFreeFunctionClassShape" "evaluateFunctionShapeDeclaration" "evaluateTypePolicyDeclaration")
+  (must-have-method "requiresSourceAnalysis")
+  (must-have-method "resolvePythonRuntime")
+  (aggregate-members "analyzePythonFiles" "evaluateCodeShapes" "expandTargetPattern" "requiresSourceAnalysis" "resolvePythonRuntime" "walkRoot")
 )
 
 (core-node "cli-design-diff-engine-aggregate"

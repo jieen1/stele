@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "9588891cf4dd07b2a6a03d754d4d730a71c2a25b62f13fb3a957b93c45d0f294",
+  "profileHash": "ca762944d2b6ae9b850a1602dd3a330b638d75dc772679c81cf39ebe684bc334",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "ae069664b2b0d1a76f47407d236910afb93db689"
+    "git_sha": "cc2001d266c5a4a2212564386ebba415a7e86c98"
   },
   "templates": [
     "ddd-typedriven"
@@ -386,8 +386,8 @@
       "ruleKind": "core-node",
       "origin": "unknown",
       "origins": [],
-      "fileHash": "e7933e0a0323ea3c90278252fc383f3edb87e917139f72de50408d78902bdb4b",
-      "cdl": "(class-shape cli-code-shape-evaluator-aggregate-shape\n  (lang typescript)\n  (target \"packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes\")\n  (must-have-method \"evaluateBoundaryDeclaration\")\n  (must-have-method \"evaluateClassShapeDeclaration\")\n  (must-have-method \"evaluateCodeShapes\")\n  (must-have-method \"evaluateFunctionShapeDeclaration\")\n  (aggregate-members \"evaluateBoundaryDeclaration\" \"evaluateClassShapeDeclaration\" \"evaluateCodeShapes\" \"evaluateFilePolicyDeclaration\" \"evaluateFreeFunctionClassShape\" \"evaluateFunctionShapeDeclaration\" \"evaluateTypePolicyDeclaration\")\n)"
+      "fileHash": "4e06a1466bc13c6574a7ca00fbcb0e291e22a10c4df8a3ae77c9ea315ef65285",
+      "cdl": "(class-shape cli-code-shape-evaluator-aggregate-shape\n  (lang typescript)\n  (target \"packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes\")\n  (must-have-method \"analyzePythonFiles\")\n  (must-have-method \"evaluateCodeShapes\")\n  (must-have-method \"requiresSourceAnalysis\")\n  (must-have-method \"resolvePythonRuntime\")\n  (aggregate-members \"analyzePythonFiles\" \"evaluateCodeShapes\" \"expandTargetPattern\" \"requiresSourceAnalysis\" \"resolvePythonRuntime\" \"walkRoot\")\n)"
     },
     {
       "ruleId": "core-node.cli-design-diff-engine-aggregate",
@@ -474,17 +474,17 @@
       "cdl": "(class-shape architecture-architecture-evaluator-aggregate-shape\n  (lang typescript)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (must-have-method \"detectCycles\")\n  (must-have-method \"evaluateArchitecture\")\n  (must-have-method \"findCycleViolations\")\n  (must-have-method \"findDependencyViolations\")\n  (must-have-method \"findLayerDirectionViolations\")\n  (must-have-method \"findPublicEntryViolations\")\n  (aggregate-members \"buildAllowMap\" \"detectCycles\" \"evaluateArchitecture\" \"findCycleViolations\" \"findDependencyViolations\" \"findLayerDirectionViolations\" \"findPublicEntryViolations\")\n)"
     }
   ],
-  "generatedAt": "2026-06-04T01:07:10.271Z",
+  "generatedAt": "2026-06-04T08:20:22.981Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "c36c1752ba280cec0784d39680412ec536ffdf7c17763e980d8fd354944b25af"
+      "hash": "9a46eccbc80f306e15c5e680f0d39758b2f0fd65793ad9f08e4bf325ab323fff"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "c36c1752ba280cec0784d39680412ec536ffdf7c17763e980d8fd354944b25af",
+      "sha256": "9a46eccbc80f306e15c5e680f0d39758b2f0fd65793ad9f08e4bf325ab323fff",
       "rules": [
         {
           "id": "architecture.ddd-core",
