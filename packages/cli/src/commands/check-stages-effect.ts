@@ -272,24 +272,70 @@ export async function buildEffectStage(
     });
   }
 
+  // Zero-binding guard (symmetric with the trace + type-state stages): an
+  // error-severity effect-policy whose target-scope matches 0 call-graph nodes
+  // enforces nothing — a renamed file or mistyped glob would otherwise let the
+  // policy pass green while protecting nothing. Surface it as an error.
+  const zeroBindingViolations = buildEffectZeroBindingViolations(result.coverage, command);
+
   // Merge violations + notices. Notices (e.g. lenient-mode
   // unresolved_call_blocks_evaluation) are warning-severity findings that
   // surface through the report but do not flip `ok` to false because we key
   // `ok` off the error-severity count.
-  const allViolations: Violation[] = [...result.violations, ...result.notices];
+  const errorViolations: Violation[] = [...result.violations, ...zeroBindingViolations];
+  const allViolations: Violation[] = [...errorViolations, ...result.notices];
 
   return createViolationReport({
     tool: "stele",
     command,
-    ok: result.violations.length === 0,
+    ok: errorViolations.length === 0,
     summary: {
       invariant_count: protectedState.summary.invariantCount,
       generated_file_count: protectedState.summary.generatedFileCount,
       protected_file_count: protectedState.summary.protectedFileCount,
-      violation_count: result.violations.length,
+      violation_count: errorViolations.length,
     },
     violations: allViolations,
   });
+}
+
+/**
+ * Emit an `effect.<id>.zero_binding` error for every error-severity
+ * effect-policy whose target-scope bound 0 call-graph nodes. Mirrors the trace
+ * and type-state zero-binding guards — no decorative green for a policy that
+ * protects nothing.
+ */
+function buildEffectZeroBindingViolations(
+  coverage: readonly { policyId: string; severity: string; scopeNodesMatched: number }[],
+  command: string,
+): Violation[] {
+  const out: Violation[] = [];
+  for (const c of coverage) {
+    if (c.severity !== "error") continue;
+    if (c.scopeNodesMatched > 0) continue;
+    out.push(
+      createViolation({
+        rule_id: ruleId(`effect.${c.policyId}.zero_binding`),
+        rule_kind: "effect_zero_binding",
+        severity: "error",
+        source: { tool: "stele", command, kind: "rule" },
+        location: { path: "contract/main.stele" },
+        cause: {
+          summary:
+            `Effect-policy \`${c.policyId}\` (severity=error) matched 0 call-graph nodes in its target-scope — ` +
+            `it enforces nothing. A green check that protects nothing is not allowed.`,
+        },
+        scope_paths: ["contract/main.stele"],
+        status: "active",
+        fix: {
+          summary:
+            `Fix the policy's (target-scope …) so it resolves to real nodes (check for a renamed file or a ` +
+            `mistyped glob / extern: alias), or remove the policy if the scope legitimately no longer exists.`,
+        },
+      }),
+    );
+  }
+  return out;
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {

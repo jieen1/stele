@@ -217,26 +217,74 @@ export async function buildTraceStage(
       ? evaluateTracePolicies(evaluationOptions)
       : deps.evaluate(evaluationOptions);
 
+  // Zero-binding guard (symmetric with the type-state stage): an error-severity
+  // trace-policy whose target pattern matches 0 nodes in the call graph
+  // enforces nothing. Previously the evaluator silently skipped it and the
+  // stage reported green — a policy that binds nothing protects nothing. We now
+  // surface it as an error so a renamed target / broken extern alias can't
+  // silently neuter a policy.
+  const zeroBindingViolations = buildTraceZeroBindingViolations(result.coverage, command);
+
   // Merge violations + notices. In strict mode (the default) an incomplete
   // enumeration (`path_exceeded_max_depth`, Round 3 P0-5) is already pushed to
   // `result.violations` — a policy that cannot be proven fails CLOSED, not as
   // a silent warning. `result.notices` only carries genuinely advisory items
   // (and the lenient-mode demotion of the depth cap); they surface through the
   // report but do not flip `ok`, which keys off the error-severity count.
-  const allViolations: Violation[] = [...result.violations, ...result.notices];
+  const errorViolations: Violation[] = [...result.violations, ...zeroBindingViolations];
+  const allViolations: Violation[] = [...errorViolations, ...result.notices];
 
   return createViolationReport({
     tool: "stele",
     command,
-    ok: result.violations.length === 0,
+    ok: errorViolations.length === 0,
     summary: {
       invariant_count: protectedState.summary.invariantCount,
       generated_file_count: protectedState.summary.generatedFileCount,
       protected_file_count: protectedState.summary.protectedFileCount,
-      violation_count: result.violations.length,
+      violation_count: errorViolations.length,
     },
     violations: allViolations,
   });
+}
+
+/**
+ * Emit a `trace.<id>.zero_binding` error for every error-severity trace-policy
+ * whose `(target …)` matched no call-graph nodes. Mirrors the type-state
+ * stage's zero-binding guard — no decorative green for a policy bound to
+ * nothing.
+ */
+function buildTraceZeroBindingViolations(
+  coverage: readonly { policyId: string; severity: string; targetsMatched: number }[],
+  command: string,
+): Violation[] {
+  const out: Violation[] = [];
+  for (const c of coverage) {
+    if (c.severity !== "error") continue;
+    if (c.targetsMatched > 0) continue;
+    out.push(
+      createViolation({
+        rule_id: ruleId(`trace.${c.policyId}.zero_binding`),
+        rule_kind: "trace_zero_binding",
+        severity: "error",
+        source: { tool: "stele", command, kind: "rule" },
+        location: { path: "contract/main.stele" },
+        cause: {
+          summary:
+            `Trace-policy \`${c.policyId}\` (severity=error) matched 0 target nodes in the call graph — ` +
+            `it enforces nothing. A green check that protects nothing is not allowed.`,
+        },
+        scope_paths: ["contract/main.stele"],
+        status: "active",
+        fix: {
+          summary:
+            `Fix the policy's (target …) so it resolves to a real node (check for a renamed symbol or a broken ` +
+            `extern: alias), or remove the policy if the target legitimately no longer exists.`,
+        },
+      }),
+    );
+  }
+  return out;
 }
 
 function resolveTsconfigPath(context: PreparedCheckContext): string | null {

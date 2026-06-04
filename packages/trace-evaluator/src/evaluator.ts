@@ -64,10 +64,18 @@ export interface EvaluateTraceStats {
   readonly pathsCappedTotal: number;
 }
 
+/** Per-policy binding coverage — drives the zero-binding guard. */
+export interface TracePolicyCoverage {
+  readonly policyId: string;
+  readonly severity: string;
+  readonly targetsMatched: number;
+}
+
 export interface EvaluateTraceResult {
   readonly violations: readonly Violation[];
   readonly notices: readonly Violation[];
   readonly stats: EvaluateTraceStats;
+  readonly coverage: readonly TracePolicyCoverage[];
 }
 
 interface CompiledPolicy {
@@ -192,6 +200,7 @@ export function evaluateTracePolicies(
 
   const violations: Violation[] = [];
   const notices: Violation[] = [];
+  const coverage: TracePolicyCoverage[] = [];
   let pathsEnumeratedTotal = 0;
   let pathsCappedTotal = 0;
 
@@ -200,14 +209,23 @@ export function evaluateTracePolicies(
       violations: Object.freeze([]),
       notices: Object.freeze([]),
       stats: { policiesEvaluated: 0, pathsEnumeratedTotal: 0, pathsCappedTotal: 0 },
+      coverage: Object.freeze([]),
     };
   }
 
   for (const policy of contract.tracePolicies) {
     const compiled = compilePolicy(policy, callGraph, externAliases);
     const { allTargets } = buildTargetSet(callGraph, compiled);
+    coverage.push({
+      policyId: policy.id,
+      severity: policy.severity,
+      targetsMatched: allTargets.size,
+    });
     if (allTargets.size === 0) {
-      // No matching targets at all in this graph — nothing to enforce.
+      // No matching targets at all in this graph — nothing to enforce. The
+      // zero coverage recorded above lets the check stage's zero-binding guard
+      // turn this into an error for error-severity policies instead of a
+      // silent green (a policy that binds nothing protects nothing).
       continue;
     }
     const callerNodes = buildCallerSet(callGraph, compiled);
@@ -401,5 +419,6 @@ export function evaluateTracePolicies(
       pathsEnumeratedTotal,
       pathsCappedTotal,
     },
+    coverage: Object.freeze(coverage),
   };
 }

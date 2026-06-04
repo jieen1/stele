@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-06-03T14:30:34.175Z",
+  "generated_at": "2026-06-04T01:08:45.656Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -60,20 +60,20 @@
       "size": 2109
     },
     "contract/design/manifest.json": {
-      "sha256": "ed049f332597004635f6eda7b9ac6f9d01148844696ff5e7c880dae18be3b668",
-      "size": 51551
+      "sha256": "80f429b031bd587ccbb42272da9f41b877c9e418e2347993944b5a773725a8a6",
+      "size": 51542
     },
     "contract/design/profile.yaml": {
-      "sha256": "d00c377850b4601807aa345a87b200699ea651bc072d652875dde7f179c6d113",
-      "size": 24848
+      "sha256": "9588891cf4dd07b2a6a03d754d4d730a71c2a25b62f13fb3a957b93c45d0f294",
+      "size": 26143
     },
     "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml": {
       "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601",
       "size": 2615
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "7d39002d77db764f0d24735bdbae64ec92fe0455846ace60b66495c9cd7e2c33",
-      "size": 25150
+      "sha256": "c36c1752ba280cec0784d39680412ec536ffdf7c17763e980d8fd354944b25af",
+      "size": 24739
     },
     "contract/main.stele": {
       "sha256": "d8c32f2c8998797836184fc32f5e39fd02b834587103b749b6bd61201950f027",
@@ -256,5 +256,5 @@
       "size": 381
     }
   },
-  "contract_hash": "d5282cd0ba55cc0b813817f7a233295cb9240f750905266713c8cff79e86531f"
+  "contract_hash": "403c6c8d75c5890d2443479c74c5d6d804cb833df2f40128b183b093c546be40"
 }

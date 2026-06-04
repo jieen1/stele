@@ -84,10 +84,18 @@ export interface EvaluateEffectStats {
   readonly suppressionsActive: number;
 }
 
+/** Per-policy binding coverage — drives the zero-binding guard. */
+export interface EffectPolicyCoverage {
+  readonly policyId: string;
+  readonly severity: string;
+  readonly scopeNodesMatched: number;
+}
+
 export interface EvaluateEffectResult {
   readonly violations: readonly Violation[];
   readonly notices: readonly Violation[];
   readonly stats: EvaluateEffectStats;
+  readonly coverage: readonly EffectPolicyCoverage[];
 }
 
 function flattenDeclaredEffects(contract: Contract): ReadonlySet<string> {
@@ -291,7 +299,9 @@ export async function evaluateEffects(
   // semantics replace the old globally-unconditional strictMode behaviour.
   // Out-of-scope nodes simply emit nothing: no policy cares.
   const activeScopeMatchers: CompiledPattern[] = [];
+  const coverage: EffectPolicyCoverage[] = [];
   for (const policy of contract.effectPolicies) {
+    const policyMatchers: CompiledPattern[] = [];
     for (const raw of policy.targetScope) {
       let pattern = raw;
       if (externAliases !== undefined) {
@@ -304,8 +314,25 @@ export async function evaluateEffects(
           pattern = resolved;
         }
       }
-      activeScopeMatchers.push(compilePattern(pattern));
+      const compiled = compilePattern(pattern);
+      policyMatchers.push(compiled);
+      activeScopeMatchers.push(compiled);
     }
+    // Per-policy coverage: how many call-graph nodes this policy's target-scope
+    // actually binds. Drives the zero-binding guard in the effect check stage —
+    // a renamed file / mistyped glob that resolves to 0 nodes must FAIL, not
+    // pass green (symmetric with the trace + type-state guards).
+    let scopeNodesMatched = 0;
+    for (const n of callGraph.nodes) {
+      if (matchAny(n.id, policyMatchers)) {
+        scopeNodesMatched += 1;
+      }
+    }
+    coverage.push({
+      policyId: policy.id,
+      severity: policy.severity,
+      scopeNodesMatched,
+    });
   }
 
   // Step 2 — read source-code annotations.
@@ -500,6 +527,7 @@ export async function evaluateEffects(
       propagationRounds: propagation.rounds,
       suppressionsActive: suppressionResult.activeCount,
     },
+    coverage: Object.freeze(coverage),
   };
 }
 

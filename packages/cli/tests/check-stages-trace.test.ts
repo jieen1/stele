@@ -267,7 +267,13 @@ describe("buildTraceStage — successful evaluation", () => {
       denyDirect: ["**/controllers/**::*"],
     });
     const callGraph = mkCallGraph({
-      nodes: [mkNode({ id: CTRL, filePath: "src/controllers/order.ts" })],
+      // DB node present so the policy target (src/db/**::*) binds — the
+      // zero-binding guard requires a real target; the point of this test is
+      // "target present, no OFFENDING edge", not "target absent".
+      nodes: [
+        mkNode({ id: CTRL, filePath: "src/controllers/order.ts" }),
+        mkNode({ id: DB, filePath: "src/db/users.ts" }),
+      ],
       edges: [], // no edge to DB
     });
     const context = mkContext({
@@ -283,6 +289,33 @@ describe("buildTraceStage — successful evaluation", () => {
     expect(report.ok).toBe(true);
     expect(report.violations).toHaveLength(0);
     expect(report.summary.violation_count).toBe(0);
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("zero-binding guard: an error-severity policy matching 0 target nodes fails the build", async () => {
+    const policy = mkPolicy({
+      id: "NO_DIRECT_DB",
+      target: ["src/db/**::*"], // no db node in the graph below → 0 targets
+      denyDirect: ["**/controllers/**::*"],
+    });
+    const callGraph = mkCallGraph({
+      nodes: [mkNode({ id: CTRL, filePath: "src/controllers/order.ts" })],
+      edges: [],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const extract = vi.fn(async () => callGraph);
+
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+    });
+
+    expect(report.ok).toBe(false);
+    const guard = report.violations.find((v) => v.rule_id === "trace.NO_DIRECT_DB.zero_binding");
+    expect(guard).toBeDefined();
+    expect(guard!.severity).toBe("error");
     _clearCallGraphCacheForTests(context);
   });
 
@@ -320,6 +353,7 @@ describe("buildTraceStage — successful evaluation", () => {
         pathsEnumeratedTotal: 0,
         pathsCappedTotal: 1,
       },
+      coverage: [],
     }));
 
     const report = await buildTraceStage(context, PROTECTED_STATE, "check", {

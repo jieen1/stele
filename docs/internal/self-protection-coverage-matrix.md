@@ -1,15 +1,28 @@
 # Self-Protection Coverage Matrix
 
-**Status:** generated 2026-05-25 (Phase 7 step 7.1); **type-state row + open
-follow-ups updated 2026-06-03** (runtime binding closeout — see the §Type-state
-runtime binding note below).
+**Status:** generated 2026-05-25 (Phase 7 step 7.1); type-state row updated
+2026-06-03; **vacuity sweep 2026-06-04** (see §2026-06-04 below).
 **Owner:** self-dogfooding plan (`docs/design/self-dogfooding/`)
 **Live counts:** 52 invariants · 132 negative tests · run `stele list` for the
 live invariant count. (The 48 / 88 figures below were the 2026-05-25 snapshot.)
 
-This document tracks which of Stele's **14 advertised contract mechanisms**
-are exercised against which **workspace packages**, in this repository's
-own `contract/main.stele` + `contract/generated/ddd-typedriven.stele`.
+> **§2026-06-04 vacuity sweep.** A strict re-audit found 14 *vacuous* (decorative,
+> can-never-fire) declarations and fixed them: (1) the 9 `core-node` aggregates
+> measured all-zero because the complexity metric extractor used a non-existent
+> TS API + a SourceFile without `setParentNodes` — every metric silently read 0;
+> fixed, thresholds re-tuned against real values. (2) The 5 `smart-ctor`
+> declarations were **removed** — the smart-ctor checker only binds `class`
+> value-objects, but Stele's brands are string type aliases, so they never ran;
+> their "deny raw construction" intent is enforced by the 5 `*_USES_BRANDED_TYPE`
+> invariants. Mechanism count is therefore **13**, not 14. (3) Symmetric
+> zero-binding guards were added to the `trace-policy` stage and the `type-policy`
+> `requireFieldTypes` branch, matching the type-state guard — an error-severity
+> structural declaration that binds 0 targets now fails instead of passing green.
+
+This document tracks which of Stele's contract mechanisms are exercised against
+which **workspace packages**, in this repository's own `contract/main.stele` +
+`contract/generated/ddd-typedriven.stele`. (Originally 14 advertised mechanisms;
+smart-ctor removed 2026-06-04 as inapplicable to string-alias brands → **13**.)
 
 The goal of the self-dogfooding plan (Phases 0–6) was to take every row
 from `❌ none` to at least one `✅` cell. After Phase 6 close-out, **every
@@ -59,7 +72,7 @@ package and is excluded.
 | **architecture**         | ✅ 1   | ✅ 1   | ✅ 2   | ✅ 5     | ✅ 6   | ✅ 3  | 18    |
 | **core-node**            | ✅ 4   | ✅ 5   | ❌     | ❌       | ✅ 1   | ❌    | 10    |
 | **branded-id**           | ✅ 4   | ✅ 1   | ❌     | ❌       | ❌     | ❌    | 5     |
-| **smart-ctor**           | ✅ 4   | ✅ 1   | ❌     | ❌       | ❌     | ❌    | 5     |
+| **smart-ctor**           | —      | —      | —      | —        | —      | —     | 0 (removed 2026-06-04) |
 | **trace-policy**         | ✅ 1   | ✅ 3   | ❌     | ❌       | ❌     | ❌    | 4     |
 | **type-state**           | ✅ 1   | ✅ 2   | ❌     | ❌       | ✅ 1   | ❌    | 4     |
 | **effect-policy**        | ✅ 2   | ✅ 1   | ✅ 1   | ❌       | ❌     | ❌    | 4     |
@@ -180,9 +193,14 @@ package and is excluded.
 
 After Phase 6 close-out:
 
-- **14 / 14 mechanisms have at least one ✅** (the goal of the plan).
-- 153 total declarations across the contract surface (was 35 invariants
-  before the plan).
+- **13 / 13 mechanisms have at least one genuinely-binding ✅** (smart-ctor
+  removed 2026-06-04 as inapplicable; was 14/14 with one decorative).
+- ~133 binding declarations across the contract surface (was 35 invariants
+  before the plan; -5 smart-ctor removed 2026-06-04).
+- As of 2026-06-04 **no mechanism is vacuous**: the 9 all-zero core-node
+  aggregates now measure real values, and every error-severity structural
+  family (type-state, trace-policy, class/function/type/file-shape, boundary)
+  fails on a zero-binding target rather than passing green.
 - As of 2026-06-03 **no mechanism is `⚠️ partial`**. `type-state` was the
   last partial row; all 4 lifecycles now bind at runtime (see the type-state
   note above). A **zero-binding guard** in `check-stages-type-state.ts` now

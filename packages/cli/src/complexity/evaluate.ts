@@ -121,6 +121,11 @@ async function collectMetrics(
       filePath,
       text,
       compilerOptions.target ?? ts.ScriptTarget.Latest,
+      // setParentNodes MUST be true: countSLOCForFunction/Interface call
+      // node.getStart(), which walks parent pointers to the SourceFile. Without
+      // it getStart() throws, the catch below swallows it, and every metric
+      // silently reads 0 — making core-node constraints vacuous.
+      /* setParentNodes */ true,
     );
 
     // Try class first (has SLOC/public-method/cyclomatic metrics)
@@ -157,8 +162,11 @@ async function collectMetrics(
  * Count SLOC for a function declaration or variable.
  */
 function countSLOCForFunction(source: string, node: ts.Node): number {
-  const start = (node as any).getStartPosition?.() ?? (node as any).getStart?.() ?? 0;
-  const end = (node as any).getEnd?.() ?? source.length;
+  // node.getStart() needs parent pointers (setParentNodes:true at the
+  // SourceFile). `getStartPosition` is not a ts.Node API and was always
+  // undefined — the real start comes from getStart().
+  const start = node.getStart();
+  const end = node.getEnd();
   const fnText = source.slice(start, end);
   const lines = fnText.split("\n");
   let count = 0;
@@ -222,8 +230,8 @@ function computeFunctionCyclomatic(node: ts.Node): number {
  * Count SLOC for an interface declaration.
  */
 function countSLOCForInterface(source: string, node: ts.Node): number {
-  const start = (node as any).getStartPosition?.() ?? (node as any).getStart?.() ?? 0;
-  const end = (node as any).getEnd?.() ?? source.length;
+  const start = node.getStart();
+  const end = node.getEnd();
   const ifaceText = source.slice(start, end);
   const lines = ifaceText.split("\n");
   let count = 0;

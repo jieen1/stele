@@ -36,13 +36,23 @@ export function countSLOC(source: string, classNode: ts.ClassDeclaration): numbe
   const nameEnd = name.getEnd();
   let bodyStart = nameEnd;
 
+  // Scan forward to the class BODY's opening brace. Anything between the name
+  // and that brace is a heritage clause (`extends X`, `implements Y, Z`) or a
+  // type-parameter list — none of which contain a `{`. The previous version
+  // broke out of the loop on the first non-whitespace char (the `e` of
+  // `extends` / `i` of `implements`), found no `{`, and returned 0 SLOC for
+  // every class with a heritage clause.
   while (bodyStart < source.length) {
     const ch = source[bodyStart];
     if (ch === CHAR_SLASH && source[bodyStart + 1] === CHAR_STAR) {
-      bodyStart = findBlockCommentEnd(source, bodyStart);
+      const commentEnd = findBlockCommentEnd(source, bodyStart);
+      if (commentEnd < 0) {
+        return 0;
+      }
+      bodyStart = commentEnd;
       continue;
     }
-    if (ch !== CHAR_SPACE && ch !== CHAR_TAB && ch !== CHAR_LF && ch !== CHAR_CR) {
+    if (ch === "{") {
       break;
     }
     bodyStart++;

@@ -196,6 +196,7 @@ function okResult(): EvaluateEffectResult {
   return {
     violations: Object.freeze([]),
     notices: Object.freeze([]),
+    coverage: Object.freeze([]),
     stats: {
       policiesEvaluated: 0,
       nodesAnalyzed: 0,
@@ -304,6 +305,7 @@ describe("buildEffectStage — successful evaluation", () => {
       async (): Promise<EvaluateEffectResult> => ({
         violations: Object.freeze([violation]),
         notices: Object.freeze([]),
+        coverage: Object.freeze([]),
         stats: {
           policiesEvaluated: 1,
           nodesAnalyzed: 1,
@@ -330,6 +332,78 @@ describe("buildEffectStage — successful evaluation", () => {
     _clearCallGraphCacheForTests(context);
   });
 
+  it("zero-binding guard: an error-severity policy with 0 scope nodes fails the build", async () => {
+    const policy = mkEffectPolicy({ id: "NO_IO", forbid: ["io"] });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const evaluate = vi.fn(
+      async (): Promise<EvaluateEffectResult> => ({
+        violations: Object.freeze([]),
+        notices: Object.freeze([]),
+        coverage: Object.freeze([
+          { policyId: "NO_IO", severity: "error", scopeNodesMatched: 0 },
+        ]),
+        stats: {
+          policiesEvaluated: 1,
+          nodesAnalyzed: 0,
+          unresolvedFailures: 0,
+          propagationRounds: 0,
+          suppressionsActive: 0,
+        },
+      }),
+    );
+    const extract = vi.fn(async () => mkCallGraph({}));
+
+    const report = await buildEffectStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+      evaluate,
+      extractor: STUB_EXTRACTOR,
+    });
+
+    expect(report.ok).toBe(false);
+    const guard = report.violations.find((v) => v.rule_id === "effect.NO_IO.zero_binding");
+    expect(guard).toBeDefined();
+    expect(guard!.severity).toBe("error");
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("zero-binding guard: a warning-severity 0-scope policy does NOT fail the build", async () => {
+    const policy = mkEffectPolicy({ id: "NO_IO", forbid: ["io"] });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const evaluate = vi.fn(
+      async (): Promise<EvaluateEffectResult> => ({
+        violations: Object.freeze([]),
+        notices: Object.freeze([]),
+        coverage: Object.freeze([
+          { policyId: "NO_IO", severity: "warning", scopeNodesMatched: 0 },
+        ]),
+        stats: {
+          policiesEvaluated: 1,
+          nodesAnalyzed: 0,
+          unresolvedFailures: 0,
+          propagationRounds: 0,
+          suppressionsActive: 0,
+        },
+      }),
+    );
+    const extract = vi.fn(async () => mkCallGraph({}));
+
+    const report = await buildEffectStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+      evaluate,
+      extractor: STUB_EXTRACTOR,
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.violations.map((v) => v.rule_id)).not.toContain("effect.NO_IO.zero_binding");
+    _clearCallGraphCacheForTests(context);
+  });
+
   it("surfaces multiple violations across policies", async () => {
     const p1 = mkEffectPolicy({ id: "NO_IO", forbid: ["io"] });
     const p2 = mkEffectPolicy({
@@ -351,6 +425,7 @@ describe("buildEffectStage — successful evaluation", () => {
       async (): Promise<EvaluateEffectResult> => ({
         violations: Object.freeze([v1, v2, v3]),
         notices: Object.freeze([]),
+        coverage: Object.freeze([]),
         stats: {
           policiesEvaluated: 2,
           nodesAnalyzed: 3,
@@ -410,6 +485,7 @@ describe("buildEffectStage — successful evaluation", () => {
       async (): Promise<EvaluateEffectResult> => ({
         violations: Object.freeze([]),
         notices: Object.freeze([notice]),
+        coverage: Object.freeze([]),
         stats: {
           policiesEvaluated: 1,
           nodesAnalyzed: 1,

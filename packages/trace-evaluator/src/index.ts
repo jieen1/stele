@@ -3,6 +3,7 @@ export {
   type EvaluateTraceOptions,
   type EvaluateTraceResult,
   type EvaluateTraceStats,
+  type TracePolicyCoverage,
 } from "./evaluator.js";
 export {
   enumeratePaths,

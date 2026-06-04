@@ -43,6 +43,28 @@ describe("countSLOC", () => {
     expect(countSLOC(source, cls)).toBe(3);
   });
 
+  it("counts the body of a class with a heritage clause (regression: implements broke body scan)", () => {
+    // Before the 2026-06-04 fix the body-brace scan broke on the first char of
+    // `implements`/`extends`, found no `{`, and returned 0 — making every
+    // core-node on a class with a heritage clause vacuous.
+    const source = `class Service implements Foo, Bar {
+  public foo(): void {}
+  public bar(): void {}
+}
+`;
+    const cls = findClass(source, "Service");
+    expect(countSLOC(source, cls)).toBe(2);
+  });
+
+  it("counts the body of a class with extends + generics heritage", () => {
+    const source = `class Service extends Base<Thing> {
+  public foo(): void {}
+}
+`;
+    const cls = findClass(source, "Service");
+    expect(countSLOC(source, cls)).toBe(1);
+  });
+
   it("ignores blank lines", () => {
     const source = `class Service {
   public foo(): void {}

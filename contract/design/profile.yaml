@@ -109,10 +109,15 @@ ddd:
             - list
           required_fields:
             - "#operators"
+          # Thresholds re-tuned 2026-06-04 against real measured values
+          # (sloc 28 / pub-method 4 / cyclo 2) after the metric-extractor bug
+          # fix. Ceilings are ~2-3x current so the guard is green today but
+          # bites on genuine bloat — previously all maxes were set blind
+          # against measured-0 and could never fire.
           metrics:
-            sloc: { ideal: 400, max: 800 }
-            public-method-count: { ideal: 8, max: 20 }
-            max-cyclomatic: { ideal: 10, max: 25 }
+            sloc: { ideal: 60, max: 120 }
+            public-method-count: { ideal: 8, max: 14 }
+            max-cyclomatic: { ideal: 6, max: 12 }
         - id: invariant-validator
           class: InvariantValidator
           # Closeout 3b (2026-05-25): target switched from the `validateInvariant`
@@ -131,8 +136,9 @@ ddd:
             - readSingleText
             - readSingleValueField
             - readMultiValueField
+          # Re-tuned 2026-06-04 vs real (sloc 204 / pub-method 0).
           metrics:
-            sloc: { ideal: 150, max: 350 }
+            sloc: { ideal: 260, max: 340 }
             public-method-count: { ideal: 4, max: 10 }
         - id: contract-loader
           class: ContractLoader
@@ -149,8 +155,9 @@ ddd:
             - loadRecursive
             - readContractFile
             - MAX_IMPORT_DEPTH
+          # Re-tuned 2026-06-04 vs real (sloc 6 / pub-method 0).
           metrics:
-            sloc: { ideal: 100, max: 250 }
+            sloc: { ideal: 40, max: 100 }
             public-method-count: { ideal: 3, max: 8 }
         - id: manifest-engine
           class: ManifestEngine
@@ -173,9 +180,10 @@ ddd:
             - writeHashManifest
             - HASH_MANIFEST_VERSION
             - HASH_MANIFEST_RELATIVE_PATH
+          # Re-tuned 2026-06-04 vs real (sloc 44 / cyclo 6).
           metrics:
-            sloc: { ideal: 100, max: 250 }
-            max-cyclomatic: { ideal: 8, max: 20 }
+            sloc: { ideal: 90, max: 160 }
+            max-cyclomatic: { ideal: 12, max: 20 }
 
     - id: cli
       decision_ref: d1
@@ -222,10 +230,13 @@ ddd:
             - prepareCheckContextWithContract
             - collectProtectedCheckState
             - buildRawCheckReport
+          # Re-tuned 2026-06-04 vs real (sloc 3 / pub-method 0 / cyclo 1).
+          # runCheck is a thin delegating entry point; ceilings catch it
+          # growing into a fat orchestrator.
           metrics:
-            sloc: { ideal: 400, max: 700 }
-            public-method-count: { ideal: 6, max: 15 }
-            max-cyclomatic: { ideal: 15, max: 30 }
+            sloc: { ideal: 50, max: 120 }
+            public-method-count: { ideal: 6, max: 12 }
+            max-cyclomatic: { ideal: 8, max: 16 }
         - id: code-shape-evaluator
           class: CodeShapeEvaluator
           target: "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes"
@@ -242,10 +253,11 @@ ddd:
             - evaluateTypePolicyDeclaration
             - evaluateFilePolicyDeclaration
             - evaluateFreeFunctionClassShape
+          # Re-tuned 2026-06-04 vs real (sloc 71 / pub-method 0 / cyclo 17).
           metrics:
-            sloc: { ideal: 400, max: 800 }
-            public-method-count: { ideal: 8, max: 20 }
-            max-cyclomatic: { ideal: 15, max: 35 }
+            sloc: { ideal: 120, max: 200 }
+            public-method-count: { ideal: 6, max: 14 }
+            max-cyclomatic: { ideal: 22, max: 32 }
         - id: design-diff-engine
           class: DesignDiffEngine
           target: "packages/cli/src/commands/design/diff.ts::computeDesignDiff"
@@ -266,9 +278,10 @@ ddd:
             - compareToolchainContracts
             - compareProject
             - SEVERITY
+          # Re-tuned 2026-06-04 vs real (sloc 20 / cyclo 2).
           metrics:
-            sloc: { ideal: 300, max: 600 }
-            max-cyclomatic: { ideal: 12, max: 25 }
+            sloc: { ideal: 60, max: 140 }
+            max-cyclomatic: { ideal: 8, max: 18 }
         - id: cli-program-factory
           class: CliProgramFactory
           # Closeout 3b: target switched from the `createSteleProgram` alias
@@ -287,9 +300,12 @@ ddd:
             - formatVersion
             - runInstallCommand
             - loadAgentHooksInstaller
+          # Re-tuned 2026-06-04 vs real (sloc 394 / pub-method 0). createProgram
+          # legitimately registers ~40 commands; ceiling gives real headroom
+          # (was max 400 with value 394 — one command from a false failure).
           metrics:
-            sloc: { ideal: 200, max: 400 }
-            public-method-count: { ideal: 4, max: 10 }
+            sloc: { ideal: 450, max: 600 }
+            public-method-count: { ideal: 6, max: 12 }
         - id: design-profile-validator
           class: DesignProfileValidator
           target: "packages/cli/src/design-profile/validate.ts::validateProfile"
@@ -309,9 +325,10 @@ ddd:
             - addCoreInvariantErrors
             - addUniquenessErrors
             - addTraceErrors
+          # Re-tuned 2026-06-04 vs real (sloc 16 / cyclo 4).
           metrics:
-            sloc: { ideal: 200, max: 400 }
-            max-cyclomatic: { ideal: 10, max: 25 }
+            sloc: { ideal: 60, max: 140 }
+            max-cyclomatic: { ideal: 10, max: 20 }
 
     - id: architecture
       decision_ref: d1
@@ -340,9 +357,10 @@ ddd:
             - findLayerDirectionViolations
             - findPublicEntryViolations
             - buildAllowMap
+          # Re-tuned 2026-06-04 vs real (sloc 27 / cyclo 4).
           metrics:
-            sloc: { ideal: 200, max: 400 }
-            max-cyclomatic: { ideal: 10, max: 25 }
+            sloc: { ideal: 70, max: 150 }
+            max-cyclomatic: { ideal: 10, max: 20 }
 
     - id: backends-ts
       decision_ref: d1
@@ -706,24 +724,15 @@ type_driven:
       - name: CommandName
         base_type: string
         invariant: "matches /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/"
-  smart_constructors:
-    mode: hard
-    value_objects:
-      - name: RuleId
-        constructor: "parseRuleId(input: string): RuleId"
-        deny_raw: true
-      - name: ContractPath
-        constructor: "parseContractPath(input: string): ContractPath"
-        deny_raw: true
-      - name: Sha256
-        constructor: "parseSha256(input: string): Sha256"
-        deny_raw: true
-      - name: PackageName
-        constructor: "parsePackageName(input: string): PackageName"
-        deny_raw: true
-      - name: CommandName
-        constructor: "parseCommandName(input: string): CommandName"
-        deny_raw: true
+  # smart_constructors removed 2026-06-04. The smart-ctor evaluator only binds
+  # to `class` value-objects with a private constructor + static factory; Stele's
+  # brands (RuleId/ContractPath/Sha256/PackageName/CommandName) are branded
+  # STRING TYPE ALIASES, not classes, so the declarations bound to nothing,
+  # were filtered out before execution (check-stages-type-driven.ts: target
+  # undefined), and named non-existent `parse*` constructors. The "deny raw
+  # construction" intent is already enforced GENUINELY by the five
+  # *_USES_BRANDED_TYPE invariants (each with a passing negative test). A
+  # class-only mechanism pointed at string aliases is decorative; removed.
   type_state:
     mode: hard
 

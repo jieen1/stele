@@ -676,6 +676,32 @@ function evaluateTypePolicyDeclaration(
     );
   }
 
+  // Zero-binding guard: when a type-policy declares requireFieldTypes but NO
+  // type/interface in scope matches the owner-suffix policy, the requirement
+  // loop below never runs and the policy passes silently — a green check that
+  // protects nothing (e.g. every `*Violation`/`*Report` owner was renamed
+  // away). Surface it as an error instead, mirroring the other code-shape
+  // mechanisms' 0-match guards.
+  if (declaration.requireFieldTypes.length > 0) {
+    const matchedOwners = collectTypeDeclarationsForTarget(parsedTarget, matchedFiles, fileAnalyses).filter(
+      (typeDeclaration) => ownerMatchesSuffixPolicy(typeDeclaration.name, declaration.ownerNameSuffixes),
+    );
+    if (matchedOwners.length === 0) {
+      violations.push(
+        createRuleViolation({
+          declaration,
+          command,
+          contractPath,
+          filePath: matchedFiles[0] ?? parsedTarget.pathPattern,
+          summary: `Type policy "${declaration.id}" matched no owner types — it enforces nothing.`,
+          detail: `requireFieldTypes is declared but no type/interface in "${parsedTarget.pathPattern}" matched the owner-name suffix policy [${declaration.ownerNameSuffixes.join(", ")}]. A green check that protects nothing is not allowed.`,
+          fixSummary: `Fix the target/owner-suffix so it resolves to real types, or remove the requireFieldTypes requirement if those owners legitimately no longer exist.`,
+          scopePaths: createScopePaths(contractPath, matchedFiles, parsedTarget.pathPattern),
+        }),
+      );
+    }
+  }
+
   for (const requirement of declaration.requireFieldTypes) {
     for (const typeDeclaration of collectTypeDeclarationsForTarget(parsedTarget, matchedFiles, fileAnalyses)) {
       if (!ownerMatchesSuffixPolicy(typeDeclaration.name, declaration.ownerNameSuffixes)) {

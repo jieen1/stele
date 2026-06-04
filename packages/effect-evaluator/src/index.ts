@@ -3,6 +3,7 @@ export {
   type EvaluateEffectOptions,
   type EvaluateEffectResult,
   type EvaluateEffectStats,
+  type EffectPolicyCoverage,
 } from "./evaluator.js";
 
 export type {
