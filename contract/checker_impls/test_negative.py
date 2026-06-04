@@ -24,8 +24,7 @@ import self_protection as sp
 
 # Reset caches before each test.
 def _reset_caches():
-    sp._backend_registry_cache = None
-    sp._stele_files_cache = None
+    sp.reset_caches()
 
 
 def _pass_if_false(result: dict[str, Any], name: str) -> bool:

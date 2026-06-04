@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-06-04T08:59:54.714Z",
+  "generated_at": "2026-06-04T10:16:46.816Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -16,12 +16,36 @@
       "size": 0
     },
     "contract/checker_impls/self_protection.py": {
-      "sha256": "f8db0eb7a9bebd3b383f347840cd7edf47019c7c61bca23545dc29f58685c066",
-      "size": 166443
+      "sha256": "696beeb476f77d7cfccce66dc99b0df35332069cddc7e37df14728b4d3bde1ee",
+      "size": 1339
+    },
+    "contract/checker_impls/sp_branded.py": {
+      "sha256": "aeba1e7fc74e2121d65815f8430298f34e48b6055f0d1ac5fbaf958f89b1d4ea",
+      "size": 18908
+    },
+    "contract/checker_impls/sp_core.py": {
+      "sha256": "869361c9cdfb18b69649c621f4d2da09956f1ab9fe1e1381c0c8112db019293f",
+      "size": 40191
+    },
+    "contract/checker_impls/sp_dogfood.py": {
+      "sha256": "2385c2777cded34245198eba0f092fcc7a89c1ed66c645766e1e41b745686e5a",
+      "size": 47778
+    },
+    "contract/checker_impls/sp_lock1.py": {
+      "sha256": "366a75819ab79d2d5ce625e12c53ee6de73b3d81bcc80b7d20f04ed06296b132",
+      "size": 12711
+    },
+    "contract/checker_impls/sp_phase_b.py": {
+      "sha256": "1fd39b87ae5cb7e7529cb47aae2c1af21942144e977958adb23f04aa1dc18f26",
+      "size": 30219
+    },
+    "contract/checker_impls/sp_shared.py": {
+      "sha256": "ed8647dbeb37df6e37e1e9a1953a064d4392bccfe7d40331bfa75bda71070b74",
+      "size": 22784
     },
     "contract/checker_impls/test_negative.py": {
-      "sha256": "2502bcdb1f118d5559ef56bfe10db9ffc185778722f0040b632c716839eaeab9",
-      "size": 149827
+      "sha256": "a8a9bb7bfea7c97b8587cceb58c7ce5e93648165a9e6b615705cba3a1a63f4eb",
+      "size": 149778
     },
     "contract/design/approvals/2026-05-23-e08-core-has-no-stele-deps.json": {
       "sha256": "fa76ca3e74de4c791d21f6de5d16853c77739ecb03d6d927d022b15c66e19baa",
