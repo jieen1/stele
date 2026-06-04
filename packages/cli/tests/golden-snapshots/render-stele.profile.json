@@ -294,18 +294,17 @@
             "target": "packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes",
             "required_methods": [
               "evaluateCodeShapes",
-              "evaluateBoundaryDeclaration",
-              "evaluateClassShapeDeclaration",
-              "evaluateFunctionShapeDeclaration"
+              "requiresSourceAnalysis",
+              "analyzePythonFiles",
+              "resolvePythonRuntime"
             ],
             "aggregate_members": [
               "evaluateCodeShapes",
-              "evaluateBoundaryDeclaration",
-              "evaluateClassShapeDeclaration",
-              "evaluateFunctionShapeDeclaration",
-              "evaluateTypePolicyDeclaration",
-              "evaluateFilePolicyDeclaration",
-              "evaluateFreeFunctionClassShape"
+              "requiresSourceAnalysis",
+              "analyzePythonFiles",
+              "resolvePythonRuntime",
+              "expandTargetPattern",
+              "walkRoot"
             ],
             "metrics": {
               "sloc": {
