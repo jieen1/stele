@@ -574,7 +574,12 @@ async function checkCustomCheckers(
     };
   }
 
-  const pyFiles = entries.filter((f) => f.endsWith(".py") && !f.startsWith("_"));
+  // Exclude private modules, test files, and conftest — only checker modules
+  // are imported as checkers. (test_*.py / conftest.py are pytest infra, not
+  // checkers, and importing them standalone is meaningless.)
+  const pyFiles = entries.filter(
+    (f) => f.endsWith(".py") && !f.startsWith("_") && !f.startsWith("test_") && f !== "conftest.py",
+  );
   if (pyFiles.length === 0) {
     return {
       check,
@@ -589,7 +594,11 @@ async function checkCustomCheckers(
     try {
       await execFileAsync(
         "python3",
-        ["-c", `import importlib.util; spec = importlib.util.spec_from_file_location("m", ${JSON.stringify(modulePath)}); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)`],
+        // Put the checker dir on sys.path first: checker modules may be split
+        // across sibling files (e.g. an entry module that re-exports `from
+        // sp_shared import *`), which only resolve when their own directory is
+        // importable — exactly how conftest.py loads them at runtime.
+        ["-c", `import sys, importlib.util; sys.path.insert(0, ${JSON.stringify(fullPath)}); spec = importlib.util.spec_from_file_location("m", ${JSON.stringify(modulePath)}); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)`],
         { windowsHide: true },
       );
     } catch (error) {

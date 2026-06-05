@@ -135,3 +135,63 @@ describe("evaluateCoreNodes — missing target", () => {
     expect(result.violations).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test: public-method-count is vacuous on non-class targets — guard fails closed
+// ---------------------------------------------------------------------------
+
+describe("evaluateCoreNodes — public-method-count guard", () => {
+  it("reports a configuration violation when public-method-count targets a free function", async () => {
+    const projectDir = await createTempDir();
+    writeConfig(projectDir);
+
+    writeContract(projectDir, `(core-node "fn-with-method-metric"
+  (lang typescript)
+  (target "src/fn.ts::doThing")
+  (role business-core-service)
+  (metric sloc (ideal 50) (max 100))
+  (metric public-method-count (ideal 4) (max 10))
+)`);
+
+    const srcPath = join(projectDir, "src/fn.ts");
+    mkdirSync(join(projectDir, "src"), { recursive: true });
+    writeFileSync(srcPath, "export function doThing(): number {\n  return 1;\n}\n", "utf8");
+
+    const config = await loadConfig(projectDir);
+    const contract = await loadContract(join(projectDir, config.entry));
+
+    const results = await evaluateCoreNodes(projectDir, contract.coreNodes);
+    expect(results).toHaveLength(1);
+
+    const violation = results[0].violations[0];
+    expect(results[0].violations).toHaveLength(1);
+    expect(violation.metric).toBe("public-method-count");
+    expect(violation.isConfigurationViolation).toBe(true);
+    expect(violation.nodeId).toBe("fn-with-method-metric");
+  });
+
+  it("does NOT fire the guard when public-method-count targets a real class", async () => {
+    const projectDir = await createTempDir();
+    writeConfig(projectDir);
+
+    writeContract(projectDir, `(core-node "class-with-method-metric"
+  (lang typescript)
+  (target "src/svc.ts::Svc")
+  (role business-core-service)
+  (metric public-method-count (ideal 4) (max 10))
+)`);
+
+    const srcPath = join(projectDir, "src/svc.ts");
+    mkdirSync(join(projectDir, "src"), { recursive: true });
+    writeFileSync(srcPath, "export class Svc {\n  a(): void {}\n  b(): void {}\n}\n", "utf8");
+
+    const config = await loadConfig(projectDir);
+    const contract = await loadContract(join(projectDir, config.entry));
+
+    const results = await evaluateCoreNodes(projectDir, contract.coreNodes);
+    expect(results).toHaveLength(1);
+    // Class has 2 public methods, under max 10, and the guard does not apply to
+    // class targets — so no violation at all.
+    expect(results[0].violations).toHaveLength(0);
+  });
+});

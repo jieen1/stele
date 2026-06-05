@@ -70,6 +70,29 @@ export async function evaluateCoreNode(
     };
   }
 
+  // public-method-count is only meaningful for class/aggregate targets. A free
+  // function or interface has no public methods, so the metric would always read
+  // 0 and silently pass (vacuous). Fail closed if it's declared on a non-class
+  // target rather than letting a no-op metric masquerade as enforcement.
+  const declaresPublicMethodCount = declaration.metrics.some(
+    (boundary: CoreNodeMetricBoundary) => boundary.name === "public-method-count",
+  );
+  if (declaresPublicMethodCount && metrics.kind !== "class") {
+    return {
+      measurement: createStubMeasurement(declaration),
+      violations: [{
+        nodeId: declaration.id,
+        target: declaration.target,
+        metric: "public-method-count" as CoreNodeMetricName,
+        value: 0,
+        ideal: 0,
+        max: 0,
+        isConfigurationViolation: true,
+      }],
+      notices: [],
+    };
+  }
+
   const measurement = buildMeasurement(declaration, metrics, filePath, parsed.className);
   const { violations, notices } = classifyMetrics(measurement);
 
@@ -98,6 +121,7 @@ type RawMetricValues = {
   sloc: number;
   publicMethodCount: number;
   maxCyclomatic: number;
+  kind: "class" | "function" | "interface" | "none";
 };
 
 /**
@@ -134,7 +158,7 @@ async function collectMetrics(
       const sloc = countSLOC(text, classNode);
       const publicMethodCount = countPublicMethods(classNode);
       const maxCyclomatic = computeMaxCyclomaticComplexity(classNode);
-      return { sloc, publicMethodCount, maxCyclomatic };
+      return { sloc, publicMethodCount, maxCyclomatic, kind: "class" };
     }
 
     // Try function declaration or variable (countSLOC for functions uses the whole function body)
@@ -142,19 +166,19 @@ async function collectMetrics(
     if (funcNode !== undefined) {
       const sloc = countSLOCForFunction(text, funcNode);
       const maxCyclomatic = computeMaxCyclomaticForFunction(funcNode);
-      return { sloc, publicMethodCount: 0, maxCyclomatic };
+      return { sloc, publicMethodCount: 0, maxCyclomatic, kind: "function" };
     }
 
     // Try interface (only SLOC is meaningful for interfaces)
     const ifaceNode = findInterfaceByName(sourceFile, symbolName);
     if (ifaceNode !== undefined) {
       const sloc = countSLOCForInterface(text, ifaceNode);
-      return { sloc, publicMethodCount: 0, maxCyclomatic: 0 };
+      return { sloc, publicMethodCount: 0, maxCyclomatic: 0, kind: "interface" };
     }
 
-    return { sloc: -1, publicMethodCount: -1, maxCyclomatic: -1 };
+    return { sloc: -1, publicMethodCount: -1, maxCyclomatic: -1, kind: "none" };
   } catch {
-    return { sloc: 0, publicMethodCount: 0, maxCyclomatic: 0 };
+    return { sloc: 0, publicMethodCount: 0, maxCyclomatic: 0, kind: "none" };
   }
 }
 

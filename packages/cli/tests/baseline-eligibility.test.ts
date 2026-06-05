@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBaselineEligibleViolation } from "../src/commands/check.js";
+import { isBaselineEligibleViolation } from "../src/report/filters.js";
 import type { RuleId, Violation, ViolationSource } from "@stele/core";
 
 type ViolationOverrides = Partial<Omit<Violation, "rule_id">> & {

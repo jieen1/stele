@@ -5,7 +5,8 @@ import {
   PYTHON_RESERVED_WORDS,
 } from "./types.js";
 
-// Alias for backward compatibility. Delegates to @stele/core sanitizeIdentifier.
+// Canonical name used across the python backend (invariant-renderer, translator,
+// code-shape-renderer). Delegates to @stele/core sanitizeIdentifier.
 export const sanitizePythonIdentifier = sanitizeIdentifier;
 
 // ---------------------------------------------------------------------------

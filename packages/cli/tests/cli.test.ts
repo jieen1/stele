@@ -409,6 +409,34 @@ describe("stele CLI", () => {
     await runCheck(projectDir);
   });
 
+  it("check falls through to manifest verification when baseline human_state is uninitialized", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerateAndLock(projectDir, "initial contract baseline");
+
+    // A hand-authored / uninitialized baseline (empty human_state) must NOT
+    // manufacture human_file_drift for every existing file. It falls through to
+    // manifest verification, which the lock above left clean.
+    await writeProjectFile(
+      projectDir,
+      "contract/.baseline.json",
+      `${JSON.stringify(
+        { version: "1", generated_at: "2026-05-08T00:00:00.000Z", reason: "uninitialized passthrough", violations: {}, human_state: { files: {}, contract_hash: "" } },
+        null,
+        2,
+      )}\n`,
+    );
+    await runCheck(projectDir);
+
+    // ...and it is NOT a verification bypass: with the empty baseline still in
+    // place, tampering a protected file must still fail manifest verification.
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      '(invariant TAMPERED\n  (severity high)\n  (description "tampered")\n  (assert (eq 1 1)))\n',
+    );
+    await expect(runCheck(projectDir)).rejects.toThrow();
+  });
+
   it("check fails when a generated file is missing", async () => {
     const projectDir = await createFixtureProject();
     await runGenerateAndLock(projectDir);

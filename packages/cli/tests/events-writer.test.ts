@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEvent, writeEvent, writeEventStrict } from "../src/events/write-event.js";
 import { getGitInfo } from "../src/events/git.js";
-import { generateSessionId } from "../src/events/session.js";
 import type { SteleEvent } from "../src/events/types.js";
 
 const tempDirs: string[] = [];
@@ -210,21 +209,5 @@ describe("getGitInfo", () => {
 
     // commit will be undefined (not a git repo)
     expect(info.commit).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// generateSessionId
-// ---------------------------------------------------------------------------
-
-describe("generateSessionId", () => {
-  it("returns a 16-char hex string", () => {
-    const id = generateSessionId();
-    expect(id).toMatch(/^[0-9a-f]{16}$/);
-  });
-
-  it("generates unique IDs", () => {
-    const ids = new Set(Array.from({ length: 100 }, () => generateSessionId()));
-    expect(ids.size).toBe(100);
   });
 });

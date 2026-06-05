@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1",
-  "profileHash": "ca762944d2b6ae9b850a1602dd3a330b638d75dc772679c81cf39ebe684bc334",
+  "profileHash": "7a6dd67452ed766ad8345754866482e0f479bf304985fc5e11517903e36d7b66",
   "profilePath": "contract/design/profile.yaml",
   "preset": "ddd-typedriven",
   "generator": {
     "package": "@stele/cli",
     "version": "0.1.0",
-    "git_sha": "cc2001d266c5a4a2212564386ebba415a7e86c98"
+    "git_sha": "37644662ba19325bd4a2c1d08645cbdbd1a64934"
   },
   "templates": [
     "ddd-typedriven"
@@ -294,8 +294,8 @@
           "aggregate_id": "validator"
         }
       ],
-      "fileHash": "9f77c22175fcd4a0ec1a8cde4505ce7a8a0f2c2ed56b846c2ac1d6743e15ac6d",
-      "cdl": "(core-node \"core-invariant-validator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration\")\n  (description \"Generated from design profile: InvariantValidator aggregate must remain reviewable.\")\n  (rationale \"InvariantValidator protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 260) (max 340))\n  (metric public-method-count (ideal 4) (max 10))\n)"
+      "fileHash": "978dae34400daa770be8855c1c92b14f046d39b8f4ba1bcd4b4829f07584d828",
+      "cdl": "(core-node \"core-invariant-validator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/validator/structure-invariant.ts::parseInvariantDeclaration\")\n  (description \"Generated from design profile: InvariantValidator aggregate must remain reviewable.\")\n  (rationale \"InvariantValidator protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 260) (max 340))\n)"
     },
     {
       "ruleId": "core-node.unknown",
@@ -315,8 +315,8 @@
           "aggregate_id": "loader"
         }
       ],
-      "fileHash": "95d77b020ca163270a7e36049e4d0431821d8227901d0504c3101508c3da434d",
-      "cdl": "(core-node \"core-contract-loader-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/loader/load-contract.ts::loadContract\")\n  (description \"Generated from design profile: ContractLoader aggregate must remain reviewable.\")\n  (rationale \"ContractLoader protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 40) (max 100))\n  (metric public-method-count (ideal 3) (max 8))\n)"
+      "fileHash": "67a2d563e22cd1b04582fed06b77dd5002af213c40872e05616e2aa47e609889",
+      "cdl": "(core-node \"core-contract-loader-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/core/src/loader/load-contract.ts::loadContract\")\n  (description \"Generated from design profile: ContractLoader aggregate must remain reviewable.\")\n  (rationale \"ContractLoader protects core core invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 40) (max 100))\n)"
     },
     {
       "ruleId": "core-node.unknown",
@@ -357,8 +357,8 @@
           "aggregate_id": "orchestrator"
         }
       ],
-      "fileHash": "cb64f2a1c6fcdf0db5f257028da1f3ed5da2d2959f404363ffd1970248df9a40",
-      "cdl": "(core-node \"cli-check-orchestrator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/commands/check.ts::runCheck\")\n  (description \"Generated from design profile: CheckOrchestrator aggregate must remain reviewable.\")\n  (rationale \"CheckOrchestrator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 50) (max 120))\n  (metric public-method-count (ideal 6) (max 12))\n  (metric max-cyclomatic (ideal 8) (max 16))\n)"
+      "fileHash": "545d1f4ec812c4afd400c7da6969d90ab6ba61ede5b135b5065dc1bddc227eee",
+      "cdl": "(core-node \"cli-check-orchestrator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/commands/check.ts::runCheck\")\n  (description \"Generated from design profile: CheckOrchestrator aggregate must remain reviewable.\")\n  (rationale \"CheckOrchestrator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 50) (max 120))\n  (metric max-cyclomatic (ideal 8) (max 16))\n)"
     },
     {
       "ruleId": "core-node.unknown",
@@ -378,8 +378,8 @@
           "aggregate_id": "evaluator"
         }
       ],
-      "fileHash": "d42776542f60c6247b84593d27836d47500b04502fb8ac74e0839b3da886ef63",
-      "cdl": "(core-node \"cli-code-shape-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes\")\n  (description \"Generated from design profile: CodeShapeEvaluator aggregate must remain reviewable.\")\n  (rationale \"CodeShapeEvaluator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 120) (max 200))\n  (metric public-method-count (ideal 6) (max 14))\n  (metric max-cyclomatic (ideal 22) (max 32))\n)"
+      "fileHash": "079e6b50ce8dc287e0da23a8bdea5b242fe5c68df3c592f383c886f9aa5f7c45",
+      "cdl": "(core-node \"cli-code-shape-evaluator-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/code-shape/evaluate.ts::evaluateCodeShapes\")\n  (description \"Generated from design profile: CodeShapeEvaluator aggregate must remain reviewable.\")\n  (rationale \"CodeShapeEvaluator protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 120) (max 200))\n  (metric max-cyclomatic (ideal 22) (max 32))\n)"
     },
     {
       "ruleId": "core-node.unknown",
@@ -420,8 +420,8 @@
           "aggregate_id": "factory"
         }
       ],
-      "fileHash": "757fa23ad5a7878206078c26818daa3637d6e57a8d905dbcec316551c6505247",
-      "cdl": "(core-node \"cli-cli-program-factory-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/index.ts::createProgram\")\n  (description \"Generated from design profile: CliProgramFactory aggregate must remain reviewable.\")\n  (rationale \"CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 450) (max 600))\n  (metric public-method-count (ideal 6) (max 12))\n)"
+      "fileHash": "0a1c5e76330158e1f51b7f1625df0707a7ba3df5a790242d311cc3f2277e18b0",
+      "cdl": "(core-node \"cli-cli-program-factory-aggregate\"\n  (lang typescript)\n  (role business-core-service)\n  (target \"packages/cli/src/index.ts::createProgram\")\n  (description \"Generated from design profile: CliProgramFactory aggregate must remain reviewable.\")\n  (rationale \"CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.\")\n  (metric sloc (ideal 450) (max 600))\n)"
     },
     {
       "ruleId": "core-node.unknown",
@@ -474,17 +474,17 @@
       "cdl": "(class-shape architecture-architecture-evaluator-aggregate-shape\n  (lang typescript)\n  (target \"packages/architecture-core/src/evaluate.ts::evaluateArchitecture\")\n  (must-have-method \"detectCycles\")\n  (must-have-method \"evaluateArchitecture\")\n  (must-have-method \"findCycleViolations\")\n  (must-have-method \"findDependencyViolations\")\n  (must-have-method \"findLayerDirectionViolations\")\n  (must-have-method \"findPublicEntryViolations\")\n  (aggregate-members \"buildAllowMap\" \"detectCycles\" \"evaluateArchitecture\" \"findCycleViolations\" \"findDependencyViolations\" \"findLayerDirectionViolations\" \"findPublicEntryViolations\")\n)"
     }
   ],
-  "generatedAt": "2026-06-04T08:20:22.981Z",
+  "generatedAt": "2026-06-05T01:21:05.738Z",
   "generatedFiles": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "hash": "9a46eccbc80f306e15c5e680f0d39758b2f0fd65793ad9f08e4bf325ab323fff"
+      "hash": "075f30b510390593c20d4b11bb879b71a6cfe3be4cceaa3775dc0f6519288526"
     }
   ],
   "outputs": [
     {
       "path": "contract/generated/ddd-typedriven.stele",
-      "sha256": "9a46eccbc80f306e15c5e680f0d39758b2f0fd65793ad9f08e4bf325ab323fff",
+      "sha256": "075f30b510390593c20d4b11bb879b71a6cfe3be4cceaa3775dc0f6519288526",
       "rules": [
         {
           "id": "architecture.ddd-core",

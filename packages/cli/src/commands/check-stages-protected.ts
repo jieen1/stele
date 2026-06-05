@@ -37,7 +37,7 @@ export async function buildProtectedStageReport(
     const baseline = await tryReadViolationBaseline(resolve(context.projectDir, STELE_BASELINE_FILE));
     const humanState = baseline?.human_state;
 
-    if (humanState !== undefined) {
+    if (humanState !== undefined && isInitializedHumanState(humanState)) {
       return buildProtectedReportWithBaseline(context, protectedState, humanState, command);
     }
 
@@ -56,6 +56,19 @@ export async function buildProtectedStageReport(
       violations: [createExecutionViolation(error, context.config.entry, command)],
     });
   }
+}
+
+/**
+ * A human_state is usable for drift detection only once it records something —
+ * a contract hash or at least one file. An all-empty human_state (the shape a
+ * freshly hand-authored or uninitialized `.baseline.json` carries) is NOT a
+ * recorded approval to diverge from; treating it as one would flag every
+ * existing human file as drift. When it's empty we fall through to manifest
+ * verification, which is the secure default: it still fully verifies every
+ * protected file, so an empty baseline can never become a verification bypass.
+ */
+function isInitializedHumanState(humanState: HumanState): boolean {
+  return humanState.contract_hash !== "" || Object.keys(humanState.files).length > 0;
 }
 
 /**

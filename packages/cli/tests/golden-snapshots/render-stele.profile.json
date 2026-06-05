@@ -145,10 +145,6 @@
               "sloc": {
                 "ideal": 260,
                 "max": 340
-              },
-              "public-method-count": {
-                "ideal": 4,
-                "max": 10
               }
             }
           },
@@ -175,10 +171,6 @@
               "sloc": {
                 "ideal": 40,
                 "max": 100
-              },
-              "public-method-count": {
-                "ideal": 3,
-                "max": 8
               }
             }
           },
@@ -278,10 +270,6 @@
                 "ideal": 50,
                 "max": 120
               },
-              "public-method-count": {
-                "ideal": 6,
-                "max": 12
-              },
               "max-cyclomatic": {
                 "ideal": 8,
                 "max": 16
@@ -310,10 +298,6 @@
               "sloc": {
                 "ideal": 120,
                 "max": 200
-              },
-              "public-method-count": {
-                "ideal": 6,
-                "max": 14
               },
               "max-cyclomatic": {
                 "ideal": 22,
@@ -377,10 +361,6 @@
               "sloc": {
                 "ideal": 450,
                 "max": 600
-              },
-              "public-method-count": {
-                "ideal": 6,
-                "max": 12
               }
             }
           },

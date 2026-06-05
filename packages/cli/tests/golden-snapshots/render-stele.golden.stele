@@ -392,7 +392,6 @@
   (description "Generated from design profile: InvariantValidator aggregate must remain reviewable.")
   (rationale "InvariantValidator protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 260) (max 340))
-  (metric public-method-count (ideal 4) (max 10))
 )
 
 (class-shape core-invariant-validator-aggregate-shape
@@ -411,7 +410,6 @@
   (description "Generated from design profile: ContractLoader aggregate must remain reviewable.")
   (rationale "ContractLoader protects core core invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 40) (max 100))
-  (metric public-method-count (ideal 3) (max 8))
 )
 
 (class-shape core-contract-loader-aggregate-shape
@@ -452,7 +450,6 @@
   (description "Generated from design profile: CheckOrchestrator aggregate must remain reviewable.")
   (rationale "CheckOrchestrator protects core cli invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 50) (max 120))
-  (metric public-method-count (ideal 6) (max 12))
   (metric max-cyclomatic (ideal 8) (max 16))
 )
 
@@ -473,7 +470,6 @@
   (description "Generated from design profile: CodeShapeEvaluator aggregate must remain reviewable.")
   (rationale "CodeShapeEvaluator protects core cli invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 120) (max 200))
-  (metric public-method-count (ideal 6) (max 14))
   (metric max-cyclomatic (ideal 22) (max 32))
 )
 
@@ -515,7 +511,6 @@
   (description "Generated from design profile: CliProgramFactory aggregate must remain reviewable.")
   (rationale "CliProgramFactory protects core cli invariants; complexity drift makes agent changes risky.")
   (metric sloc (ideal 450) (max 600))
-  (metric public-method-count (ideal 6) (max 12))
 )
 
 (class-shape cli-cli-program-factory-aggregate-shape

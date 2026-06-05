@@ -48,8 +48,18 @@ def _lazy_load_checkers():
         if py_name.startswith("_"):
             continue
         owner = getattr(fn, "__module__", "") or ""
-        if owner == mod_name or owner.startswith("sp_"):
-            _checkers[py_name.replace("_", "-")] = fn
+        if owner != mod_name and not owner.startswith("sp_"):
+            continue
+        # Every checker accepts a context argument; a 0-parameter public function
+        # (e.g. the reset_caches test helper) is infrastructure, not a checker,
+        # and must not be registered as one. This keeps the registered set exactly
+        # the declared checkers without a drift-prone name list.
+        try:
+            if len(inspect.signature(fn).parameters) == 0:
+                continue
+        except (TypeError, ValueError):
+            pass
+        _checkers[py_name.replace("_", "-")] = fn
 
 
 @pytest.fixture

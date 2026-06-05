@@ -18,9 +18,9 @@ import { STELE_BASELINE_FILE, type SteleConfig } from "../config/defaults.js";
 import {
   buildRawCheckReport,
   collectProtectedCheckState,
-  isBaselineEligibleViolation,
   prepareCheckContext,
 } from "./check.js";
+import { isBaselineEligibleViolation } from "../report/filters.js";
 import { isMissingFileError } from "../utils/shared-utils.js";
 import { createEvent, writeEvent } from "../events/write-event.js";
 

@@ -38,6 +38,15 @@ jobs:
       - run: pnpm build
       - run: python -m pytest tests/contract -q
       - run: node packages/cli/dist/index.js check
+      # The 142-test negative suite is the ONLY proof the Python self-protection
+      # checkers actually DETECT violations (tests/contract only asserts they
+      # pass on clean source, which a hollowed-out always-pass checker also does;
+      # `stele check` never runs the uses-checker invariants at all). Without
+      # this step a checker neutered to `return {"passed": True}` would survive
+      # every other gate. The suite tampers real source in place and restores;
+      # contract/checker_impls/conftest.py is an autouse backstop that restores
+      # any file a test fails to clean up, so it is safe to run unattended here.
+      - run: python -m pytest contract/checker_impls -q
 
       - run: pnpm test
       - run: pnpm typecheck

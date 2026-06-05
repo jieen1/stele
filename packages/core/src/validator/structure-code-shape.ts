@@ -506,7 +506,9 @@ export function parseClassShapeFieldRequirement(node: ListNode, id: string): Cla
   };
 }
 
-// -- Backward compatibility: re-export individual parsers --
+// -- Typed dispatch wrappers consumed by structure.ts --
+// Each forwards to parseCodeShapeDeclaration and narrows the result to the
+// declaration type for its mechanism, giving structure.ts a typed per-kind API.
 
 export function parseBoundaryDeclaration(filePath: string, node: ListNode): BoundaryDeclaration {
   return parseCodeShapeDeclaration(filePath, node) as BoundaryDeclaration;

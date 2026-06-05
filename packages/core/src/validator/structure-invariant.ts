@@ -1,9 +1,6 @@
 import type { AstNode, ListNode } from "../ast/types.js";
 import { readSingleExpression, ensureFieldUnset } from "./structure-shared.js";
 import { ALLOWED_INVARIANT_FIELDS } from "./structure-types.js";
-
-// Re-export for backward compatibility (tests)
-export { readSingleExpression };
 import type {
   CheckerUse,
   InvariantDeclaration,

@@ -1,19 +1,23 @@
 {
   "version": "1",
-  "generated_at": "2026-06-04T10:56:47.125Z",
+  "generated_at": "2026-06-05T02:11:49.401Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
-      "sha256": "90efc225315d2a358df5479c1d2663027a6f1b99fef45a5a2adf85dc8a91a00d",
-      "size": 1762
+      "sha256": "e7c7b1c6c1fce67df8be371f92425ae29b82f841e4a3cfb436f9de82d32780b6",
+      "size": 2457
     },
     ".github/workflows/publish.yml": {
-      "sha256": "f4bde1e5eb0653685d8669b7bb779b98f4d14a97d6c62e8a07d96b4aab4ca586",
-      "size": 1599
+      "sha256": "712bb58b8c9c2795bc284f7c375ca89f95538b970fc2f3958fe6e30b079f8259",
+      "size": 1986
     },
     "contract/checker_impls/.gitkeep": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
+    },
+    "contract/checker_impls/conftest.py": {
+      "sha256": "eeb460619de8e2036829948b098b300e5945030c5627571a490957449b3d0bae",
+      "size": 3104
     },
     "contract/checker_impls/self_protection.py": {
       "sha256": "696beeb476f77d7cfccce66dc99b0df35332069cddc7e37df14728b4d3bde1ee",
@@ -84,20 +88,20 @@
       "size": 2109
     },
     "contract/design/manifest.json": {
-      "sha256": "c82878932a2bf8b409aa813d759abe2e937ddd55151e996149fd01656a6df3d9",
-      "size": 51420
+      "sha256": "32518297179489b1c4a103f9d8e9a636a8ddeee647c4e23791a28fe01b166b60",
+      "size": 51166
     },
     "contract/design/profile.yaml": {
-      "sha256": "ca762944d2b6ae9b850a1602dd3a330b638d75dc772679c81cf39ebe684bc334",
-      "size": 26322
+      "sha256": "7a6dd67452ed766ad8345754866482e0f479bf304985fc5e11517903e36d7b66",
+      "size": 26591
     },
     "contract/design/proposals/2026-05-23-e08-core-has-no-stele-deps.yaml": {
       "sha256": "d947531cdc513471c3b3b8b2d38b72d9f4efc6ca3d1def2ba2728af32ea0a601",
       "size": 2615
     },
     "contract/generated/ddd-typedriven.stele": {
-      "sha256": "9a46eccbc80f306e15c5e680f0d39758b2f0fd65793ad9f08e4bf325ab323fff",
-      "size": 24619
+      "sha256": "075f30b510390593c20d4b11bb879b71a6cfe3be4cceaa3775dc0f6519288526",
+      "size": 24370
     },
     "contract/main.stele": {
       "sha256": "a7b7f9b5b73de190e198173d0da9be19c6b1ab8cd41b5f4751988170fad70c78",
@@ -268,8 +272,8 @@
       "size": 30931
     },
     "tests/contract/conftest.py": {
-      "sha256": "7d67a5de838b8de87cdde838fd110344442ea9d83c1beae707cd5a1d97751688",
-      "size": 2121
+      "sha256": "7fd707e6b8f3d524a5e352a5d36a283eb98ac9d7bd701568e5ce4b11efde99cb",
+      "size": 2607
     },
     "tests/contract/test_contract.py": {
       "sha256": "c7e3215cc08849c9c23dd0318ad70e6cc750b5b91afeb87d09285cbcbe6823ae",
@@ -280,5 +284,5 @@
       "size": 381
     }
   },
-  "contract_hash": "daf55e2b54fa67676a7de60af02783d9c6fcf1c68ba34299600eae2668644b9f"
+  "contract_hash": "e185c99552f77c4e2a3d73f30625d5ef5c560ec1c682673f86c7e7155c2612f7"
 }

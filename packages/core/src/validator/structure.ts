@@ -8,8 +8,11 @@ export {
 
 export {
   parseInvariantDeclaration,
-  readSingleExpression as readSingleExpressionInvariant,
 } from "./structure-invariant.js";
+
+export {
+  readSingleExpression as readSingleExpressionInvariant,
+} from "./structure-shared.js";
 
 export {
   parseScenarioDeclaration,

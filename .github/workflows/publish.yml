@@ -42,6 +42,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: python -m pip install pytest
+      # Never publish a build whose own self-protection contract is broken.
+      # Mirrors ci.yml: positive checker tests + `stele check` + the negative
+      # suite that proves the checkers actually bite.
+      - run: pnpm build
+      - run: python -m pytest tests/contract -q
+      - run: node packages/cli/dist/index.js check
+      - run: python -m pytest contract/checker_impls -q
       - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm lint

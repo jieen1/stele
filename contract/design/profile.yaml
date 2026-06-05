@@ -136,10 +136,12 @@ ddd:
             - readSingleText
             - readSingleValueField
             - readMultiValueField
-          # Re-tuned 2026-06-04 vs real (sloc 204 / pub-method 0).
+          # Re-tuned 2026-06-04 vs real (sloc 204). public-method-count omitted:
+          # parseInvariantDeclaration is a free function (no methods), so that
+          # metric is inapplicable — the evaluator now errors if it's declared
+          # on a non-class target.
           metrics:
             sloc: { ideal: 260, max: 340 }
-            public-method-count: { ideal: 4, max: 10 }
         - id: contract-loader
           class: ContractLoader
           target: "packages/core/src/loader/load-contract.ts::loadContract"
@@ -155,10 +157,10 @@ ddd:
             - loadRecursive
             - readContractFile
             - MAX_IMPORT_DEPTH
-          # Re-tuned 2026-06-04 vs real (sloc 6 / pub-method 0).
+          # Re-tuned 2026-06-04 vs real (sloc 6). public-method-count omitted:
+          # loadContract is a free function (no methods) — inapplicable metric.
           metrics:
             sloc: { ideal: 40, max: 100 }
-            public-method-count: { ideal: 3, max: 8 }
         - id: manifest-engine
           class: ManifestEngine
           # Closeout 3b: target switched from the `hashManifest` alias to the
@@ -233,9 +235,9 @@ ddd:
           # Re-tuned 2026-06-04 vs real (sloc 3 / pub-method 0 / cyclo 1).
           # runCheck is a thin delegating entry point; ceilings catch it
           # growing into a fat orchestrator.
+          # public-method-count omitted: runCheck is a free function (no methods).
           metrics:
             sloc: { ideal: 50, max: 120 }
-            public-method-count: { ideal: 6, max: 12 }
             max-cyclomatic: { ideal: 8, max: 16 }
         - id: code-shape-evaluator
           # 2026-06-04: evaluate.ts was split into per-mechanism modules
@@ -257,9 +259,9 @@ ddd:
             - resolvePythonRuntime
             - expandTargetPattern
             - walkRoot
+          # public-method-count omitted: evaluateCodeShapes is a free function.
           metrics:
             sloc: { ideal: 120, max: 200 }
-            public-method-count: { ideal: 6, max: 14 }
             max-cyclomatic: { ideal: 22, max: 32 }
         - id: design-diff-engine
           class: DesignDiffEngine
@@ -306,9 +308,9 @@ ddd:
           # Re-tuned 2026-06-04 vs real (sloc 394 / pub-method 0). createProgram
           # legitimately registers ~40 commands; ceiling gives real headroom
           # (was max 400 with value 394 — one command from a false failure).
+          # public-method-count omitted: createProgram is a free function.
           metrics:
             sloc: { ideal: 450, max: 600 }
-            public-method-count: { ideal: 6, max: 12 }
         - id: design-profile-validator
           class: DesignProfileValidator
           target: "packages/cli/src/design-profile/validate.ts::validateProfile"

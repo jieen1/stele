@@ -43,9 +43,7 @@ import {
   useHashedProfile,
 } from "../design-profile/lifecycle.js";
 import { runAllStages } from "./check-stages-registry.js";
-import { isBaselineEligibleViolation, type ReportFilters } from "../report/filters.js";
-
-export { isBaselineEligibleViolation };
+import { type ReportFilters } from "../report/filters.js";
 
 // ----------------------------------------------------------------
 // Types

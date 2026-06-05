@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runDoctor } from "../src/commands/doctor.js";
+import { runGenerate } from "../src/commands/generate.js";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
 
 // Skip tests that need pytest when pytest is unavailable
@@ -266,9 +267,12 @@ describe("stele doctor", () => {
     itIfPytestAvail("exits 0 (no exitCode change) when there are only warnings", async () => {
       const projectDir = await createTempDir();
       await createFixtureProject(projectDir);
-      // afterEach resets process.exitCode to undefined between tests
+      // Generate the tests so the "generated tests in sync" check passes — a
+      // contract with no generated tests is genuine drift (an ERROR), which
+      // would otherwise mask the warnings-only scenario this test asserts.
       captureStdout();
-
+      await runGenerate(projectDir, {});
+      // afterEach resets process.exitCode to undefined between tests
       await runDoctor(projectDir, {});
 
       // No hard errors (just warnings like missing manifest) — exit stays undefined or 0

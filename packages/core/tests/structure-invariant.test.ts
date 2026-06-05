@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ListNode } from "../src/index";
 import { SteleError, parseFile } from "../src/index";
-import {
-  parseInvariantDeclaration,
-  readSingleExpression,
-} from "../src/validator/structure-invariant";
+import { parseInvariantDeclaration } from "../src/validator/structure-invariant";
+import { readSingleExpression } from "../src/validator/structure-shared";
 
 const TEST_FILE = "test.stele";
 
