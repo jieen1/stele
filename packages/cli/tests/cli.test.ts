@@ -553,6 +553,25 @@ describe("stele CLI", () => {
     await expect(runCheck(projectDir)).rejects.toThrow(/manifest|protected/i);
   });
 
+  it("check fails when a protected file's entry is deleted from the manifest (manifest cannot silently under-protect)", async () => {
+    const projectDir = await createFixtureProject();
+    await runGenerateAndLock(projectDir);
+    // Add a protected checker and lock it into the manifest.
+    await writeProjectFile(projectDir, "contract/checker_impls/custom_checker.py", "def custom_checker(context):\n    return True\n");
+    await runLock(projectDir, { reason: "add custom checker" });
+    await expect(runCheck(projectDir)).resolves.toBeUndefined();
+
+    // Tamper the manifest: drop the checker's entry. The file still matches the
+    // protected globs, so check must flag it (protected_file_drift) — a manifest
+    // cannot quietly shrink the protected set below what the patterns cover.
+    const manifestPath = join(projectDir, "contract", ".manifest.json");
+    const manifest = await readJson(manifestPath);
+    delete manifest.protected_files["contract/checker_impls/custom_checker.py"];
+    await writeProjectFile(projectDir, "contract/.manifest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+
+    await expect(runCheck(projectDir)).rejects.toThrow(/protected|drift|manifest/i);
+  });
+
   it("generate fails when a protected unimported stele file exists, even if invalid", async () => {
     const projectDir = await createFixtureProject();
     await writeProjectFile(projectDir, "contract/invalid.stele", "(invariant BROKEN\n");
