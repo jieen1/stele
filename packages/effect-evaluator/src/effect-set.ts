@@ -154,9 +154,12 @@ export function compileEffectPattern(pattern: string): (name: string) => boolean
  * known declared effects. Returns a deterministic set.
  *
  * Effect references that resolve to zero declared effects are silently
- * skipped — the evaluator's contract validation is supposed to flag
- * unknown effect names upstream. This function does not throw; it returns
- * the empty set instead so the policy check degrades gracefully.
+ * skipped here. They are caught upstream by the core validator's
+ * `validateEffectNameReferences` (uniqueness.ts, E0350), which rejects any
+ * exact reference that is not a declared effect and any glob that matches
+ * nothing — so a reference reaching this function has already been
+ * validated. This function does not throw; it returns the empty set so the
+ * policy check degrades gracefully if invoked on an unvalidated contract.
  */
 export function expandEffectPatterns(
   refs: Iterable<string>,

@@ -48,6 +48,12 @@ export function defaultPriority(kind: EffectViolationKind): ViolationPriority {
       // not blocking, because the resolution requires either a refactor or
       // a contract addition. We surface it but allow the agent to plan.
       return "major";
+    case "undeclared_effect_name":
+      // A source `@stele:effects` annotation referencing an effect name that
+      // is not in the contract's (effect-declarations ...) set. This is a
+      // typo or a missing declaration — blocking, because the author thinks
+      // they declared an effect that no forbid/allow-only policy can ever see.
+      return "blocking";
     default: {
       const exhaustive: never = kind;
       throw new Error(`defaultPriority: unreachable kind ${String(exhaustive)}`);
@@ -394,5 +400,116 @@ export function buildUnresolvedCallViolation(
     },
     priority: defaultPriority("unresolved_call_blocks_evaluation"),
     group_id: node.id,
+  });
+}
+
+export interface BuildUndeclaredEffectNameOptions {
+  readonly node: CallGraphNode;
+  readonly undeclaredEffect: string;
+  readonly declaredEffects: readonly string[];
+  readonly callGraph: CallGraph;
+}
+
+/**
+ * Build `effect.undeclared_effect_name` — a source-level `@stele:effects`
+ * annotation references an effect name that is not in the contract's
+ * `(effect-declarations ...)` set. Without this, a misspelled annotation
+ * (`@stele:effects netork`) silently slips past every forbid/allow-only
+ * policy: the policy targets `network`, the node carries `netork`, and
+ * nothing fires. Severity is always `error` — the annotation enforces
+ * nothing and the author almost certainly meant a declared effect.
+ */
+export function buildUndeclaredEffectNameViolation(
+  options: BuildUndeclaredEffectNameOptions,
+): Violation {
+  const { node, undeclaredEffect, declaredEffects, callGraph } = options;
+  const effectRuleId = ruleId("effect.undeclared_effect_name");
+  const callerFile = node.filePath;
+  const callerLine = node.span.line;
+
+  const declaredList = [...declaredEffects].sort((a, b) =>
+    stableStringCompare(a, b),
+  );
+  const declaredRendered =
+    declaredList.length === 0 ? "<none>" : `[${declaredList.join(", ")}]`;
+
+  const summary =
+    `Source annotation on \`${node.id}\` declares effect \`${undeclaredEffect}\`, ` +
+    `which is not in the contract's declared effect set.`;
+
+  return createViolation({
+    rule_id: effectRuleId,
+    rule_kind: "effect_violation",
+    severity: "error",
+    source: {
+      tool: "stele",
+      command: "check",
+      kind: "effect",
+    },
+    location: {
+      path: callerFile,
+      line: callerLine,
+      column: node.span.column,
+    },
+    cause: {
+      summary,
+      detail: [
+        `node: ${node.id}`,
+        `undeclared_effect: ${undeclaredEffect}`,
+        `declared_effects: ${declaredRendered}`,
+      ].join("\n"),
+    },
+    scope_paths: scopePathsFor(callGraph, node.id),
+    fix: {
+      summary:
+        `Fix the \`@stele:effects\` annotation on \`${node.id}\`: replace ` +
+        `\`${undeclaredEffect}\` with a declared effect ${declaredRendered}, ` +
+        `or add \`${undeclaredEffect}\` to the (effect-declarations ...) block.`,
+    },
+    priority: defaultPriority("undeclared_effect_name"),
+    group_id: node.id,
+  });
+}
+
+export interface BuildIgnoredAnnotationNoticeOptions {
+  readonly filePath: string;
+  readonly line: number;
+  readonly raw: string;
+  readonly reason: string;
+}
+
+/**
+ * Build `effect.line_comment_annotation_ignored` — a NOTICE (not a hard
+ * violation) emitted when the extractor saw a `@stele:effects` annotation in
+ * a form the language channel does not honour (e.g. a `//` line comment in
+ * TypeScript, where only block JSDoc is recognised). The annotation declared
+ * no effects; the notice tells the author their comment is inert so they can
+ * convert it to the honoured form.
+ */
+export function buildIgnoredAnnotationNotice(
+  options: BuildIgnoredAnnotationNoticeOptions,
+): Violation {
+  const { filePath, line, raw, reason } = options;
+  return createViolation({
+    rule_id: ruleId("effect.line_comment_annotation_ignored"),
+    rule_kind: "effect_annotation_notice",
+    severity: "warning",
+    source: { tool: "stele", command: "check", kind: "effect" },
+    location: { path: filePath, line, column: 1 },
+    cause: {
+      summary:
+        `\`@stele:effects\` annotation at ${filePath}:${line} was ignored ` +
+        `(${reason}). It declares no effects.`,
+      detail: [`raw: ${raw}`, `reason: ${reason}`].join("\n"),
+    },
+    scope_paths: [filePath],
+    fix: {
+      summary:
+        "Convert the line comment to a block JSDoc comment " +
+        "(`/** @stele:effects <names> */`) immediately above the declaration, " +
+        "or remove it if the effects are not real.",
+    },
+    priority: "minor",
+    group_id: `${filePath}:${line}`,
   });
 }

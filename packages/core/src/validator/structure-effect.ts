@@ -226,8 +226,10 @@ function parseEffectEntry(item: ListNode): EffectName {
  * Parse a `(effect-annotation ...)` top-level form.
  * Throws SteleError on E0355/E0356/E0335/E0359.
  *
- * Validation that annotated effect names resolve to declared effects is
- * deferred to the evaluator (cross-form check, requires the whole contract).
+ * Validation that annotated effect names resolve to declared effects is a
+ * cross-form check (it needs the whole contract, since declarations may live
+ * in a different imported file) and runs in `uniqueness.ts`
+ * (`validateEffectNameReferences`, E0350).
  */
 export function parseEffectAnnotationDeclaration(
   filePath: string,

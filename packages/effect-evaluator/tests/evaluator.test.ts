@@ -755,3 +755,177 @@ describe("evaluateEffects — propagation root surfaced in evidence", () => {
     );
   });
 });
+
+describe("evaluateEffects — Fix #3(b) undeclared source effect name", () => {
+  it("source @stele:effects with an undeclared name (in policy scope) emits an error violation", async () => {
+    const node = mkNode({ id: "src/svc/api.ts::call(0)", filePath: "src/svc/api.ts" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(["network"])],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "P",
+            targetScope: ["src/svc/**::*"],
+            forbid: ["network"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({ nodes: [node], edges: [] }),
+      extractor: new StubExtractor(
+        new Map<string, readonly string[]>([[node.id, ["netork"]]]),
+      ),
+    });
+    const undeclared = r.violations.filter(
+      (v) => v.rule_id === "effect.undeclared_effect_name",
+    );
+    expect(undeclared).toHaveLength(1);
+    expect(undeclared[0]?.severity).toBe("error");
+    expect(undeclared[0]?.cause.summary).toContain("netork");
+    expect(undeclared[0]?.cause.detail).toContain("declared_effects: [network]");
+  });
+
+  it("source @stele:effects with a declared name emits no undeclared violation", async () => {
+    const node = mkNode({ id: "src/svc/api.ts::call(0)", filePath: "src/svc/api.ts" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(["network"])],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "P",
+            targetScope: ["src/svc/**::*"],
+            forbid: ["network"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({ nodes: [node], edges: [] }),
+      extractor: new StubExtractor(
+        new Map<string, readonly string[]>([[node.id, ["network"]]]),
+      ),
+    });
+    expect(
+      r.violations.filter((v) => v.rule_id === "effect.undeclared_effect_name"),
+    ).toEqual([]);
+  });
+
+  it("undeclared name on a node OUTSIDE every policy scope emits nothing", async () => {
+    const node = mkNode({ id: "tests/fixture/x.ts::x(0)", filePath: "tests/fixture/x.ts" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(["network"])],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "P",
+            targetScope: ["src/svc/**::*"],
+            forbid: ["network"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({ nodes: [node], edges: [] }),
+      extractor: new StubExtractor(
+        new Map<string, readonly string[]>([[node.id, ["netork"]]]),
+      ),
+    });
+    expect(
+      r.violations.filter((v) => v.rule_id === "effect.undeclared_effect_name"),
+    ).toEqual([]);
+  });
+});
+
+describe("evaluateEffects — Fix #4 line-comment annotation ignored notice", () => {
+  it("surfaces an ignored line-comment annotation IN an active policy scope", async () => {
+    const node = mkNode({ id: "src/svc/api.ts::call(0)", filePath: "src/svc/api.ts" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(["network"])],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "SVC_NO_NETWORK",
+            targetScope: ["src/svc/**::*"],
+            forbid: ["network"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({ nodes: [node], edges: [] }),
+      extractor: new StubExtractor(new Map(), [
+        {
+          filePath: "src/svc/api.ts",
+          line: 9,
+          raw: "// @stele:effects network",
+          reason: "line-comment form; only block JSDoc is honoured",
+        },
+      ]),
+    });
+    const ignored = r.notices.filter(
+      (n) => n.rule_id === "effect.line_comment_annotation_ignored",
+    );
+    expect(ignored).toHaveLength(1);
+    expect(ignored[0]?.severity).toBe("warning");
+    expect(ignored[0]?.cause.summary).toContain("src/svc/api.ts:9");
+    // It is a NOTICE, not a hard violation.
+    expect(
+      r.violations.filter(
+        (v) => v.rule_id === "effect.line_comment_annotation_ignored",
+      ),
+    ).toEqual([]);
+  });
+
+  it("does NOT surface an ignored line-comment annotation OUT of every policy scope", async () => {
+    // The ignored annotation lives in `tests/fixtures/...`, which no
+    // policy's target-scope covers. The notice must be suppressed — an inert
+    // comment in an ungoverned file enforces nothing and is pure noise. This
+    // is the exact case that fired on Stele's own effect-annotation fixtures.
+    const node = mkNode({
+      id: "src/svc/api.ts::call(0)",
+      filePath: "src/svc/api.ts",
+    });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(["network"])],
+        effectPolicies: [
+          mkEffectPolicy({
+            id: "SVC_NO_NETWORK",
+            targetScope: ["src/svc/**::*"],
+            forbid: ["network"],
+          }),
+        ],
+      }),
+      callGraph: mkCallGraph({ nodes: [node], edges: [] }),
+      extractor: new StubExtractor(new Map(), [
+        {
+          filePath: "tests/fixtures/line-comment/index.ts",
+          line: 3,
+          raw: "// @stele:effects network",
+          reason: "line-comment form; only block JSDoc is honoured",
+        },
+      ]),
+    });
+    expect(
+      r.notices.filter(
+        (n) => n.rule_id === "effect.line_comment_annotation_ignored",
+      ),
+    ).toEqual([]);
+  });
+
+  it("does NOT surface any ignored annotation when no policies are active", async () => {
+    const node = mkNode({ id: "src/svc/api.ts::call(0)", filePath: "src/svc/api.ts" });
+    const r = await evaluateEffects({
+      contract: mkContract({
+        effectDeclarations: [mkEffectDeclarations(["network"])],
+      }),
+      callGraph: mkCallGraph({ nodes: [node], edges: [] }),
+      extractor: new StubExtractor(new Map(), [
+        {
+          filePath: "src/svc/api.ts",
+          line: 9,
+          raw: "// @stele:effects network",
+          reason: "line-comment form; only block JSDoc is honoured",
+        },
+      ]),
+    });
+    expect(
+      r.notices.filter(
+        (n) => n.rule_id === "effect.line_comment_annotation_ignored",
+      ),
+    ).toEqual([]);
+  });
+});

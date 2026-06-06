@@ -24,10 +24,16 @@
  * are NOT implemented in B.1 — only JSDoc. See §六 of
  * docs/design/phase-b/04-effect-system.md.
  *
- * Line/inline `// @stele:effects ...` comments are NOT recognized —
- * only block-form JSDoc. This is consistent with how all other
- * language-native annotation channels work (decorators, attribute
- * macros) and avoids false positives from non-doc commentary.
+ * Line/inline `// @stele:effects ...` comments are NOT recognized as
+ * effect declarations — only block-form JSDoc. This is consistent with how
+ * all other language-native annotation channels work (decorators, attribute
+ * macros) and avoids false positives from non-doc commentary. HOWEVER, a
+ * line comment carrying `@stele:effects` is almost always an author mistake
+ * (they think they declared an effect but did not), so we DETECT it via the
+ * leading-comment ranges of each function-like declaration and surface it as
+ * an `ignoredAnnotations` entry. The evaluator turns that into an
+ * `effect.line_comment_annotation_ignored` notice (Fix #4) rather than
+ * silently dropping it.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -35,8 +41,12 @@ import { isAbsolute, resolve, sep } from "node:path";
 
 import * as ts from "typescript";
 
-import type { EffectAnnotationExtractor } from "@stele/effect-evaluator";
+import type {
+  EffectAnnotationExtractor,
+  IgnoredAnnotation,
+} from "@stele/effect-evaluator";
 
+import { inferEffectsFromBody } from "./effect-inference.js";
 import { buildNodeIdForDeclaration } from "./node-id-builder.js";
 import type { ExtractorContext } from "./types.js";
 
@@ -267,14 +277,57 @@ function isInDistPath(filePath: string): boolean {
   return posix.includes("/dist/") || posix.endsWith("/dist") || posix.startsWith("dist/");
 }
 
+/**
+ * Matches a `//`-form line comment carrying `@stele:effects`. We accept the
+ * colon-preserved (`@stele:effects`) form only — the same marker the JSDoc
+ * path recognises. Block comments are NOT matched here (those go through the
+ * `ts.getJSDocTags` path). `\/\/+` tolerates `///` triple-slash comments too.
+ */
+const LINE_COMMENT_EFFECTS_RE = /^\/\/+\s*@stele:effects\b/;
+
+/**
+ * Inspect the leading comment ranges of `decl` for a `//`-form
+ * `@stele:effects` annotation that the JSDoc channel does not honour. Each
+ * match is pushed to `ignored` so the evaluator can surface a notice. We
+ * dedupe by file:line so the same comment leading multiple sibling
+ * declarations (or an overload + impl) is reported once.
+ */
+function collectIgnoredLineComments(
+  decl: ts.Node,
+  sourceFile: ts.SourceFile,
+  fullText: string,
+  ignored: Map<string, IgnoredAnnotation>,
+): void {
+  const ranges = ts.getLeadingCommentRanges(fullText, decl.getFullStart());
+  if (ranges === undefined) return;
+  for (const range of ranges) {
+    if (range.kind !== ts.SyntaxKind.SingleLineCommentTrivia) continue;
+    const text = fullText.slice(range.pos, range.end).trim();
+    if (!LINE_COMMENT_EFFECTS_RE.test(text)) continue;
+    const line = sourceFile.getLineAndCharacterOfPosition(range.pos).line + 1;
+    const key = `${sourceFile.fileName}:${line}`;
+    if (ignored.has(key)) continue;
+    ignored.set(key, {
+      filePath: sourceFile.fileName,
+      line,
+      raw: text,
+      reason:
+        "line-comment form; only block JSDoc `/** @stele:effects ... */` is honoured",
+    });
+  }
+}
+
 function visitSourceFile(
   sourceFile: ts.SourceFile,
   ctx: ExtractorContext,
   out: Map<string, string[]>,
+  ignored: Map<string, IgnoredAnnotation>,
 ): void {
+  const fullText = sourceFile.getFullText();
   const visit = (node: ts.Node): void => {
     if (isFunctionLikeDeclaration(node)) {
       const decl = node;
+      collectIgnoredLineComments(decl, sourceFile, fullText, ignored);
       // NOTE: We do NOT skip overload signatures without bodies. The
       // call-graph extractor skips them because they would double-emit
       // identical nodes, but here we WANT to collect annotations from
@@ -288,7 +341,16 @@ function visitSourceFile(
       // zero effects, and the evaluator uses the presence of an entry to
       // gate unresolved-call fail-closed widening (closed-world override).
       const { effects, present } = annotationsForDeclaration(decl);
-      if (present) {
+
+      // Type-checker-backed inference: effects the body DIRECTLY performs
+      // (fetch, fs write, Math.random, …), resolved via the checker so an
+      // un-annotated effectful function still gets its effects. We union
+      // these with the annotated effects. The `present` flag (closed-world
+      // semantics for the evaluator) is left untouched — inference ADDS
+      // effects, it does not assert the author declared zero effects.
+      const inferred = inferEffectsFromBody(decl, ctx.checker);
+
+      if (present || inferred.length > 0) {
         let nodeId: string;
         try {
           nodeId = buildNodeIdForDeclaration(decl, ctx);
@@ -299,11 +361,21 @@ function visitSourceFile(
         }
         const existing = out.get(nodeId);
         if (existing === undefined) {
-          out.set(nodeId, [...effects]);
+          // Annotated effects first (preserve their declared order), then
+          // inferred ones, deduplicated.
+          const merged: string[] = [];
+          const seen = new Set<string>();
+          for (const e of [...effects, ...inferred]) {
+            if (!seen.has(e)) {
+              seen.add(e);
+              merged.push(e);
+            }
+          }
+          out.set(nodeId, merged);
         } else {
-          // Union, preserving first-seen order, deduplicated.
+          // Union onto the existing entry, preserving first-seen order.
           const seen = new Set(existing);
-          for (const e of effects) {
+          for (const e of [...effects, ...inferred]) {
             if (!seen.has(e)) {
               seen.add(e);
               existing.push(e);
@@ -338,9 +410,10 @@ export const tsEffectAnnotationExtractor: EffectAnnotationExtractor = {
     };
 
     const collected = new Map<string, string[]>();
+    const ignored = new Map<string, IgnoredAnnotation>();
     for (const sourceFile of program.getSourceFiles()) {
       if (!shouldVisit(sourceFile, projectRoot)) continue;
-      visitSourceFile(sourceFile, ctx, collected);
+      visitSourceFile(sourceFile, ctx, collected, ignored);
     }
 
     // Freeze each entry list so the contract's `readonly string[]` is
@@ -351,6 +424,11 @@ export const tsEffectAnnotationExtractor: EffectAnnotationExtractor = {
       const v = collected.get(k);
       if (v !== undefined) frozen.set(k, Object.freeze(v.slice()));
     }
-    return { annotationsByNode: frozen };
+    // Deterministic order: sort ignored annotations by file:line key.
+    const ignoredAnnotations = [...ignored.keys()]
+      .sort()
+      .map((k) => ignored.get(k))
+      .filter((v): v is IgnoredAnnotation => v !== undefined);
+    return { annotationsByNode: frozen, ignoredAnnotations };
   },
 };

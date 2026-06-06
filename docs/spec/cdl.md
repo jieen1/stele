@@ -996,6 +996,14 @@ The effect system declares which side effects (e.g. `db.read`, `http.outgoing`, 
 
 Effect names follow lowercase dot-notation: `^[a-z][a-z0-9._-]*$` (e.g. `db.read`, `payment.charge`). Because identifiers in CDL cannot contain `.`, dotted effect names must be written as string literals (`"db.read"`); bare single-segment names (`render`) are accepted as identifiers.
 
+**How a node's effects are determined (soundness model).** A function's effect set is the union of three sources, then propagated transitively up the call graph (a caller acquires every effect of its callees):
+
+1. **Source annotations** — `@stele:effects <names>` in a JSDoc block (`/** ... */`) on the declaration. Only the block form is honored; a `//` line comment is NOT a valid annotation and is surfaced as an `effect.line_comment_annotation_ignored` notice (warning) when it occurs inside a policy's `target-scope`, so a mistaken line comment can never silently stand in for a real declaration.
+2. **CDL `(effect-annotation ...)`** — attaches effects to nodes matched by NodeId patterns (contract-side, below).
+3. **Inferred effects (B.1, TypeScript)** — the extractor uses the TypeScript type checker to resolve each call / `new` / property access in a function body to its origin and assigns the corresponding effect *without requiring an annotation*: e.g. `node:fs` write APIs → `fs.write`, read APIs → `fs.read`; `node:http`/`node:https`/`node:net`/global `fetch` → `network`; `node:child_process` → `child-process`; `Math.random`/`crypto.randomBytes` → `random`; `Date.now`/`new Date()` → `time`; `process.env` → `env`; other `process.*` → `process`; `node:crypto` `createHash` → `crypto.hash`. Resolution is checker-backed (it requires the call to resolve to the actual builtin/lib origin), so a user method that merely shares a name is not mis-attributed. Inference makes the system **sound for the common case**: an un-annotated forbidden call (e.g. a bare `fetch` in a hook) is caught even though nothing was declared. The closed-world `@stele:effects` override still applies for genuinely-dynamic callees the extractor cannot resolve (see `unresolved_call_blocks_evaluation`). Effect inference for non-TypeScript languages is deferred; an effect-policy in an unsupported language fails loud.
+
+**Effect-name validation.** Every effect name referenced by `(effect-policy ...)`, `(effect-suppression ...)`, and `(effect-annotation ...)` must resolve to a declared effect (exact name declared, or a glob matching ≥1 declared effect); an unknown name fails with `E0350` in the uniqueness pass — a misspelled `(forbid "netork")` no longer silently enforces nothing. A source `@stele:effects` token naming an undeclared effect (inside a policy scope) is reported by the evaluator as `effect.undeclared_effect_name` (error).
+
 ### `effect-declarations`
 
 The project-level name table for effects. Each file may declare at most one `(effect-declarations ...)` block; multiple files may contribute disjoint blocks that get merged.
@@ -1038,7 +1046,7 @@ Attaches one or more effects to functions or methods matched by NodeId patterns.
 Fields:
 
 - `target`: **required**, one or more NodeId patterns. Patterns share the trace-policy `compilePattern` syntax; malformed patterns fail with `E0335`.
-- `annotates`: **required**, one or more effect names or globs (e.g. `payment.*`). Cross-referencing the declared effect set is deferred to the evaluator stage — the parser only enforces the dot-notation pattern.
+- `annotates`: **required**, one or more effect names or globs (e.g. `payment.*`). The parser enforces the dot-notation pattern; the uniqueness pass additionally verifies every name resolves to a declared effect (exact name, or a glob matching ≥1 declared effect), failing with `E0350` otherwise.
 
 Error codes:
 

@@ -10,6 +10,7 @@ export type {
   EffectAnnotationExtractor,
   ExtractEffectAnnotationsOptions,
   ExtractEffectAnnotationsResult,
+  IgnoredAnnotation,
 } from "./trait.js";
 
 export {
@@ -50,10 +51,14 @@ export {
 export {
   buildDisallowedEffectViolation,
   buildForbiddenEffectViolation,
+  buildIgnoredAnnotationNotice,
+  buildUndeclaredEffectNameViolation,
   buildUnresolvedCallViolation,
   defaultPriority,
   type BuildDisallowedEffectOptions,
   type BuildForbiddenEffectOptions,
+  type BuildIgnoredAnnotationNoticeOptions,
+  type BuildUndeclaredEffectNameOptions,
   type BuildUnresolvedCallOptions,
 } from "./violation-builder.js";
 

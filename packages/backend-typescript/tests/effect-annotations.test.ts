@@ -25,6 +25,14 @@ async function runExtract(name: string): Promise<ReadonlyMap<string, readonly st
   return annotationsByNode;
 }
 
+async function runExtractFull(name: string): ReturnType<
+  typeof tsEffectAnnotationExtractor.extractAnnotations
+> {
+  const projectRoot = fixturePath(name);
+  const callGraph = await tsCallGraphExtractor.extract({ projectRoot });
+  return tsEffectAnnotationExtractor.extractAnnotations({ callGraph, projectRoot });
+}
+
 describe("tsEffectAnnotationExtractor — extractor identity", () => {
   it("registers as the 'typescript' language extractor", () => {
     expect(tsEffectAnnotationExtractor.language).toBe("typescript");
@@ -269,5 +277,26 @@ describe("tsEffectAnnotationExtractor — result shape", () => {
     // truly-unannotated functions remain absent.
     const m = await runExtract("unannotated");
     expect(m.size).toBe(1);
+  });
+});
+
+describe("tsEffectAnnotationExtractor — Fix #4 line-comment annotation detection", () => {
+  it("detects a `//`-form @stele:effects and surfaces it as ignoredAnnotations", async () => {
+    const result = await runExtractFull("line-comment");
+    const ignored = result.ignoredAnnotations ?? [];
+    expect(ignored).toHaveLength(1);
+    expect(ignored[0]?.raw).toContain("@stele:effects network");
+    expect(ignored[0]?.filePath).toContain("line-comment");
+    expect(ignored[0]?.line).toBe(1);
+    expect(ignored[0]?.reason).toContain("line-comment");
+  });
+
+  it("does NOT treat the line comment as a real effect declaration", async () => {
+    // The block-JSDoc function gets `fs.read`; the line-commented function
+    // contributes nothing to annotationsByNode (it is ignored, not honoured).
+    const result = await runExtractFull("line-comment");
+    const declaredNames = [...result.annotationsByNode.values()].flat();
+    expect(declaredNames).not.toContain("network");
+    expect(declaredNames).toContain("fs.read");
   });
 });

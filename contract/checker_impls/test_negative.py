@@ -1786,17 +1786,17 @@ def test_generator_no_network_or_child_process_catches_fetch_call():
     ), "checker did not detect violation: effect.GENERATOR_NO_NETWORK_OR_CHILD_PROCESS.forbidden_effect (fetch)"
 
 
-def test_manifest_leaves_are_pinned_catches_extra_effect():
-    """Phase 4.3: a new function inside hash-manifest.ts that has an
-    effect outside {fs.read, fs.write, crypto.hash, time, random} must
-    trip MANIFEST_LEAVES_ARE_PINNED. Use `network` — clearly
-    out of bounds for a manifest file."""
-    # Append an annotated helper at the bottom of hash-manifest.ts.
+def test_core_is_pure_or_fs_read_catches_network_in_core():
+    """A function inside @stele/core with a `network` effect must trip
+    CORE_IS_PURE_OR_FS_READ (allow-only fs.read/fs.write/crypto.hash).
+    (Previously asserted the removed MANIFEST_LEAVES_ARE_PINNED policy,
+    which was a subsumed no-op; the protection lives in CORE_IS_PURE.)
+    Injected into hash-manifest.ts as a representative core file."""
     def mutator(text: str) -> str:
         injection = (
             "\n/** @stele:effects network */\n"
             "export async function phaseNegativeNetwork(): Promise<void> {\n"
-            "  // synthetic — for Phase 4 negative test only\n"
+            "  // synthetic — for negative test only\n"
             "}\n"
         )
         return text + injection
@@ -1804,40 +1804,21 @@ def test_manifest_leaves_are_pinned_catches_extra_effect():
     assert _mutate_then_check(
         "packages/core/src/manifest/hash-manifest.ts",
         mutator,
-        "effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect",
-    ), "checker did not detect violation: effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect"
+        "effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect",
+    ), "checker did not detect violation: effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect (network in core)"
 
 
-def test_manifest_leaves_are_pinned_catches_child_process_effect():
-    """Closeout 1 (2026-05-25) — paired second negative test for
-    MANIFEST_LEAVES_ARE_PINNED of a STRUCTURALLY DIFFERENT shape per
-    CC-13's anti-vacuity rule.
-
-    The first paired test (above) introduces a `network` effect on
-    a new function inside hash-manifest.ts. This one introduces a
-    DIFFERENT forbidden effect — `child-process` — on a separately
-    named function. The closeout doc suggested `Date.now()` (a `time`
-    effect) "outside the 3 atomic-writer leaves", but the active
-    policy's allow-only list IS `fs.read fs.write crypto.hash time
-    random`, so `time` is permitted everywhere in hash-manifest.ts;
-    a `Date.now()` injection would NOT fire MANIFEST_LEAVES_ARE_PINNED
-    (and Closeout 1 must not narrow the policy to make a test pass).
-
-    `child-process` is a clean second-shape alternative: it is
-    forbidden by BOTH the broader `CORE_IS_PURE_OR_FS_READ`
-    `allow-only fs.read fs.write crypto.hash` AND by
-    MANIFEST_LEAVES_ARE_PINNED's tighter `allow-only fs.read fs.write
-    crypto.hash time random`, but the two suites of policies hit
-    different evaluator pathways, the effect name is different from
-    `network`, and the rule_id we assert is the MANIFEST one (the
-    tightest scope decides). This satisfies CC-13's "Two removals
-    of the same kind do not count as two tests" anti-vacuity rule.
-    """
+def test_core_is_pure_or_fs_read_catches_child_process_in_core():
+    """Paired second negative of a STRUCTURALLY DIFFERENT shape (anti-vacuity):
+    a `child-process` effect on a function inside @stele/core must trip
+    CORE_IS_PURE_OR_FS_READ — a different forbidden effect name than the
+    `network` and `random` variants, exercising the same allow-only gate.
+    (Previously asserted the removed MANIFEST_LEAVES_ARE_PINNED policy.)"""
     def mutator(text: str) -> str:
         injection = (
             "\n/** @stele:effects child-process */\n"
             "export function phaseNegativeChildProcess(): void {\n"
-            "  // synthetic — Closeout 1 paired negative test\n"
+            "  // synthetic — paired negative test\n"
             "}\n"
         )
         return text + injection
@@ -1845,8 +1826,8 @@ def test_manifest_leaves_are_pinned_catches_child_process_effect():
     assert _mutate_then_check(
         "packages/core/src/manifest/hash-manifest.ts",
         mutator,
-        "effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect",
-    ), "checker did not detect violation: effect.MANIFEST_LEAVES_ARE_PINNED.disallowed_effect"
+        "effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect",
+    ), "checker did not detect violation: effect.CORE_IS_PURE_OR_FS_READ.disallowed_effect (child-process in core)"
 
 
 def _mutate_then_check(file_relpath: str, mutator, rule_id: str) -> bool:
@@ -2964,7 +2945,8 @@ def main() -> int:
         ("hook_no_network_catches_fetch_in_hook_script", test_hook_no_network_catches_fetch_in_hook_script),
         ("generator_no_network_or_child_process_catches_execfile", test_generator_no_network_or_child_process_catches_execfile),
         ("generator_no_network_or_child_process_catches_fetch_call", test_generator_no_network_or_child_process_catches_fetch_call),
-        ("manifest_leaves_are_pinned_catches_extra_effect", test_manifest_leaves_are_pinned_catches_extra_effect),
+        ("core_is_pure_or_fs_read_catches_network_in_core", test_core_is_pure_or_fs_read_catches_network_in_core),
+        ("core_is_pure_or_fs_read_catches_child_process_in_core", test_core_is_pure_or_fs_read_catches_child_process_in_core),
         # Phase 5 (self-dogfooding plan): type-state brand discriminator tests.
         ("manifest_lifecycle_brand_fires", test_manifest_lifecycle_brand_fires),
         ("approval_lifecycle_brand_fires", test_approval_lifecycle_brand_fires),

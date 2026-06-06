@@ -24,6 +24,7 @@ import type {
   EffectAnnotationExtractor,
   ExtractEffectAnnotationsOptions,
   ExtractEffectAnnotationsResult,
+  IgnoredAnnotation,
 } from "../../src/trait.js";
 
 const FAKE_SPAN = { line: 1, column: 1 } as const;
@@ -228,6 +229,7 @@ export class StubExtractor implements EffectAnnotationExtractor {
   constructor(
     private readonly annotationsByNode: ReadonlyMap<string, readonly string[]> =
       new Map<string, readonly string[]>(),
+    private readonly ignoredAnnotations: readonly IgnoredAnnotation[] = [],
   ) {}
 
   async extractAnnotations(
@@ -235,6 +237,9 @@ export class StubExtractor implements EffectAnnotationExtractor {
   ): Promise<ExtractEffectAnnotationsResult> {
     this.lastOptions = options;
     this.callCount += 1;
-    return { annotationsByNode: this.annotationsByNode };
+    return {
+      annotationsByNode: this.annotationsByNode,
+      ignoredAnnotations: this.ignoredAnnotations,
+    };
   }
 }

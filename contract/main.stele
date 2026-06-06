@@ -807,7 +807,7 @@
 ; ============================================================================
 
 (effect-policy CORE_IS_PURE_OR_FS_READ
-  (description "@stele/core/src is the pure-ish layer. fs.read is allowed (loadContract, baseline IO). fs.write is allowed for the 3 atomic-writer leaves under manifest/. Everything else (time, random, env, network, process, child-process) is forbidden — those belong to the cli or backends, not core.")
+  (description "@stele/core/src is the pure-ish layer. Allowed: fs.read (loadContract, baseline IO), fs.write (the manifest/baseline IO layer), crypto.hash (manifest hashing). Forbidden: time, random, env, network, process, child-process — those belong to the cli or backends, not core. Effect inference (not just @stele:effects annotations) now makes these visible, so an un-annotated network/child-process/process/time call in core is caught. The few audited process/time leaf reads in the IO layer are pinned via per-leaf (effect-suppression ...). NOTE: pinning fs.write itself to the audited writer leaves is a possible follow-up now that inference makes every fs.write visible — it requires forbidding fs.write here + suppressing each of the ~4 direct write/unlink leaves.")
   (severity "error")
   (target-scope "packages/core/src/**::*")
   (allow-only "fs.read" "fs.write" "crypto.hash"))
@@ -824,12 +824,6 @@
   (target-scope "packages/cli/src/commands/generate.ts::*" "packages/cli/src/design-generator/**::*")
   (forbid "network" "child-process"))
 
-(effect-policy MANIFEST_LEAVES_ARE_PINNED
-  (severity "error")
-  (description "The fs.write effect in @stele/core must only originate at the 3 atomic-writer leaves (writeAtomic, writeManifest, writeHashManifest). Any other fs.write inside @stele/core is a violation. CORE_IS_PURE_OR_FS_READ already allows fs.write globally in core; this is the tighter constraint that pins it to the 3 audited sites.")
-  (target-scope "packages/core/src/manifest/hash-manifest.ts::*")
-  (allow-only "fs.read" "fs.write" "crypto.hash" time random))
-
 ; ============================================================================
 ; §4.4 — Effect suppressions: 3 legitimate fs.write leaves in @stele/core.
 ; Each is the canonical atomic writer or a thin wrapper around it. Round 7
@@ -838,21 +832,44 @@
 
 (effect-suppression
   (target "packages/core/src/manifest/hash-manifest.ts::writeAtomic(2)")
-  (suppresses "fs.write" time random)
+  (suppresses "fs.write" time random process)
   (severity "warning")
-  (reason "Canonical atomic writer. Uses Date.now() + randomBytes(8) to build a unique temp-file name; the fs.write is the actual atomic rename. Lone Stele/core exemption documented since Round 7."))
+  (reason "Canonical atomic writer. Builds a unique temp-file name from Date.now() (time) + randomBytes(8) (random) + process.pid (process); the fs.write is the actual atomic rename. Lone Stele/core write exemption documented since Round 7; `process` added when effect inference surfaced the previously-invisible process.pid read."))
+
+; Audited `process`/`time` leaf reads in core's IO layer, surfaced by effect
+; inference (previously invisible to the annotation-only model). Each is a
+; legitimate leaf in the loader/manifest/baseline/path layer; CORE_IS_PURE stays
+; strict (fs.read/fs.write/crypto.hash) everywhere else and these are the only
+; audited exceptions. Suppressing at the originating leaf stops propagation.
+(effect-suppression
+  (target "packages/core/src/loader/load-contract.ts::safeFilePath(1)")
+  (suppresses process)
+  (severity "warning")
+  (reason "Reads process.cwd() to render a contract path relative for diagnostics. Read-only environment access in the loader's path layer; no mutation."))
 
 (effect-suppression
-  (target "packages/core/src/manifest/manifest.ts::writeManifest(3)")
-  (suppresses "fs.write")
+  (target "packages/core/src/manifest/manifest.ts::safeFilePath(1)")
+  (suppresses process)
   (severity "warning")
-  (reason "Wraps writeAtomic. The fs.write effect is inherited; this suppression marks it as expected and audited."))
+  (reason "Reads process.cwd() to render a protected-file path relative for diagnostics. Read-only environment access; no mutation."))
 
 (effect-suppression
-  (target "packages/core/src/manifest/hash-manifest.ts::writeHashManifest(2)")
-  (suppresses "fs.write")
+  (target "packages/core/src/util/path-utils.ts::isPathWithin(2)")
+  (suppresses process)
   (severity "warning")
-  (reason "Wraps writeAtomic. Same rationale as writeManifest above."))
+  (reason "Reads process.platform to select case-insensitive path comparison on win32. Read-only environment access required for correct cross-platform path containment."))
+
+(effect-suppression
+  (target "packages/core/src/manifest/manifest.ts::buildContractManifest(3)")
+  (suppresses time)
+  (severity "warning")
+  (reason "Reads the clock for the manifest's `generated_at` metadata field. The timestamp is NOT part of the verification hash (file hashes + contract_hash drive `stele check`), so it does not affect determinism of verification or generated test source."))
+
+(effect-suppression
+  (target "packages/core/src/baseline/types.ts::createViolationBaseline(1)")
+  (suppresses time)
+  (severity "warning")
+  (reason "Reads the clock for the baseline's `generated_at` metadata field. Metadata only; not part of any verification hash."))
 
 ; ============================================================================
 ; §5 — Type-state lifecycles (self-dogfooding Phase 5).

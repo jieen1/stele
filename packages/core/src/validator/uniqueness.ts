@@ -100,6 +100,7 @@ export function validateUniqueness(contract: Contract): Contract {
   );
   validateEffectDeclarationsBlocks([...contract.effectDeclarations]);
   validateEffectNamesUnique([...contract.effectDeclarations]);
+  validateEffectNameReferences(contract);
   validateDuplicateIds(
     [...contract.externAliases],
     "E0362",
@@ -152,6 +153,117 @@ function validateEffectNamesUnique(
         line: effect.span.line,
         column: effect.span.column,
       });
+    }
+  }
+}
+
+const EFFECT_GLOB_META = /[*]/;
+
+/**
+ * Cross-form check (E0350): every effect name referenced by an
+ * `(effect-policy ... forbid/allow-only ...)`, an
+ * `(effect-suppression ... suppresses ...)`, or an
+ * `(effect-annotation ... annotates ...)` must resolve to a member of the
+ * declared `(effect-declarations ...)` set.
+ *
+ * - An exact (non-glob) reference must be a declared effect name verbatim.
+ *   A typo like `forbid "netork"` therefore fails here instead of silently
+ *   enforcing nothing.
+ * - A glob reference (`payment.*`, or the bare `*`) must match at least one
+ *   declared effect; a glob that matches nothing is the same footgun as a
+ *   misspelled exact name.
+ *
+ * Per-form parsing in `structure-effect.ts` deliberately defers this check
+ * because resolving references requires the whole contract (declarations may
+ * live in a different imported file than the policy that references them).
+ */
+function validateEffectNameReferences(contract: Contract): void {
+  const declared = new Set<string>();
+  for (const block of contract.effectDeclarations) {
+    for (const effect of block.effects) {
+      declared.add(effect.name);
+    }
+  }
+  const declaredList = [...declared].sort();
+  const declaredRendered =
+    declaredList.length === 0 ? "<none>" : `[${declaredList.join(", ")}]`;
+
+  const isGlob = (ref: string): boolean => EFFECT_GLOB_META.test(ref);
+
+  const compileGlob = (pattern: string): RegExp => {
+    let re = "^";
+    for (const ch of pattern) {
+      if (ch === "*") {
+        re += "[a-z0-9._-]+";
+      } else if (/[.+^$|(){}\\\][?]/.test(ch)) {
+        re += `\\${ch}`;
+      } else {
+        re += ch;
+      }
+    }
+    re += "$";
+    return new RegExp(re);
+  };
+
+  const resolves = (ref: string): boolean => {
+    if (!isGlob(ref)) {
+      return declared.has(ref);
+    }
+    if (ref === "*") {
+      return declared.size > 0;
+    }
+    const compiled = compileGlob(ref);
+    for (const name of declared) {
+      if (compiled.test(name)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const check = (
+    ref: string,
+    context: string,
+    span: Contract["effectPolicies"][number]["span"],
+  ): void => {
+    if (resolves(ref)) {
+      return;
+    }
+    const kind = isGlob(ref)
+      ? `Effect glob "${ref}" matches no declared effect`
+      : `Unknown effect name "${ref}"`;
+    throw new SteleError(
+      "E0350",
+      "Validation Error",
+      `${kind} in ${context}.`,
+      span,
+      `Declared effects are ${declaredRendered}. Effect references must resolve to a name in the (effect-declarations ...) set.`,
+      isGlob(ref)
+        ? "Fix the glob so it matches a declared effect, or declare the effect in (effect-declarations ...)."
+        : "Fix the typo, or declare this effect in the (effect-declarations ...) block.",
+    );
+  };
+
+  for (const policy of contract.effectPolicies) {
+    for (const ref of policy.forbid ?? []) {
+      check(ref, `effect-policy "${policy.id}" (forbid ...)`, policy.span);
+    }
+    for (const ref of policy.allowOnly ?? []) {
+      check(ref, `effect-policy "${policy.id}" (allow-only ...)`, policy.span);
+    }
+  }
+  for (const suppression of contract.effectSuppressions) {
+    for (const ref of suppression.suppresses) {
+      check(
+        ref,
+        `effect-suppression for target "${suppression.target}" (suppresses ...)`,
+        suppression.span,
+      );
+    }
+  }
+  for (const annotation of contract.effectAnnotations) {
+    for (const ref of annotation.annotates) {
+      check(ref, `effect-annotation (annotates ...)`, annotation.span);
     }
   }
 }

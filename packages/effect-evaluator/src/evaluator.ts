@@ -31,8 +31,11 @@
  * fix-hint (see fix-hint.ts).
  */
 
+import { isAbsolute, relative, sep } from "node:path";
+
 import {
   compilePattern,
+  formatNodeId,
   resolveExternPattern,
   type CompiledPattern,
   type ExternAliasRegistry,
@@ -49,7 +52,13 @@ import {
   type Violation,
 } from "@stele/core";
 
-import { expandEffectPatterns, sortedSet, unionEffects } from "./effect-set.js";
+import {
+  compileEffectPattern,
+  expandEffectPatterns,
+  isEffectGlob,
+  sortedSet,
+  unionEffects,
+} from "./effect-set.js";
 import {
   buildPropagationChain,
   propagateEffects,
@@ -62,6 +71,8 @@ import type { PropagationEvidence } from "./types.js";
 import {
   buildDisallowedEffectViolation,
   buildForbiddenEffectViolation,
+  buildIgnoredAnnotationNotice,
+  buildUndeclaredEffectNameViolation,
   buildUnresolvedCallViolation,
 } from "./violation-builder.js";
 
@@ -140,6 +151,39 @@ function matchAny(nodeId: string, patterns: readonly CompiledPattern[]): boolean
   return false;
 }
 
+/**
+ * True when `filePath` (the absolute source path carried by an
+ * `IgnoredAnnotation`) sits inside at least one active effect-policy's
+ * `target-scope`. An `IgnoredAnnotation` has no NodeId — the annotation was
+ * never honoured, so no graph node carries it — so we synthesise a NodeId
+ * from the file's project-relative path and a wildcard-matchable symbol, then
+ * reuse the exact same compiled scope matchers (`activeScopeMatchers`) that
+ * gate the undeclared-effect-name violation and the unresolved-call widening.
+ * Scope patterns are `<file-glob>::*`, so any synthetic symbol matches the
+ * symbol portion and the gate reduces to a file-glob test on the leftmost
+ * component — the intended behaviour.
+ */
+function ignoredAnnotationInScope(
+  filePath: string,
+  projectRoot: string,
+  activeScopeMatchers: readonly CompiledPattern[],
+): boolean {
+  if (activeScopeMatchers.length === 0) return false;
+  // `IgnoredAnnotation.filePath` is the absolute source path; NodeId file
+  // paths (and therefore scope globs) are project-relative POSIX. A path
+  // that is already relative is passed through unchanged.
+  const rel = isAbsolute(filePath)
+    ? relative(projectRoot, filePath).split(sep).join("/")
+    : filePath.split(sep).join("/");
+  if (rel.length === 0 || rel.startsWith("..")) return false;
+  const syntheticId = formatNodeId({
+    filePath: rel,
+    symbolName: "__ignored_annotation__",
+    arity: 0,
+  });
+  return matchAny(syntheticId, activeScopeMatchers);
+}
+
 function buildInitialEffects(
   contract: Contract,
   callGraph: CallGraph,
@@ -186,6 +230,32 @@ function buildInitialEffects(
     }
   }
   return out;
+}
+
+/**
+ * True when a source-extracted effect reference resolves against the declared
+ * effect set: an exact name must be declared verbatim; a glob must match at
+ * least one declared effect (the bare `*` matches any when ≥1 is declared).
+ * Mirrors the core validator's `validateEffectNameReferences` (E0350) so the
+ * source-side check and contract-side check agree on what "declared" means.
+ */
+function effectRefResolves(
+  ref: string,
+  declaredEffects: ReadonlySet<string>,
+): boolean {
+  if (!isEffectGlob(ref)) {
+    return declaredEffects.has(ref);
+  }
+  if (ref === "*") {
+    return declaredEffects.size > 0;
+  }
+  const predicate = compileEffectPattern(ref);
+  for (const name of declaredEffects) {
+    if (predicate(name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function nodesById(callGraph: CallGraph): ReadonlyMap<string, CallGraphNode> {
@@ -416,6 +486,78 @@ export async function evaluateEffects(
 
   const violations: Violation[] = [];
   const notices: Violation[] = [...suppressionResult.notices];
+
+  // Fix #4 — line-comment `@stele:effects` footgun. The extractor surfaces
+  // any `@stele:effects` annotation it recognised textually but could not
+  // honour through the language channel (e.g. a `//` line comment in TS).
+  // Emit one notice per ignored annotation so the inert comment is visible.
+  //
+  // Scope gate (symmetric with the undeclared-effect-name violation and the
+  // unresolved-call widening above): only surface an ignored annotation whose
+  // file sits inside at least one active effect-policy's `target-scope`. An
+  // inert comment in a file no policy governs enforces nothing and could
+  // never have leaked past a policy — flagging it project-wide false-positives
+  // on unrelated code and on test fixtures that intentionally carry a line
+  // comment to exercise detection. With no active policies the gate is empty
+  // and this loop emits nothing.
+  for (const ignored of extracted.ignoredAnnotations ?? []) {
+    if (
+      !ignoredAnnotationInScope(
+        ignored.filePath,
+        callGraph.projectRoot,
+        activeScopeMatchers,
+      )
+    ) {
+      continue;
+    }
+    notices.push(
+      buildIgnoredAnnotationNotice({
+        filePath: ignored.filePath,
+        line: ignored.line,
+        raw: ignored.raw,
+        reason: ignored.reason,
+      }),
+    );
+  }
+
+  // Fix #3(b) — source-side undeclared-effect-name guard. A source
+  // `@stele:effects` annotation whose effect name is NOT in the contract's
+  // declared set (`extracted.annotationsByNode` holds source-extracted names
+  // only — CDL annotations are merged separately) enforces nothing: a forbid
+  // policy targeting `network` never matches a node annotated `netork`. We
+  // surface it as an error-severity violation so the typo cannot slip past.
+  //
+  // Scope gate (symmetric with the unresolved-call gate above): only flag a
+  // node that sits inside at least one active policy's `target-scope`. An
+  // annotation on a node no policy cares about cannot leak past any policy —
+  // there is nothing to fail closed on — and flagging it project-wide would
+  // false-positive on unrelated code / test fixtures that use their own
+  // effect vocabulary. With no active policies, `activeScopeMatchers` is
+  // empty and this loop emits nothing.
+  // Iterate deterministically by sorted NodeId, then by sorted effect name.
+  for (const nodeId of [...extracted.annotationsByNode.keys()].sort((a, b) =>
+    stableStringCompare(a, b),
+  )) {
+    const refs = extracted.annotationsByNode.get(nodeId);
+    if (refs === undefined) continue;
+    const node = nodeIndex.get(nodeId);
+    if (node === undefined) continue;
+    if (!matchAny(nodeId, activeScopeMatchers)) continue;
+    const seen = new Set<string>();
+    for (const ref of [...refs].sort((a, b) => stableStringCompare(a, b))) {
+      if (seen.has(ref)) continue;
+      seen.add(ref);
+      if (effectRefResolves(ref, declaredEffects)) continue;
+      violations.push(
+        buildUndeclaredEffectNameViolation({
+          node,
+          undeclaredEffect: ref,
+          declaredEffects: [...declaredEffects],
+          callGraph,
+        }),
+      );
+    }
+  }
 
   // Emit one unresolved-call violation per (fromId, callSite) pair whose
   // caller is in-scope. Severity is always `error` — fail-closed restored.

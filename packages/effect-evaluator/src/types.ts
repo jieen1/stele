@@ -12,13 +12,15 @@
 export type EffectViolationKind =
   | "forbidden_effect"
   | "disallowed_effect"
-  | "unresolved_call_blocks_evaluation";
+  | "unresolved_call_blocks_evaluation"
+  | "undeclared_effect_name";
 
 export const ALL_EFFECT_VIOLATION_KINDS: readonly EffectViolationKind[] =
   Object.freeze([
     "forbidden_effect",
     "disallowed_effect",
     "unresolved_call_blocks_evaluation",
+    "undeclared_effect_name",
   ] as const);
 
 /**

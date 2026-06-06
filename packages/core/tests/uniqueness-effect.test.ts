@@ -48,6 +48,7 @@ describe("effect-declarations uniqueness", () => {
   it("rejects two effect-policy declarations with the same id (E0359)", async () => {
     const project = await createTempProject({
       "main.stele": [
+        '(effect-declarations (effect "db.read") (effect "db.write"))',
         '(effect-policy DUP (target-scope "**/a/**") (forbid "db.read"))',
         '(effect-policy DUP (target-scope "**/b/**") (forbid "db.write"))',
       ].join("\n"),
@@ -90,6 +91,7 @@ describe("effect-declarations uniqueness", () => {
   it("accepts multiple effect-policy declarations with distinct ids (happy path)", async () => {
     const project = await createTempProject({
       "main.stele": [
+        '(effect-declarations (effect "db.read") (effect "time.now"))',
         '(effect-policy NO_IO_IN_UI (target-scope "**/views/**") (forbid "db.read"))',
         '(effect-policy PURE_LIB (target-scope "**/lib/pure/**") (allow-only "time.now"))',
       ].join("\n"),
@@ -106,6 +108,7 @@ describe("effect-declarations uniqueness", () => {
   it("accepts multiple effect-suppression declarations (no id uniqueness on suppression)", async () => {
     const project = await createTempProject({
       "main.stele": [
+        '(effect-declarations (effect "db.read") (effect "db.write"))',
         '(effect-suppression (target "src/a.ts::wrap(1)") (suppresses "db.read") (reason "Wrapper around getUser."))',
         '(effect-suppression (target "src/b.ts::wrap(1)") (suppresses "db.write") (reason "Wrapper around setUser."))',
       ].join("\n"),
@@ -113,6 +116,111 @@ describe("effect-declarations uniqueness", () => {
 
     const contract = await getLoadContract()(project.rootPath);
     expect(contract.effectSuppressions).toHaveLength(2);
+  });
+});
+
+describe("effect-name reference resolution (E0350)", () => {
+  afterEach(async () => {
+    await Promise.allSettled(
+      tempDirs.splice(0).map((directory) =>
+        rm(directory, { recursive: true, force: true }),
+      ),
+    );
+  });
+
+  it("rejects a misspelled effect name in (forbid ...) (E0350)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(effect-declarations (effect "network"))',
+        '(effect-policy NO_NET (target-scope "**/lib/**") (forbid "netork"))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0350",
+      messageIncludes: 'Unknown effect name "netork"',
+    });
+  });
+
+  it("rejects a misspelled effect name in (allow-only ...) (E0350)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(effect-declarations (effect "time.now"))',
+        '(effect-policy PURE (target-scope "**/pure/**") (allow-only "tim.now"))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0350",
+      messageIncludes: 'Unknown effect name "tim.now"',
+    });
+  });
+
+  it("rejects an undeclared effect in (suppresses ...) (E0350)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(effect-declarations (effect "db.read"))',
+        '(effect-suppression (target "src/a.ts::wrap(1)") (suppresses "db.rad") (reason "Wrapper."))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0350",
+      messageIncludes: 'Unknown effect name "db.rad"',
+    });
+  });
+
+  it("rejects an undeclared effect in (annotates ...) (E0350)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(effect-declarations (effect "fs.read"))',
+        '(effect-annotation (target "src/a.ts::*") (annotates "fs.raed"))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0350",
+      messageIncludes: 'Unknown effect name "fs.raed"',
+    });
+  });
+
+  it("rejects a glob that matches no declared effect (E0350)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(effect-declarations (effect "db.read"))',
+        '(effect-policy NO_PAY (target-scope "**/lib/**") (forbid "payment.*"))',
+      ].join("\n"),
+    });
+
+    await expectSteleError(getLoadContract()(project.rootPath), {
+      code: "E0350",
+      messageIncludes: 'Effect glob "payment.*" matches no declared effect',
+    });
+  });
+
+  it("accepts a glob that matches at least one declared effect (happy path)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(effect-declarations (effect "payment.charge") (effect "payment.refund"))',
+        '(effect-policy NO_PAY (target-scope "**/lib/**") (forbid "payment.*"))',
+      ].join("\n"),
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.effectPolicies).toHaveLength(1);
+  });
+
+  it("resolves references against declarations in an imported file (happy path)", async () => {
+    const project = await createTempProject({
+      "main.stele": [
+        '(import "./effects.stele")',
+        '(effect-policy NO_NET (target-scope "**/lib/**") (forbid "network"))',
+      ].join("\n"),
+      "effects.stele": '(effect-declarations (effect "network"))',
+    });
+
+    const contract = await getLoadContract()(project.rootPath);
+    expect(contract.effectPolicies).toHaveLength(1);
   });
 });
 
