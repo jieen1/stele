@@ -11,9 +11,13 @@ future extension.)
 ## The model
 
 - **Denominator (the "countable universe"):** product source files under
-  `packages/*/src/**` plus the Python runtime and checker implementations. Tests,
-  build output, fixtures, examples, generated contracts, and `*.d.ts` are
-  excluded.
+  `packages/*/src/**` plus the Python runtime. Tests, build output, fixtures,
+  examples, generated contracts, and `*.d.ts` are excluded. The contract's own
+  checker implementations (`contract/checker_impls/**`) are also excluded — they
+  are the contract's mechanism logic (manifest-protected), not application code a
+  spatial contract can guard. Files in other languages (e.g. `.js` hook scripts)
+  are likewise outside the spatial denominator; the command emits a note
+  disclosing this.
 - **Numerator:** for each declaration, the files its mechanism *binds*:
   - `boundary` / `class-shape` / `function-shape` / `type-policy` / `file-policy`
     expand their `target` glob.

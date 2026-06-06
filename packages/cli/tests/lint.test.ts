@@ -160,6 +160,28 @@ describe("stele lint (end-to-end with z3)", () => {
     expect(result.exitCode).toBe(1);
   });
 
+  it("T9 reports a tautology ONCE, not also as redundant-under-every-invariant", async () => {
+    // A tautology is implied by every other invariant, so a naive redundancy pass
+    // re-reports it as `subsumes: X, redundant: C` for each X — noise. It must be
+    // excluded from the redundancy pass and surfaced only as a tautology.
+    const cdl = `
+(invariant A (severity high)(description "d")(assert (gt (path x) 10)))
+(invariant B (severity high)(description "d")(assert (gt (path x) 0)))
+(invariant C (severity high)(description "d")(assert (or (gt (path x) 0) (lte (path x) 0))))
+(invariant D (severity high)(description "d")(assert (eq (path y) "alice")))
+`;
+    const result = await lintFixture(cdl);
+    const tautologies = result.report.findings.filter((f) => f.kind === "tautology");
+    const subsumptions = result.report.findings.filter((f) => f.kind === "subsumption");
+    expect(tautologies).toEqual([{ kind: "tautology", invariant: "C" }]);
+    // C must never appear on either side of a subsumption.
+    for (const s of subsumptions) {
+      expect(s.kind === "subsumption" && (s.subsumes === "C" || s.redundant === "C")).toBe(false);
+    }
+    // The genuine A⟹B subsumption is still reported.
+    expect(subsumptions).toContainEqual({ kind: "subsumption", subsumes: "A", redundant: "B" });
+  });
+
   it("emits deterministic JSON without wall-clock", async () => {
     const cdl = `
 (invariant X_MIN (severity high) (description "d") (assert (gt (path x) 5)))

@@ -35,17 +35,30 @@ const execFileAsync = promisify(execFile);
  * binds at least one declaration AND none of those declarations' covered files
  * is in the changed set.
  *
- * Everything NOT in this map (generated, protected, design, toolchain,
- * type-driven, plus the Python uses-checker invariants that run under pytest)
- * is GLOBAL and always runs.
+ * SOUNDNESS — why ONLY code-shape is here. A stage may be skipped only when its
+ * reverse-index file set provably EQUALS the set of files it actually examines.
+ * That holds for the code-shape family (boundary / class-shape / function-shape /
+ * type-policy / file-policy): each declaration examines exactly the AST of its
+ * own target file(s), so a change disjoint from those files cannot change its
+ * verdict. It does NOT hold for the call-graph or whole-universe mechanisms, so
+ * they are deliberately absent here and ALWAYS run:
+ *   - trace: extern targets exist only as edge `toId`s (never call-graph nodes,
+ *     so they expand to bound=false/files=0), and path constraints
+ *     (must-transit / deny-transit / …) examine INTERMEDIATE nodes anywhere in
+ *     the graph — neither is captured by the scope-caller file set. Skipping it
+ *     on an in-scope core change hid a real FS_WRITES_VIA_WRITE_ATOMIC violation.
+ *   - effect: effect sets PROPAGATE up from callees, so an out-of-scope callee
+ *     edit changes an in-scope node's effective effects — the target-scope file
+ *     set is strictly narrower than the propagation cone.
+ *   - type-state / architecture / core-node: call-graph / whole-universe module
+ *     maps whose examination surface is non-local.
+ * Conservative on purpose: correctness over inner-loop speed. Everything not in
+ * this map (the above, plus generated, protected, design, toolchain,
+ * type-driven, and the Python uses-checker invariants run under pytest) always
+ * runs.
  */
 const SKIPPABLE_STAGE_MECHANISMS: ReadonlyMap<string, readonly Mechanism[]> = new Map([
   ["code-shape", ["boundary", "type-policy", "file-policy", "function-shape", "class-shape"]],
-  ["architecture", ["architecture"]],
-  ["complexity", ["core-node"]],
-  ["trace", ["trace-policy"]],
-  ["type-state", ["type-state"]],
-  ["effect", ["effect-policy"]],
 ]);
 
 export const SKIPPABLE_STAGE_IDS: readonly string[] = [...SKIPPABLE_STAGE_MECHANISMS.keys()];

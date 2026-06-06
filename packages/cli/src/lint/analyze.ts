@@ -114,7 +114,8 @@ export async function analyze(input: LintInput, opts: AnalyzeOpts): Promise<Anal
       case "cmp": {
         const a = lowerArith(term.a);
         const b = lowerArith(term.b);
-        switch (term.op) {
+        const op = term.op;
+        switch (op) {
           case "gt":
             return a.gt(b);
           case "gte":
@@ -123,9 +124,14 @@ export async function analyze(input: LintInput, opts: AnalyzeOpts): Promise<Anal
             return a.lt(b);
           case "lte":
             return a.le(b);
+          default: {
+            // Exhaustiveness: a future cmp op must be handled here explicitly —
+            // never silently fall through into arithmetic lowering.
+            const unreachable: never = op;
+            throw new Error(`lint internal: unhandled cmp op ${String(unreachable)}`);
+          }
         }
       }
-      // eslint-disable-next-line no-fallthrough
       case "arith":
         return lowerArithmetic(term);
     }
@@ -178,8 +184,8 @@ export async function analyze(input: LintInput, opts: AnalyzeOpts): Promise<Anal
   }
 
   // wholeResult === "sat": run tautology + pairwise redundancy.
-  await runTautology(phi, Z, newSolver, findings);
-  await runRedundancy(phi, Z, newSolver, findings);
+  const tautologies = await runTautology(phi, Z, newSolver, findings);
+  await runRedundancy(phi, Z, newSolver, findings, tautologies);
   return { findings };
 
   // ---- helpers ----------------------------------------------------------
@@ -189,14 +195,18 @@ export async function analyze(input: LintInput, opts: AnalyzeOpts): Promise<Anal
     Zc: Z3Context,
     mk: typeof newSolver,
     out: Finding[],
-  ): Promise<void> {
+  ): Promise<Set<string>> {
+    const tautologyIds = new Set<string>();
     for (const { id, bool } of terms) {
       const s = mk();
       s.add(Zc.Not(bool));
       const r = (await s.check()) as CheckResult;
-      if (r === "unsat") out.push({ kind: "tautology", invariant: id });
-      else if (r === "unknown") out.push({ kind: "incomplete", analysis: "tautology", subject: [id] });
+      if (r === "unsat") {
+        out.push({ kind: "tautology", invariant: id });
+        tautologyIds.add(id);
+      } else if (r === "unknown") out.push({ kind: "incomplete", analysis: "tautology", subject: [id] });
     }
+    return tautologyIds;
   }
 
   async function runRedundancy(
@@ -204,6 +214,7 @@ export async function analyze(input: LintInput, opts: AnalyzeOpts): Promise<Anal
     Zc: Z3Context,
     mk: typeof newSolver,
     out: Finding[],
+    tautologies: ReadonlySet<string>,
   ): Promise<void> {
     const implies = async (A: Bool, B: Bool): Promise<"yes" | "no" | "unknown"> => {
       const s = mk();
@@ -217,6 +228,10 @@ export async function analyze(input: LintInput, opts: AnalyzeOpts): Promise<Anal
       for (let j = i + 1; j < terms.length; j += 1) {
         const A = terms[i]!;
         const B = terms[j]!; // idA < idB by construction (sorted)
+        // A tautology is implied by EVERY other invariant; reporting it as
+        // "redundant under X" for each X is noise — it is already flagged once as
+        // a tautology. Skip any pair touching a tautology.
+        if (tautologies.has(A.id) || tautologies.has(B.id)) continue;
         const ab = await implies(A.bool, B.bool);
         const ba = await implies(B.bool, A.bool);
         if (ab === "unknown" || ba === "unknown") {

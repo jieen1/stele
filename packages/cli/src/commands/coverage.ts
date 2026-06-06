@@ -245,6 +245,9 @@ export async function buildCoverageReport(
   notes.push(
     "Python checkers and uses-checker invariants have no spatial expansion; they are counted as nonSpatialGuards and do not mark files covered.",
   );
+  notes.push(
+    `Spatial coverage is measured over ${language} source under the configured roots only. Files in other languages (e.g. hand-written .js hook scripts, .py glue) and manifest-protected protection-infrastructure are OUTSIDE this denominator — they may be protected by manifest tamper-evidence and their own tests, not by spatial contracts. A high % here does not imply those surfaces are protected.`,
+  );
   if (expansion.externTargets.length > 0) {
     notes.push(`${expansion.externTargets.length} extern: target(s) contribute no file coverage (metadata only).`);
   }

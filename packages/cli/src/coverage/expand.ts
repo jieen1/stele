@@ -244,20 +244,24 @@ export async function expandContractToFiles(options: ExpandOptions): Promise<Exp
   }
 
   for (const decl of contract.typeStates) {
-    if (callGraph === undefined) {
-      declarations.set(decl.id, unboundSymbolDecl("type-state", decl.id));
+    // type-state targets are `file::Type` definitions (the lifecycle type), NOT
+    // call-graph function nodes. Resolve the declaring file literally — mirroring
+    // core-node / branded-id. matchNodesToFiles only matches function/method
+    // nodes, so it reported filesTouched:0, falsely reading as a zero-binding
+    // (decorative) mechanism even though the type-state genuinely guards that type.
+    const sep = decl.target.indexOf("::");
+    if (sep === -1) {
+      failures.push({ declarationId: decl.id, reason: `type-state target "${decl.target}" is not file::Type` });
       continue;
     }
-    const targets = [decl.target];
-    const match = matchNodesToFiles(callGraph, targets);
-    collectExtern(targets, externTargets);
-    const bound = match.nodeCount > 0;
+    const filePath = decl.target.slice(0, sep).replaceAll("\\", "/");
+    const typeName = decl.target.slice(sep + 2);
     declarations.set(decl.id, {
       mechanism: "type-state",
       declarationId: decl.id,
-      files: bound ? match.files : new Set<string>(),
-      symbols: new Set<string>(),
-      bound,
+      files: new Set([filePath]),
+      symbols: new Set([typeName]),
+      bound: true,
     });
   }
 

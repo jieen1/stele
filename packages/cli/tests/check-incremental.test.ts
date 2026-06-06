@@ -214,65 +214,62 @@ describe("computeIncrementalPlan — (b) changed file in NO stage scope => file-
   });
 });
 
-describe("computeIncrementalPlan — symbol mechanism (effect) via call graph", () => {
-  it("skips effect when no changed file is in the effect targetScope", async () => {
+describe("computeIncrementalPlan — call-graph mechanisms are NEVER skipped (C1/C2 false-green regression)", () => {
+  // The reverse index attributes a call-graph mechanism's coverage to a file set
+  // strictly NARROWER than what the stage examines: effect sets PROPAGATE up from
+  // out-of-scope callees, and trace extern targets / path constraints reach nodes
+  // outside the scope-caller files. Skipping these on a disjoint change hid real
+  // violations (FS_WRITES_VIA_WRITE_ATOMIC; GENERATOR_NO_NETWORK_OR_CHILD_PROCESS).
+  // They must ALWAYS run, regardless of the changed set.
+  it("never skips effect even when the changed file is outside the effect target-scope (propagation is non-local)", async () => {
     const projectDir = await createTempProject();
     await writeFileEnsuringDir(projectDir, "packages/a/src/svc.ts", "export function pay() {}\n");
-    await writeFileEnsuringDir(projectDir, "packages/a/src/ui.ts", "export function render() {}\n");
+    await writeFileEnsuringDir(projectDir, "packages/a/src/callee.ts", "export function helper() {}\n");
 
     const callGraph = mkCallGraph(
-      [mkNode("packages/a/src/svc.ts::pay(0)", "packages/a/src/svc.ts")],
-      [],
+      [
+        mkNode("packages/a/src/svc.ts::pay(0)", "packages/a/src/svc.ts"),
+        mkNode("packages/a/src/callee.ts::helper(0)", "packages/a/src/callee.ts"),
+      ],
+      [mkEdge("packages/a/src/svc.ts::pay(0)", "packages/a/src/callee.ts::helper(0)")],
     );
     const contract = mkContract({
       effectPolicies: [mkEffectPolicy("EP1", ["packages/a/src/svc.ts::*"])],
     });
     const context = mkContext(projectDir, contract);
 
-    const planSkip = await computeIncrementalPlan(context, ["packages/a/src/ui.ts"], {
+    // Changing the out-of-scope callee MUST NOT skip effect (its effects would
+    // propagate into the in-scope pay()).
+    const plan = await computeIncrementalPlan(context, ["packages/a/src/callee.ts"], {
       buildCallGraph: async () => callGraph,
     });
-    expect(planSkip.skipped.has("effect")).toBe(true);
-
-    const planRun = await computeIncrementalPlan(context, ["packages/a/src/svc.ts"], {
-      buildCallGraph: async () => callGraph,
-    });
-    expect(planRun.skipped.has("effect")).toBe(false);
+    expect(plan.skipped.has("effect")).toBe(false);
   });
 
-  it("RUNS effect (fail-safe) when the call graph is unavailable", async () => {
+  it("never skips trace, type-state, architecture, or core-node for any change", async () => {
     const projectDir = await createTempProject();
-    await writeFileEnsuringDir(projectDir, "packages/a/src/ui.ts", "export function render() {}\n");
+    await writeFileEnsuringDir(projectDir, "packages/a/src/dep.ts", "export function helper() {}\n");
+    await writeFileEnsuringDir(projectDir, "packages/a/src/unrelated.ts", "export const z = 1;\n");
+
+    const callGraph = mkCallGraph(
+      [mkNode("packages/a/src/dep.ts::helper(0)", "packages/a/src/dep.ts")],
+      [],
+    );
     const contract = mkContract({
-      effectPolicies: [mkEffectPolicy("EP1", ["packages/a/src/svc.ts::*"])],
+      // extern-target trace policy: expands to bound=false/files=0 — must still run.
+      tracePolicies: [mkTracePolicy("TP1", ["extern:node-fs::writeFile(*)"], ["packages/a/src/dep.ts"])],
+      effectPolicies: [mkEffectPolicy("EP1", ["packages/a/src/dep.ts::*"])],
     });
     const context = mkContext(projectDir, contract);
 
-    const plan = await computeIncrementalPlan(context, ["packages/a/src/ui.ts"], {
-      buildCallGraph: async () => null,
+    const plan = await computeIncrementalPlan(context, ["packages/a/src/unrelated.ts"], {
+      buildCallGraph: async () => callGraph,
     });
-
-    // No call graph => cannot prove effect unaffected => MUST run (no false green).
-    expect(plan.skipped.has("effect")).toBe(false);
-    expect(plan.notes.some((n) => /call-graph/.test(n))).toBe(true);
-  });
-
-  it("RUNS effect (fail-safe) when call graph extraction throws", async () => {
-    const projectDir = await createTempProject();
-    await writeFileEnsuringDir(projectDir, "packages/a/src/ui.ts", "export function render() {}\n");
-    const contract = mkContract({
-      effectPolicies: [mkEffectPolicy("EP1", ["packages/a/src/svc.ts::*"])],
-    });
-    const context = mkContext(projectDir, contract);
-
-    const plan = await computeIncrementalPlan(context, ["packages/a/src/ui.ts"], {
-      buildCallGraph: async () => {
-        throw new Error("extractor boom");
-      },
-    });
-
-    expect(plan.skipped.has("effect")).toBe(false);
-    expect(plan.notes.some((n) => /extraction failed/.test(n))).toBe(true);
+    for (const stage of ["trace", "effect", "type-state", "architecture", "complexity"]) {
+      expect(plan.skipped.has(stage)).toBe(false);
+    }
+    // Only code-shape is ever eligible.
+    expect([...SKIPPABLE_STAGE_IDS]).toEqual(["code-shape"]);
   });
 });
 
@@ -346,12 +343,12 @@ describe("computeIncrementalPlan — (c) EQUIVALENCE / no false-green safety pro
       buildCallGraph: async () => callGraph,
     });
 
-    // Both file-scoped stages are skippable here.
+    // Only code-shape is skippable; effect (a call-graph mechanism) always runs.
     expect(plan.skipped.has("code-shape")).toBe(true);
-    expect(plan.skipped.has("effect")).toBe(true);
+    expect(plan.skipped.has("effect")).toBe(false);
 
-    // Reproduce the reverse index the plan used and assert disjointness for
-    // every skipped stage's mechanisms.
+    // Reproduce the reverse index the plan used and assert disjointness for the
+    // code-shape mechanism (the only skippable one) against the changed set.
     const { expandContractToFiles } = await import("../src/coverage/expand.js");
     const { enumerateUniverse } = await import("../src/coverage/universe.js");
     const universe = await enumerateUniverse(resolve(projectDir));
@@ -361,13 +358,15 @@ describe("computeIncrementalPlan — (c) EQUIVALENCE / no false-green safety pro
       callGraph,
       universeFiles: universe.map((f) => f.path),
     });
-    const allCoveredOfSkipped = new Set<string>();
+    const codeShapeMechanisms = new Set(["boundary", "type-policy", "file-policy", "function-shape", "class-shape"]);
+    const codeShapeFiles = new Set<string>();
     for (const decl of expansion.declarations.values()) {
-      // Both decl mechanisms above belong to skipped stages in this scenario.
-      for (const f of decl.files) allCoveredOfSkipped.add(f);
+      if (codeShapeMechanisms.has(decl.mechanism)) {
+        for (const f of decl.files) codeShapeFiles.add(f);
+      }
     }
     for (const c of changed) {
-      expect(allCoveredOfSkipped.has(c)).toBe(false);
+      expect(codeShapeFiles.has(c)).toBe(false);
     }
   });
 
@@ -386,13 +385,11 @@ describe("computeIncrementalPlan — (c) EQUIVALENCE / no false-green safety pro
   });
 });
 
-describe("computeIncrementalPlan — whole-graph trace policy must never be skipped (false-green regression)", () => {
-  // A trace policy with empty `scope` guards EVERY caller in the graph, so its
-  // file coverage is unbounded (expand encodes it as files={}). When mixed with
-  // a scoped policy (which DOES contribute files), the stage `bindsAnything`, so
-  // a naive planner would compare the changed set only against the scoped files
-  // and skip the stage — silently dropping the whole-graph policy. That is a
-  // false green. The planner must force the trace stage to run.
+describe("computeIncrementalPlan — trace is force-run even for a whole-graph + scoped mix", () => {
+  // Trace is unconditionally force-run (it is not in SKIPPABLE_STAGE_MECHANISMS),
+  // so the historic whole-graph false-green (a whole-graph empty-scope policy
+  // mixed with a scoped one) cannot occur. This documents that scenario stays
+  // green-safe: the trace stage always runs regardless of the changed set.
   it("does NOT skip trace when a whole-graph policy coexists with a scoped one and an out-of-scope caller changes", async () => {
     const projectDir = await createTempProject();
     await writeFileEnsuringDir(projectDir, "packages/a/src/scoped.ts", "export function caller() {}\n");
@@ -427,7 +424,6 @@ describe("computeIncrementalPlan — whole-graph trace policy must never be skip
     });
 
     expect(plan.skipped.has("trace")).toBe(false);
-    expect(plan.notes.some((n) => /trace.*whole-graph\/extern-only/.test(n))).toBe(true);
   });
 });
 
