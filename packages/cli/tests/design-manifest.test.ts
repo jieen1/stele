@@ -8,6 +8,12 @@ import type { DesignProfile } from "../src/design-profile/types.js";
 import { hashFile, hashString } from "../src/design-profile/hash.js";
 import { generateFromProfile } from "../src/design-generator/ddd.js";
 import {
+  asRawProfile,
+  markProfileValidated,
+  hashValidatedProfile,
+  type TypedDesignProfile,
+} from "../src/design-profile/lifecycle.js";
+import {
   writeManifest,
   readManifest,
   verifyManifestIntegrity,
@@ -16,6 +22,10 @@ import {
   type GeneratedRuleEntry,
 } from "../src/design-generator/manifest.js";
 import { validateOwnership } from "../src/design-generator/ownership.js";
+
+const brand = (p: DesignProfile): TypedDesignProfile<"Hashed"> =>
+  hashValidatedProfile(markProfileValidated(asRawProfile(p)), hashString(JSON.stringify(p)))
+    .profile;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -461,7 +471,7 @@ describe("end-to-end: generate → manifest → verify", () => {
     };
 
     // Generate
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     // Compute profile hash
     const profilePath = await writeProfile(dir, profile);
@@ -521,7 +531,7 @@ describe("end-to-end: generate → manifest → verify", () => {
       },
     };
 
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
     const outputPath = "contract/generated/ddd-typedriven.stele";
     const manifest = buildManifest({
       profileHash: "profile-hash",

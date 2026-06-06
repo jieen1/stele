@@ -9,7 +9,18 @@ import {
   renderAclIntegration,
   renderAggregateCoreNode,
 } from "../src/design-generator/render-stele.js";
+import {
+  asRawProfile,
+  markProfileValidated,
+  hashValidatedProfile,
+  type TypedDesignProfile,
+} from "../src/design-profile/lifecycle.js";
+import { hashString } from "../src/design-profile/hash.js";
 import { loadContract } from "@stele/core";
+
+const brand = (p: DesignProfile): TypedDesignProfile<"Hashed"> =>
+  hashValidatedProfile(markProfileValidated(asRawProfile(p)), hashString(JSON.stringify(p)))
+    .profile;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -417,7 +428,7 @@ describe("generateFromProfile — full profile", () => {
       },
     };
 
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     // Two context architectures + 1 ACL architecture = 3 architectures
     expect(result.architectures.length).toBeGreaterThanOrEqual(2);
@@ -478,7 +489,7 @@ describe("generateFromProfile — full profile", () => {
       },
     };
 
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
     expect(result.coreNodes).toHaveLength(2);
 
     expect(result.coreNodes[0]).toContain("billing-invoice-aggregate");
@@ -493,7 +504,7 @@ describe("generateFromProfile — full profile", () => {
 describe("generateFromProfile — empty profile", () => {
   it("generates no architectures or core-nodes when ddd section is absent", () => {
     const profile = minimalProfile();
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     expect(result.architectures).toHaveLength(0);
     expect(result.coreNodes).toHaveLength(0);
@@ -507,7 +518,7 @@ describe("generateFromProfile — empty profile", () => {
         contexts: [],
       },
     };
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     expect(result.architectures).toHaveLength(0);
     expect(result.coreNodes).toHaveLength(0);
@@ -529,7 +540,7 @@ describe("generateFromProfile — empty profile", () => {
         ],
       },
     };
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     // Should have the context architecture but no ACL architecture
     expect(result.architectures).toHaveLength(1);
@@ -605,7 +616,7 @@ describe("generateFromProfile — loadContract integration", () => {
       },
     };
 
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     // Write generated CDL to a temp .stele file
     const contractPath = join(tmpDir, "generated.stele");
@@ -660,7 +671,7 @@ describe("generateFromProfile — loadContract integration", () => {
       },
     };
 
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     // Write to file and load
     const contractPath = join(tmpDir, "generated.stele");
@@ -727,7 +738,7 @@ describe("generateFromProfile — loadContract integration", () => {
       },
     };
 
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
 
     const contractPath = join(tmpDir, "generated.stele");
     await writeFile(contractPath, result.combined, "utf8");

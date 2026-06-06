@@ -26,6 +26,7 @@ import {
   type CallGraph,
   type CallGraphNode,
   type CompiledPattern,
+  type ConsumableCallGraph,
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
 
@@ -45,7 +46,7 @@ import { buildViolation } from "./violation-builder.js";
 
 export interface EvaluateTraceOptions {
   readonly contract: Contract;
-  readonly callGraph: CallGraph;
+  readonly callGraph: ConsumableCallGraph;
   readonly externAliases?: ExternAliasRegistry;
   readonly maxDepth?: number;
   readonly maxPaths?: number;
@@ -69,6 +70,13 @@ export interface TracePolicyCoverage {
   readonly policyId: string;
   readonly severity: string;
   readonly targetsMatched: number;
+  /**
+   * Number of in-scope caller nodes the policy's scope actually matched in this
+   * graph. A policy with targets but an empty scope (e.g. its scope file was
+   * renamed) enforces nothing on any caller — the guard treats that as a
+   * zero-binding error, not a silent green.
+   */
+  readonly scopeNodesMatched: number;
 }
 
 export interface EvaluateTraceResult {
@@ -216,10 +224,12 @@ export function evaluateTracePolicies(
   for (const policy of contract.tracePolicies) {
     const compiled = compilePolicy(policy, callGraph, externAliases);
     const { allTargets } = buildTargetSet(callGraph, compiled);
+    const callerNodes = buildCallerSet(callGraph, compiled);
     coverage.push({
       policyId: policy.id,
       severity: policy.severity,
       targetsMatched: allTargets.size,
+      scopeNodesMatched: callerNodes.length,
     });
     if (allTargets.size === 0) {
       // No matching targets at all in this graph — nothing to enforce. The
@@ -228,7 +238,6 @@ export function evaluateTracePolicies(
       // silent green (a policy that binds nothing protects nothing).
       continue;
     }
-    const callerNodes = buildCallerSet(callGraph, compiled);
 
     for (const caller of callerNodes) {
       // ---- Path-based constraints (must-transit / deny-direct / deny-transit) ----

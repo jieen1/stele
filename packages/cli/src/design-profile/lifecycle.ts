@@ -89,24 +89,3 @@ export function loadHashedProfile(
   return hashValidatedProfile(validated, contentHash);
 }
 
-/**
- * Closeout 4: typed consumer for a Hashed profile. Accepts only a
- * `TypedDesignProfile<"Hashed">` (the phantom-branded profile inside a
- * HashedDesignProfile), so a caller cannot pass a Raw/Validated brand.
- * The matching `(type-state-binding ...)` in `contract/main.stele`
- * pins param 0 to state `Hashed`; the evaluator's
- * wrong_state_at_binding rule fires if the inferred state disagrees.
- *
- * The `profile.valueOf()` call below is the receiver-method site the
- * TS type-state extractor inspects: it gives the extractor a concrete
- * call expression whose receiver type is `TypedDesignProfile<"Hashed">`,
- * so the inferred state can be compared against the binding's declared
- * state. Without this call the bound function would have no inference
- * site and the wrong_state_at_binding rule would never fire for it.
- */
-export function useHashedProfile(
-  profile: TypedDesignProfile<"Hashed">,
-): DesignProfile {
-  profile.valueOf();
-  return profile as DesignProfile;
-}

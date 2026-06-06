@@ -25,7 +25,6 @@ import {
   _clearCallGraphCacheForTests as _clearSharedCallGraphCacheForTests,
   getCachedCallGraph,
   setCachedCallGraph,
-  useCachedCallGraph,
   wrapExtractedGraph,
 } from "./check-stages-call-graph-cache.js";
 
@@ -151,9 +150,8 @@ export async function buildTraceStage(
     });
   }
 
-  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — the cache returns a
-  // `TypedCallGraph<"Cached">`; `useCachedCallGraph` is the bound entry
-  // that param 0 must be `Cached` to consume.
+  // CALLGRAPH_LIFECYCLE: the cache returns a branded `TypedCallGraph<"Cached">`,
+  // which the evaluator requires (ConsumableCallGraph).
   let cached: TypedCallGraph<"Cached">;
   try {
     cached = await extractOrCacheCallGraph(context, tsconfigPath, deps, extractor);
@@ -205,11 +203,9 @@ export async function buildTraceStage(
     }));
     externAliases = buildExternAliasRegistry(aliases);
   }
-  // Closeout 4: bound consumer for the cached call graph.
-  const callGraph: CallGraph = useCachedCallGraph(cached);
   const evaluationOptions = {
     contract: context.contract,
-    callGraph,
+    callGraph: cached,
     externAliases,
   };
   const result =
@@ -255,13 +251,22 @@ export async function buildTraceStage(
  * nothing.
  */
 function buildTraceZeroBindingViolations(
-  coverage: readonly { policyId: string; severity: string; targetsMatched: number }[],
+  coverage: readonly { policyId: string; severity: string; targetsMatched: number; scopeNodesMatched: number }[],
   command: string,
 ): Violation[] {
   const out: Violation[] = [];
   for (const c of coverage) {
     if (c.severity !== "error") continue;
-    if (c.targetsMatched > 0) continue;
+    // A policy enforces something only if BOTH its targets AND its in-scope
+    // callers are present. targetsMatched > 0 alone is not enough: the targets
+    // are usually global externs (writeFileSync, …) that exist regardless of
+    // whether any in-scope caller reaches them, so a policy whose scope matched
+    // 0 nodes (e.g. a renamed scope path) would otherwise stay vacuously green.
+    if (c.targetsMatched > 0 && c.scopeNodesMatched > 0) continue;
+    const reason =
+      c.targetsMatched === 0
+        ? `matched 0 target nodes`
+        : `matched 0 in-scope caller nodes (scope resolves to nothing)`;
     out.push(
       createViolation({
         rule_id: ruleId(`trace.${c.policyId}.zero_binding`),
@@ -271,7 +276,7 @@ function buildTraceZeroBindingViolations(
         location: { path: "contract/main.stele" },
         cause: {
           summary:
-            `Trace-policy \`${c.policyId}\` (severity=error) matched 0 target nodes in the call graph — ` +
+            `Trace-policy \`${c.policyId}\` (severity=error) ${reason} in the call graph — ` +
             `it enforces nothing. A green check that protects nothing is not allowed.`,
         },
         scope_paths: ["contract/main.stele"],

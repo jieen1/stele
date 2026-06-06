@@ -11,9 +11,9 @@ import {
   asRawProfile,
   hashValidatedProfile,
   markProfileValidated,
-  useHashedProfile,
   type TypedDesignProfile,
 } from "../src/design-profile/lifecycle.js";
+import { generateFromProfile } from "../src/design-generator/ddd.js";
 import type { DesignProfile } from "../src/design-profile/types.js";
 
 const sample = {
@@ -46,8 +46,9 @@ markProfileValidated(hashed);
 const smuggled: TypedDesignProfile<"Raw"> = sample;
 void smuggled;
 
-// 4. Closeout 4: `useHashedProfile` accepts only `TypedDesignProfile<"Hashed">`.
-//    Passing a Raw brand MUST fail — the read site is the runtime gate
-//    that validation + hashing transitions ran first.
-// @ts-expect-error — Raw cannot be passed where useHashedProfile requires Hashed
-useHashedProfile(raw);
+// 4. KEYSTONE: the REAL consumer `generateFromProfile` accepts only a
+//    `TypedDesignProfile<"Hashed">`. Passing a Raw (un-validated, un-hashed)
+//    profile MUST fail — the generator cannot run on a profile that skipped
+//    the validation + hashing integrity gate.
+// @ts-expect-error — Raw cannot be passed where generateFromProfile requires Hashed
+generateFromProfile(raw);

@@ -16,6 +16,17 @@ import {
   renderTraceSection,
 } from "../src/design-generator/render-stele.js";
 import { generateFromProfile } from "../src/design-generator/ddd.js";
+import {
+  asRawProfile,
+  markProfileValidated,
+  hashValidatedProfile,
+  type TypedDesignProfile,
+} from "../src/design-profile/lifecycle.js";
+import { hashString } from "../src/design-profile/hash.js";
+
+const brand = (p: DesignProfile): TypedDesignProfile<"Hashed"> =>
+  hashValidatedProfile(markProfileValidated(asRawProfile(p)), hashString(JSON.stringify(p)))
+    .profile;
 
 function minimalPolicy(overrides: Partial<TracePolicySpec> = {}): TracePolicySpec {
   return {
@@ -275,7 +286,7 @@ describe("renderTraceSection — byte stability", () => {
 describe("generateFromProfile — trace integration", () => {
   it("omits trace section entirely when profile.trace is undefined (byte stability)", () => {
     const profile = minimalProfile(undefined);
-    const out = generateFromProfile(profile);
+    const out = generateFromProfile(brand(profile));
     expect(out.combined).toBe("");
     expect(out.manifest.outputs[0]?.rule_count).toBe(0);
   });
@@ -286,7 +297,7 @@ describe("generateFromProfile — trace integration", () => {
         minimalPolicy({ id: "DEMO", fix_hint: "Use `Repo.find` at src/x.ts:1" }),
       ],
     });
-    const out = generateFromProfile(profile);
+    const out = generateFromProfile(brand(profile));
     expect(out.combined).toContain('(trace-policy "DEMO"');
     expect(out.combined).toContain("(must-transit");
     expect(out.manifest.outputs[0]?.rule_count).toBe(1);

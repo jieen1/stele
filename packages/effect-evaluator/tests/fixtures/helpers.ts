@@ -5,10 +5,10 @@
  */
 
 import type {
-  CallGraph,
   CallGraphEdge,
   CallGraphNode,
   SupportedLanguage,
+  TypedCallGraph,
   UnresolvedCall,
 } from "@stele/call-graph-core";
 import type {
@@ -94,7 +94,7 @@ export function mkCallGraph(opts: {
   unresolvedCalls?: readonly UnresolvedCall[];
   language?: SupportedLanguage;
   projectRoot?: string;
-}): CallGraph {
+}): TypedCallGraph<"Built"> {
   return {
     schemaVersion: "1",
     language: opts.language ?? "typescript",
@@ -106,7 +106,7 @@ export function mkCallGraph(opts: {
     ambiguousCalls: [],
     methodResolutionHash: "0".repeat(64),
     fileHashes: {},
-  };
+  } as TypedCallGraph<"Built">;
 }
 
 export function mkEffectDeclarations(

@@ -1,12 +1,12 @@
 /**
- * Closeout 4 — compile-time test for the CALLGRAPH_LIFECYCLE typed
- * consumer (`useCachedCallGraph`) that lives in the CLI package.
+ * Compile-time test for the CALLGRAPH_LIFECYCLE consumer contract.
  *
- * The call-graph-core package owns the lifecycle transitions and has its
- * own `.test-d.ts` for the transitions themselves; this file pins
- * compile-time enforcement of the typed consumer's brand requirement
- * (param 0 must be `TypedCallGraph<"Cached">`). Pin removal must surface
- * a TS2345 argument-not-assignable error from
+ * The Phase B evaluators (trace / type-state / effect) require a
+ * `ConsumableCallGraph` (= `TypedCallGraph<"Built"> | TypedCallGraph<"Cached">`)
+ * at their public option type, so an `Empty` or `Building` graph — which has
+ * incomplete edges / unresolvedCalls — cannot be fed to an evaluator. This
+ * file pins that the brand discriminator rejects the non-consumable states.
+ * Pin removal must surface a TS2345/TS2322 error from
  *   pnpm --filter @stele/cli typecheck
  */
 
@@ -15,10 +15,10 @@ import {
   emptyCallGraph,
   finalizeCallGraph,
   startBuilding,
+  type ConsumableCallGraph,
   type TypedCallGraph,
 } from "@stele/call-graph-core";
 import type { CallGraph } from "@stele/call-graph-core";
-import { useCachedCallGraph } from "../src/commands/check-stages-call-graph-cache.js";
 
 const blank: CallGraph = {
   schemaVersion: "1",
@@ -38,15 +38,18 @@ const building: TypedCallGraph<"Building"> = startBuilding(empty);
 const built: TypedCallGraph<"Built"> = finalizeCallGraph(building);
 const cached: TypedCallGraph<"Cached"> = cacheCallGraph(built);
 
-// Happy path — useCachedCallGraph accepts the Cached brand.
-void useCachedCallGraph(cached);
+// Stand-in for the Phase B evaluator entry point, whose option type requires
+// a ConsumableCallGraph (e.g. `evaluateTypeStates({ callGraph })`).
+const consume = (_graph: ConsumableCallGraph): void => {};
 
-// Closeout 4: useCachedCallGraph requires `Cached`. Passing `Built`
-// (one transition short) MUST fail — the brand is the runtime gate
-// that the lifecycle reached the cached terminal state.
-// @ts-expect-error — Built cannot be passed where useCachedCallGraph requires Cached
-useCachedCallGraph(built);
+// Happy path — both Built and Cached are consumable by Phase B evaluators.
+consume(built);
+consume(cached);
 
-// Closeout 4: same for `Building` — even further from the terminal state.
-// @ts-expect-error — Building cannot be passed where useCachedCallGraph requires Cached
-useCachedCallGraph(building);
+// Building is NOT consumable — its edges/unresolvedCalls are incomplete.
+// @ts-expect-error — Building cannot be assigned to ConsumableCallGraph
+consume(building);
+
+// Empty is NOT consumable — even further from a usable graph.
+// @ts-expect-error — Empty cannot be assigned to ConsumableCallGraph
+consume(empty);

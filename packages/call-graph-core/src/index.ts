@@ -36,6 +36,7 @@ export type {
   CallGraphState,
   CallGraphStateBrand,
   TypedCallGraph,
+  ConsumableCallGraph,
 } from "./lifecycle.js";
 export {
   cacheCallGraph,

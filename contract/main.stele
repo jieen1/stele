@@ -897,7 +897,7 @@
   (transition (from Validated) (via hashValidatedProfile) (to Hashed))
   (allowed-ops Raw markProfileValidated)
   (allowed-ops Validated hashValidatedProfile)
-  (fix-hint "Route the profile through `asRawProfile` → `markProfileValidated` → `hashValidatedProfile` in `packages/cli/src/design-profile/lifecycle.ts`. Generators must accept `HashedDesignProfile` only. If the lifecycle is wrong, propose an update via `stele design propose --type-state DESIGN_PROFILE_LIFECYCLE`."))
+  (fix-hint "Route the profile through `asRawProfile` → `markProfileValidated` → `hashValidatedProfile` in `packages/cli/src/design-profile/lifecycle.ts`. Generators must accept a `TypedDesignProfile<\"Hashed\">` only (e.g. `generateFromProfile` in `packages/cli/src/design-generator/ddd.ts`); read `.profile` off a `HashedDesignProfile` to obtain it. If the lifecycle is wrong, propose an update via `stele design propose --type-state DESIGN_PROFILE_LIFECYCLE`."))
 
 (type-state APPROVAL_LIFECYCLE
   (description "An Approval record cannot be written to disk before the human-identity gate has run. Lifecycle: Drafting (created from raw payload) → IdentityChecked (resolveApprovedBy passed) → Signed (writeFileSync persisted). The on-disk path must only ever see a Signed approval.")
@@ -926,44 +926,18 @@
   (allowed-ops Locked verifyLockedManifest)
   (fix-hint "Route the manifest through `asLoaded()` then `lockManifest()` then `verifyLockedManifest()` from `packages/core/src/manifest/lifecycle.ts`; skipping a transition is what trips this rule. If the lifecycle itself is wrong, propose an update via `stele design propose --type-state MANIFEST_LIFECYCLE` — do NOT edit the contract directly."))
 
-; ============================================================================
-; Closeout 4 (self-dogfooding plan): type-state-binding declarations.
-;
-; Each binding pins the FIRST parameter of a typed lifecycle wrapper to
-; the lifecycle's expected state. The TS extractor uses these bindings
-; to inform receiver-state inference inside the wrapper's body; the
-; evaluator (extended in this closeout) emits
-;   typestate.<LIFECYCLE>.wrong_state_at_binding
-; when the inferred state of the same param disagrees with the binding.
-;
-; The functions referenced below are the single sanctioned entry points
-; for their respective lifecycles' terminal/consumable operations:
-;
-;   - writeLockedManifest      → MANIFEST_LIFECYCLE persist
-;   - writeSignedApproval      → APPROVAL_LIFECYCLE persist
-;   - loadHashedProfile        → DESIGN_PROFILE_LIFECYCLE terminal construct
-;   - wrapExtractedGraph       → CALLGRAPH_LIFECYCLE terminal wrap
-;
-; Removing or short-circuiting the typed chain inside any of these
-; (Test B of step 4.7) trips wrong_state_at_binding at the call site
-; that disagrees with the binding's declared state.
-; ============================================================================
-
-(type-state-binding
-  (function "packages/core/src/manifest/lifecycle.ts::writeLockedManifest(2)")
-  (param 0 state Locked))
-
-(type-state-binding
-  (function "packages/cli/src/commands/design/approval-lifecycle.ts::writeSignedApproval(2)")
-  (param 0 state Signed))
-
-(type-state-binding
-  (function "packages/cli/src/design-profile/lifecycle.ts::useHashedProfile(1)")
-  (param 0 state Hashed))
-
-(type-state-binding
-  (function "packages/cli/src/commands/check-stages-call-graph-cache.ts::useCachedCallGraph(1)")
-  (param 0 state Cached))
+(type-state INCIDENT_LIFECYCLE
+  (description "An incident draft cannot reach the atomic apply→generate→lock sink before the teeth proof has been gated AND bound to this exact draft. Lifecycle: Drafted (validated draft + teeth gate passed) → TeethProven (enforceTeethGate accepted: TEETH_PROVEN or an explicit teeth-unavailable reason) → Bound (enforceTeethBinding confirmed the proof attests to THIS draft's parentSha/fixSha/test bytes). The apply/generate/lock sink must only ever see a Bound draft.")
+  (target "packages/cli/src/commands/incident/incident-lifecycle.ts::ProvenDraft")
+  (severity "error")
+  (states Drafted TeethProven Bound)
+  (initial Drafted)
+  (terminal Bound)
+  (transition (from Drafted) (via markTeethProven) (to TeethProven))
+  (transition (from TeethProven) (via bindTeethProof) (to Bound))
+  (allowed-ops Drafted markTeethProven)
+  (allowed-ops TeethProven bindTeethProof)
+  (fix-hint "Route the draft through `draftProvenDraft(...)` → `markTeethProven(...)` (only after `enforceTeethGate` accepts) → `bindTeethProof(...)` (only after `enforceTeethBinding` accepts) in `packages/cli/src/commands/incident/incident-lifecycle.ts`; the apply→generate→lock sink must only accept `ProvenDraft<\"Bound\">`. If the lifecycle itself is wrong, propose an update via `stele design propose --type-state INCIDENT_LIFECYCLE` — do NOT edit the contract directly."))
 
 
 ; ============================================================================

@@ -2192,7 +2192,7 @@ def test_evaluator_via_extern_registry_catches_premature_evaluation():
         "packages/cli/src/commands/check-stages-trace.ts",
         lambda text: text.replace(
             "    const aliases: ExternAlias[] = externAliasDeclarations.map((d) => ({\n",
-            "    evaluateTracePolicies({ contract: context.contract, callGraph: useCachedCallGraph(cached), externAliases });\n"
+            "    evaluateTracePolicies({ contract: context.contract, callGraph: cached, externAliases });\n"
             "    const aliases: ExternAlias[] = externAliasDeclarations.map((d) => ({\n",
             1,
         ),
@@ -2301,6 +2301,18 @@ def test_callgraph_lifecycle_brand_fires():
         "@ts-expect-error — Empty cannot be passed where Building is required",
         "@stele/call-graph-core",
     ), "CALLGRAPH_LIFECYCLE StateBrand failed to fire — tsc accepted Empty→Building illegal transition"
+
+
+def test_incident_lifecycle_brand_fires():
+    """Type-state hardening: removing the keystone pin in
+    incident-lifecycle.test-d.ts (the apply→generate→lock sink accepts only
+    `ProvenDraft<"Bound">`) must surface TS2345 — i.e. a non-Bound (un-gated)
+    witness cannot reach the apply/generate/lock sink."""
+    assert _type_state_brand_negative(
+        "packages/cli/tests/incident-lifecycle.test-d.ts",
+        "@ts-expect-error — Drafted cannot be passed where the sink requires Bound",
+        "@stele/cli",
+    ), "INCIDENT_LIFECYCLE StateBrand failed to fire — tsc accepted reaching the apply/generate/lock sink without the teeth gate"
 
 
 # ---------------------------------------------------------------------------
@@ -2643,17 +2655,12 @@ def test_architecture_evaluator_shape_catches_missing_aggregate_member():
 
 
 # ---------------------------------------------------------------------------
-# Closeout 4 Test A (CC-13 paired negative shape #1, compile-time):
-# the typed CONSUMER wrappers (writeLockedManifest, writeSignedApproval,
-# useHashedProfile, useCachedCallGraph) reject non-matching brands at
-# tsc. Each `.test-d.ts` file pins one such illegal call with an
-# `@ts-expect-error` comment; removing the pin must surface TS2345.
-#
-# Test B (the runtime-evaluator paired test) lives in
-# `packages/type-state-evaluator/tests/closeout-4-test-b.test.ts` and
-# asserts the new `wrong_state_at_binding` rule fires per CC-13's
-# requirement that the paired test exercises a DIFFERENT enforcement
-# layer.
+# Compile-time consumer-brand negatives: the REAL consumers reject a
+# non-terminal-state brand at tsc. writeLockedManifest requires Locked,
+# writeSignedApproval requires Signed, generateFromProfile requires Hashed,
+# and the Phase B evaluators require a ConsumableCallGraph (Built|Cached).
+# Each `.test-d.ts` pins one illegal call with `@ts-expect-error`; removing
+# the pin must surface a TS2345/TS2322 error.
 # ---------------------------------------------------------------------------
 
 
@@ -2679,26 +2686,26 @@ def test_writesignedapproval_brand_fires():
     ), "APPROVAL_LIFECYCLE typed-write brand failed to fire — tsc accepted Drafting → writeSignedApproval"
 
 
-def test_usehashedprofile_brand_fires():
-    """Closeout 4 (DESIGN_PROFILE): removing the pin on the Raw → use
-    illegal transition must surface TS2345 from
-    `packages/cli/tests/design-profile-lifecycle.test-d.ts`."""
+def test_generatefromprofile_brand_fires():
+    """DESIGN_PROFILE: the real consumer `generateFromProfile` requires a
+    Hashed profile — removing the pin on the Raw → generate illegal call must
+    surface TS2345 from `packages/cli/tests/design-profile-lifecycle.test-d.ts`."""
     assert _type_state_brand_negative(
         "packages/cli/tests/design-profile-lifecycle.test-d.ts",
-        "@ts-expect-error — Raw cannot be passed where useHashedProfile requires Hashed",
+        "@ts-expect-error — Raw cannot be passed where generateFromProfile requires Hashed",
         "@stele/cli",
-    ), "DESIGN_PROFILE_LIFECYCLE typed-use brand failed to fire — tsc accepted Raw → useHashedProfile"
+    ), "DESIGN_PROFILE_LIFECYCLE consumer brand failed to fire — tsc accepted Raw → generateFromProfile"
 
 
-def test_usecachedcallgraph_brand_fires():
-    """Closeout 4 (CALLGRAPH): removing the pin on the Built → use
-    illegal transition must surface TS2345 from
-    `packages/cli/tests/cached-callgraph-consumer.test-d.ts`."""
+def test_consumable_callgraph_brand_fires():
+    """CALLGRAPH: the Phase B evaluators require a ConsumableCallGraph
+    (Built|Cached) — removing the pin on the Building assignment must surface
+    a tsc error from `packages/cli/tests/cached-callgraph-consumer.test-d.ts`."""
     assert _type_state_brand_negative(
         "packages/cli/tests/cached-callgraph-consumer.test-d.ts",
-        "@ts-expect-error — Built cannot be passed where useCachedCallGraph requires Cached",
+        "@ts-expect-error — Building cannot be assigned to ConsumableCallGraph",
         "@stele/cli",
-    ), "CALLGRAPH_LIFECYCLE typed-use brand failed to fire — tsc accepted Built → useCachedCallGraph"
+    ), "CALLGRAPH_LIFECYCLE consumer brand failed to fire — tsc accepted Building → ConsumableCallGraph"
 
 
 # ---------------------------------------------------------------------------
@@ -2988,8 +2995,8 @@ def main() -> int:
         # typed-CONSUMER brand-fires for the 4 lifecycle wrappers.
         ("writelockedmanifest_brand_fires", test_writelockedmanifest_brand_fires),
         ("writesignedapproval_brand_fires", test_writesignedapproval_brand_fires),
-        ("usehashedprofile_brand_fires", test_usehashedprofile_brand_fires),
-        ("usecachedcallgraph_brand_fires", test_usecachedcallgraph_brand_fires),
+        ("generatefromprofile_brand_fires", test_generatefromprofile_brand_fires),
+        ("consumable_callgraph_brand_fires", test_consumable_callgraph_brand_fires),
     ]
 
     print("=" * 60)

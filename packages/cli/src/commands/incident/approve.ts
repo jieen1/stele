@@ -27,6 +27,12 @@ import {
   type IncidentDraft,
   type TeethProof,
 } from "./shared.js";
+import {
+  bindTeethProof,
+  draftProvenDraft,
+  markTeethProven,
+  type ProvenDraft,
+} from "./incident-lifecycle.js";
 
 // runPropose's append targets (mirrored from propose.ts). runPropose self-rolls-
 // back only THIS append; generate writes the tests dir and lock writes the
@@ -52,7 +58,7 @@ export type IncidentApproveOptions = {
  * Extracting the human-authored text also preserves the assert expression
  * byte-for-byte rather than re-serialising an AST core has no printer for.
  */
-type ParsedInvariant = {
+export type ParsedInvariant = {
   id: string;
   severity: string;
   description: string;
@@ -290,7 +296,7 @@ async function restoreDir(absDir: string, before: Map<string, string>): Promise<
   }
 }
 
-type TeethGateResult = {
+export type TeethGateResult = {
   verdict: "TEETH_PROVEN" | "TEETH_UNAVAILABLE";
   teethUnavailable: boolean;
   unavailableReason?: string;
@@ -337,6 +343,74 @@ function buildIncidentApprovalPath(projectDir: string, id: string): string {
   // not affect manifest stability.
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 22);
   return join(incidentScratchDir(projectDir, id), `approval-${ts}.json`);
+}
+
+/**
+ * The atomic apply → generate → lock sink. Accepts ONLY a `ProvenDraft<"Bound">`
+ * witness — a caller cannot reach this function without first routing the draft
+ * through `draftProvenDraft` → `markTeethProven` (after enforceTeethGate) →
+ * `bindTeethProof` (after enforceTeethBinding, or in the teeth-unavailable
+ * branch). This is the type-state INCIDENT_LIFECYCLE sink; it defends the code
+ * path against future refactors/new callers skipping the teeth gate. The
+ * runtime tamper-evidence checks (enforceTeethGate, enforceTeethBinding) are
+ * orthogonal and stay where they are.
+ *
+ * Takes its OWN OUTER snapshot of the mutation set BEFORE any write, and on a
+ * mid-sequence failure restores the pre-call snapshot exactly (so the tree
+ * never lingers at stele-check exit-2/3), then re-throws the native code. All
+ * data (invariant/rationale/tags/draft) is read off the Bound witness.
+ */
+async function applyGenerateLock(
+  bound: ProvenDraft<"Bound">,
+  ctx: {
+    projectDir: string;
+    config: Awaited<ReturnType<typeof loadConfig>>;
+    propose: typeof runPropose;
+    generate: typeof runGenerate;
+    lock: typeof runLock;
+  },
+): Promise<void> {
+  const { projectDir, config, propose, generate, lock } = ctx;
+  const { id, invariant, rationale, tags } = bound;
+
+  // OUTER snapshot of the mutation set BEFORE any write.
+  const entryAbs = resolve(projectDir, config.entry);
+  const proposalAbs = resolve(projectDir, PROPOSAL_FILE);
+  const manifestAbs = resolve(projectDir, config.manifestPath);
+  const generatedDirAbs = resolve(projectDir, config.generatedDir);
+
+  const entrySnap = await snapshotFile(entryAbs);
+  const proposalSnap = await snapshotFile(proposalAbs);
+  const manifestSnap = await snapshotFile(manifestAbs);
+  const generatedSnap = await snapshotDir(generatedDirAbs);
+
+  const rollback = async (): Promise<void> => {
+    await restoreFile(entrySnap);
+    await restoreFile(proposalSnap);
+    await restoreDir(generatedDirAbs, generatedSnap);
+    await restoreFile(manifestSnap);
+  };
+
+  // atomic apply → generate → lock.
+  try {
+    await propose(projectDir, {
+      kind: "invariant",
+      id: invariant.id,
+      severity: invariant.severity,
+      description: invariant.description,
+      assert: invariant.assert,
+      category: invariant.category,
+      rationale,
+      tags: [...tags],
+      apply: true,
+    });
+    await generate(projectDir, { force: true });
+    await lock(projectDir, { reason: `incident:${id}` });
+  } catch (error) {
+    // restore the pre-call snapshot exactly, then re-throw the native code.
+    await rollback();
+    throw error;
+  }
 }
 
 /**
@@ -402,19 +476,10 @@ export async function runIncidentApprove(
   const draft = await readDraft(projectDir, id);
   const invariant = parseInvariantFromDraft(draft);
 
-  // (4b) teeth-binding gate: when the verdict is TEETH_PROVEN, the proof MUST
-  // attest to THIS draft. `teeth` is non-null whenever the gate returned
-  // TEETH_PROVEN (enforceTeethGate only takes that branch when teeth !== null).
-  if (!gate.teethUnavailable) {
-    if (teeth === null) {
-      throw new CliCommandError(
-        "Internal error: TEETH_PROVEN verdict with no teeth proof.",
-        ExitCode.USER_ERROR,
-      );
-    }
-    await enforceTeethBinding(projectDir, id, teeth, draft);
-  }
-
+  // (4c) INCIDENT_LIFECYCLE witness — mint Drafted then promote to TeethProven
+  // immediately after the teeth gate passed (still pre-binding). The witness is
+  // a phantom-typed proof-of-ordering: the apply→generate→lock sink accepts only
+  // a Bound witness, so no caller can reach it without routing through the gate.
   const tags = gate.teethUnavailable
     ? [PROVENANCE_TAG, TEETH_UNPROVEN_TAG]
     : [PROVENANCE_TAG];
@@ -430,45 +495,38 @@ export async function runIncidentApprove(
     ? `${invariant.rationale} (${rationaleSuffix})`
     : `incident ${id} ${rationaleSuffix}`;
 
-  // (5) OUTER snapshot of the mutation set BEFORE any write.
-  const config = await loadConfig(projectDir);
-  const entryAbs = resolve(projectDir, config.entry);
-  const proposalAbs = resolve(projectDir, PROPOSAL_FILE);
-  const manifestAbs = resolve(projectDir, config.manifestPath);
-  const generatedDirAbs = resolve(projectDir, config.generatedDir);
-
-  const entrySnap = await snapshotFile(entryAbs);
-  const proposalSnap = await snapshotFile(proposalAbs);
-  const manifestSnap = await snapshotFile(manifestAbs);
-  const generatedSnap = await snapshotDir(generatedDirAbs);
-
-  const rollback = async (): Promise<void> => {
-    await restoreFile(entrySnap);
-    await restoreFile(proposalSnap);
-    await restoreDir(generatedDirAbs, generatedSnap);
-    await restoreFile(manifestSnap);
-  };
-
-  // (6) atomic apply → generate → lock.
-  try {
-    await propose(projectDir, {
-      kind: "invariant",
-      id: invariant.id,
-      severity: invariant.severity,
-      description: invariant.description,
-      assert: invariant.assert,
-      category: invariant.category,
+  const proven = markTeethProven(
+    draftProvenDraft({
+      id,
+      invariant,
       rationale,
       tags,
-      apply: true,
-    });
-    await generate(projectDir, { force: true });
-    await lock(projectDir, { reason: `incident:${id}` });
-  } catch (error) {
-    // (7) restore the pre-call snapshot exactly, then re-throw the native code.
-    await rollback();
-    throw error;
+      draft,
+      approvedBy: approver.approvedBy,
+      teethVerdict: gate.verdict,
+      unavailableReason: gate.unavailableReason,
+    }),
+  );
+
+  // (4b) teeth-binding gate: when the verdict is TEETH_PROVEN, the proof MUST
+  // attest to THIS draft. In the teeth-unavailable branch the binding check is
+  // skipped (no proof to bind) — both branches legitimately reach Bound (see
+  // incident-lifecycle.ts header).
+  if (!gate.teethUnavailable) {
+    if (teeth === null) {
+      throw new CliCommandError(
+        "Internal error: TEETH_PROVEN verdict with no teeth proof.",
+        ExitCode.USER_ERROR,
+      );
+    }
+    await enforceTeethBinding(projectDir, id, teeth, draft);
   }
+  const bound = bindTeethProof(proven);
+
+  // (5+6) atomic apply → generate → lock under the sink's OUTER snapshot/
+  // rollback. The sink accepts ONLY the Bound witness and reads all data off it.
+  const config = await loadConfig(projectDir);
+  await applyGenerateLock(bound, { projectDir, config, propose, generate, lock });
 
   // (8) only after the sequence succeeds, write the signed approval record under
   // scratch via the typed lifecycle chain.

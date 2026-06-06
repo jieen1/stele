@@ -31,6 +31,17 @@ export type TypedCallGraph<S extends CallGraphState = "Built"> = CallGraph &
   CallGraphStateBrand<S>;
 
 /**
+ * The only call-graph states Phase B evaluators are permitted to
+ * consume: a graph that has finished building (`Built`) or been
+ * hydrated from cache (`Cached`). An `Empty` or `Building` graph is
+ * rejected at the type level. Every evaluator's public entry option
+ * (`.callGraph`) must require this union, never plain `CallGraph`.
+ */
+export type ConsumableCallGraph =
+  | TypedCallGraph<"Built">
+  | TypedCallGraph<"Cached">;
+
+/**
  * Begin a new build. The returned wrapper is `Empty` — no edges or
  * nodes have been added yet.
  */

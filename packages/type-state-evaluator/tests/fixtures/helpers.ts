@@ -6,10 +6,10 @@
  */
 
 import type {
-  CallGraph,
   CallGraphEdge,
   CallGraphNode,
   SupportedLanguage,
+  TypedCallGraph,
 } from "@stele/call-graph-core";
 import type {
   Contract,
@@ -65,7 +65,7 @@ export function mkCallGraph(opts: {
   edges: readonly CallGraphEdge[];
   language?: SupportedLanguage;
   projectRoot?: string;
-}): CallGraph {
+}): TypedCallGraph<"Built"> {
   return {
     schemaVersion: "1",
     language: opts.language ?? "typescript",
@@ -77,7 +77,7 @@ export function mkCallGraph(opts: {
     ambiguousCalls: [],
     methodResolutionHash: "0".repeat(64),
     fileHashes: {},
-  };
+  } as TypedCallGraph<"Built">;
 }
 
 export interface MkDeclOpts {

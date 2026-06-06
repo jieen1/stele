@@ -37,7 +37,11 @@ import {
   type CompiledPattern,
   type ExternAliasRegistry,
 } from "@stele/call-graph-core";
-import type { CallGraph, CallGraphNode } from "@stele/call-graph-core";
+import type {
+  CallGraph,
+  CallGraphNode,
+  ConsumableCallGraph,
+} from "@stele/call-graph-core";
 import {
   stableStringCompare,
   type Contract,
@@ -63,7 +67,7 @@ import {
 
 export interface EvaluateEffectOptions {
   readonly contract: Contract;
-  readonly callGraph: CallGraph;
+  readonly callGraph: ConsumableCallGraph;
   readonly extractor: EffectAnnotationExtractor;
   /**
    * Round 4 D-07: cross-language alias registry built from

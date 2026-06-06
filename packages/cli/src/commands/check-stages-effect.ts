@@ -32,7 +32,6 @@ import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import {
   getCachedCallGraph,
   setCachedCallGraph,
-  useCachedCallGraph,
   wrapExtractedGraph,
 } from "./check-stages-call-graph-cache.js";
 
@@ -182,8 +181,8 @@ export async function buildEffectStage(
     });
   }
 
-  // Closeout 4: typed CALLGRAPH_LIFECYCLE chain — cache returns
-  // `TypedCallGraph<"Cached">`; `useCachedCallGraph` is the bound entry.
+  // CALLGRAPH_LIFECYCLE: the cache returns a branded `TypedCallGraph<"Cached">`,
+  // which the evaluator requires (ConsumableCallGraph).
   let cached: TypedCallGraph<"Cached">;
   try {
     cached = await extractOrCacheCallGraph(context, tsconfigPath, deps, callGraphExtractor);
@@ -230,13 +229,11 @@ export async function buildEffectStage(
   // evaluator alongside the call graph + extractor.
   const externAliases =
     deps.externAliases ?? buildContractExternAliasRegistry(context.contract.externAliases);
-  const callGraph: CallGraph = useCachedCallGraph(cached);
-
   let result: EvaluateEffectResult;
   try {
     result = await evaluate({
       contract: context.contract,
-      callGraph,
+      callGraph: cached,
       extractor,
       externAliases,
     });

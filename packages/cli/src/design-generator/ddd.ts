@@ -1,7 +1,7 @@
 // DDD generator entry point — Phase 2.1 of DDD + TypeDriven.
 // Compiles design profile into Stele contract CDL declarations.
 
-import type { DesignProfile } from "../design-profile/types.js";
+import type { TypedDesignProfile } from "../design-profile/lifecycle.js";
 import {
   renderContextArchitecture,
   renderAclIntegration,
@@ -40,7 +40,7 @@ export interface GeneratorResult {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function generateFromProfile(profile: DesignProfile): GeneratorResult {
+export function generateFromProfile(profile: TypedDesignProfile<"Hashed">): GeneratorResult {
   const architectures: string[] = [];
   const coreNodes: string[] = [];
   const provenanceRules: ProvenanceRule[] = [];

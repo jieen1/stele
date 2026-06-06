@@ -36,9 +36,7 @@ function isCheckSuppressibleViolation(violation: Violation): boolean {
 
 /**
  * Whether a violation is eligible to appear in a Stele baseline file.
- *
- * Re-exported from `commands/check.ts` for backward compatibility with
- * callers (baseline.ts, tests) that import it from the check module.
+ * Defined here and imported directly by baseline.ts and the report path.
  */
 export function isBaselineEligibleViolation(violation: Violation): boolean {
   if (violation.rule_id.startsWith("stele.check.")) {

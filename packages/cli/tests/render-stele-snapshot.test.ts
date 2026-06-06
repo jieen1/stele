@@ -19,11 +19,22 @@ import { dirname, resolve } from "node:path";
 import { loadProfile } from "../src/design-profile/load.js";
 import { generateFromProfile } from "../src/design-generator/ddd.js";
 import type { DesignProfile } from "../src/design-profile/types.js";
+import {
+  asRawProfile,
+  markProfileValidated,
+  hashValidatedProfile,
+  type TypedDesignProfile,
+} from "../src/design-profile/lifecycle.js";
+import { hashString } from "../src/design-profile/hash.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, "../../..");
 const GOLDEN_DIR = resolve(__dirname, "golden-snapshots");
+
+const brand = (p: DesignProfile): TypedDesignProfile<"Hashed"> =>
+  hashValidatedProfile(markProfileValidated(asRawProfile(p)), hashString(JSON.stringify(p)))
+    .profile;
 
 describe("render-stele byte-stability", () => {
   it("loaded profile matches captured JSON snapshot", () => {
@@ -35,7 +46,7 @@ describe("render-stele byte-stability", () => {
   });
 
   it("generateFromProfile(combined) matches the protected on-disk artifact byte-for-byte", () => {
-    const profile = loadProfile(REPO_ROOT);
+    const profile = brand(loadProfile(REPO_ROOT));
     const expected = readFileSync(
       resolve(REPO_ROOT, "contract/generated/ddd-typedriven.stele"),
       "utf8",
@@ -45,12 +56,21 @@ describe("render-stele byte-stability", () => {
   });
 
   it("generateFromProfile(combined) matches the captured golden snapshot", () => {
-    const profile = loadProfile(REPO_ROOT);
+    const profile = brand(loadProfile(REPO_ROOT));
     const expected = readFileSync(
       resolve(GOLDEN_DIR, "render-stele.golden.stele"),
       "utf8",
     );
     const result = generateFromProfile(profile);
     expect(result.combined).toBe(expected);
+  });
+
+  it("generateFromProfile rejects a non-Hashed profile at the type level", () => {
+    // The phantom `Hashed` brand on the parameter is load-bearing: passing a
+    // Raw profile must be a compile error. If this @ts-expect-error stops
+    // firing, the generator no longer requires the integrity gate.
+    // @ts-expect-error generateFromProfile requires a Hashed-branded profile
+    void (() => generateFromProfile(asRawProfile(loadProfile(REPO_ROOT))));
+    expect(true).toBe(true);
   });
 });

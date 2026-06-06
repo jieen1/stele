@@ -41,6 +41,7 @@ import type {
   CallGraph,
   CallGraphEdge,
   CallGraphNode,
+  ConsumableCallGraph,
   ExternAliasRegistry,
 } from "@stele/call-graph-core";
 import {
@@ -72,7 +73,7 @@ import {
 
 export interface EvaluateTypeStateOptions {
   readonly contract: Contract;
-  readonly callGraph: CallGraph;
+  readonly callGraph: ConsumableCallGraph;
   readonly extractor: TypeStateInferenceExtractor;
   /**
    * When true (default per Round 2 D-CG-1), inference failures become

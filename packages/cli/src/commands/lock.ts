@@ -62,8 +62,8 @@ export async function lockProject(projectDir: string, _options: LockOptions): Pr
   // MANIFEST_LIFECYCLE — build the in-memory manifest in `Loaded` state,
   // promote it to `Locked`, then persist via the typed-write entry.
   // The persist site only accepts a `Manifest<"Locked">`; calling
-  // `writeManifest` directly would bypass the lifecycle and is a
-  // typestate.MANIFEST_LIFECYCLE.wrong_state_at_binding violation.
+  // `writeManifest` directly would not compile (tsc rejects a non-Locked
+  // value), so the lifecycle cannot be bypassed.
   const manifestPath = resolve(projectDir, config.manifestPath);
   const contractHash = computeSha256(normalizeContract(contract));
   const loaded = await buildLoadedManifestForPaths(protectedPaths, manifestPath, contractHash);

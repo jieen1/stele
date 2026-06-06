@@ -12,12 +12,11 @@
  * `__state_Locked` would have to be `true` but is `never` on a `Loaded`
  * value.
  *
- * Evaluator enforcement: the contract's `(type-state MANIFEST_LIFECYCLE ...)`
- * declaration targets the `Manifest` symbol from this file. The TS extractor
- * (B.1) recognises class-method calls only; the present free-function
- * transition surface is documentation for the evaluator until the
- * call-sites in `lock`/`baseline`/`check-stages-protected` are routed
- * through the typed pipeline below.
+ * Enforcement is at COMPILE TIME: `writeLockedManifest` accepts only a
+ * `Manifest<"Locked">`, so the production call-sites in `lock`, `baseline`,
+ * and `check-stages-protected` cannot persist a manifest without routing it
+ * through `buildLoadedManifestForPaths → lockManifest → writeLockedManifest`.
+ * tsc rejects any skipped step; see `manifest-lifecycle.test-d.ts`.
  */
 
 import type { ContractManifest, VerificationResult } from "./manifest.js";
@@ -103,12 +102,6 @@ export async function writeLockedManifest(
   locked: Manifest<"Locked">,
   manifestPath: string,
 ): Promise<Manifest<"Verified">> {
-  // Closeout 4: the `locked.valueOf()` call gives the TS type-state
-  // extractor a receiver-method site on the bound parameter, so the
-  // evaluator can correlate the inferred state with the binding's
-  // declared `Locked` state. Zero-cost (valueOf is a no-op on plain
-  // objects); see `useHashedProfile` for the equivalent pattern.
-  locked.valueOf();
   await writeContractManifestObject(locked, manifestPath);
   return locked as unknown as Manifest<"Verified">;
 }
@@ -119,10 +112,13 @@ export async function writeLockedManifest(
  * underlying `VerificationResult` so callers that need the per-file
  * diff (e.g. drift reporting) keep their existing access pattern.
  *
- * Internally delegates to `verifyManifest`. The typed brand is on a
- * stub-shape value — the on-disk manifest content is exposed through
- * the `verification` field, not through the returned manifest brand
- * (callers that need the content should use the verification result).
+ * Internally delegates to `verifyManifest`. The returned `manifest`
+ * field is a NON-DATA marker: it carries the `Manifest<"Verified">`
+ * brand for type-level lifecycle continuity but holds NO manifest
+ * payload. The verified on-disk content lives entirely in the
+ * `verification` (`VerificationResult`) field; callers must read the
+ * content from there. The marker exists only so the lifecycle's
+ * Verified state has a typed witness at the read+verify site.
  *
  * @stele:effects fs.read, crypto.hash
  */
@@ -131,6 +127,7 @@ export async function verifyManifestToVerified(
 ): Promise<{ readonly manifest: Manifest<"Verified">; readonly verification: VerificationResult }> {
   const verification = await verifyManifest(manifestPath);
   return {
+    // Non-data marker: brand only, no payload. Verified content is in `verification`.
     manifest: { __verified_marker: true } as unknown as Manifest<"Verified">,
     verification,
   };

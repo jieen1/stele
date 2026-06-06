@@ -280,9 +280,8 @@ export async function runDesignApprove(
   // Closeout 4 (self-dogfooding plan): route through the typed
   // APPROVAL_LIFECYCLE chain — Drafting → IdentityChecked → Signed.
   // The persist site `writeSignedApproval` only accepts a
-  // `Approval<"Signed">`, so a caller that skips a step gets a tsc
-  // error AND the evaluator's wrong_state_at_binding rule when a
-  // matching (type-state-binding ...) is in force.
+  // `Approval<"Signed">`, so a caller that skips a step does not compile
+  // (tsc rejects a non-Signed value).
   const drafting = draftApproval(approvalPayload);
   const identityChecked = attachApprovedBy(drafting);
   const signed = signApproval(identityChecked);

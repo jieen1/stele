@@ -52,28 +52,6 @@ export function wrapExtractedGraph(
   return cacheCallGraph(built);
 }
 
-/**
- * Closeout 4: typed consumer for a cached call graph. Accepts only a
- * `TypedCallGraph<"Cached">` so evaluators cannot consume an Empty or
- * Building graph (which would have incomplete edges + unresolvedCalls).
- * The matching `(type-state-binding ...)` in `contract/main.stele`
- * pins param 0 to state `Cached`; the evaluator's
- * wrong_state_at_binding rule fires on a state mismatch.
- *
- * Returns the underlying `CallGraph` field so existing evaluator
- * call sites keep their access pattern.
- *
- * The `graph.valueOf()` call below is the receiver-method site the
- * TS type-state extractor inspects: it produces an inference whose
- * receiver type is `TypedCallGraph<"Cached">`, which the evaluator
- * compares against the binding's declared state.
- */
-export function useCachedCallGraph(
-  graph: TypedCallGraph<"Cached">,
-): CallGraph {
-  graph.valueOf();
-  return graph as CallGraph;
-}
 
 /**
  * Test helper — clears the WeakMap entry for one context. Production code

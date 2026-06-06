@@ -7,6 +7,17 @@ import {
   renderTypeDrivenDeclarations,
   resolveBrandedIdTarget,
 } from "../src/design-generator/render-stele.js";
+import {
+  asRawProfile,
+  markProfileValidated,
+  hashValidatedProfile,
+  type TypedDesignProfile,
+} from "../src/design-profile/lifecycle.js";
+import { hashString } from "../src/design-profile/hash.js";
+
+const brand = (p: DesignProfile): TypedDesignProfile<"Hashed"> =>
+  hashValidatedProfile(markProfileValidated(asRawProfile(p)), hashString(JSON.stringify(p)))
+    .profile;
 
 function minimalProfile(): DesignProfile {
   return {
@@ -130,7 +141,7 @@ describe("generateFromProfile — type-driven integration", () => {
         type_state: { mode: "hard" },
       },
     };
-    const result = generateFromProfile(profile);
+    const result = generateFromProfile(brand(profile));
     expect(result.brandedIds).toHaveLength(1);
     expect(result.smartCtors).toHaveLength(1);
     expect(result.combined).toContain('(branded-id "RuleId"');
@@ -159,8 +170,8 @@ describe("generateFromProfile — type-driven integration", () => {
         type_state: { mode: "hard" },
       },
     };
-    const r1 = generateFromProfile(profile);
-    const r2 = generateFromProfile(profile);
+    const r1 = generateFromProfile(brand(profile));
+    const r2 = generateFromProfile(brand(profile));
     expect(r1.combined).toBe(r2.combined);
   });
 });

@@ -76,6 +76,7 @@ function mkPolicy(opts: {
   target: readonly string[];
   mustTransit?: readonly string[];
   denyDirect?: readonly string[];
+  scope?: readonly string[];
   severity?: "error" | "warning";
 }): TracePolicyDeclaration {
   return {
@@ -97,7 +98,7 @@ function mkPolicy(opts: {
     mustBeFollowedBy: [],
     denyDirect: opts.denyDirect ?? [],
     denyTransit: [],
-    scope: [],
+    scope: opts.scope ?? [],
     exempt: [],
     fixHint: undefined,
   };
@@ -316,6 +317,37 @@ describe("buildTraceStage — successful evaluation", () => {
     const guard = report.violations.find((v) => v.rule_id === "trace.NO_DIRECT_DB.zero_binding");
     expect(guard).toBeDefined();
     expect(guard!.severity).toBe("error");
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("zero-binding guard: an error-severity policy with targets but an empty scope fails the build", async () => {
+    // Targets are usually global externs that exist regardless of callers; a
+    // non-empty scope that resolves to 0 nodes (e.g. a renamed scope path)
+    // would otherwise leave the policy vacuously green. The guard must fire.
+    const policy = mkPolicy({
+      id: "SCOPED_NOWHERE",
+      target: ["**/controllers/**::*"], // matches the CTRL node below → targets > 0
+      scope: ["**/this-path-matches-nothing/**::*"], // 0 in-scope callers
+      denyDirect: ["src/db/**::*"],
+    });
+    const callGraph = mkCallGraph({
+      nodes: [mkNode({ id: CTRL, filePath: "src/controllers/order.ts" })],
+      edges: [],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const extract = vi.fn(async () => callGraph);
+
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+    });
+
+    expect(report.ok).toBe(false);
+    const guard = report.violations.find((v) => v.rule_id === "trace.SCOPED_NOWHERE.zero_binding");
+    expect(guard).toBeDefined();
+    expect(guard!.cause?.summary).toContain("in-scope caller");
     _clearCallGraphCacheForTests(context);
   });
 
