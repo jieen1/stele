@@ -29,4 +29,13 @@ export interface ResolvedCallee {
   readonly nodeIds: readonly string[];
   readonly reason?: "dynamic" | "reflection" | "module-not-resolved" | "external-lib";
   readonly rawText?: string;
+  /**
+   * For `kind === "unresolved"`: whether the called NAME is hidden from static
+   * analysis (computed-member `obj[expr]()`, reflection, dynamic `import()`).
+   * When the callee name is statically visible (a named identifier / param /
+   * property / interface-method) but the symbol/module didn't resolve, this is
+   * `false` — the call cannot be a hidden bypass of a named trace target. See
+   * `UnresolvedCall.nameHidden`.
+   */
+  readonly nameHidden?: boolean;
 }

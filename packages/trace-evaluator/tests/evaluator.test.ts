@@ -9,6 +9,7 @@ import {
   mkEdge,
   mkNode,
   mkPolicy,
+  mkUnresolved,
 } from "./fixtures/helpers.js";
 
 const CTRL = "src/controllers/order.ts::OrderController::handle(0)";
@@ -350,6 +351,319 @@ describe("evaluateTracePolicies — path_exceeded_max_depth (strict vs lenient)"
     ).toBe(true);
     expect(result.notices[0]!.severity).toBe("warning");
     expect(result.notices[0]!.priority).toBe("minor");
+  });
+});
+
+describe("evaluateTracePolicies — fail-closed on unresolved calls (HIGH #1)", () => {
+  // An in-scope caller with a call site the static graph could not resolve
+  // (dynamic dispatch `obj[m]()`, an unfollowed alias, `Reflect.apply`,
+  // `await import`) is never an edge, so the path/edge walks are blind to it.
+  // The ordering analysis is therefore incomplete and MUST fail closed —
+  // mirroring effect's `unresolved_call_blocks_evaluation`.
+  const STRIPE = "extern:stripe::Charges::create(2)";
+  const VERIFY = "src/permission/verify.ts::permission::verify(2)";
+  const CALLER = "src/services/pay.ts::PayService::fastPay(1)";
+
+  const policy = mkPolicy({
+    id: "PAYMENT_GUARD",
+    target: ["extern:stripe::*"],
+    mustBePrecededBy: ["**::permission::verify(*)"],
+    fixHint: "Insert `await permission.verify(...)` before `{target_call}`.",
+  });
+
+  it("emits an error-severity violation when an in-scope caller has a dynamic-dispatch call site", () => {
+    // The caller verifies first, THEN reaches stripe — sequence is clean for
+    // the resolved edges. But it ALSO has an unresolvable dynamic call: the
+    // analyzer cannot prove that hidden call doesn't reach stripe before
+    // verify, so it fails closed instead of reporting green.
+    const graph = mkCallGraph({
+      nodes: [
+        mkNode({ id: CALLER, filePath: "src/services/pay.ts" }),
+        mkNode({ id: VERIFY, filePath: "src/permission/verify.ts" }),
+      ],
+      edges: [
+        mkEdge({ from: CALLER, to: VERIFY, line: 10, column: 5 }),
+        mkEdge({ from: CALLER, to: STRIPE, line: 17, column: 5 }),
+      ],
+      unresolvedCalls: [
+        mkUnresolved({ from: CALLER, line: 14, column: 7, rawText: "handlers[name]()" }),
+      ],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+    });
+    const failClosed = result.violations.find(
+      (v) => v.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+    );
+    expect(failClosed).toBeDefined();
+    expect(failClosed!.severity).toBe("error");
+    expect(failClosed!.group_id).toBe(CALLER);
+    expect(failClosed!.location.line).toBe(14);
+    expect(failClosed!.cause?.detail).toContain("handlers[name]()");
+  });
+
+  it("does NOT fail closed for an out-of-scope caller's unresolved call", () => {
+    const scoped = mkPolicy({
+      id: "SCOPED_GUARD",
+      target: ["extern:stripe::*"],
+      mustBePrecededBy: ["**::permission::verify(*)"],
+      // Only callers under src/payments/** are in scope; CALLER is not.
+      scope: ["src/payments/**::*"],
+      fixHint: "Verify first.",
+    });
+    const graph = mkCallGraph({
+      nodes: [
+        mkNode({ id: CALLER, filePath: "src/services/pay.ts" }),
+        mkNode({ id: VERIFY, filePath: "src/permission/verify.ts" }),
+      ],
+      edges: [mkEdge({ from: CALLER, to: STRIPE, line: 17, column: 5 })],
+      unresolvedCalls: [mkUnresolved({ from: CALLER, line: 14 })],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([scoped]),
+      callGraph: graph,
+    });
+    expect(
+      result.violations.some(
+        (v) => v.rule_id === "trace.SCOPED_GUARD.unresolved_call_blocks_evaluation",
+      ),
+    ).toBe(false);
+  });
+
+  it("does NOT fail closed for an exempt caller's unresolved call", () => {
+    const exempted = mkPolicy({
+      id: "EXEMPT_GUARD",
+      target: ["extern:stripe::*"],
+      mustBePrecededBy: ["**::permission::verify(*)"],
+      exempt: [{ pattern: "**::PayService::*", reason: "trusted entrypoint" }],
+      fixHint: "Verify first.",
+    });
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: CALLER, filePath: "src/services/pay.ts" })],
+      edges: [mkEdge({ from: CALLER, to: STRIPE, line: 17 })],
+      unresolvedCalls: [mkUnresolved({ from: CALLER, line: 14 })],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([exempted]),
+      callGraph: graph,
+    });
+    expect(
+      result.violations.some(
+        (v) => v.rule_id === "trace.EXEMPT_GUARD.unresolved_call_blocks_evaluation",
+      ),
+    ).toBe(false);
+  });
+
+  it("emits ONE fail-closed violation per caller even with multiple unresolved sites", () => {
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: CALLER, filePath: "src/services/pay.ts" })],
+      edges: [mkEdge({ from: CALLER, to: STRIPE, line: 17 })],
+      unresolvedCalls: [
+        mkUnresolved({ from: CALLER, line: 20, rawText: "b[k]()" }),
+        mkUnresolved({ from: CALLER, line: 14, rawText: "a[k]()" }),
+      ],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+    });
+    const failClosed = result.violations.filter(
+      (v) => v.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+    );
+    expect(failClosed).toHaveLength(1);
+    // Deterministic: the earliest call site (line 14) is reported.
+    expect(failClosed[0]!.location.line).toBe(14);
+    expect(failClosed[0]!.cause?.detail).toContain("a[k]()");
+  });
+
+  it("lenient mode demotes the fail-closed finding to a notice (warning)", () => {
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: CALLER, filePath: "src/services/pay.ts" })],
+      edges: [mkEdge({ from: CALLER, to: STRIPE, line: 17 })],
+      unresolvedCalls: [mkUnresolved({ from: CALLER, line: 14 })],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+      strictMode: false,
+    });
+    expect(
+      result.violations.some(
+        (v) => v.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+      ),
+    ).toBe(false);
+    const notice = result.notices.find(
+      (n) => n.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+    );
+    expect(notice).toBeDefined();
+    expect(notice!.severity).toBe("warning");
+  });
+
+  it("fails closed even when the policy matched no targets (the hidden call could BE the edge)", () => {
+    const noTargetPolicy = mkPolicy({
+      id: "NO_TARGET",
+      target: ["src/never/**::*"], // 0 targets in this graph
+      denyDirect: ["**::*"],
+      fixHint: "n/a",
+    });
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: CALLER, filePath: "src/services/pay.ts" })],
+      edges: [],
+      unresolvedCalls: [mkUnresolved({ from: CALLER, line: 9 })],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([noTargetPolicy]),
+      callGraph: graph,
+    });
+    expect(
+      result.violations.some(
+        (v) => v.rule_id === "trace.NO_TARGET.unresolved_call_blocks_evaluation",
+      ),
+    ).toBe(true);
+  });
+
+  it("does NOT fail closed for a NAME-VISIBLE indirect call (calling a named param/property)", () => {
+    // `predicate()` — the callee name is statically visible. It is not the
+    // named target, so it provably cannot be a hidden bypass. The refined gate
+    // ignores it (nameHidden: false).
+    const graph = mkCallGraph({
+      nodes: [
+        mkNode({ id: CALLER, filePath: "src/services/pay.ts" }),
+        mkNode({ id: VERIFY, filePath: "src/permission/verify.ts" }),
+      ],
+      edges: [
+        mkEdge({ from: CALLER, to: VERIFY, line: 10, column: 5 }),
+        mkEdge({ from: CALLER, to: STRIPE, line: 17, column: 5 }),
+      ],
+      unresolvedCalls: [
+        mkUnresolved({
+          from: CALLER,
+          line: 14,
+          rawText: "predicate()",
+          reason: "module-not-resolved",
+          nameHidden: false,
+        }),
+      ],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+    });
+    expect(
+      result.violations.some(
+        (v) => v.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+      ),
+    ).toBe(false);
+  });
+
+  it("fails closed for a name-hidden site but not for a sibling name-visible site on the same caller", () => {
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: CALLER, filePath: "src/services/pay.ts" })],
+      edges: [mkEdge({ from: CALLER, to: STRIPE, line: 17 })],
+      unresolvedCalls: [
+        mkUnresolved({
+          from: CALLER,
+          line: 12,
+          rawText: "predicate()",
+          reason: "module-not-resolved",
+          nameHidden: false,
+        }),
+        mkUnresolved({
+          from: CALLER,
+          line: 14,
+          rawText: "handlers[name]()",
+          nameHidden: true,
+        }),
+      ],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+    });
+    const failClosed = result.violations.filter(
+      (v) => v.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+    );
+    expect(failClosed).toHaveLength(1);
+    // The reported site is the name-hidden one (line 14), not the visible one.
+    expect(failClosed[0]!.location.line).toBe(14);
+    expect(failClosed[0]!.cause?.detail).toContain("handlers[name]()");
+  });
+});
+
+describe("evaluateTracePolicies — callSitesExamined coverage (HIGH #3)", () => {
+  const CTRL = "src/controllers/order.ts::OrderController::handle(0)";
+  const SVC = "src/services/order.ts::OrderService::run(0)";
+  const DBN = "src/db/users.ts::Db::query(1)";
+
+  it("counts enumerated paths reaching a target for path policies", () => {
+    const policy = mkPolicy({
+      id: "DB_VIA_REPO",
+      target: ["src/db/**::*"],
+      denyDirect: ["**/never/**::*"],
+      fixHint: "n/a",
+    });
+    const graph = mkCallGraph({
+      nodes: [
+        mkNode({ id: CTRL, filePath: "src/controllers/order.ts" }),
+        mkNode({ id: SVC, filePath: "src/services/order.ts" }),
+        mkNode({ id: DBN, filePath: "src/db/users.ts" }),
+      ],
+      edges: [mkEdge({ from: CTRL, to: SVC }), mkEdge({ from: SVC, to: DBN })],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+    });
+    const cov = result.coverage.find((c) => c.policyId === "DB_VIA_REPO")!;
+    expect(cov.callSitesExamined).toBeGreaterThan(0);
+  });
+
+  it("records callSitesExamined=0 when in-scope callers never reach the target (vacuous green)", () => {
+    // Target + in-scope callers both bind, but there is NO edge from any
+    // in-scope caller to the target — the policy examines nothing.
+    const policy = mkPolicy({
+      id: "VACUOUS",
+      target: ["src/db/**::*"],
+      denyDirect: ["**::*"],
+      fixHint: "n/a",
+    });
+    const graph = mkCallGraph({
+      nodes: [
+        mkNode({ id: CTRL, filePath: "src/controllers/order.ts" }),
+        mkNode({ id: DBN, filePath: "src/db/users.ts" }),
+      ],
+      edges: [], // no caller→target call site
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+    });
+    const cov = result.coverage.find((c) => c.policyId === "VACUOUS")!;
+    expect(cov.targetsMatched).toBeGreaterThan(0);
+    expect(cov.scopeNodesMatched).toBeGreaterThan(0);
+    expect(cov.callSitesExamined).toBe(0);
+  });
+
+  it("counts body edges matching a target pattern for sequence policies", () => {
+    const STRIPE = "extern:stripe::Charges::create(2)";
+    const CALLER = "src/services/pay.ts::PayService::fastPay(1)";
+    const policy = mkPolicy({
+      id: "SEQ",
+      target: ["extern:stripe::*"],
+      mustBePrecededBy: ["**::permission::verify(*)"],
+      fixHint: "n/a",
+    });
+    const graph = mkCallGraph({
+      nodes: [mkNode({ id: CALLER, filePath: "src/services/pay.ts" })],
+      edges: [mkEdge({ from: CALLER, to: STRIPE, line: 17 })],
+    });
+    const result = evaluateTracePolicies({
+      contract: mkContract([policy]),
+      callGraph: graph,
+    });
+    const cov = result.coverage.find((c) => c.policyId === "SEQ")!;
+    expect(cov.callSitesExamined).toBe(1);
   });
 });
 

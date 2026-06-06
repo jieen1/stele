@@ -16,6 +16,7 @@ import {
   stableStringCompare,
   stableStringify,
   stripVolatileConfigFields,
+  verifyGenerated,
   writeAtomic,
   writeHashManifest,
   type Contract,
@@ -456,7 +457,6 @@ export async function verifyManagedGeneratedFiles(
   contract: Contract,
   backend: LanguageBackend,
 ): Promise<GeneratedVerificationResult> {
-  const { verifyGenerated } = await import("@stele/core");
   const verification = await verifyGenerated(contract, backend, {
     projectRoot: projectDir,
     outputDir: generatedDir,

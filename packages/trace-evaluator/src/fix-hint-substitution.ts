@@ -177,6 +177,8 @@ function codeIssueAdvice(
     }
     case "path_exceeded_max_depth":
       return `Call chain to \`${target}\` exceeds the analyzer depth cap; shorten the chain or run \`stele check --trace-max-depth N\` (see ${fileLine}).`;
+    case "unresolved_call_blocks_evaluation":
+      return `Make the call at ${fileLine} statically resolvable (replace dynamic dispatch / aliasing with a direct call) so the analyzer can prove the ordering.`;
     default: {
       const exhaustive: never = kind;
       return `Trace constraint violated at ${fileLine}. (${String(exhaustive)})`;

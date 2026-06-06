@@ -56,6 +56,7 @@ function mkCallGraph(opts: {
   nodes?: readonly CallGraphNode[];
   edges?: readonly CallGraphEdge[];
   language?: SupportedLanguage;
+  unresolvedCalls?: CallGraph["unresolvedCalls"];
 }): CallGraph {
   return {
     schemaVersion: "1",
@@ -64,7 +65,7 @@ function mkCallGraph(opts: {
     projectRoot: "/tmp/fixture",
     nodes: opts.nodes ?? [],
     edges: opts.edges ?? [],
-    unresolvedCalls: [],
+    unresolvedCalls: opts.unresolvedCalls ?? [],
     ambiguousCalls: [],
     methodResolutionHash: "0".repeat(64),
     fileHashes: {},
@@ -261,21 +262,28 @@ describe("buildTraceStage — successful evaluation", () => {
     _clearCallGraphCacheForTests(context);
   });
 
-  it("returns ok=true with zero violations when graph has no offending edges", async () => {
+  it("returns ok=true with zero violations when an examined path is clean (indirect, not denied)", async () => {
     const policy = mkPolicy({
       id: "NO_DIRECT_DB",
       target: ["src/db/**::*"],
       denyDirect: ["**/controllers/**::*"],
     });
+    // The controller reaches DB only INDIRECTLY (via the repository), so the
+    // policy examines a real caller→target call site (callSitesExamined > 0)
+    // but finds no DIRECT controller→DB call. ok must stay true. (An EMPTY
+    // edge set would now correctly trip the HIGH #3 vacuous-green guard —
+    // 0 examined call sites — so we give the policy a path to examine.)
+    const SVC = "src/services/order.ts::OrderService::run(0)";
     const callGraph = mkCallGraph({
-      // DB node present so the policy target (src/db/**::*) binds — the
-      // zero-binding guard requires a real target; the point of this test is
-      // "target present, no OFFENDING edge", not "target absent".
       nodes: [
         mkNode({ id: CTRL, filePath: "src/controllers/order.ts" }),
+        mkNode({ id: SVC, filePath: "src/services/order.ts" }),
         mkNode({ id: DB, filePath: "src/db/users.ts" }),
       ],
-      edges: [], // no edge to DB
+      edges: [
+        mkEdge({ from: CTRL, to: SVC }),
+        mkEdge({ from: SVC, to: DB }),
+      ],
     });
     const context = mkContext({
       contract: mkContract([policy]),
@@ -348,6 +356,93 @@ describe("buildTraceStage — successful evaluation", () => {
     const guard = report.violations.find((v) => v.rule_id === "trace.SCOPED_NOWHERE.zero_binding");
     expect(guard).toBeDefined();
     expect(guard!.cause?.summary).toContain("in-scope caller");
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("zero-binding guard (HIGH #3): targets + scope bind but 0 call sites examined fails the build", async () => {
+    // The classic blind spot: the protected sink (DB) exists, the in-scope
+    // caller (CTRL) exists, but no in-scope caller actually reaches the sink —
+    // e.g. APPROVE's scope contained no call to it. Previously vacuously green;
+    // now the guard turns it into an error.
+    const policy = mkPolicy({
+      id: "UNEXERCISED",
+      target: ["src/db/**::*"], // DB present below → targets > 0
+      denyDirect: ["**/controllers/**::*"], // CTRL in scope → scope > 0
+    });
+    const callGraph = mkCallGraph({
+      nodes: [
+        mkNode({ id: CTRL, filePath: "src/controllers/order.ts" }),
+        mkNode({ id: DB, filePath: "src/db/users.ts" }),
+      ],
+      edges: [], // CTRL never reaches DB → 0 examined call sites
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const extract = vi.fn(async () => callGraph);
+
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+    });
+
+    expect(report.ok).toBe(false);
+    const guard = report.violations.find((v) => v.rule_id === "trace.UNEXERCISED.zero_binding");
+    expect(guard).toBeDefined();
+    expect(guard!.severity).toBe("error");
+    expect(guard!.cause?.summary).toContain("0 in-scope caller");
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("fail-closed (HIGH #1): an in-scope caller with a dynamic-dispatch call site fails the build", async () => {
+    // A call the extractor could not resolve (obj[m]()) is never an edge, so
+    // the ordering walks are blind to it. The stage must surface the
+    // evaluator's fail-closed violation as an error.
+    const policy = mkPolicy({
+      id: "PAYMENT_GUARD",
+      target: [DB],
+      mustTransit: [REPO],
+    });
+    const callGraph = mkCallGraph({
+      nodes: [
+        mkNode({ id: CTRL, filePath: "src/controllers/order.ts" }),
+        mkNode({ id: REPO, filePath: "src/repository/orders.ts" }),
+        mkNode({ id: DB, filePath: "src/db/users.ts" }),
+      ],
+      // CTRL transits REPO to reach DB — the resolved path is clean…
+      edges: [
+        mkEdge({ from: CTRL, to: REPO }),
+        mkEdge({ from: REPO, to: DB }),
+      ],
+      // …but CTRL also has an unresolvable call the analyzer cannot prove
+      // doesn't bypass REPO. Fail closed.
+      unresolvedCalls: [
+        {
+          fromId: CTRL,
+          callSite: { line: 14, column: 7 },
+          rawText: "handlers[name]()",
+          reason: "dynamic",
+          nameHidden: true,
+        },
+      ],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      projectDir: resolve(__dirname, ".."),
+    });
+    const extract = vi.fn(async () => callGraph);
+
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+    });
+
+    expect(report.ok).toBe(false);
+    const failClosed = report.violations.find(
+      (v) => v.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+    );
+    expect(failClosed).toBeDefined();
+    expect(failClosed!.severity).toBe("error");
+    expect(failClosed!.location.line).toBe(14);
     _clearCallGraphCacheForTests(context);
   });
 

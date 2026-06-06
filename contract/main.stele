@@ -747,12 +747,12 @@
 ; model for design approvals: skipping it lets an agent forge approval records
 ; that survive the manifest-protection layer.
 (trace-policy APPROVE_VIA_RESOLVE_APPROVED_BY
-  (description "runDesignApprove must call resolveApprovedBy before writing any approval record — the human-identity gate is the security model.")
+  (description "runDesignApprove must call resolveApprovedBy (the human-identity denylist gate) before persisting an approval record via writeSignedApproval — the identity check is the security model. The APPROVAL type-state guarantees the STATE order (Drafting→IdentityChecked→Signed) at compile time but NOT that resolveApprovedBy actually ran (attachApprovedBy only brands a passed-in value); this trace policy guards that distinct property. Target is writeSignedApproval (the typed persist entry the actual fs.write now lives behind), not the raw writeFileSync.")
   (severity "error")
-  (target "extern:node-fs::writeFileSync(*)")
+  (target "packages/cli/src/commands/design/approval-lifecycle.ts::writeSignedApproval(2)")
   (must-be-preceded-by "packages/cli/src/commands/design/approve.ts::resolveApprovedBy(0)")
   (scope "packages/cli/src/commands/design/approve.ts")
-  (fix-hint "[A] Approve flow MUST gate through `resolveApprovedBy` in `packages/cli/src/commands/design/approve.ts:180` before any `writeFileSync`. [B] If you're replacing the identity gate, write a new policy first."))
+  (fix-hint "[A] runDesignApprove MUST call `resolveApprovedBy` in `packages/cli/src/commands/design/approve.ts` before `writeSignedApproval(...)`. [B] If you're replacing the identity gate, propose a new policy first via `stele design propose`. (Note: the incident-approve flow gates through the same resolveApprovedBy via an injectable seam; covering it in trace is limited by the `??`-alias indirection — it is additionally covered by the APPROVAL type-state.)"))
 
 ; Closeout 6 — trace-policy evaluator must receive the extern-alias registry
 ; built from the contract before evaluation. This protects cross-language

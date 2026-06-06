@@ -11,7 +11,8 @@ export type TraceViolationKind =
   | "missing_successor"
   | "direct_call_denied"
   | "forbidden_transit"
-  | "path_exceeded_max_depth";
+  | "path_exceeded_max_depth"
+  | "unresolved_call_blocks_evaluation";
 
 export const ALL_TRACE_VIOLATION_KINDS: readonly TraceViolationKind[] =
   Object.freeze([
@@ -21,4 +22,5 @@ export const ALL_TRACE_VIOLATION_KINDS: readonly TraceViolationKind[] =
     "direct_call_denied",
     "forbidden_transit",
     "path_exceeded_max_depth",
+    "unresolved_call_blocks_evaluation",
   ] as const);

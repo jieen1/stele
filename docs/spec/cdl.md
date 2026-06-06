@@ -510,6 +510,14 @@ Code: `E0328`.
 
 `trace-policy` declarations express call-chain rules over the static call graph. They are part of Phase B and are recognised by the CDL parser today; the runtime evaluator ships in B.1 targeting TypeScript source. See `docs/design/phase-b/02-trace-based-policy.md` for the semantics.
 
+**Soundness model (what trace can and cannot prove).** Trace-policy is sound only to the extent the static call graph is complete. To keep "green = enforced" honest:
+
+- **Fail-closed on name-hidden unresolved calls.** A call whose target NAME is hidden — computed-member dispatch `obj[expr]()`, `Reflect.apply/construct`, dynamic `import(...)` — could be the forbidden target, so for any in-scope, non-exempt caller the evaluator emits an error-severity `trace.<id>.unresolved_call_blocks_evaluation` (incomplete analysis = failure-to-prove, the same way a truncated path enumeration fails closed in strict mode). Calls to a statically-VISIBLE name (an interface method, or a function held in a named param/local/property) do NOT fail closed — the visible name is provably not the target. **Residual limitation:** higher-order *argument smuggling* — passing the target into a callback parameter that is then invoked under a different name — is not caught by trace alone; security-critical orderings (e.g. the approval identity gate) are therefore paired with the type-state/effect layer for a second, independent guarantee.
+- **Single-identifier alias resolution.** `const w = writeFileSync; w()` is resolved one hop to a real edge to `writeFileSync`, so the common alias bypass is caught directly rather than only via fail-closed.
+- **Vacuity guard (zero-binding).** A policy that binds targets and an in-scope scope but examined ZERO in-scope caller→target call sites is vacuously green; the guard surfaces `trace.<id>.zero_binding` so a policy whose target moved out of its scope cannot silently protect nothing.
+- **Lexical ordering.** `must-be-preceded-by` / `must-be-followed-by` reason over lexical (source) order of call sites within a caller body, not control-flow dominance. A gate call textually before the sink satisfies the policy even on a branch where the sink is reachable without it; pair security-critical orderings with a runtime check / type-state for a control-flow-sound guarantee.
+- **Cross-language `extern-alias`** remapping is available for `extern:<logical>::...` patterns but is currently undeclared (dormant) in this repo; the repo's `extern:` patterns match the TypeScript extractor's emitted ids directly. Unsupported languages fail loud.
+
 Form:
 
 ```lisp

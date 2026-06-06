@@ -28,8 +28,10 @@ export {
 } from "./fix-hint-substitution.js";
 export {
   buildViolation,
+  buildUnresolvedCallViolation,
   defaultPriority,
   type BuildViolationOptions,
+  type BuildUnresolvedCallViolationOptions,
 } from "./violation-builder.js";
 export type { TraceViolationKind } from "./types.js";
 export { ALL_TRACE_VIOLATION_KINDS } from "./types.js";

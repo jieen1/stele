@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
@@ -471,7 +472,6 @@ async function checkSelfNoBaseline(projectDir: string): Promise<Violation[]> {
 
   // Check for .baseline.json
   const baselinePath = resolve(projectDir, STELE_BASELINE_FILE);
-  const { existsSync } = await import("node:fs");
   if (!existsSync(baselinePath)) {
     return [];
   }

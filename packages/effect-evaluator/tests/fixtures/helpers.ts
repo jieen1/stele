@@ -80,12 +80,17 @@ export function mkUnresolved(opts: {
   column?: number;
   rawText?: string;
   reason?: UnresolvedCall["reason"];
+  nameHidden?: boolean;
 }): UnresolvedCall {
   return {
     fromId: opts.from,
     callSite: { line: opts.line ?? 1, column: opts.column ?? 1 },
     rawText: opts.rawText ?? "dynamic()",
     reason: opts.reason ?? "dynamic",
+    // The effect evaluator gates on ALL unresolved sites (it tracks declared
+    // effects, not a single named target), so its fixtures default to hidden
+    // to preserve the existing fail-closed behaviour.
+    nameHidden: opts.nameHidden ?? true,
   };
 }
 

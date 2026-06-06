@@ -454,6 +454,7 @@ function recordCall(
     callSite,
     rawText: result.rawText ?? call.getText(),
     reason: result.reason ?? "dynamic",
+    nameHidden: result.nameHidden ?? false,
   });
 }
 

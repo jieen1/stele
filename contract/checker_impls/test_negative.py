@@ -2135,15 +2135,16 @@ def test_generate_via_coordinator_catches_bypass():
 
 
 def test_approve_via_resolve_approved_by_catches_bypass():
-    """Phase 3.5: appending a function to approve.ts that calls
-    writeFileSync without first calling resolveApprovedBy must trip
-    the trace-policy with a `missing_predecessor` violation."""
+    """Appending a function to approve.ts that persists an approval via
+    writeSignedApproval (the policy's target — the typed persist entry the
+    actual fs.write lives behind) WITHOUT first calling resolveApprovedBy must
+    trip the trace-policy with a `missing_predecessor` violation."""
     assert _mutate_then_check(
         "packages/cli/src/commands/design/approve.ts",
         lambda text: text + (
             "\n"
             "export function __phase3_bypass_identity(p: string): void {\n"
-            '  writeFileSync(p, "forged-approval", "utf8");\n'
+            "  writeSignedApproval(null as never, p);\n"
             "}\n"
         ),
         "trace.APPROVE_VIA_RESOLVE_APPROVED_BY.missing_predecessor",

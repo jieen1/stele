@@ -251,22 +251,42 @@ export async function buildTraceStage(
  * nothing.
  */
 function buildTraceZeroBindingViolations(
-  coverage: readonly { policyId: string; severity: string; targetsMatched: number; scopeNodesMatched: number }[],
+  coverage: readonly {
+    policyId: string;
+    severity: string;
+    targetsMatched: number;
+    scopeNodesMatched: number;
+    callSitesExamined: number;
+  }[],
   command: string,
 ): Violation[] {
   const out: Violation[] = [];
   for (const c of coverage) {
     if (c.severity !== "error") continue;
-    // A policy enforces something only if BOTH its targets AND its in-scope
-    // callers are present. targetsMatched > 0 alone is not enough: the targets
-    // are usually global externs (writeFileSync, …) that exist regardless of
-    // whether any in-scope caller reaches them, so a policy whose scope matched
-    // 0 nodes (e.g. a renamed scope path) would otherwise stay vacuously green.
-    if (c.targetsMatched > 0 && c.scopeNodesMatched > 0) continue;
+    // A policy enforces something only if its targets AND its in-scope callers
+    // are present AND at least one in-scope caller→target call site was actually
+    // examined. targetsMatched > 0 alone is not enough: the targets are usually
+    // global externs (writeFileSync, …) that exist regardless of whether any
+    // in-scope caller reaches them, so a policy whose scope matched 0 nodes
+    // (e.g. a renamed scope path) would otherwise stay vacuously green.
+    //
+    // HIGH #3: even when targets AND scope both bind, a policy that examined 0
+    // call sites is vacuously green — the in-scope callers never actually reach
+    // the target (e.g. APPROVE's scope contained no call to the protected
+    // sink). That blind spot is closed here.
+    if (
+      c.targetsMatched > 0 &&
+      c.scopeNodesMatched > 0 &&
+      c.callSitesExamined > 0
+    ) {
+      continue;
+    }
     const reason =
       c.targetsMatched === 0
         ? `matched 0 target nodes`
-        : `matched 0 in-scope caller nodes (scope resolves to nothing)`;
+        : c.scopeNodesMatched === 0
+          ? `matched 0 in-scope caller nodes (scope resolves to nothing)`
+          : `examined 0 in-scope caller→target call sites (its in-scope callers never reach the target)`;
     out.push(
       createViolation({
         rule_id: ruleId(`trace.${c.policyId}.zero_binding`),

@@ -12,7 +12,13 @@ import type { ExtractorContext, ResolvedCallee } from "./types.js";
  * - `ambiguous`: multiple in-project candidates (e.g. interface method
  *   with several class implementations).
  * - `unresolved`: dynamic (`obj[name]()`, `Reflect.apply(...)`),
- *   reflective, or extern-but-untracked. `reason` carries the bucket.
+ *   reflective, or extern-but-untracked. `reason` carries the bucket, and
+ *   `nameHidden` distinguishes NAME-HIDDEN forms (computed-member, reflection,
+ *   dynamic-import — the callee name is a runtime value, so the call COULD
+ *   reach any target) from NAME-VISIBLE indirection (a named identifier /
+ *   param / property whose symbol simply did not bind — the visible name
+ *   cannot be a hidden bypass of a named trace target). The trace fail-closed
+ *   gate fires only on `nameHidden`.
  *
  * External-library calls produce a `resolved` `extern:` NodeId — they
  * are out of project but we still know where they go logically. Only
@@ -26,7 +32,8 @@ export function resolveCallee(
   const rawText = call.getText();
 
   // Dynamic dispatch first — `Reflect.apply`, `Reflect.construct`,
-  // `Function.prototype.apply`, `obj[name]()`, etc.
+  // `Function.prototype.apply`, `obj[name]()`, etc. All of these HIDE the
+  // called name (it is a runtime value), so they could reach any target.
   const dynamic = detectDynamicDispatch(expr);
   if (dynamic !== null) {
     return {
@@ -34,6 +41,7 @@ export function resolveCallee(
       nodeIds: [],
       reason: dynamic,
       rawText,
+      nameHidden: true,
     };
   }
 
@@ -50,33 +58,61 @@ export function resolveCallee(
   // property access, the expression itself for bare identifiers.
   const target = getResolutionTarget(expr);
   if (target === null) {
+    // No statically-recoverable callee name: dynamic `import(...)` whose
+    // namespace member is invoked, a call-returns-a-function form `getFn()()`,
+    // or an IIFE. In every case the invoked name is HIDDEN, so the call could
+    // reach any target — fail-closed applies.
     return {
       kind: "unresolved",
       nodeIds: [],
       reason: "dynamic",
       rawText,
+      nameHidden: true,
     };
   }
 
   const symbol = ctx.checker.getSymbolAtLocation(target);
   if (symbol === undefined) {
+    // The callee NAME is statically visible (a named identifier / property /
+    // param), we just could not bind its symbol. The visible name cannot BE a
+    // named trace target unless it matches the target pattern — in which case
+    // it would have resolved to an edge — so this is NOT a hidden bypass.
     return {
       kind: "unresolved",
       nodeIds: [],
       reason: "module-not-resolved",
       rawText,
+      nameHidden: false,
     };
   }
 
   // Aliased symbols (e.g. import aliases) need to be followed.
   const resolved = followAlias(symbol, ctx.checker);
-  const decls = resolved.declarations ?? [];
+  let decls = resolved.declarations ?? [];
+  // Single-identifier alias deref (one hop). `const w = writeFileSync; w()`
+  // binds `w` to a VariableDeclaration whose initializer is a BARE identifier
+  // referencing another known symbol. Without this hop `w` is a non-function
+  // in-project variable → dropped → unresolved → the trace/effect ordering
+  // analysis goes blind. Follow the initializer ONE hop so the alias resolves
+  // to the same extern / in-project node a direct call would (it becomes a
+  // real edge, caught directly rather than only via the fail-closed gate).
+  //
+  // Conservative: single hop, identifier-initializer ONLY. Arrow / function
+  // expression initializers are already handled downstream by
+  // `dereferenceVariableBindings`; we leave them untouched.
+  const aliasTargetDecls = dereferenceIdentifierAlias(decls, ctx);
+  if (aliasTargetDecls !== null) {
+    decls = aliasTargetDecls;
+  }
   if (decls.length === 0) {
+    // Named callee, symbol bound but no declarations reachable — still a
+    // visible name, not a hidden bypass.
     return {
       kind: "unresolved",
       nodeIds: [],
       reason: "module-not-resolved",
       rawText,
+      nameHidden: false,
     };
   }
 
@@ -154,11 +190,14 @@ export function resolveCallee(
       if (hadImplicitInProjectCtor) {
         return { kind: "resolved", nodeIds: [], rawText };
       }
+      // A named `new X()` whose ctor chain produced no in-project edge — the
+      // class name is statically visible, so this is not a hidden bypass.
       return {
         kind: "unresolved",
         nodeIds: [],
         reason: "dynamic",
         rawText,
+        nameHidden: false,
       };
     }
     if (unique.length === 1) {
@@ -174,11 +213,14 @@ export function resolveCallee(
     if (externId !== null) {
       return { kind: "resolved", nodeIds: [externId], rawText };
     }
+    // External library with a visible callee name we could not turn into an
+    // extern NodeId — visible, not a hidden bypass.
     return {
       kind: "unresolved",
       nodeIds: [],
       reason: "external-lib",
       rawText,
+      nameHidden: false,
     };
   }
 
@@ -187,6 +229,7 @@ export function resolveCallee(
     nodeIds: [],
     reason: "module-not-resolved",
     rawText,
+    nameHidden: false,
   };
 }
 
@@ -263,6 +306,40 @@ function findInheritedConstructor(
     }
   }
   return null;
+}
+
+/**
+ * Single-hop alias deref. When `decls` is exactly one VariableDeclaration of
+ * the form `const x = <bare-identifier>` (the initializer is a plain
+ * `Identifier`, NOT a call / arrow / function expression / property access),
+ * resolve that identifier's symbol and return ITS declarations. Returns `null`
+ * when the shape does not match, so the caller keeps the original decls.
+ *
+ * Conservative on purpose:
+ *   - single declaration only (no ambiguous multi-decl symbols),
+ *   - identifier initializer only (arrow/function expressions are handled by
+ *     `dereferenceVariableBindings`; call expressions are runtime-unknown),
+ *   - single hop (we do NOT recurse — a chain `const a = b; const b = c` only
+ *     follows one step, matching the spec's "follow the alias one hop").
+ */
+function dereferenceIdentifierAlias(
+  decls: readonly ts.Declaration[],
+  ctx: ExtractorContext,
+): ts.Declaration[] | null {
+  if (decls.length !== 1) return null;
+  const decl = decls[0]!;
+  if (!ts.isVariableDeclaration(decl)) return null;
+  const init = decl.initializer;
+  if (init === undefined || !ts.isIdentifier(init)) return null;
+  const aliasSymbol = ctx.checker.getSymbolAtLocation(init);
+  if (aliasSymbol === undefined) return null;
+  const target = followAlias(aliasSymbol, ctx.checker);
+  const targetDecls = target.declarations ?? [];
+  if (targetDecls.length === 0) return null;
+  // Guard against a self-referential or no-op hop (the initializer resolved
+  // back to the same variable declaration).
+  if (targetDecls.length === 1 && targetDecls[0] === decl) return null;
+  return [...targetDecls];
 }
 
 function detectDynamicDispatch(expr: ts.LeftHandSideExpression): "dynamic" | "reflection" | null {

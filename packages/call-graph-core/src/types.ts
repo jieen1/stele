@@ -76,6 +76,27 @@ export interface UnresolvedCall {
   readonly callSite: SourceSpan;
   readonly rawText: string;
   readonly reason: "dynamic" | "reflection" | "module-not-resolved" | "external-lib";
+  /**
+   * Whether the called NAME is hidden from static analysis. A trace-policy
+   * forbids/requires reaching a SPECIFIC NAMED target (e.g. `writeFileSync`).
+   * An unresolved call can only be a bypass of that policy if the called name
+   * is HIDDEN — so it COULD be the target:
+   *
+   *   - computed-member dispatch `obj[expr]()` (name is an arbitrary runtime
+   *     value),
+   *   - reflection (`Reflect.apply`/`Reflect.construct`, `.call`/`.apply`/
+   *     `.bind` indirection where the function is not statically named),
+   *   - dynamic `import(...)` whose namespace member is then invoked.
+   *
+   * When the callee name is statically VISIBLE (calling a named identifier /
+   * param / local / property / interface-method whose identifier is
+   * recoverable, e.g. `predicate()`, `output.stdout()`) the call cannot BE the
+   * target unless its visible name matches the target pattern — in which case
+   * it would have resolved to an edge. Such name-visible indirect calls are
+   * recorded as unresolved (the symbol/module didn't resolve) but with
+   * `nameHidden: false`, and the trace fail-closed gate does NOT fire on them.
+   */
+  readonly nameHidden: boolean;
 }
 
 export interface AmbiguousCall {

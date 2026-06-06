@@ -73,4 +73,32 @@ describe("tsCallGraphExtractor — unresolved", () => {
     expect(dynU?.reason).toBe("dynamic");
     expect(reflectU?.reason).not.toBe(dynU?.reason);
   });
+
+  it("computed-member dispatch tools[name]() is NAME-HIDDEN", async () => {
+    const g = await extractFixture("dynamic-call");
+    const u = g.unresolvedCalls.find((u) => u.fromId === "src/index.ts::callDynamic(1)");
+    expect(u?.nameHidden).toBe(true);
+  });
+
+  it("Reflect.apply is NAME-HIDDEN", async () => {
+    const g = await extractFixture("dynamic-call");
+    const u = g.unresolvedCalls.find((u) => u.fromId === "src/index.ts::callReflect(1)");
+    expect(u?.nameHidden).toBe(true);
+  });
+
+  it("dynamic import(...) is NAME-HIDDEN", async () => {
+    const g = await extractFixture("dynamic-call");
+    const u = g.unresolvedCalls.find((u) => u.fromId === "src/index.ts::callDynamicImport(0)");
+    expect(u).toBeDefined();
+    expect(u?.nameHidden).toBe(true);
+    expect(u?.rawText).toMatch(/import\(/);
+  });
+
+  it("calling a name-VISIBLE param predicate() is unresolved but NOT name-hidden", async () => {
+    const g = await extractFixture("dynamic-call");
+    const u = g.unresolvedCalls.find((u) => u.fromId === "src/index.ts::callVisibleParam(1)");
+    expect(u).toBeDefined();
+    expect(u?.nameHidden).toBe(false);
+    expect(u?.rawText).toMatch(/predicate\(\)/);
+  });
 });

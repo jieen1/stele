@@ -8,6 +8,7 @@ import type {
   CallGraphNode,
   SupportedLanguage,
   TypedCallGraph,
+  UnresolvedCall,
 } from "@stele/call-graph-core";
 import type {
   Contract,
@@ -64,6 +65,7 @@ export function mkCallGraph(opts: {
   nodes: readonly CallGraphNode[];
   edges: readonly CallGraphEdge[];
   language?: SupportedLanguage;
+  unresolvedCalls?: readonly UnresolvedCall[];
 }): TypedCallGraph<"Built"> {
   return {
     schemaVersion: "1",
@@ -72,11 +74,32 @@ export function mkCallGraph(opts: {
     projectRoot: "/tmp/fixture",
     nodes: opts.nodes,
     edges: opts.edges,
-    unresolvedCalls: [],
+    unresolvedCalls: opts.unresolvedCalls ?? [],
     ambiguousCalls: [],
     methodResolutionHash: "0".repeat(64),
     fileHashes: {},
   } as TypedCallGraph<"Built">;
+}
+
+export function mkUnresolved(opts: {
+  from: string;
+  line?: number;
+  column?: number;
+  rawText?: string;
+  reason?: UnresolvedCall["reason"];
+  /** Defaults to `true` — the helper models a name-hidden computed-member
+   * dispatch (`obj[m]()`), the shape that triggers the fail-closed gate. Pass
+   * `false` to model a name-visible indirect call (e.g. `predicate()`) that
+   * must NOT trigger the gate. */
+  nameHidden?: boolean;
+}): UnresolvedCall {
+  return {
+    fromId: opts.from,
+    callSite: { line: opts.line ?? 1, column: opts.column ?? 1 },
+    rawText: opts.rawText ?? "obj[m]()",
+    reason: opts.reason ?? "dynamic",
+    nameHidden: opts.nameHidden ?? true,
+  };
 }
 
 export function mkPolicy(opts: {
