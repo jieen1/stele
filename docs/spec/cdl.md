@@ -1172,7 +1172,15 @@ The CLI exposes the following Phase-B-aware commands. All flag and argument shap
 
 Runs the full pipeline: registry → toolchain → protected → call-graph cache → trace → type-state → effect → type-driven → other. The base command takes no Phase-B-specific CLI flags in v0.3 — the trace, type-state, and effect stages run in their default strict mode (`strictMode = true`). Strict mode routes unresolved-call and inference failures to violations; lenient mode (currently only reachable via programmatic stage options) emits notices instead. The repo's own self-protection invariant `STRICT_MODE_DEFAULT_IN_CI` forbids passing `--lenient-effects`, `--lenient-typestate`, `--lenient-callgraph`, or `--lenient-trace` from `.github/workflows/`.
 
-Existing `check` options: `--diff [ref]`, `--diff-from <base>`, `--format <human|json|sarif>`, `--report-file <path>`, `--lenient` (skip code-shape checks), `--architecture-only`, `--complexity-only`, `--recursive`.
+Existing `check` options: `--diff [ref]`, `--diff-from <base>`, `--format <human|json|sarif>`, `--report-file <path>`, `--lenient` (skip code-shape checks), `--architecture-only`, `--complexity-only`, `--recursive`, `--changed-from <ref>`, `--changed <files...>`.
+
+**Incremental source-change skipping (`--changed-from <ref>` / `--changed <files...>`).** This is an inner-loop speedup, distinct from `--diff`/`--diff-from` (which filter *invariants* by changed *contract* files). `--changed-from <ref>` collects the changed *source* files (branch diff vs `<ref>`, unioned with staged/unstaged/untracked, fail-closed if git is unavailable); `--changed` takes an explicit file list. The check then **skips only the file-scoped source-analysis stages** (`code-shape`, `architecture`, `complexity`/core-node, `trace`, `effect`, `type-state`) that are *provably* unaffected — i.e. the stage's reverse-index covered files (computed by the same `expandContractToFiles` primitive that powers `stele coverage`) are disjoint from the changed set. Every whole-repo / whole-contract stage (`generated`, `protected`/manifest, `design`, `toolchain`, `type-driven`, and the pytest checker suite) **always runs**. Skipping is strictly conservative — it never changes a result, only avoids recomputing stages that could not have flagged a changed file:
+
+- No call graph (extractor missing or extraction throws) ⇒ trace/effect/type-state **run** (their reverse index would otherwise look empty and falsely skippable).
+- Any declaration whose coverage is *unbounded* — a whole-graph trace policy (empty `scope`, guards every caller) or an extern-only target ⇒ its stage **runs** (its file coverage cannot be proven disjoint from any change).
+- Any expansion failure ⇒ all file-scoped stages **run**.
+
+A `[incremental]` banner on stderr lists exactly which stages ran and which were skipped, so the output never silently implies full coverage. A full `stele check` (no `--changed*`) remains authoritative and is what CI runs.
 
 ### `stele explain effect <node-id>`
 

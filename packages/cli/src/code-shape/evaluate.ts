@@ -246,7 +246,7 @@ function createExecutionErrorViolation(projectDir: string, error: PythonAnalysis
   });
 }
 
-async function expandTargetPattern(projectDir: string, pattern: string): Promise<string[]> {
+export async function expandTargetPattern(projectDir: string, pattern: string): Promise<string[]> {
   const normalizedPattern = normalizeRelativePath(pattern);
   const rootPattern = normalizeRelativePath(globParent(normalizedPattern));
   const rootDirectory = rootPattern === "." ? resolve(projectDir) : resolve(projectDir, rootPattern);
@@ -255,7 +255,7 @@ async function expandTargetPattern(projectDir: string, pattern: string): Promise
   return files.filter((file) => minimatch(file, normalizedPattern));
 }
 
-async function walkRoot(directory: string, projectDir: string): Promise<string[]> {
+export async function walkRoot(directory: string, projectDir: string): Promise<string[]> {
   try {
     const directoryStat = await stat(directory);
 

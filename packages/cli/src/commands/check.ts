@@ -42,6 +42,14 @@ import { createEvent, writeEvent } from "../events/write-event.js";
 import { loadHashedProfile } from "../design-profile/lifecycle.js";
 import { runAllStages } from "./check-stages-registry.js";
 import { type ReportFilters } from "../report/filters.js";
+import {
+  collectChangedSourceFiles,
+  computeIncrementalPlan,
+  normalizeChangedArg,
+  NO_INCREMENTAL,
+  type IncrementalDeps,
+  type IncrementalPlan,
+} from "./check-incremental.js";
 
 // ----------------------------------------------------------------
 // Types
@@ -52,6 +60,8 @@ import { type ReportFilters } from "../report/filters.js";
 export type CheckCommandOptions = {
   diff?: string | true;
   diffFrom?: string;
+  changedFrom?: string;
+  changed?: string[];
   format?: string;
   json?: boolean;
   reportFile?: string;
@@ -76,7 +86,19 @@ export async function runCheck(projectDir: string, options: CheckCommandOptions 
   await checkProject(projectDir, options);
 }
 
-export async function checkProject(projectDir: string, options: CheckCommandOptions = {}): Promise<CheckCommandResult> {
+export type CheckProjectDeps = {
+  incremental?: IncrementalDeps;
+  /** Test seam: bypass git for --changed-from and use this changed set directly. */
+  collectChangedSourceFiles?: (projectDir: string, ref: string) => Promise<string[]>;
+  /** Sink for the incremental banner/notes (defaults to process.stderr). */
+  emit?: (chunk: string) => void;
+};
+
+export async function checkProject(
+  projectDir: string,
+  options: CheckCommandOptions = {},
+  deps: CheckProjectDeps = {},
+): Promise<CheckCommandResult> {
   // --diff: compute changed contract files upfront (always, even if not used yet).
   let changedFileSet: Set<string> | undefined;
   if (options.diff !== undefined) {
@@ -91,6 +113,13 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   // (only changed files) via `codeShapeContract`; all other stages keep
   // the full contract.
   const context = await prepareCheckContext(projectDir, changedFileSet);
+
+  // --changed-from / --changed: compute the incremental plan (which file-scoped
+  // stages are provably unaffected by the changed SOURCE files). This is a pure
+  // speedup — see check-incremental.ts for the safety contract. Global stages
+  // are never in `plan.skipped`.
+  const plan = await resolveIncrementalPlan(context, options, deps);
+  emitIncrementalBanner(plan, deps.emit);
 
   // Self no-baseline check: if profile declares no_baseline: true and a baseline
   // file exists, fail immediately. This is a hard rule—cannot be bypassed by
@@ -119,7 +148,7 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   // also halt after the generated stage, but doing the guard here avoids the
   // side effects in `collectProtectedCheckState`.
   if (!context.generated.ok) {
-    const reports = await runAllStages(context, makeEmptyProtectedState(context), "check", options, filters);
+    const reports = await runAllStages(context, makeEmptyProtectedState(context), "check", options, filters, plan.skipped);
     const report = mergeCheckReports(reports);
     await recordViolationEvent(projectDir, report);
     await persistLastReport(projectDir, report);
@@ -127,7 +156,7 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
   }
 
   const protectedState = await collectProtectedCheckState(projectDir, context.config, context.contract, context.generated);
-  const reports = await runAllStages(context, protectedState, "check", options, filters);
+  const reports = await runAllStages(context, protectedState, "check", options, filters, plan.skipped);
   const report = mergeCheckReports(reports);
 
   if (!report.ok) {
@@ -143,6 +172,57 @@ export async function checkProject(projectDir: string, options: CheckCommandOpti
     summary: protectedState.summary,
     report: finalReport,
   };
+}
+
+// ----------------------------------------------------------------
+// Incremental (--changed-from / --changed)
+// ----------------------------------------------------------------
+
+async function resolveIncrementalPlan(
+  context: PreparedCheckContext,
+  options: CheckCommandOptions,
+  deps: CheckProjectDeps,
+): Promise<IncrementalPlan> {
+  const hasChangedArg = options.changed !== undefined && options.changed.length > 0;
+  if (options.changedFrom === undefined && !hasChangedArg) {
+    return NO_INCREMENTAL;
+  }
+
+  const changedFiles = new Set<string>();
+  if (options.changedFrom !== undefined) {
+    const collect = deps.collectChangedSourceFiles ?? collectChangedSourceFiles;
+    for (const f of await collect(context.projectDir, options.changedFrom)) {
+      changedFiles.add(f);
+    }
+  }
+  if (hasChangedArg) {
+    for (const f of normalizeChangedArg(context.projectDir, options.changed ?? [])) {
+      changedFiles.add(f);
+    }
+  }
+
+  return computeIncrementalPlan(context, [...changedFiles].sort(), deps.incremental);
+}
+
+function emitIncrementalBanner(plan: IncrementalPlan, emit?: (chunk: string) => void): void {
+  if (!plan.active) return;
+  const write = emit ?? ((chunk: string) => process.stderr.write(chunk));
+  const lines: string[] = [];
+  lines.push(
+    "stele check --changed is an INNER-LOOP OPTIMIZATION: it skips file-scoped " +
+      "stages provably unaffected by the changed source files. A full `stele check` " +
+      "is authoritative — run it before relying on a clean result.",
+  );
+  lines.push(`changed source files: ${plan.changedFiles.length}`);
+  if (plan.skipped.size === 0) {
+    lines.push("no stages skipped: all eligible stages had an in-scope changed file (or were inconclusive).");
+  } else {
+    lines.push(`stages skipped (NOT run): ${[...plan.skipped].sort().join(", ")}`);
+  }
+  for (const note of plan.notes) {
+    lines.push(note);
+  }
+  write(lines.map((l) => `[incremental] ${l}`).join("\n") + "\n");
 }
 
 // ----------------------------------------------------------------

@@ -4,6 +4,9 @@ dist/
 packages/github-action/dist/__tests__/
 packages/github-action/dist/src/
 coverage/
+# The broad `coverage/` rule above ignores test-coverage *report* output, but
+# it also matches the `stele coverage` feature's source module. Re-include it.
+!packages/cli/src/coverage/
 .worktrees/
 .pnpm-store/
 .npm/

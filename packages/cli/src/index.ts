@@ -72,6 +72,7 @@ import { unlockProject, type UnlockOptions, type UnlockSummary } from "./command
 import { runComplexitySuggest, runComplexityMeasure, type ComplexityOptions } from "./commands/complexity.js";
 import { getExitCode } from "./errors.js";
 import { runScore } from "./commands/score.js";
+import { runCoverage, type CoverageOptions } from "./commands/coverage.js";
 import { runPluginInstall, type PluginInstallOptions } from "./commands/plugin-install.js";
 import { runDoctor, type DoctorOptions } from "./commands/doctor.js";
 import { STELE_VERSION } from "./version.js";
@@ -159,6 +160,8 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .description("Verify contract invariants against generated tests and protected files.")
     .option("--diff [ref]", "only check invariants in contract files that changed since the given git ref (default: HEAD)")
     .option("--diff-from <base>", "limit failures to files changed since the given git base")
+    .option("--changed-from <ref>", "INNER-LOOP SPEEDUP: skip file-scoped Phase-B/code-shape stages with no changed source file in scope (full check is authoritative)")
+    .option("--changed <files...>", "INNER-LOOP SPEEDUP: treat these source files as the changed set (skips provably-unaffected file-scoped stages)")
     .option("--format <format>", "output format (human|json|sarif)", "human")
     .option("--json", "deprecated; use --format json")
     .option("--report-file <path>", "write the JSON check report to a file")
@@ -439,6 +442,18 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--threshold <n>", "fail with exit code 6 if score is below threshold", parseFloat)
     .action(async (options: { json?: boolean; threshold?: number }) => {
       await runScore(cwd(), options);
+    });
+
+  program
+    .command(cmdSpec("coverage"))
+    .description("Map how much product source is protected by a contract; rank unprotected high-churn modules.")
+    .option("--json", "emit CoverageReport JSON (deterministic, no wall-clock)")
+    .option("--min <pct>", "exit 2 (CONTRACT_FAIL) if overall coverage % is below pct", parseFloat)
+    .option("--top <n>", "number of unprotected hotspots to list (default 10)", (v) => parseInt(v, 10))
+    .option("--since <git-ref>", "churn window (default: full history)")
+    .option("--by <view>", "rollup view for human output: file | package | mechanism")
+    .action(async (options: CoverageOptions) => {
+      await runCoverage(cwd(), options);
     });
 
   const complexityCommand = program

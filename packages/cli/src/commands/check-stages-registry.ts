@@ -127,10 +127,15 @@ export async function runAllStages(
   command: string,
   options: CheckCommandOptions,
   filters: ReportFilters,
+  skipStages?: ReadonlySet<string>,
 ): Promise<ViolationReport[]> {
   const reports: ViolationReport[] = [];
   for (const stage of topologicalSortStages(CHECK_STAGES)) {
     if (!stage.shouldRun(context, options)) continue;
+    // Incremental skip (--changed-from / --changed): a file-scoped stage proven
+    // unaffected by the changed source files. NEVER applies to global stages —
+    // the caller's `skipStages` set only ever contains SKIPPABLE_STAGE_IDS.
+    if (skipStages?.has(stage.id) ?? false) continue;
     const rawReport = await stage.build(context, protectedState, command);
     const filtered = applyFiltersToReport(rawReport, filters);
     reports.push(filtered);
