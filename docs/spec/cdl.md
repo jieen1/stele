@@ -1205,6 +1205,37 @@ Required option: `--id <id>`. Optional: `--description <text>`, `--evolvability 
 
 Phase B trace-policy, type-state, and effect-policy proposals are made by writing a YAML file under `contract/design/proposals/` and having a human approve it through `stele design approve`; direct edits to `contract/**/*.stele` are blocked by the Claude Code plugin hooks.
 
+### `stele lint`
+
+Advisory static analysis of `assert`-based invariants. `stele lint` translates the decidable subset of CDL `assert` expressions into an SMT term IR, hands it to an embedded Z3 solver (lazily loaded — other commands never pay its WASM init cost), and reports three classes of logical defect across the *whole* contract:
+
+- **Contradiction** — the conjunction of (a minimal subset of) invariants is unsatisfiable, so the contract can never hold. Reported with the minimal conflicting set (a deletion-minimized unsat core). This is a hard error (exit `1`).
+- **Tautology / vacuity** — an invariant whose assertion is valid (its negation is unsatisfiable): it constrains nothing. Warning.
+- **Redundancy / subsumption** — invariant A implies invariant B (so B is deletable), or A and B are logically equivalent. Warning.
+
+Options:
+
+- `--json` — emit a deterministic machine-readable report (`version: 1`, no timestamps/durations/model). The report carries a `coverage` envelope (`totalInvariants`, `translated`, and the explicit `skipped` list with reasons), a sorted `findings` array, and a `summary` count block.
+- `--strict` — treat warnings (tautology, subsumption, equivalent) as errors for the exit code.
+
+Exit codes: `0` when clean (or warnings present without `--strict`); `1` when a contradiction is found or when warnings are present under `--strict`. `lint` only ever returns `0` or `1` and never touches `stele check`'s `2`/`3` codes.
+
+**Translatable subset (soundness rule).** An invariant is analyzed only when its entire `assert` tree lies inside the decidable closure; whenever *any* sub-expression cannot be faithfully encoded, the whole invariant is marked untranslatable and excluded, and the exclusion is reported explicitly (honest coverage, never a silent drop). The closure is:
+
+- Boolean connectives: `and`, `or`, `not`, `implies`, `iff`, `when` (lowered to implication).
+- Equality: `eq`, `neq` (operands unified to one sort — numerics to Real, else Bool or String; an integer literal compared against a numeric path is a real number, not a sort clash).
+- Ordered comparison: `gt`, `gte`, `lt`, `lte`, and `between` (lowered to an inclusive `and` of `gte`/`lte`); numeric operands.
+- Arithmetic: `add`, `sub`, `mul`, `neg`, `abs` (numeric operands; `mul` may be nonlinear — a resulting Z3 `unknown` degrades to an `incomplete` honesty signal, never a wrong verdict).
+- Data access: `(path …)` / `(field …)` — the same accessor maps to the same shared SMT variable across invariants, so cross-invariant contradictions are detectable.
+
+Everything else is untranslatable in v0, including string/regex operators (`matches`, `contains`, `starts-with`, …), collection/quantifier operators (`forall`, `exists`, `none`, `where`, `count`, `sum`, …), partial or non-first-order arithmetic (`div`, `mod`, `pow`, `round`, `ceil`, `floor`), tolerance/decimal comparisons (`approx-eq`, `decimal-eq`), and any invariant that `uses-checker` (external validation, opaque to the solver). These are never approximated because an approximation could change the verdict.
+
+**Sort inference.** Each path variable's SMT sort (Real/Bool/String) is inferred from how it is compared and used: equality with a string literal → String; with `true`/`false` → Bool; any numeric use (number literal, arithmetic, ordered comparison) → **Real**. A path used inconsistently across *families* (e.g. compared to both a string and a number) makes every invariant referencing it untranslatable (`inconsistent-sort: <key>`) rather than risk an unsound encoding.
+
+Numeric paths resolve to **Real, never Int** — this is a soundness requirement, not a convenience. A contradiction verdict ("this contract can never be satisfied") is a hard exit-1 error, so it may only be reported when the constraint set is unsatisfiable over the *widest* plausible domain: `unsat` over the reals implies `unsat` over the integers, so Real never yields a **false** contradiction. Defaulting to Int (because the literals happened to be integral) would flag common satisfiable business shapes — a rate, ratio, probability, or fraction bounded to an open interval such as `0 < discount_rate < 1` — as permanent contradictions, violating the "never a wrong verdict" guarantee. The trade-off is intentional and conservative: tautology and redundancy are likewise judged over Real, so they may *miss* a defect that holds only over the integers, but they never *invent* one. Integer-domain reasoning would require an explicit declared integer type for the field, which CDL does not yet carry; until then the linter does not assume integrality.
+
+**Determinism.** Z3 runs with a fixed seed and per-check timeout, no hash-order-sensitive tactics, and no model is ever emitted; all findings, skipped entries, and id arrays are sorted, so identical input yields byte-identical output.
+
 ## Errors and exit codes
 
 ### Core error families

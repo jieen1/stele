@@ -59,7 +59,8 @@
     "glob-parent": "^6.0.2",
     "js-yaml": "^4.1.1",
     "minimatch": "^10.0.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "z3-solver": "4.16.0"
   },
   "peerDependencies": {
     "@stele/agent-hooks": "workspace:*"

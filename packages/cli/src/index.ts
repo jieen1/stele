@@ -46,6 +46,7 @@ import { runExplainEffect, type ExplainEffectOptions } from "./commands/explain-
 import { runGenerate, runGenerateRecursive, type GenerateOptions, type GenerateSummary } from "./commands/generate.js";
 import { runInit, SUPPORTED_LANGUAGES, type InitOptions } from "./commands/init.js";
 import { runList } from "./commands/list.js";
+import { runLint, type LintOptions, type LintResult } from "./commands/lint.js";
 import { lockProject, runLockRecursive, type LockOptions, type LockSummary } from "./commands/lock.js";
 import { runMaintenanceSummary, type MaintenanceSummaryOptions } from "./commands/maintenance.js";
 import { runObserve, type ObserveOptions } from "./commands/observe.js";
@@ -86,6 +87,7 @@ type ProgramDependencies = {
   runLock?: (projectDir: string, options: LockOptions) => Promise<LockSummary | void>;
   runInit?: typeof runInit;
   runList?: typeof runList;
+  runLint?: (projectDir: string, options: LintOptions) => Promise<LintResult>;
   runExplain?: (projectDir: string, invariantId: string, options?: ExplainOptions) => Promise<void>;
   runAddChecker?: typeof runAddChecker;
   runRules?: (projectDir: string, options?: RulesOptions) => Promise<void>;
@@ -108,6 +110,7 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
   const lock = dependencies.runLock ?? lockProject;
   const init = dependencies.runInit ?? runInit;
   const list = dependencies.runList ?? runList;
+  const lint = dependencies.runLint ?? runLint;
   const explain = dependencies.runExplain ?? runExplain;
   const addChecker = dependencies.runAddChecker ?? runAddChecker;
   const rules = dependencies.runRules ?? runRules;
@@ -293,6 +296,18 @@ export function createProgram(dependencies: ProgramDependencies = {}): Command {
     .option("--tag <tag>", "filter by tag")
     .option("--format <format>", "output format (table|json)", "table")
     .action((options) => list(cwd(), options));
+  program
+    .command(cmdSpec("lint"))
+    .description("Statically analyze assert-based invariants for contradictions, tautologies, and redundancy (advisory, SMT-backed).")
+    .option("--json", "emit deterministic machine-readable findings")
+    .option("--strict", "treat warnings as errors")
+    .action(async (options: LintOptions) => {
+      const result = await lint(cwd(), options);
+      process.stdout.write(result.text);
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
+    });
   program
     .command(cmdSpec("rules"))
     .description("Display the contract rule inventory with severity and category details.")
