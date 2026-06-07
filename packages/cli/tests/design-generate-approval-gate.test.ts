@@ -97,6 +97,7 @@ function captureStderr(): { lines: string[]; restore: () => void } {
 }
 
 describe("runDesignGenerate — approval gate (Round 3 P0-4)", () => {
+  // @tcb-negative design
   it("refuses to write when no matching approval record exists", async () => {
     const projectDir = await createTempDir();
     writeConfig(projectDir);

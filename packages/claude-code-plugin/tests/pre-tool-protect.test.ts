@@ -35,6 +35,7 @@ describe("pre-tool-protect hook", () => {
     await Promise.allSettled(tempDirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
+  // @tcb-negative @stele/claude-code-plugin
   it("denies the default protected stele entry file from tool_input.file_path", async () => {
     const projectDir = await createProject();
 

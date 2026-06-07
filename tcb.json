@@ -1,0 +1,32 @@
+{
+  "verdictBearing": {
+    "packages": [
+      "@stele/core",
+      "@stele/backend-python",
+      "@stele/backend-go",
+      "@stele/backend-rust",
+      "@stele/backend-java",
+      "@stele/backend-typescript",
+      "@stele/call-graph-core",
+      "@stele/trace-evaluator",
+      "@stele/type-state-evaluator",
+      "@stele/effect-evaluator",
+      "@stele/type-driven-evaluator",
+      "@stele/architecture-core",
+      "@stele/cli",
+      "@stele/agent-hooks",
+      "@stele/claude-code-plugin",
+      "@stele/github-action"
+    ],
+    "commands": [
+      "check",
+      "generate",
+      "lock",
+      "baseline-init",
+      "baseline-update",
+      "unlock",
+      "incident",
+      "design"
+    ]
+  }
+}

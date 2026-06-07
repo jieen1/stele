@@ -135,6 +135,7 @@ describe("serializeScenarioValue", () => {
     expect(serializeScenarioValue(node)).toBe(null);
   });
 
+  // @tcb-negative @stele/backend-python
   it("throws for unsupported bare identifier", () => {
     const node: AstNode = { kind: "identifier", value: "unknownThing", span: { file: "", line: 1, column: 1 } };
     expect(() => serializeScenarioValue(node)).toThrow(SteleError);

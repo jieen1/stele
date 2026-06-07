@@ -223,6 +223,7 @@ describe("evaluateEffects — suppression", () => {
 });
 
 describe("evaluateEffects — Round 2 D-CG-5 fail-closed (Closeout 1 per-policy gating)", () => {
+  // @tcb-negative @stele/effect-evaluator
   it("in-scope unresolved call still emits an error-severity violation", async () => {
     const node = mkNode({ id: "src/c/Q.tsx::Q(0)", filePath: "src/c/Q.tsx" });
     const r = await evaluateEffects({

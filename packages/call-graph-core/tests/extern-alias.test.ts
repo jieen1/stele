@@ -81,6 +81,7 @@ describe("buildExternAliasRegistry — reverseLookup", () => {
 });
 
 describe("buildExternAliasRegistry — conflict policy", () => {
+  // @tcb-negative @stele/call-graph-core
   it("throws on duplicate logical name", () => {
     expect(() =>
       buildExternAliasRegistry([STRIPE, { ...STRIPE, typescript: "stripe-v2" }]),

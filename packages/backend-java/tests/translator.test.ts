@@ -290,6 +290,7 @@ describe("astToSource", () => {
 });
 
 describe("translateExpression: unsupported operators throw", () => {
+  // @tcb-negative @stele/backend-java
   it("throws for unknown operator", () => {
     const node = makeList("unknown-op", [makeNumber(1)]);
     expect(() => translateExpression(node)).toThrow();

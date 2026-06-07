@@ -111,6 +111,7 @@ describe("new commands", () => {
       expect(result.baselinePath).toBeDefined();
     });
 
+    // @tcb-negative unlock
     it("unlock without confirm throws error", async () => {
       const projectDir = await createFixtureProject();
 

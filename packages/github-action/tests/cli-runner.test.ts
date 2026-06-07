@@ -13,6 +13,7 @@ describe("spawnCli", () => {
     expect(mockSpawn).toHaveBeenCalledTimes(2); // version check + actual command
   });
 
+  // @tcb-negative @stele/github-action
   it("throws when version check fails", async () => {
     const mockSpawn = makeSpawnMock(1, "", "not found");
     await expect(spawnCli(["check"], { spawn: mockSpawn })).rejects.toThrow("Stele CLI not found");

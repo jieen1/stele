@@ -209,9 +209,11 @@ function emitIncrementalBanner(plan: IncrementalPlan, emit?: (chunk: string) => 
   const write = emit ?? ((chunk: string) => process.stderr.write(chunk));
   const lines: string[] = [];
   lines.push(
-    "stele check --changed is an INNER-LOOP OPTIMIZATION: it skips file-scoped " +
-      "stages provably unaffected by the changed source files. A full `stele check` " +
-      "is authoritative — run it before relying on a clean result.",
+    "ADVISORY — NOT AN AUTHORITATIVE VERDICT. `stele check --changed` is an " +
+      "inner-loop optimization that skips file-scoped stages provably unaffected by " +
+      "the changed source files. Its exit code MUST NOT be used as a CI/merge gate. " +
+      "The authoritative verdict is a full `stele check` (no --changed), which is what " +
+      "the Stop hook and CI run. Do not rely on a clean --changed result.",
   );
   lines.push(`changed source files: ${plan.changedFiles.length}`);
   if (plan.skipped.size === 0) {
@@ -347,7 +349,7 @@ async function prepareCheckFilters(context: PreparedCheckContext, options: Check
 // Report building
 // ----------------------------------------------------------------
 
-function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
+export function mergeCheckReports(reports: ViolationReport[]): ViolationReport {
   const rawViolations = reports.flatMap((report) => report.violations);
   // Round 3 P1-4: cross-rule annotation runs at the merged layer so a
   // trace.X.foo and effect.Y.bar firing on the same caller node now learn

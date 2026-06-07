@@ -568,6 +568,7 @@ describe("translateExpression — field operator", () => {
         expect(result).toContain("balance");
     });
 
+    // @tcb-negative @stele/backend-rust
     test("throws when first argument is not a path", () => {
         const expr = list("field", [ident("account"), ident("cash")]);
         expect(() => translateExpression(expr)).toThrow('Operator "field" expects its first argument to be a path expression.');

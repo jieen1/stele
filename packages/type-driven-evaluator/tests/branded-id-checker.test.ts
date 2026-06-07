@@ -31,6 +31,7 @@ describe("typescript-shape: branded IDs", () => {
     expect(violations).toHaveLength(0);
   });
 
+  // @tcb-negative @stele/type-driven-evaluator
   it("invalid: entity uses string instead of branded ID produces violations", () => {
     const violations = checkBrandedIds(
       makeOptions([

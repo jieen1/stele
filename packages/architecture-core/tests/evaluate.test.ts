@@ -73,6 +73,7 @@ describe("findDependencyViolations", () => {
     expect(violations).toHaveLength(0);
   });
 
+  // @tcb-negative @stele/architecture-core
   it("detects disallowed dependency edges", () => {
     const decl = makeDeclaration(
       ["api", "domain", "infra"],

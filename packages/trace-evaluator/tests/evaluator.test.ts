@@ -44,6 +44,7 @@ describe("evaluateTracePolicies — must-transit (DB via Repository)", () => {
     fixHint: "Route DB access through `Repository.find` in {actual_file}:{actual_line}",
   });
 
+  // @tcb-negative @stele/trace-evaluator
   it("emits violation when controller calls Db directly", () => {
     const graph = ctrlGraph({
       extraEdges: [mkEdge({ from: CTRL, to: DB, line: 5 })],

@@ -47,6 +47,7 @@ describe("isBaselineEligibleViolation — rule violations", () => {
     expect(isBaselineEligibleViolation(violation)).toBe(false);
   });
 
+  // @tcb-negative baseline-init
   it("rejects non-rule source kinds", () => {
     const violation = makeViolation({
       source: makeSource("code_shape"),

@@ -50,6 +50,7 @@ describe("@stele/backend-typescript translator", () => {
       );
     });
 
+    // @tcb-negative @stele/backend-typescript
     it("rejects empty path expressions with E0603", () => {
       expect(() => translateExpression(parseExpression("(path)"))).toThrow(SteleError);
       try {

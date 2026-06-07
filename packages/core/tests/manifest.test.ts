@@ -172,6 +172,7 @@ describe("manifest", () => {
     });
   });
 
+  // @tcb-negative @stele/core
   it("rejects invalid JSON manifests instead of silently overwriting them", async () => {
     const project = await createTempProject({
       "main.stele": [

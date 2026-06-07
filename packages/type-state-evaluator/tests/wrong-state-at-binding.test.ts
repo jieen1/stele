@@ -62,6 +62,7 @@ function baseGraph(extraEdges: ReturnType<typeof mkEdge>[] = []) {
 }
 
 describe("evaluateTypeStates — wrong_state_at_binding (closeout-4)", () => {
+  // @tcb-negative @stele/type-state-evaluator
   it("fires when binding's declared state mismatches the inferred state for the same param index", async () => {
     const graph = baseGraph([
       mkEdge({ from: CALLER, to: ORDER_SUBMIT, line: 40, column: 5 }),

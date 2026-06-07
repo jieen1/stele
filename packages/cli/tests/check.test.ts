@@ -1,13 +1,24 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { CallGraph } from "@stele/call-graph-core";
+import {
+  createViolation,
+  createViolationReport,
+  ruleId,
+  type Violation,
+  type ViolationReport,
+} from "@stele/core";
+import { isCheckCommandError } from "../src/commands/check.js";
 import { DEFAULT_CONFIG, STELE_CONFIG_FILE } from "../src/config/defaults.js";
 import {
   checkProject,
   createDiffNoChangesResult,
+  mergeCheckReports,
   runCheck,
   type CheckCommandOptions,
 } from "../src/commands/check.js";
@@ -222,6 +233,176 @@ describe("createDiffNoChangesResult", () => {
     expect(result.summary.protectedFileCount).toBe(0);
     expect(result.report.ok).toBe(true);
     expect(result.report.violations).toEqual([]);
+  });
+});
+
+// ----------------------------------------------------------------
+// P1-#2: check --changed end-to-end. An out-of-scope `--changed` file lets the
+// planner skip the (clean) code-shape stage, but the always-force-run effect
+// stage still evaluates and its in-scope violation MUST still fail the check.
+//
+// This is exactly the seam the two CRITICAL false-greens slipped through: a
+// would-be violation in a force-run call-graph stage must never be hidden by an
+// over-broad incremental skip. Teeth: adding `effect` to the planner's skippable
+// set (SKIPPABLE_STAGE_MECHANISMS in check-incremental.ts) makes this check pass
+// — so this test fails — proving the force-run guarantee is load-bearing.
+// ----------------------------------------------------------------
+
+describe("check --changed — an out-of-scope change skips code-shape but a force-run effect violation still fails", () => {
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await Promise.allSettled(tempDirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  });
+
+  // @tcb-negative @stele/cli
+  it("rejects (effect violation reported, exit 3) even though code-shape is skipped", async () => {
+    const projectDir = await createTempDir();
+    // Copy the self-contained effect-violation fixture (a UI component in
+    // src/components/** that performs db.read — forbidden by NO_IO_IN_UI).
+    const fixtureDir = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "fixtures/effect/03-forbid-policy-violation",
+    );
+    await cp(join(fixtureDir, "contract"), join(projectDir, "contract"), { recursive: true });
+    await cp(join(fixtureDir, "src"), join(projectDir, "src"), { recursive: true });
+    await cp(join(fixtureDir, "tsconfig.json"), join(projectDir, "tsconfig.json"));
+
+    // A CLEAN class-shape (Widget has the required `render` method) so code-shape
+    // binds a file and is genuinely skippable when nothing in its scope changed.
+    await writeProjectFile(
+      projectDir,
+      "src/widget.ts",
+      ["export class Widget {", "  render(): string {", '    return "";', "  }", "}", ""].join("\n"),
+    );
+    // The out-of-scope changed file: in neither the class-shape target nor the
+    // effect-policy target-scope (src/components/**).
+    await writeProjectFile(projectDir, "src/unrelated.ts", "export const z = 1;\n");
+    const mainStele = await readFile(join(projectDir, "contract", "main.stele"), "utf8");
+    await writeProjectFile(
+      projectDir,
+      "contract/main.stele",
+      mainStele +
+        ["", "(class-shape cs-widget", "  (lang typescript)", '  (target "src/widget.ts::Widget")', '  (must-have-method "render"))', ""].join("\n"),
+    );
+    await writeProjectFile(
+      projectDir,
+      STELE_CONFIG_FILE,
+      `${JSON.stringify({ ...DEFAULT_CONFIG, targetLanguage: "typescript", testFramework: "vitest" }, null, 2)}\n`,
+    );
+
+    await runGenerate(projectDir, { force: false });
+    await runLock(projectDir, { reason: "effect fixture baseline" });
+
+    // A synthetic call graph that attributes the effect-policy's scope to
+    // component files. With it, the planner CAN reason about effect's coverage —
+    // which makes the force-run guarantee (effect is never skippable) the only
+    // thing keeping the violation visible under an out-of-scope change. If the
+    // planner ever added effect to its skippable set, this graph would let it
+    // skip effect (its files are disjoint from src/unrelated.ts) and hide the
+    // violation.
+    const callGraph: CallGraph = {
+      schemaVersion: "1",
+      language: "typescript",
+      generatedAt: "2026-01-01T00:00:00Z",
+      projectRoot: projectDir,
+      nodes: [
+        { id: "src/components/UserCard.ts::UserCard(1)", kind: "function", filePath: "src/components/UserCard.ts", span: { line: 1, column: 1 }, signature: "UserCard", isExported: true, isAsync: false },
+        { id: "src/db.ts::findUser(1)", kind: "function", filePath: "src/db.ts", span: { line: 1, column: 1 }, signature: "findUser", isExported: true, isAsync: false },
+      ],
+      edges: [
+        { fromId: "src/components/UserCard.ts::UserCard(1)", toId: "src/db.ts::findUser(1)", callSite: { line: 1, column: 1 }, isConditional: false, isLoop: false, isAsync: false },
+      ],
+      unresolvedCalls: [],
+      ambiguousCalls: [],
+      methodResolutionHash: "0".repeat(64),
+      fileHashes: {},
+    };
+
+    const notes: string[] = [];
+    let thrown: unknown;
+    try {
+      await checkProject(
+        projectDir,
+        { changed: ["src/unrelated.ts"] },
+        { incremental: { buildCallGraph: async () => callGraph }, emit: (c) => notes.push(c) },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    // The check must REJECT: the effect violation is fatal even under --changed.
+    expect(isCheckCommandError(thrown)).toBe(true);
+    if (!isCheckCommandError(thrown)) throw thrown;
+    expect(thrown.exitCode).toBe(3);
+    expect(thrown.report.ok).toBe(false);
+    expect(thrown.report.violations.some((v) => v.rule_kind === "effect_violation")).toBe(true);
+
+    // And the banner must confirm code-shape WAS skipped (otherwise the test
+    // would be trivially green — it would pass even if nothing was skipped).
+    const banner = notes.join("");
+    expect(banner).toMatch(/stages skipped \(NOT run\): .*code-shape/);
+  });
+});
+
+// ----------------------------------------------------------------
+// P2-#5: mergeCheckReports verdict semantics. The merged `ok` is driven by the
+// ACTIVE BLOCKING violation count (severity error; warning/info do not block;
+// status suppressed/out_of_scope do not block). Teeth: widening the
+// blocking-severity set (isBlockingViolation in check.ts) — e.g. treating
+// "warning" as blocking — flips the warning-only case from ok to not-ok, and
+// narrowing it (treating "error" as non-blocking) flips the error case from
+// not-ok to ok. Either mutation breaks one of these assertions.
+// ----------------------------------------------------------------
+
+describe("mergeCheckReports — verdict by active blocking severity", () => {
+  function violation(
+    id: string,
+    severity: Violation["severity"],
+    status?: Violation["status"],
+  ): Violation {
+    return createViolation({
+      rule_id: ruleId(id),
+      rule_kind: "rule_violation",
+      severity,
+      source: { tool: "stele", command: "check", kind: "rule" },
+      location: { path: "src/x.ts" },
+      cause: { summary: `v ${id}` },
+      scope_paths: ["src/x.ts"],
+      ...(status === undefined ? {} : { status }),
+    });
+  }
+
+  function reportWith(violations: Violation[]): ViolationReport {
+    return createViolationReport({
+      tool: "stele",
+      command: "check",
+      ok: violations.length === 0,
+      summary: { invariant_count: 0, violation_count: violations.length },
+      violations,
+    });
+  }
+
+  it("warning/info-only violations do NOT block (ok stays true)", () => {
+    const merged = mergeCheckReports([
+      reportWith([violation("warn-rule", "warning"), violation("info-rule", "info")]),
+    ]);
+    expect(merged.ok).toBe(true);
+    expect(merged.summary.active_violation_count).toBe(2);
+  });
+
+  it("a single ACTIVE error blocks (ok becomes false)", () => {
+    const merged = mergeCheckReports([
+      reportWith([violation("warn-rule", "warning"), violation("err-rule", "error")]),
+    ]);
+    expect(merged.ok).toBe(false);
+  });
+
+  it("a SUPPRESSED error does NOT block (ok stays true)", () => {
+    const merged = mergeCheckReports([
+      reportWith([violation("suppressed-err", "error", "suppressed")]),
+    ]);
+    expect(merged.ok).toBe(true);
+    expect(merged.summary.suppressed_violation_count).toBe(1);
   });
 });
 

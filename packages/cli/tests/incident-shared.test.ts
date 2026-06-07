@@ -83,6 +83,7 @@ describe("scratch path containment", () => {
     );
   });
 
+  // @tcb-negative incident
   it("rejects an escaping id", () => {
     expect(() => incidentScratchDir("/tmp/proj", "../escape")).toThrow();
   });

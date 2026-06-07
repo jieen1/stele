@@ -87,6 +87,7 @@ describe("createPreEditProtect", () => {
     expect(decision.action).toBe("allow");
   });
 
+  // @tcb-negative @stele/agent-hooks
   it("denies bash redirect into protected path", async () => {
     const hook = createPreEditProtect(makeConfig());
     const decision = await hook(

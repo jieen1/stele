@@ -202,6 +202,7 @@ describe("stele CLI", () => {
     );
   });
 
+  // @tcb-negative generate
   it("generate rejects an entry path outside the project root and writes nothing", async () => {
     const projectDir = await createFixtureProject();
     const externalDir = await createTempDir();
@@ -293,6 +294,7 @@ describe("stele CLI", () => {
     await expect(readFile(manifestPath, "utf8")).resolves.toBe(manifestBefore);
   });
 
+  // @tcb-negative lock
   it("lock fails closed on malformed protected config and does not write or refresh the manifest", async () => {
     const projectDir = await createFixtureProject();
     await runGenerate(projectDir, { force: false });
@@ -379,6 +381,7 @@ describe("stele CLI", () => {
     expect(after).toEqual(before);
   });
 
+  // @tcb-negative check
   it("check fails when a generated file changes", async () => {
     const projectDir = await createFixtureProject();
     await runGenerateAndLock(projectDir);
@@ -387,6 +390,7 @@ describe("stele CLI", () => {
     await expect(runCheck(projectDir)).rejects.toThrow(/generated/i);
   });
 
+  // @tcb-negative baseline-update
   it("baseline-update requires a non-empty reason", async () => {
     const projectDir = await createFixtureProject();
     await runGenerateAndLock(projectDir, "initial contract baseline");

@@ -410,6 +410,7 @@ describe("translateExpression field operator", () => {
     );
   });
 
+  // @tcb-negative @stele/backend-go
   it("throws when first argument is not a path", () => {
     const expr = list("field", [atom("identifier", "account"), atom("identifier", "cash")]);
     expect(() => translateExpression(expr)).toThrow('Operator "field" expects its first argument to be a path expression.');
