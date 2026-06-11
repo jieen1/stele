@@ -25,7 +25,7 @@ This repo is a **pnpm monorepo**. The publishable packages today:
 
 Run `pnpm -r ls --json --depth -1 | jq '[.[].name]'` for the live list — the count grows with new evaluators / backends.
 
-The repo is self-protected via `contract/main.stele` + `contract/generated/ddd-typedriven.stele` (currently **52 invariants** + ~100 non-invariant declarations across 13 contract mechanisms — run `stele list` for the live invariant count). Mechanisms in use on Stele's own source: `invariant`, `checker`, `boundary`, `class-shape`, `function-shape`, `type-policy`, `file-policy`, `architecture`, `core-node`, `branded-id`, `trace-policy`, `type-state`, `effect-policy` (the last gates unresolved-call fail-closed per-policy by `target-scope` membership since Closeout 1, 2026-05-25). (`smart-ctor` was a 14th mechanism, removed 2026-06-04 — it only binds class value-objects, but Stele's brands are string aliases; its intent is covered by the `*_USES_BRANDED_TYPE` invariants.) See [`docs/internal/self-protection-coverage-matrix.md`](docs/internal/self-protection-coverage-matrix.md) for the mechanism × package matrix and [`docs/design/self-dogfooding/`](docs/design/self-dogfooding/) for the plan that drove the expansion from 35 → 48 invariants during 2026-Q2. Bugs in security-critical paths are caught by `stele check` + `pytest tests/contract` + the 142 negative tests under `contract/checker_impls/test_negative.py`.
+The repo is self-protected via `contract/main.stele` + `contract/generated/ddd-typedriven.stele` (currently **52 invariants** + ~100 non-invariant declarations across 13 contract mechanisms — run `stele list` for the live invariant count). Mechanisms in use on Stele's own source: `invariant`, `checker`, `boundary`, `class-shape`, `function-shape`, `type-policy`, `file-policy`, `architecture`, `core-node`, `branded-id`, `trace-policy`, `type-state`, `effect-policy` (the last gates unresolved-call fail-closed per-policy by `target-scope` membership since Closeout 1, 2026-05-25). (`smart-ctor` was a 14th mechanism, removed 2026-06-04 — it only binds class value-objects, but Stele's brands are string aliases; its intent is covered by the `*_USES_BRANDED_TYPE` invariants.) See [`docs/internal/self-protection-coverage-matrix.md`](docs/internal/self-protection-coverage-matrix.md) for the mechanism × package matrix and [`docs/design/self-dogfooding/`](docs/design/self-dogfooding/) for the plan that drove the expansion from 35 → 48 invariants during 2026-Q2. Bugs in security-critical paths are caught by `stele check` + `pytest tests/contract` + the 143 negative tests under `contract/checker_impls/test_negative.py`.
 
 ## Workspace commands
 
@@ -101,7 +101,7 @@ When updating documentation, **update the spec or guide that the code uses**, no
 
 ## Versioning
 
-All eight packages are pinned at `0.1.0` and release together. Bump in lockstep. The release script (`scripts/publish-npm.mjs`) verifies that packed manifests do not contain `workspace:*` before uploading.
+All 17 packages are pinned at `0.1.0` and release together. Bump in lockstep. The release script (`scripts/publish-npm.mjs`) verifies that packed manifests do not contain `workspace:*` before uploading.
 
 ## Self-protection plugin setup
 
