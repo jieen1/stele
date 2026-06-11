@@ -111,6 +111,17 @@ describe("backend.generate()", () => {
         expect(testFile!.content).toContain("#[test]");
     });
 
+    test("asserts on the translated expression instead of discarding it (vacuous-pass regression)", () => {
+        const invariant = makeInvariant("inv-assert", list("eq", [num(1), num(2)]));
+        const contract = makeContract([invariant]);
+        const files = backend.generate(contract, { projectRoot: "/test", outputDir: "tests/contract" });
+        const testFile = files.find((f) => f.path.endsWith("test_contract.rs"));
+        expect(testFile).toBeDefined();
+        expect(testFile!.content).toContain("assert!(");
+        expect(testFile!.content).toContain("Invariant inv-assert violated");
+        expect(testFile!.content).not.toMatch(/let _ = stele_/);
+    });
+
     test("does NOT emit test_contract.rs when no top-level invariants", () => {
         const invariant = makeInvariant("inv-1", list("eq", [num(1), num(1)]), "group-a");
         const group: import("@stele/core").GroupDeclaration = {

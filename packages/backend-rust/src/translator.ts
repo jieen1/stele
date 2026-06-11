@@ -217,7 +217,14 @@ function renderInvariantTest(
     }
 
     const translated = translateNode(invariant.assertExpression!, expressionContext);
-    lines.push(`${INDENT}let _ = ${translated};`);
+    // The translated expression evaluates to a plain bool (runtime comparators
+    // return Result<bool> and `?` is applied inside the translation). Discarding
+    // it would make every assert-invariant pass vacuously, so assert on it.
+    lines.push(
+        `${INDENT}assert!(${translated}, ${rustStringLiteral(
+            `Invariant ${invariant.id} violated: (assert ...) evaluated to false`,
+        )});`,
+    );
     lines.push(`${INDENT}Ok(())`);
     lines.push("}");
     return lines;
