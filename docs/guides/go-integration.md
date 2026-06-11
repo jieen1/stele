@@ -1,6 +1,6 @@
 # Stele Go App Integration
 
-Stele attaches to an existing Go application via the standard `testing` package. Your application owns runtime state through a `SteleContext()` helper; generated Stele tests read that state directly and never fabricate domain objects.
+Stele attaches to an existing Go application via the standard `testing` package. Your application owns runtime state through a `SetupSteleContext()` helper; generated Stele tests read that state directly and never fabricate domain objects.
 
 > **Phase A only.** Go has the Phase A pipeline (CDL → `_test.go` via `go test`). Phase B forms (`trace-policy`, `type-state`, `effect-policy`) are supported on TypeScript and Python projects only; Go projects fail loud (Round 4 F-A-02). See the bottom of this guide for the workaround.
 
@@ -11,35 +11,41 @@ npm install --save-dev @stele/cli @stele/claude-code-plugin
 npx stele init --language go
 ```
 
-After `stele init`, your repository has:
+`stele init --language go` scaffolds **exactly**:
 
-- `stele.config.json` (with `"targetLanguage": "go"`, `"testFramework": "testing"`)
-- `contract/main.stele`
-- `contract/checker_impls/.gitkeep`
-- `tests/contract/stele_context.go` (you implement this)
+- `stele.config.json` (with `"targetLanguage": "go"`, `"testFramework": "testing"`, `protected[]`)
+- `contract/main.stele` (ships 3 example invariants — see note below)
+- `contract/checker_impls/` (custom Go checkers go here)
+- `go.mod`
+- `tests/contract/setup_test.go` (placeholder — you implement `SetupSteleContext()` here)
 
-Your project must have a `go.mod` at the root that includes `tests/contract/` in its module tree.
+It does **not** create `stele_context.go`, `.gitkeep`, or `contract/modules/`.
+
+> The example invariants in `contract/main.stele` reference data that only exists once
+> you wire `SetupSteleContext()` — a fresh project is not green until you implement it
+> or delete the examples (the contract still locks + `stele check` passes with 0
+> invariants).
 
 ## Contract layout
 
 ```
 contract/
-  main.stele                  # entry
-  modules/*.stele
+  main.stele                  # entry (modules/*.stele optional if you split it)
   checker_impls/*.go          # custom Go checker functions
   .manifest.json
 tests/contract/
-  contract_test.go            # generated; do not edit
-  stele_runtime.go            # generated helper; do not edit
-  stele_context.go            # user-owned; implements func SteleContext()
+  setup_test.go               # user-owned; implements SetupSteleContext()
+  stele_runtime_test.go       # generated helper — do not edit
+  test_contract_test.go       # generated tests (test_<group>_test.go per group) — do not edit
 ```
 
-## The `SteleContext()` helper
+## The `SetupSteleContext()` helper
 
-Your application returns the contract surface from `SteleContext()`:
+Generated tests read state from `SetupSteleContext()` (init scaffolds `setup_test.go`
+for you to implement it):
 
 ```go
-// tests/contract/stele_context.go
+// tests/contract/setup_test.go
 package contract
 
 import (
@@ -47,7 +53,7 @@ import (
     "myapp/internal/repository"
 )
 
-func SteleContext() map[string]any {
+func SetupSteleContext() map[string]any {
     ctx := context.Background()
     users, _ := repository.LoadUsers(ctx)
     orders, _ := repository.LoadOrders(ctx)
@@ -67,7 +73,7 @@ func validateEmail(ctx map[string]any) bool {
 }
 ```
 
-Generated `*_test.go` files invoke `SteleContext()` once per test invocation; contract assertions read whatever map you return.
+Generated `*_test.go` files invoke `SetupSteleContext()` once per test; contract assertions read whatever map you return.
 
 ### Optional or empty app data
 
@@ -76,7 +82,7 @@ Return `nil` for keys your app doesn't have — assertions on `(path …)` resol
 ## Generate, run, lock
 
 ```bash
-npx stele generate            # CDL → tests/contract/*_test.go
+npx stele generate            # CDL → tests/contract/stele_runtime_test.go + test_contract_test.go
 go test ./tests/contract/...
 npx stele lock --reason "initial baseline"
 npx stele check               # 0 = clean, 2 = drift, 3 = tamper
@@ -90,7 +96,7 @@ Scaffold a checker:
 npx stele add-checker validate-email
 ```
 
-This creates a stub Go function under `contract/checker_impls/validate_email.go`. The generator includes its source verbatim in the generated test file; wire the function name into `_stele_checkers` in `stele_context.go`.
+This creates a stub Go function under `contract/checker_impls/validate_email.go`. The generator includes its source verbatim in the generated test file; wire the function name into `_stele_checkers` in `setup_test.go`.
 
 ## Writing contract source
 
@@ -102,7 +108,7 @@ Generated `*_test.go` files are deterministic and byte-stable. Do not hand-edit 
 
 ## Protected files and AI editing
 
-Same as other backends: with the Claude Code plugin enabled, 57 paths are protected from direct agent edits. See `docs/guides/claude-code-plugin.md`.
+Same as other backends: with the Claude Code plugin enabled, the paths in your `stele.config.json` `protected` array are blocked from direct agent edits. See `docs/guides/claude-code-plugin.md`.
 
 ## CI
 

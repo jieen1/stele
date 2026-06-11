@@ -133,7 +133,7 @@ Generated `*.spec.ts` files are deterministic and byte-stable. Do not hand-edit 
 
 ## Protected files and AI editing
 
-If you use the Claude Code plugin (`@stele/claude-code-plugin`), 57 paths under `contract/**`, `tests/contract/**`, and the supply-chain shape (`pnpm-lock.yaml`, `package.json`, `tsconfig.base.json`, etc.) are protected from direct agent writes. See `docs/guides/claude-code-plugin.md`.
+If you use the Claude Code plugin (`@stele/claude-code-plugin`), the paths in your `stele.config.json` `protected` array — `contract/**`, `tests/contract/**`, and any supply-chain shape you add (`pnpm-lock.yaml`, `package.json`, `tsconfig.base.json`, etc.) — are protected from direct agent writes. See `docs/guides/claude-code-plugin.md`.
 
 ## Agent rule maintenance
 

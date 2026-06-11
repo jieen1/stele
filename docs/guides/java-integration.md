@@ -1,6 +1,6 @@
 # Stele Java App Integration
 
-Stele attaches to an existing Java application via JUnit 5. Your application owns runtime state through a `SteleContext.build()` helper; generated Stele tests read that state directly and never fabricate domain objects.
+Stele attaches to an existing Java application via JUnit 5. Your application owns runtime state through a `SteleConftest.steleContext()` helper; generated Stele tests read that state directly and never fabricate domain objects.
 
 > **Phase A only.** Java has the Phase A pipeline (CDL → JUnit 5 tests). Phase B forms are supported on TypeScript and Python projects only; Java projects fail loud (Round 4 F-A-02).
 
@@ -11,50 +11,56 @@ npm install --save-dev @stele/cli @stele/claude-code-plugin
 npx stele init --language java
 ```
 
-After `stele init`:
+`stele init --language java` scaffolds **exactly**:
 
-- `stele.config.json` (with `"targetLanguage": "java"`, `"testFramework": "junit5"`)
-- `contract/main.stele`
-- `contract/checker_impls/.gitkeep`
-- `src/test/java/contract/SteleContext.java` (you implement this)
+- `stele.config.json` (with `"targetLanguage": "java"`, `"testFramework": "junit5"`, `protected[]`)
+- `contract/main.stele` (ships 3 example invariants — see note below)
+- `contract/checker_impls/` (custom Java checkers go here)
+- `pom.xml`
+- `src/test/java/contract/SteleConftest.java` (placeholder — you implement `steleContext()` here)
 
-Your Maven/Gradle build must include `src/test/java/contract/` in the JUnit 5 test path. JUnit 5 (`junit-jupiter` 5.9+) must be on the test classpath.
+It does **not** create `SteleContext.java`, `.gitkeep`, or `contract/modules/`.
+Your Maven/Gradle build must include `src/test/java/contract/` on the JUnit 5
+(`junit-jupiter` 5.9+) test classpath.
+
+> The example invariants in `contract/main.stele` reference data that only exists once
+> you wire `SteleConftest.steleContext()` — a fresh project is not green until you
+> implement it or delete the examples (the contract still locks + `stele check` passes
+> with 0 invariants).
 
 ## Contract layout
 
 ```
 contract/
-  main.stele                  # entry
-  modules/*.stele
+  main.stele                  # entry (modules/*.stele optional if you split it)
   checker_impls/*.java        # custom Java checker methods
   .manifest.json
 src/test/java/contract/
-  ContractTest.java           # generated; do not edit
-  SteleRuntime.java           # generated helper; do not edit
-  SteleConftest.java          # generated bootstrap; do not edit
-  SteleContext.java           # user-owned; static build() method
+  SteleConftest.java          # user-owned; implements static steleContext()
+  _stele_runtime.java         # generated helper — do not edit
+  test_contract.java          # generated tests (test_<group>.java per group) — do not edit
 ```
 
-## The `SteleContext.build()` helper
+## The `SteleConftest.steleContext()` helper
 
 Return a `LinkedHashMap<String, Object>` (deterministic iteration order):
 
 ```java
-// src/test/java/contract/SteleContext.java
+// src/test/java/contract/SteleConftest.java
 package contract;
 
 import java.util.*;
 import myapp.repository.UserRepository;
 import myapp.repository.OrderRepository;
 
-public final class SteleContext {
-    public static Map<String, Object> build() {
+public final class SteleConftest {
+    public static Map<String, Object> steleContext() {
         var users = UserRepository.loadAll();
         var orders = OrderRepository.loadAll();
         var checkers = new LinkedHashMap<String, java.lang.reflect.Method>();
         try {
             checkers.put("validate-email",
-                SteleContext.class.getMethod("validateEmail", Map.class));
+                SteleConftest.class.getMethod("validateEmail", Map.class));
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
@@ -73,7 +79,7 @@ public final class SteleContext {
 }
 ```
 
-Generated tests call `SteleContext.build()` once per test class; contract assertions read the returned map.
+Generated tests call `SteleConftest.steleContext()` once per test class; contract assertions read the returned map.
 
 ### Optional or empty app data
 
@@ -107,7 +113,7 @@ Generated `*.java` files under `src/test/java/contract/` are deterministic and b
 
 ## Protected files and AI editing
 
-Same as other backends — 57 paths protected by `@stele/claude-code-plugin`.
+Same as other backends — the paths in your `stele.config.json` `protected` array are protected by `@stele/claude-code-plugin`.
 
 ## CI
 
