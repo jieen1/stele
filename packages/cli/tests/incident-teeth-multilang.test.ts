@@ -109,6 +109,8 @@ function toolAvailable(cmd: string, args: string[]): boolean {
 
 const HAS_CARGO = toolAvailable("cargo", ["--version"]);
 const HAS_STRIP_TYPES = toolAvailable(process.execPath, ["--experimental-strip-types", "-e", ""]);
+const GO_BIN = process.env.STELE_GO && process.env.STELE_GO.trim().length > 0 ? process.env.STELE_GO.trim() : "go";
+const HAS_GO = toolAvailable(GO_BIN, ["version"]);
 
 const created: string[] = [];
 beforeEach(() => {
@@ -226,6 +228,39 @@ describe("teeth — JavaScript (node:test)", () => {
   );
 });
 
+(HAS_GO ? describe : describe.skip)("teeth — Go (go test)", () => {
+  it(
+    "PROVEN: a *_test.go in an isolated probe package fails at parent, passes at fix",
+    async () => {
+      const f = makeFixture(
+        (body) => ({
+          "go.mod": "module example.com/app\n\ngo 1.23\n",
+          "calc/calc.go": `package calc\nfunc Add(a, b int) int { return ${body} }\n`,
+        }),
+        "a + a",
+        "a + b",
+      );
+      created.push(f.dir);
+      const id = "go-proven";
+      const test =
+        "package steleteeth\n" +
+        'import (\n\t"testing"\n\t"example.com/app/calc"\n)\n' +
+        'func TestAddIsSum(t *testing.T) {\n\tif calc.Add(1, 2) != 3 {\n\t\tt.Fatalf("got %d", calc.Add(1, 2))\n\t}\n}\n';
+      await seedDraft(f, id, test, "incident_go_test.go");
+
+      await runIncidentTeeth(f.dir, { id });
+
+      expect(process.exitCode).toBe(0);
+      const teeth = readTeeth(f.dir, id);
+      expect(teeth.verdict).toBe("TEETH_PROVEN");
+      expect(teeth.parentBiteClass).toBe("assertion");
+      expect((teeth.parentRun as { exit: number }).exit).not.toBe(0);
+      expect((teeth.fixRun as { exit: number }).exit).toBe(0);
+    },
+    120_000,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Unit: runner dispatch + filename validation (no toolchains needed)
 // ---------------------------------------------------------------------------
@@ -239,9 +274,9 @@ describe("inferTeethLanguage", () => {
     expect(inferTeethLanguage("t.cjs")).toBe("javascript");
     expect(inferTeethLanguage("t.js")).toBe("javascript");
     expect(inferTeethLanguage("t.rs")).toBe("rust");
+    expect(inferTeethLanguage("x_test.go")).toBe("go");
   });
   it("returns null for unsupported extensions", () => {
-    expect(inferTeethLanguage("t.go")).toBeNull();
     expect(inferTeethLanguage("t.java")).toBeNull();
     expect(inferTeethLanguage("t.txt")).toBeNull();
   });
@@ -249,7 +284,7 @@ describe("inferTeethLanguage", () => {
 
 describe("assertSafeTestBasename", () => {
   it("accepts supported runnable extensions", () => {
-    for (const name of ["test_x.py", "x.ts", "x.mjs", "x.cjs", "x.js", "x.rs"]) {
+    for (const name of ["test_x.py", "x.ts", "x.mjs", "x.cjs", "x.js", "x.rs", "incident_x_test.go"]) {
       expect(assertSafeTestBasename(name)).toBe(name);
     }
   });
@@ -257,9 +292,10 @@ describe("assertSafeTestBasename", () => {
     expect(() => assertSafeTestBasename("../e.py")).toThrow(/separators/);
     expect(() => assertSafeTestBasename("sub/t.py")).toThrow(/separators/);
   });
-  it("rejects Go / Java with a language-specific message", () => {
-    expect(() => assertSafeTestBasename("t.go")).toThrow(/Go is not yet supported/);
+  it("rejects Java; requires Go files to be *_test.go", () => {
     expect(() => assertSafeTestBasename("t.java")).toThrow(/Java is not yet supported/);
+    expect(() => assertSafeTestBasename("incident.go")).toThrow(/_test\.go/);
+    expect(assertSafeTestBasename("incident_test.go")).toBe("incident_test.go");
   });
   it("rejects unknown extensions naming the supported set", () => {
     expect(() => assertSafeTestBasename("t.txt")).toThrow(/\.py, \.ts/);
@@ -297,6 +333,13 @@ describe("resolveTeethRunner", () => {
     expect(r.placement("t.rs")).toBe(join("tests", "t.rs"));
     const { args } = r.buildRun({ bin: "cargo" }, join("tests", "t.rs"), "/wt");
     expect(args).toEqual(["test", "--test", "t", "--quiet"]);
+  });
+  it("go places in an isolated probe package and runs go test ./<dir>/", () => {
+    const r = resolveTeethRunner("x_test.go");
+    expect(r.language).toBe("go");
+    expect(r.placement("x_test.go")).toBe(join("stele_teeth_probe", "x_test.go"));
+    const { args } = r.buildRun({ bin: "go" }, join("stele_teeth_probe", "x_test.go"), "/wt");
+    expect(args).toEqual(["test", "./stele_teeth_probe/"]);
   });
 });
 
@@ -355,6 +398,20 @@ describe("classifyFailure (B2 bite-strength)", () => {
       rs.classifyFailure(
         "thread 'main' panicked at src/lib.rs: assertion `left == right` failed\n  right: \"error[E0425]: could not compile\"\ntest result: FAILED. 0 passed; 1 failed",
       ),
+    ).toBe("assertion");
+  });
+  it("go: test failure/panic vs build error vs unknown", () => {
+    const g = resolveTeethRunner("x_test.go");
+    expect(g.classifyFailure("--- FAIL: TestAdd (0.00s)\n    got 2\nFAIL")).toBe("assertion");
+    expect(g.classifyFailure("panic: boom\nFAIL")).toBe("assertion");
+    expect(g.classifyFailure("# example.com/app/steleteeth [build failed]\nundefined: calc.New")).toBe(
+      "collection-or-build",
+    );
+    expect(g.classifyFailure("cannot find module providing package x")).toBe("collection-or-build");
+    expect(g.classifyFailure("???")).toBe("unknown");
+    // FALSE-REJECT GUARD: a real --- FAIL whose message echoes a build token.
+    expect(
+      g.classifyFailure('--- FAIL: TestDiag (0.00s)\n    got "undefined: x", want ok\nFAIL'),
     ).toBe("assertion");
   });
 });

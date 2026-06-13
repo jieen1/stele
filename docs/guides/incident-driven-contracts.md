@@ -101,8 +101,9 @@ The runner is chosen from the candidate test's filename extension, so the gate i
 | `.js` / `.mjs` / `.cjs` | `node --test` |
 | `.ts` / `.mts` / `.cts` | `node --test --experimental-strip-types` |
 | `.rs` | `cargo test --test <stem>` (placed under `tests/`) |
+| `*_test.go` | `go test ./stele_teeth_probe/` (placed in an isolated probe package that imports the project by module path) |
 
-A missing toolchain is an **infra error (exit 1), never a `TEETH_FAILED` verdict** — a missing interpreter can't masquerade as a toothless test. Go and Java are not yet wired (a single root-level test cannot soundly exercise project code under `go test`/JUnit without a package/build-aware runner); author the test in a supported language or approve with `--teeth-unavailable-reason`.
+A missing toolchain is an **infra error (exit 1), never a `TEETH_FAILED` verdict** — a missing interpreter can't masquerade as a toothless test. The Go candidate must be a `*_test.go` file declaring its own package and importing the code under test by its module path (the worktree's committed `go.mod` provides resolution). Java is not yet wired (JUnit needs a build-tool-aware runner); author the test in a supported language or approve with `--teeth-unavailable-reason`.
 
 The proof is written to `.stele/proofs/<id>/teeth.json`:
 

@@ -25,7 +25,7 @@ import { delimiter, join } from "node:path";
  * interpreter can never masquerade as a toothless test.
  */
 
-export type TeethLanguage = "python" | "javascript" | "typescript" | "rust";
+export type TeethLanguage = "python" | "javascript" | "typescript" | "rust" | "go";
 
 export interface ResolvedToolchain {
   /** Executable to spawn (absolute path or PATH-resolved name). */
@@ -78,14 +78,15 @@ const EXTENSION_LANGUAGE: ReadonlyArray<[RegExp, TeethLanguage]> = [
   [/\.(?:mts|cts|ts)$/, "typescript"],
   [/\.(?:mjs|cjs|js)$/, "javascript"],
   [/\.rs$/, "rust"],
+  [/\.go$/, "go"],
 ];
 
 /** Languages a candidate test may be authored in, for user-facing messages. */
-export const SUPPORTED_TEST_EXTENSIONS = ".py, .ts, .mts, .cts, .js, .mjs, .cjs, .rs";
+export const SUPPORTED_TEST_EXTENSIONS = ".py, .ts, .mts, .cts, .js, .mjs, .cjs, .rs, .go (must be *_test.go)";
 
 /** The runnable extension a candidate test must end with (path-safety aside). */
 const SAFE_BASENAME_PATTERN =
-  /^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:py|mts|cts|ts|mjs|cjs|js|rs)$/;
+  /^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:py|mts|cts|ts|mjs|cjs|js|rs|go)$/;
 
 export function inferTeethLanguage(basename: string): TeethLanguage | null {
   for (const [pattern, language] of EXTENSION_LANGUAGE) {
@@ -110,12 +111,12 @@ export function assertSafeTestBasename(name: string): string {
     );
   }
   if (!SAFE_BASENAME_PATTERN.test(name)) {
-    if (/\.(?:go|java)$/.test(name)) {
+    if (/\.java$/.test(name)) {
       throw new Error(
-        `testFilename ${JSON.stringify(name)}: ${name.endsWith(".go") ? "Go" : "Java"} is not yet ` +
-          `supported by the teeth gate (it needs a package/build-aware runner). ` +
-          `Author the negative test in one of: ${SUPPORTED_TEST_EXTENSIONS}, or record ` +
-          `TEETH_UNAVAILABLE via \`approve --teeth-unavailable-reason\`.`,
+        `testFilename ${JSON.stringify(name)}: Java is not yet supported by the teeth gate ` +
+          `(it needs a build-tool-aware runner). Author the negative test in one of: ` +
+          `${SUPPORTED_TEST_EXTENSIONS}, or record TEETH_UNAVAILABLE via ` +
+          `\`approve --teeth-unavailable-reason\`.`,
       );
     }
     throw new Error(
@@ -130,6 +131,14 @@ export function assertSafeTestBasename(name: string): string {
     throw new Error(
       `testFilename ${JSON.stringify(name)}: a Rust test stem becomes a cargo --test target ` +
         `(a crate name), so it may contain only [A-Za-z0-9_] before ".rs" (no "." or "-").`,
+    );
+  }
+  // Go: `go test` only picks up files named `*_test.go`. Reject up-front so a
+  // mis-named Go file isn't silently ignored (→ a vacuous "ok" at both revs).
+  if (name.endsWith(".go") && !name.endsWith("_test.go")) {
+    throw new Error(
+      `testFilename ${JSON.stringify(name)}: a Go teeth test must be named \`*_test.go\` ` +
+        `(go test ignores other files).`,
     );
   }
   return name;
@@ -300,11 +309,61 @@ const rustRunner: TeethRunner = {
   },
 };
 
+/** Isolated package dir (within the worktree) the Go candidate test is placed in. */
+const GO_PROBE_DIR = "stele_teeth_probe";
+
+const goRunner: TeethRunner = {
+  language: "go",
+  // Place the candidate in its OWN fresh package dir so `go test ./<dir>/` runs
+  // ONLY this test (no conflation with the project's existing _test.go files).
+  // The candidate is a self-contained test that imports the project package by
+  // its module path; the worktree's committed go.mod provides module resolution.
+  placement: (basename) => join(GO_PROBE_DIR, basename),
+  locate() {
+    const explicit = process.env.STELE_GO;
+    if (explicit && explicit.trim().length > 0) {
+      return { bin: explicit.trim() };
+    }
+    if (binaryOnPath("go")) {
+      return { bin: "go" };
+    }
+    throw new Error("go not found on PATH (set STELE_GO); cannot run a Go teeth proof.");
+  },
+  buildRun(tc) {
+    return {
+      cmd: tc.bin,
+      args: ["test", `./${GO_PROBE_DIR}/`],
+      // GOTOOLCHAIN=local: never auto-download a toolchain for the probe.
+      env: { ...process.env, GOTOOLCHAIN: "local" },
+    };
+  },
+  classifyFailure(out) {
+    // Run-only markers FIRST: `--- FAIL` / `panic:` appear only after the test
+    // binary built and ran. A genuine build failure prints `[build failed]` /
+    // `cannot find` / `undefined:` but no `--- FAIL`, so an assertion whose
+    // message echoes a build token is not misread as a build error.
+    if (/--- FAIL/.test(out) || /\bpanic:/.test(out)) {
+      return "assertion";
+    }
+    if (
+      /\[build failed\]/.test(out) ||
+      /build constraints exclude all Go files/.test(out) ||
+      /no(?:\srequired module provides| Go files)/.test(out) ||
+      /cannot find (?:module|package)/.test(out) ||
+      /\bundefined:/.test(out)
+    ) {
+      return "collection-or-build";
+    }
+    return "unknown";
+  },
+};
+
 const RUNNERS: Record<TeethLanguage, TeethRunner> = {
   python: pythonRunner,
   javascript: nodeRunner("javascript"),
   typescript: nodeRunner("typescript"),
   rust: rustRunner,
+  go: goRunner,
 };
 
 /**
