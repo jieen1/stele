@@ -7,7 +7,7 @@ branding:
 
 inputs:
   mode:
-    description: "Operating mode: 'check' to verify contracts, 'generate' to detect generated-test drift."
+    description: "Operating mode: 'check' to verify contracts, 'generate' to detect generated-test drift, 'reverify' to re-derive locked incident teeth verdicts from git (fails on a contradicted verdict; a could-not-reproduce is a warning)."
     required: false
     default: "check"
   diff-from:

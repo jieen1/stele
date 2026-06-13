@@ -12,8 +12,11 @@ function makeStubs(mode: string) {
   const runGenerate = vi.fn(async () => {
     calls.push("runGenerate");
   });
+  const runReverify = vi.fn(async () => {
+    calls.push("runReverify");
+  });
   const getInput = vi.fn((name: string) => (name === "mode" ? mode : ""));
-  return { calls, setFailed, runCheck, runGenerate, getInput };
+  return { calls, setFailed, runCheck, runGenerate, runReverify, getInput };
 }
 
 describe("main dispatcher", () => {
@@ -45,11 +48,19 @@ describe("main dispatcher", () => {
     expect(message).toContain("workflow_dispatch");
   });
 
+  it("invokes runReverify when mode=reverify", async () => {
+    const stubs = makeStubs("reverify");
+    await main(stubs);
+    expect(stubs.runReverify).toHaveBeenCalledTimes(1);
+    expect(stubs.runCheck).not.toHaveBeenCalled();
+    expect(stubs.setFailed).not.toHaveBeenCalled();
+  });
+
   it("rejects unsupported modes with allowed values", async () => {
     const stubs = makeStubs("foo");
     await main(stubs);
     expect(stubs.setFailed).toHaveBeenCalledWith(
-      "Unsupported mode: foo. Allowed: check | generate.",
+      "Unsupported mode: foo. Allowed: check | generate | reverify.",
     );
   });
 

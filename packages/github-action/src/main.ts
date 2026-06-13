@@ -1,12 +1,14 @@
 import * as core from "@actions/core";
 import { runCheck } from "./modes/check.js";
 import { runGenerate } from "./modes/generate.js";
+import { runReverify } from "./modes/reverify.js";
 
 export interface MainDeps {
   getInput?: (name: string) => string;
   setFailed?: (message: string) => void;
   runCheck?: () => Promise<void>;
   runGenerate?: () => Promise<void>;
+  runReverify?: () => Promise<void>;
 }
 
 const LOCK_REJECTION_MESSAGE =
@@ -17,6 +19,7 @@ export async function main(deps: MainDeps = {}): Promise<void> {
   const setFailed = deps.setFailed ?? ((message: string) => core.setFailed(message));
   const check = deps.runCheck ?? runCheck;
   const generate = deps.runGenerate ?? runGenerate;
+  const reverify = deps.runReverify ?? runReverify;
 
   const mode = (getInput("mode") || "check").trim();
 
@@ -28,11 +31,14 @@ export async function main(deps: MainDeps = {}): Promise<void> {
       case "generate":
         await generate();
         return;
+      case "reverify":
+        await reverify();
+        return;
       case "lock":
         setFailed(LOCK_REJECTION_MESSAGE);
         return;
       default:
-        setFailed(`Unsupported mode: ${mode}. Allowed: check | generate.`);
+        setFailed(`Unsupported mode: ${mode}. Allowed: check | generate | reverify.`);
         return;
     }
   } catch (err) {

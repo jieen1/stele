@@ -31858,7 +31858,7 @@ function error(message, properties = {}) {
  * @param message warning issue message. Errors will be converted to string via toString()
  * @param properties optional properties to add to the annotation.
  */
-function warning(message, properties = {}) {
+function core_warning(message, properties = {}) {
     command_issueCommand('warning', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
@@ -31873,7 +31873,7 @@ function notice(message, properties = {}) {
  * Writes info to log with console.log.
  * @param message info message
  */
-function info(message) {
+function core_info(message) {
     process.stdout.write(message + external_os_namespaceObject.EOL);
 }
 /**
@@ -31967,7 +31967,7 @@ const MAX_ERROR_ANNOTATIONS = 50;
 const MAX_WARNING_ANNOTATIONS = 50;
 const defaultSink = {
     error: (message, properties) => error(message, properties),
-    warning: (message, properties) => warning(message, properties),
+    warning: (message, properties) => core_warning(message, properties),
     notice: (message, properties) => notice(message, properties),
 };
 /**
@@ -36584,7 +36584,7 @@ function readBooleanInput(name, defaultValue) {
 async function runGenerate(deps = {}) {
     const spawn = deps.spawn ?? ((args) => spawnCli(args));
     const setFailed = deps.setFailed ?? ((message) => core_setFailed(message));
-    const log = deps.log ?? ((message) => info(message));
+    const log = deps.log ?? ((message) => core_info(message));
     const result = await spawn(["generate"]);
     if (result.exitCode === 0) {
         log("stele generate produced no drift.");
@@ -36600,7 +36600,46 @@ async function runGenerate(deps = {}) {
     setFailed(`stele generate failed (exit ${result.exitCode}): ${result.stderr.trim() || "no output"}`);
 }
 
+;// CONCATENATED MODULE: ./src/modes/reverify.ts
+
+
+/**
+ * `mode: reverify` — re-derive every locked incident teeth verdict from git +
+ * the committed provenance records, read-only. Maps `stele incident reverify
+ * --all` exit codes to CI outcomes:
+ *   0 — all reproduced → pass.
+ *   2 — a verdict was CONTRADICTED (tamper, or the proof no longer holds) →
+ *       setFailed (the integrity failure CI exists to catch).
+ *   1 — could-not-reproduce (an absent SHA / toolchain) → a WARNING, never a
+ *       failure: it is not a tamper, and failing CI on it would be a false alarm.
+ */
+async function runReverify(deps = {}) {
+    const spawn = deps.spawn ?? ((args) => spawnCli(args));
+    const setFailed = deps.setFailed ?? ((message) => core_setFailed(message));
+    const warning = deps.warning ?? ((message) => core_warning(message));
+    const info = deps.info ?? ((message) => core_info(message));
+    const result = await spawn(["incident", "reverify", "--all"]);
+    const detail = (result.stdout || result.stderr).trim();
+    if (detail.length > 0) {
+        info(detail);
+    }
+    switch (result.exitCode) {
+        case 0:
+            info("All locked incident teeth verdicts reproduced from git.");
+            return;
+        case 2:
+            setFailed("Incident provenance reverify CONTRADICTED a locked verdict — the proof no longer holds or the record was tampered. Inspect the offending incident(s) above.");
+            return;
+        case 1:
+            warning("Incident provenance reverify could not re-run one or more proofs (absent SHA / toolchain). Not treated as a failure — re-run where the toolchain + history are present.");
+            return;
+        default:
+            setFailed(`stele incident reverify exited ${result.exitCode}: ${result.stderr.trim() || "no output"}`);
+    }
+}
+
 ;// CONCATENATED MODULE: ./src/main.ts
+
 
 
 
@@ -36610,6 +36649,7 @@ async function main(deps = {}) {
     const setFailed = deps.setFailed ?? ((message) => core_setFailed(message));
     const check = deps.runCheck ?? runCheck;
     const generate = deps.runGenerate ?? runGenerate;
+    const reverify = deps.runReverify ?? runReverify;
     const mode = (getInput("mode") || "check").trim();
     try {
         switch (mode) {
@@ -36619,11 +36659,14 @@ async function main(deps = {}) {
             case "generate":
                 await generate();
                 return;
+            case "reverify":
+                await reverify();
+                return;
             case "lock":
                 setFailed(LOCK_REJECTION_MESSAGE);
                 return;
             default:
-                setFailed(`Unsupported mode: ${mode}. Allowed: check | generate.`);
+                setFailed(`Unsupported mode: ${mode}. Allowed: check | generate | reverify.`);
                 return;
         }
     }
