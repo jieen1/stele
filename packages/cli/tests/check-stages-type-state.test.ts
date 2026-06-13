@@ -120,7 +120,6 @@ function mkContract(typeStates: readonly TypeStateDeclaration[]): Contract {
     architectures: [],
     coreNodes: [],
     brandedIds: [],
-    smartCtors: [],
     tracePolicies: [],
     typeStates,
     typeStateBindings: [],

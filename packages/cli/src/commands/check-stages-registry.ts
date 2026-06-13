@@ -202,10 +202,9 @@ const STAGES: CheckStage[] = [
   },
   {
     id: "type-driven",
-    description: "Enforce (branded-id ...) and (smart-ctor ...) TypeScript checks.",
+    description: "Enforce (branded-id ...) TypeScript checks.",
     shouldRun: (context, options) =>
-      isFullRun(options) &&
-      (context.contract.brandedIds.length > 0 || context.contract.smartCtors.length > 0),
+      isFullRun(options) && context.contract.brandedIds.length > 0,
     build: (context, protectedState, command) => buildTypeDrivenStage(context, protectedState, command),
   },
   {

@@ -168,7 +168,6 @@ export type {
   CoreNodeMetricBoundary,
   CoreNodeMetricName,
   CoreNodeRole,
-  SmartCtorDeclaration,
   FilePolicyDeclaration,
   FunctionShapeDeclaration,
   GroupDeclaration,

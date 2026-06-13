@@ -83,7 +83,6 @@ function mkContract(overrides: Record<string, unknown>): Contract {
     architectures: [],
     coreNodes: [],
     brandedIds: [],
-    smartCtors: [],
     tracePolicies: [],
     typeStates: [],
     effectPolicies: [],

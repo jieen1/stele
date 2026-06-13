@@ -241,12 +241,6 @@ export const ErrorCodes: Record<string, ErrorCode> = {
     category: 3,
     source: "validator/structure-type-driven.ts",
   },
-  E0328: {
-    name: "Validation Error",
-    message: "Smart-ctor declaration error (id, constructor, deny-raw, target)",
-    category: 3,
-    source: "validator/structure-type-driven.ts",
-  },
 
   // --- Trace-policy validation errors (E0330-E0339) ---
 

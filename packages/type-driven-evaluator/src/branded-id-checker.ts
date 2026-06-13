@@ -1,7 +1,13 @@
 import * as ts from "typescript";
 import { dirname, resolve } from "node:path";
 import { minimatch } from "minimatch";
-import type { BrandedIdDeclaration, BrandedIdViolation, BrandedIdCheckOptions } from "./types.js";
+import type {
+  BrandedIdDeclaration,
+  BrandedIdViolation,
+  BrandedIdCheckOptions,
+  BrandedIdCheckResult,
+  BrandedIdCoverage,
+} from "./types.js";
 
 // Round 4 F-A-04: removed dead `_RULE_ID = "typedriven.shape.branded-id"`
 // constant. The branded-id violations emitted by this module carry their
@@ -262,8 +268,9 @@ function checkDeclaration(
   program: ts.Program,
   checker: ts.TypeChecker,
   projectDir: string,
-): BrandedIdViolation[] {
+): { violations: BrandedIdViolation[]; coverage: BrandedIdCoverage } {
   const violations: BrandedIdViolation[] = [];
+  const enforced = Boolean(declaration.entityScope);
 
   // Parse the type target
   let filePath: string;
@@ -280,7 +287,7 @@ function checkDeclaration(
       message: `Failed to parse typeTarget: ${declaration.typeTarget}`,
       fix: "Ensure typeTarget is in 'file::Type' format",
     });
-    return violations;
+    return { violations, coverage: { typeName: declaration.typeTarget, enforced, scopeFilesAnalyzed: 0 } };
   }
 
   // Find the source file for the branded type
@@ -293,7 +300,7 @@ function checkDeclaration(
       message: `Source file for branded type "${typeName}" not found: ${filePath}`,
       fix: `Ensure the file path "${filePath}" exists and is included in the tsconfig`,
     });
-    return violations;
+    return { violations, coverage: { typeName, enforced, scopeFilesAnalyzed: 0 } };
   }
 
   // Find the type declaration
@@ -306,33 +313,31 @@ function checkDeclaration(
       message: `Type "${typeName}" not found in ${filePath}`,
       fix: `Ensure type "${typeName}" is declared in "${filePath}"`,
     });
-    return violations;
+    return { violations, coverage: { typeName, enforced, scopeFilesAnalyzed: 0 } };
   }
 
   // Get the branded type via TypeChecker
   const brandedType = checker.getTypeAtLocation(typeDecl);
 
-  // If no entityScope, advisory only: skip enforcement
+  // If no entityScope, advisory only: skip enforcement. Reported as
+  // `enforced: false` so the stage's zero-binding guard does NOT fire — an
+  // advisory branded-id intentionally delegates enforcement elsewhere.
   if (!declaration.entityScope) {
-    // Advisory mode: no violations reported, but we could log warnings
-    return violations;
+    return { violations, coverage: { typeName, enforced: false, scopeFilesAnalyzed: 0 } };
   }
 
-  // Find files in scope
+  // Find files in scope and analyze each (excluding the type-def file itself).
+  // `scopeFilesAnalyzed` is the binding count the stage's zero-binding guard
+  // keys on: an enforced declaration that analyzes 0 files enforces nothing.
   const allFiles = program.getSourceFiles();
   const scopeFiles = getScopeFiles(declaration.entityScope, Array.from(allFiles), projectDir);
-
-  if (scopeFiles.length === 0) {
-    return violations;
-  }
-
-  // Derive the expected field name
   const expectedFieldName = deriveFieldNameSuffix(typeName);
 
-  // Check each scope file
+  let scopeFilesAnalyzed = 0;
   for (const sf of scopeFiles) {
     // Skip the type definition file itself
     if (sf.fileName === filePath) continue;
+    scopeFilesAnalyzed++;
 
     const fileViolations = collectStringViolations(
       sf,
@@ -345,7 +350,7 @@ function checkDeclaration(
     violations.push(...fileViolations);
   }
 
-  return violations;
+  return { violations, coverage: { typeName, enforced: true, scopeFilesAnalyzed } };
 }
 
 /**
@@ -353,9 +358,9 @@ function checkDeclaration(
  */
 export function checkBrandedIds(
   options: BrandedIdCheckOptions,
-): BrandedIdViolation[] {
+): BrandedIdCheckResult {
   if (options.declarations.length === 0) {
-    return [];
+    return { violations: [], coverage: [] };
   }
 
   const tsconfigPath = options.tsconfigPath ?? resolve(options.projectDir, "tsconfig.json");
@@ -376,10 +381,12 @@ export function checkBrandedIds(
   const checker = program.getTypeChecker();
 
   const allViolations: BrandedIdViolation[] = [];
+  const allCoverage: BrandedIdCoverage[] = [];
   for (const declaration of options.declarations) {
-    const violations = checkDeclaration(declaration, program, checker, options.projectDir);
+    const { violations, coverage } = checkDeclaration(declaration, program, checker, options.projectDir);
     allViolations.push(...violations);
+    allCoverage.push(coverage);
   }
 
-  return allViolations;
+  return { violations: allViolations, coverage: allCoverage };
 }

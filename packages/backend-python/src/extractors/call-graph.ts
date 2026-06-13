@@ -16,10 +16,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import type {
-  CallGraph,
-  CallGraphExtractor,
-  ExtractOptions,
+import {
+  type CallGraph,
+  type CallGraphExtractor,
+  type ExtractOptions,
+  assertValidCallGraph,
 } from "@stele/call-graph-core";
 
 const execFileAsync = promisify(execFile);
@@ -128,13 +129,19 @@ async function runScript(request: RequestBody): Promise<CallGraph> {
     );
   }
   const stdout = Buffer.concat(chunks).toString("utf8").trim();
+  let graph: CallGraph;
   try {
-    return JSON.parse(stdout) as CallGraph;
+    graph = JSON.parse(stdout) as CallGraph;
   } catch (e) {
     throw new Error(
       `[stele:py-callgraph] extractor returned non-JSON output: ${(e as Error).message}`,
     );
   }
+  // Fail loud if the extractor dropped a soundness-critical field (notably
+  // `nameHidden` on unresolved calls). A bare `as CallGraph` cast cannot catch
+  // that; a missing nameHidden would silently disable the trace fail-closed gate.
+  assertValidCallGraph(graph, "python extractor");
+  return graph;
 }
 
 export const pyCallGraphExtractor: CallGraphExtractor = {

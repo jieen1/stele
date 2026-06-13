@@ -4,7 +4,7 @@ This document describes the Stele Contract Definition Language (CDL) as implemen
 
 ## Status and scope
 
-CDL is an s-expression language for declaring invariants, checker-backed rules, scenario setup flows, imports, groups, code-shape constraints, architecture/core-node declarations, type-driven declarations (branded-id, smart-ctor), trace-based policies, type-state machines, and effect declarations / annotations / policies / suppressions. The shipped backend targets are Python + pytest (full coverage), TypeScript + vitest (Phase B evaluator surface), Go, Java, and Rust (test generation only — Phase B call-graph extractors are TypeScript-first; see "Phase B summary" for the deferred extractor work).
+CDL is an s-expression language for declaring invariants, checker-backed rules, scenario setup flows, imports, groups, code-shape constraints, architecture/core-node declarations, type-driven declarations (branded-id), trace-based policies, type-state machines, and effect declarations / annotations / policies / suppressions. The shipped backend targets are Python + pytest (full coverage), TypeScript + vitest (Phase B evaluator surface), Go, Java, and Rust (test generation only — Phase B call-graph extractors are TypeScript-first; see "Phase B summary" for the deferred extractor work).
 
 The toolchain currently consists of:
 
@@ -16,7 +16,7 @@ The toolchain currently consists of:
 - normalized contract hashing
 - manifest verification for protected files
 - Python, TypeScript, Go, Java, and Rust test generation
-- Phase B evaluators: call-graph cache, trace-based policy, type-state machine, effect system, type-driven (branded-id, smart-ctor)
+- Phase B evaluators: call-graph cache, trace-based policy, type-state machine, effect system, type-driven (branded-id)
 
 ## Lexical grammar
 
@@ -77,7 +77,6 @@ The shipped CDL grammar (v0.3, Phase B) accepts only the following top-level dec
 - `architecture`
 - `core-node`
 - `branded-id`
-- `smart-ctor`
 - `trace-policy`
 - `type-state`
 - `type-state-binding`
@@ -486,25 +485,6 @@ Fields:
 - `entity-scope`: exactly one string (optional). The entity the brand belongs to — used by uniqueness checks across branded ids.
 
 Code: `E0327`.
-
-### `smart-ctor`
-
-Form:
-
-```lisp
-(smart-ctor RuleId
-  (constructor "parseRuleId")
-  (deny-raw "true")
-  (target "packages/core/src/types/rule-id.ts::RuleId"))
-```
-
-Fields:
-
-- `constructor`: exactly one string (required). The name of the validating constructor that callers must use.
-- `deny-raw`: `(deny-raw "true")` or `(deny-raw "false")` (optional, default `false`). When `true`, callers must not construct the type via raw `as`-casts or object literals.
-- `target`: exactly one string (optional, recommended). Pins the value-object type the constructor governs.
-
-Code: `E0328`.
 
 ## Trace-Based Policy
 
@@ -1266,7 +1246,6 @@ The table below lists every validation error code in the Phase B range (E0317-E0
 | `E0325` | `validator/uniqueness.ts` | Duplicate architecture id |
 | `E0326` | `validator/uniqueness.ts` | Duplicate core-node id |
 | `E0327` | `validator/structure-type-driven.ts` | Branded-id declaration error (id, target, base-type, pattern, entity-scope) |
-| `E0328` | `validator/structure-type-driven.ts` | Smart-ctor declaration error (id, constructor, deny-raw, target) |
 | `E0330` | `validator/structure-trace-policy.ts` | Trace-policy declaration is missing its id |
 | `E0331` | `validator/uniqueness.ts` | Duplicate trace-policy id |
 | `E0332` | `validator/structure-trace-policy.ts` | Trace-policy is missing the required `(target ...)` field |

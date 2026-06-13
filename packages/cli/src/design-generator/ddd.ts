@@ -22,7 +22,6 @@ export interface GeneratorResult {
   coreNodes: string[];     // CDL strings for core-node declarations (Phase 6: class-shapes are interleaved here, immediately after their companion core-node)
   classShapes: string[];   // CDL strings for class-shape declarations emitted from aggregate roots (Phase 6)
   brandedIds: string[];    // CDL strings for branded-id declarations
-  smartCtors: string[];    // CDL strings for smart-ctor declarations
   combined: string;        // All declarations concatenated
   manifest: {
     generator: string;
@@ -119,7 +118,7 @@ export function generateFromProfile(profile: TypedDesignProfile<"Hashed">): Gene
     }
   }
 
-  // Generate type-driven declarations (branded-id, smart-ctor)
+  // Generate type-driven declarations (branded-id)
   const typeDriven = renderTypeDrivenDeclarations(profile);
   for (const td of profile.type_driven?.branded_ids?.declarations ?? []) {
     const name = td.name ?? td.id ?? "";
@@ -131,23 +130,12 @@ export function generateFromProfile(profile: TypedDesignProfile<"Hashed">): Gene
       source: "generated",
     });
   }
-  for (const sc of profile.type_driven?.smart_constructors?.value_objects ?? []) {
-    const name = sc.name ?? sc.id ?? "";
-    provenanceRules.push({
-      id: `smart-ctor.${name}`,
-      kind: "smart-ctor",
-      origins: [],
-      enforcement_level: (profile.type_driven?.smart_constructors?.mode === "hard" ? "hard" : "partial"),
-      source: "generated",
-    });
-  }
 
   let allDeclarations = renderAllDeclarations(
     architectures.filter((a) => a !== aclArch),
     aclArch,
     coreNodes,
     typeDriven.brandedIds,
-    typeDriven.smartCtors,
   );
 
   // Append trace-policy declarations at the end. Done as a conditional
@@ -179,7 +167,6 @@ export function generateFromProfile(profile: TypedDesignProfile<"Hashed">): Gene
     coreNodes,
     classShapes,
     brandedIds: typeDriven.brandedIds,
-    smartCtors: typeDriven.smartCtors,
     combined: allDeclarations,
     manifest: {
       generator: "@stele/cli",
@@ -188,7 +175,7 @@ export function generateFromProfile(profile: TypedDesignProfile<"Hashed">): Gene
         {
           path: "contract/generated/ddd-typedriven.stele",
           sha256: "", // Computed by caller
-          rule_count: architectures.length + coreNodes.length + typeDriven.brandedIds.length + typeDriven.smartCtors.length + tracePolicyCount,
+          rule_count: architectures.length + coreNodes.length + typeDriven.brandedIds.length + tracePolicyCount,
         },
       ],
     },

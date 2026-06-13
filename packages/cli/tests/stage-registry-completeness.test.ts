@@ -129,7 +129,6 @@ describe("CHECK_STAGES smoke — shouldRun gating", () => {
       contract: {
         codeShapes: [],
         brandedIds: [],
-        smartCtors: [],
         tracePolicies: [],
         typeStates: [],
         typeStateBindings: [],
@@ -152,12 +151,11 @@ describe("CHECK_STAGES smoke — shouldRun gating", () => {
     expect(stage?.shouldRun(makeContext({ codeShapes: [{}] as unknown as PreparedCheckContext["contract"]["codeShapes"] }), {})).toBe(true);
   });
 
-  it("type-driven runs when brandedIds OR smartCtors present", () => {
+  it("type-driven runs when brandedIds present", () => {
     const stage = CHECK_STAGES.find((s) => s.id === "type-driven");
     expect(stage).toBeDefined();
     expect(stage?.shouldRun(makeContext(), {})).toBe(false);
     expect(stage?.shouldRun(makeContext({ brandedIds: [{}] as unknown as PreparedCheckContext["contract"]["brandedIds"] }), {})).toBe(true);
-    expect(stage?.shouldRun(makeContext({ smartCtors: [{}] as unknown as PreparedCheckContext["contract"]["smartCtors"] }), {})).toBe(true);
   });
 
   it("generated, protected, toolchain, architecture, complexity always run", () => {

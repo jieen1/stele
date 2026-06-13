@@ -4,7 +4,6 @@ import type {
   BrandedIdDeclaration,
   Contract,
   ContractFile,
-  SmartCtorDeclaration,
 } from "@stele/core";
 import type {
   ListNode,
@@ -26,10 +25,7 @@ function makeListNode(head: string): ListNode {
   return { kind: "list", head, items: [], span: makeSpan() };
 }
 
-function makeContract(
-  brandedIds: BrandedIdDeclaration[] = [],
-  smartCtors: SmartCtorDeclaration[] = [],
-): Contract {
+function makeContract(brandedIds: BrandedIdDeclaration[] = []): Contract {
   const parsed: ParsedFile = { kind: "file", body: [], file: "x.stele" };
   const file: ContractFile = {
     path: "x.stele",
@@ -44,7 +40,6 @@ function makeContract(
     architectures: [],
     coreNodes: [],
     brandedIds,
-    smartCtors,
     tracePolicies: [],
     typeStates: [],
     typeStateBindings: [],
@@ -68,7 +63,6 @@ function makeContract(
     architectures: [],
     coreNodes: [],
     brandedIds,
-    smartCtors,
     tracePolicies: [],
     typeStates: [],
     typeStateBindings: [],
@@ -122,8 +116,8 @@ function makeProtectedState(): ProtectedCheckState {
 }
 
 describe("buildTypeDrivenStage", () => {
-  it("returns ok with no violations when contract has no branded-ids or smart-ctors", async () => {
-    const contract = makeContract([], []);
+  it("returns ok with no violations when contract has no branded-ids", async () => {
+    const contract = makeContract([]);
     const ctx = makePreparedContext(contract);
     const protectedState = makeProtectedState();
     const report = await buildTypeDrivenStage(ctx, protectedState, "check");
@@ -141,7 +135,7 @@ describe("buildTypeDrivenStage", () => {
       target: "nonexistent.ts::MissingType",
       baseType: "string",
     };
-    const contract = makeContract([brandedId], []);
+    const contract = makeContract([brandedId]);
     const ctx = makePreparedContext(contract);
     const protectedState = makeProtectedState();
     const report = await buildTypeDrivenStage(ctx, protectedState, "check");
@@ -161,7 +155,7 @@ describe("buildTypeDrivenStage", () => {
       baseType: "string",
       entityScope: "branded-invalid/**/*.ts",
     };
-    const contract = makeContract([brandedId], []);
+    const contract = makeContract([brandedId]);
     const ctx = makePreparedContext(contract);
     const protectedState = makeProtectedState();
     const report = await buildTypeDrivenStage(ctx, protectedState, "check");
@@ -185,27 +179,56 @@ describe("buildTypeDrivenStage", () => {
       baseType: "string",
       entityScope: "branded/**/*.ts",
     };
-    const contract = makeContract([brandedId], []);
+    const contract = makeContract([brandedId]);
     const ctx = makePreparedContext(contract);
     const protectedState = makeProtectedState();
     const report = await buildTypeDrivenStage(ctx, protectedState, "check");
     expect(report.ok).toBe(true);
   });
 
-  it("skips smart-ctor enforcement when target is absent", async () => {
-    const smartCtor: SmartCtorDeclaration = {
-      kind: "smart-ctor",
+  it("zero-binding guard: an entity-scope resolving to 0 files fails the build", async () => {
+    // The type is real (resolves), but the entity-scope glob matches no file, so
+    // the declaration enforces nothing at runtime — the vacuous-green hole the
+    // other Phase B stages already guard. It must now fail loud.
+    const brandedId: BrandedIdDeclaration = {
+      kind: "branded-id",
       filePath: "x.stele",
-      node: makeListNode("smart-ctor"),
+      node: makeListNode("branded-id"),
       span: makeSpan(),
-      id: "RuleId",
-      constructorName: "parseRuleId",
-      denyRaw: true,
+      id: "InvoiceId",
+      target: "branded/InvoiceId.ts::InvoiceId",
+      baseType: "string",
+      entityScope: "no-such-directory/**/*.ts",
     };
-    const contract = makeContract([], [smartCtor]);
+    const contract = makeContract([brandedId]);
     const ctx = makePreparedContext(contract);
-    const protectedState = makeProtectedState();
-    const report = await buildTypeDrivenStage(ctx, protectedState, "check");
+    const report = await buildTypeDrivenStage(ctx, makeProtectedState(), "check");
+    expect(report.ok).toBe(false);
+    const guard = report.violations.find(
+      (v) => v.rule_id === "typedriven.branded-id.InvoiceId.zero_binding",
+    );
+    expect(guard).toBeDefined();
+    expect(guard!.severity).toBe("error");
+  });
+
+  it("advisory branded-id (no entity-scope) does NOT trip the zero-binding guard", async () => {
+    // An advisory branded-id intentionally delegates enforcement elsewhere
+    // (e.g. the Python *_USES_BRANDED_TYPE invariants). It must stay green so
+    // the guard does not destabilize the self-contract, whose branded-ids are
+    // all advisory.
+    const brandedId: BrandedIdDeclaration = {
+      kind: "branded-id",
+      filePath: "x.stele",
+      node: makeListNode("branded-id"),
+      span: makeSpan(),
+      id: "InvoiceId",
+      target: "branded/InvoiceId.ts::InvoiceId",
+      baseType: "string",
+    };
+    const contract = makeContract([brandedId]);
+    const ctx = makePreparedContext(contract);
+    const report = await buildTypeDrivenStage(ctx, makeProtectedState(), "check");
     expect(report.ok).toBe(true);
+    expect(report.violations).toHaveLength(0);
   });
 });

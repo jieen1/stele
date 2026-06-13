@@ -44,3 +44,5 @@ export {
   finalizeCallGraph,
   startBuilding,
 } from "./lifecycle.js";
+
+export { assertValidCallGraph } from "./validate.js";

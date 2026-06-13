@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ListNode } from "../src/index";
 import { SteleError, parseFile } from "../src/index";
-import {
-  parseBrandedIdDeclaration,
-  parseSmartCtorDeclaration,
-} from "../src/validator/structure-type-driven.js";
+import { parseBrandedIdDeclaration } from "../src/validator/structure-type-driven.js";
 
 const FILE_PATH = "test.stele";
 
@@ -89,6 +86,16 @@ describe("parseBrandedIdDeclaration", () => {
     });
   });
 
+  it("rejects an empty entity-scope (would silently downgrade to advisory)", () => {
+    const node = parseTopList(
+      '(branded-id RuleId (target "f.ts::RuleId") (base-type string) (entity-scope ""))',
+    );
+    expectSteleError(() => parseBrandedIdDeclaration(FILE_PATH, node), {
+      code: "E0327",
+      messageIncludes: "entity-scope must be a non-empty glob",
+    });
+  });
+
   it("rejects duplicate target", () => {
     const node = parseTopList(
       '(branded-id RuleId (target "a.ts::A") (target "b.ts::B") (base-type string))',
@@ -100,73 +107,15 @@ describe("parseBrandedIdDeclaration", () => {
   });
 });
 
-describe("parseSmartCtorDeclaration", () => {
-  it("parses a full smart-ctor with constructor and deny-raw", () => {
-    const node = parseTopList(
-      '(smart-ctor RuleId (constructor "parseRuleId") (deny-raw "true"))',
-    );
-    const result = parseSmartCtorDeclaration(FILE_PATH, node);
-    expect(result.kind).toBe("smart-ctor");
-    expect(result.id).toBe("RuleId");
-    expect(result.constructorName).toBe("parseRuleId");
-    expect(result.denyRaw).toBe(true);
-  });
-
-  it("defaults deny-raw to false when not given", () => {
-    const node = parseTopList('(smart-ctor RuleId (constructor "parseRuleId"))');
-    const result = parseSmartCtorDeclaration(FILE_PATH, node);
-    expect(result.denyRaw).toBe(false);
-  });
-
-  it("parses deny-raw false", () => {
-    const node = parseTopList(
-      '(smart-ctor RuleId (constructor "parseRuleId") (deny-raw "false"))',
-    );
-    const result = parseSmartCtorDeclaration(FILE_PATH, node);
-    expect(result.denyRaw).toBe(false);
-  });
-
-  it("rejects smart-ctor without constructor", () => {
-    const node = parseTopList('(smart-ctor RuleId)');
-    expectSteleError(() => parseSmartCtorDeclaration(FILE_PATH, node), {
-      code: "E0328",
-      messageIncludes: "must declare a (constructor ...) field",
-    });
-  });
-
-  it("rejects invalid deny-raw value", () => {
-    const node = parseTopList(
-      '(smart-ctor RuleId (constructor "parseRuleId") (deny-raw "maybe"))',
-    );
-    expectSteleError(() => parseSmartCtorDeclaration(FILE_PATH, node), {
-      code: "E0328",
-      messageIncludes: "deny-raw must be true or false",
-    });
-  });
-
-  it("rejects unknown field", () => {
-    const node = parseTopList(
-      '(smart-ctor RuleId (constructor "parseRuleId") (bar "baz"))',
-    );
-    expectSteleError(() => parseSmartCtorDeclaration(FILE_PATH, node), {
-      code: "E0328",
-      messageIncludes: 'unknown field "bar"',
-    });
-  });
-});
-
 describe("integration with buildContract", () => {
-  it("parses branded-id and smart-ctor as top-level declarations", async () => {
+  it("parses branded-id as a top-level declaration", async () => {
     const source =
       '(branded-id RuleId\n' +
       '  (target "packages/core/src/ast/types.ts::RuleId")\n' +
-      '  (base-type string))\n' +
-      '(smart-ctor RuleId (constructor "parseRuleId") (deny-raw "true"))\n';
+      '  (base-type string))\n';
 
     const parsed = parseFile(source, FILE_PATH);
-    // Each top-level is a list node; the parser allows the new heads.
-    expect(parsed.body).toHaveLength(2);
+    expect(parsed.body).toHaveLength(1);
     expect((parsed.body[0] as ListNode).head).toBe("branded-id");
-    expect((parsed.body[1] as ListNode).head).toBe("smart-ctor");
   });
 });

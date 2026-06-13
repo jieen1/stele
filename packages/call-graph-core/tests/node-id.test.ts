@@ -63,8 +63,20 @@ describe("parseNodeId", () => {
     expect(parseNodeId("")).toBeNull();
     expect(parseNodeId("no-double-colon")).toBeNull();
     expect(parseNodeId("::orphan(0)")).toBeNull();
-    expect(parseNodeId("src/x.ts::foo")).toBeNull();
     expect(parseNodeId("src/x.ts::foo()garbage")).toBeNull();
+  });
+
+  it("parses an arity-less NodeId (e.g. the Python extractor) with arity 'unspecified'", () => {
+    const parsed = parseNodeId("db.py::delete_all");
+    expect(parsed).not.toBeNull();
+    expect(parsed!.filePath).toBe("db.py");
+    expect(parsed!.symbolName).toBe("delete_all");
+    expect(parsed!.arity).toBe("unspecified");
+    const method = parseNodeId("svc.py::Svc::run");
+    expect(method).not.toBeNull();
+    expect(method!.container).toEqual(["Svc"]);
+    expect(method!.symbolName).toBe("run");
+    expect(method!.arity).toBe("unspecified");
   });
 
   it("returns null for invalid disambiguator format", () => {

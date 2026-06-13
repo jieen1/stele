@@ -27,7 +27,6 @@ export const TOP_LEVEL_DECLARATIONS = new Set([
   "architecture",
   "core-node",
   "branded-id",
-  "smart-ctor",
   "trace-policy",
   "type-state",
   "type-state-binding",
@@ -388,7 +387,7 @@ export type CoreNodeDeclaration = {
   metrics: CoreNodeMetricBoundary[];
 };
 
-// -- Branded-id and smart-ctor declarations (type-driven self-protection) --
+// -- Branded-id declarations (type-driven self-protection) --
 
 export type BrandedIdDeclaration = {
   kind: "branded-id";
@@ -400,17 +399,6 @@ export type BrandedIdDeclaration = {
   baseType: string;
   pattern?: string;
   entityScope?: string;
-};
-
-export type SmartCtorDeclaration = {
-  kind: "smart-ctor";
-  filePath: string;
-  node: ListNode;
-  span: SourceSpan;
-  id: string;
-  constructorName: string;
-  denyRaw: boolean;
-  target?: string;
 };
 
 // -- Extern-alias declarations (cross-language symbol bridging, Round 3 P0-6) --
@@ -452,7 +440,6 @@ export type ContractFile = {
   architectures: ArchitectureDeclaration[];
   coreNodes: CoreNodeDeclaration[];
   brandedIds: BrandedIdDeclaration[];
-  smartCtors: SmartCtorDeclaration[];
   tracePolicies: readonly TracePolicyDeclaration[];
   typeStates: readonly TypeStateDeclaration[];
   typeStateBindings: readonly TypeStateBindingDeclaration[];
@@ -477,7 +464,6 @@ export type Contract = {
   architectures: ArchitectureDeclaration[];
   coreNodes: CoreNodeDeclaration[];
   brandedIds: BrandedIdDeclaration[];
-  smartCtors: SmartCtorDeclaration[];
   tracePolicies: readonly TracePolicyDeclaration[];
   typeStates: readonly TypeStateDeclaration[];
   typeStateBindings: readonly TypeStateBindingDeclaration[];

@@ -86,7 +86,7 @@ export type PackageName = string & { readonly __brand: typeof PACKAGE_NAME_BRAND
  *   - `architecture.<arch>.<rest>` (cli/src/architecture/stage.ts)
  *   - `complexity.<id>.<metric>`, `design_integrity.violation`
  *   - `effect.<rest>`, `trace.<rest>`, `typestate.<rest>`
- *   - `typedriven.<rest>` (smart-ctor / branded-id / eslint / tsc)
+ *   - `typedriven.<rest>` (branded-id / eslint / tsc)
  *   - `stele.<rest>` (e.g. `stele.check.execution_error`,
  *     `stele.baseline.human_file_drift`, `stele.self.no_baseline`)
  *

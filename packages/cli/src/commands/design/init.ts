@@ -66,10 +66,6 @@ function buildTemplate(preset: string): DesignProfile {
         mode: "core_ids_only",
         declarations: [],
       },
-      smart_constructors: {
-        mode: "all_value_objects",
-        value_objects: [],
-      },
     },
     toolchain_contracts: {
       typescript_config: {

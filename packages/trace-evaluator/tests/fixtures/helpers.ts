@@ -160,7 +160,6 @@ export function mkContract(policies: readonly TracePolicyDeclaration[]): Contrac
     architectures: [],
     coreNodes: [],
     brandedIds: [],
-    smartCtors: [],
     tracePolicies: policies,
   };
 }

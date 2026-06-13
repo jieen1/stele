@@ -36,7 +36,6 @@ function makeMinimalContract(invariantCount = 1): Contract {
     architectures: [],
     coreNodes: [],
     brandedIds: [],
-    smartCtors: [],
     tracePolicies: [],
     typeStates: [],
     typeStateBindings: [],

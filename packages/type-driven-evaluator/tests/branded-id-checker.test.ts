@@ -18,7 +18,7 @@ function makeOptions(
 
 describe("typescript-shape: branded IDs", () => {
   it("valid: entity uses branded ID type produces no violations", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "InvoiceId",
@@ -33,7 +33,7 @@ describe("typescript-shape: branded IDs", () => {
 
   // @tcb-negative @stele/type-driven-evaluator
   it("invalid: entity uses string instead of branded ID produces violations", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "InvoiceId",
@@ -62,7 +62,7 @@ describe("typescript-shape: branded IDs", () => {
   });
 
   it("invalid: function parameter uses string instead of branded ID", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "InvoiceId",
@@ -82,7 +82,7 @@ describe("typescript-shape: branded IDs", () => {
   });
 
   it("missing target file handles gracefully without crash", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "NonExistentId",
@@ -98,7 +98,7 @@ describe("typescript-shape: branded IDs", () => {
   });
 
   it("missing type in file handles gracefully without crash", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "GhostId",
@@ -113,7 +113,7 @@ describe("typescript-shape: branded IDs", () => {
   });
 
   it("advisory suffix scan (no entityScope) produces no violations", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "InvoiceId",
@@ -127,12 +127,12 @@ describe("typescript-shape: branded IDs", () => {
   });
 
   it("empty declarations returns empty violations", () => {
-    const violations = checkBrandedIds(makeOptions([]));
+    const { violations } = checkBrandedIds(makeOptions([]));
     expect(violations).toEqual([]);
   });
 
   it("invalid typeTarget format produces graceful error", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "InvoiceId",
@@ -147,7 +147,7 @@ describe("typescript-shape: branded IDs", () => {
   });
 
   it("multiple declarations aggregate violations", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "InvoiceId",
@@ -169,7 +169,7 @@ describe("typescript-shape: branded IDs", () => {
   });
 
   it("field line and column point to the correct location", () => {
-    const violations = checkBrandedIds(
+    const { violations } = checkBrandedIds(
       makeOptions([
         {
           typeName: "InvoiceId",

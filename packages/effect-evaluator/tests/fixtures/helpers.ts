@@ -211,7 +211,6 @@ export function mkContract(opts: {
     architectures: [],
     coreNodes: [],
     brandedIds: [],
-    smartCtors: [],
     tracePolicies: [],
     typeStates: [],
     typeStateBindings: [],

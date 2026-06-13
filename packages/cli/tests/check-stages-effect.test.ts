@@ -123,7 +123,6 @@ function mkContract(
     architectures: [],
     coreNodes: [],
     brandedIds: [],
-    smartCtors: [],
     tracePolicies: [],
     typeStates: [],
     typeStateBindings: [],

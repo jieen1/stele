@@ -1,7 +1,6 @@
 import type { Contract, Violation } from "@stele/core";
 // Future Phase B fills in this dispatch by importing per-form checkers:
 //   import { checkBrandedIds } from "./branded-id-checker.js";
-//   import { checkSmartConstructors } from "./smart-ctor-checker.js";
 //   import { checkTypeStates } from "./type-state-checker.js";
 //   import { checkEffects } from "./effect-checker.js";
 // Today the cli calls those entry points directly so each declaration
@@ -26,8 +25,8 @@ export interface TypeDrivenCheckResult {
  * "future unified entry" this stub anticipated never materialised. The
  * function remains here as a thin compatibility shim for any external
  * consumer that imported it; new code should call the per-form
- * checkers (`checkBrandedIds`, `checkSmartConstructors`,
- * `evaluateTypeStates`, `evaluateEffects`) directly.
+ * checkers (`checkBrandedIds`, `evaluateTypeStates`, `evaluateEffects`)
+ * directly.
  */
 export async function runTypeDrivenChecks(
   options: TypeDrivenCheckOptions,

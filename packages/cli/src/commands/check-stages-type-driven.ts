@@ -8,21 +8,16 @@ import {
 import type { PreparedCheckContext, ProtectedCheckState } from "../architecture/types.js";
 import {
   checkBrandedIds,
-  checkSmartConstructors,
   type BrandedIdDeclaration as TsBrandedIdDeclaration,
-  type SmartConstructorTarget,
-  type ShapeViolation,
-  type BrandedIdViolation,
 } from "@stele/type-driven-evaluator";
 import { profilePathExists } from "../design-profile/load.js";
 import { loadHashedProfile } from "../design-profile/lifecycle.js";
 
 const RULE_KIND_BRANDED = "typescript-branded-id";
-const RULE_KIND_SMART = "typescript-smart-ctor";
 
 /**
- * Type-driven check stage: enforces (branded-id ...) and (smart-ctor ...)
- * declarations in the contract against the project's TypeScript sources.
+ * Type-driven check stage: enforces (branded-id ...) declarations in the
+ * contract against the project's TypeScript sources.
  */
 export async function buildTypeDrivenStage(
   context: PreparedCheckContext,
@@ -30,9 +25,8 @@ export async function buildTypeDrivenStage(
   command: string,
 ): Promise<ViolationReport> {
   const brandedIds = context.contract.brandedIds;
-  const smartCtors = context.contract.smartCtors;
 
-  if (brandedIds.length === 0 && smartCtors.length === 0) {
+  if (brandedIds.length === 0) {
     return createViolationReport({
       tool: "stele",
       command,
@@ -72,7 +66,7 @@ export async function buildTypeDrivenStage(
     };
 
     try {
-      const brandedViolations: BrandedIdViolation[] = checkBrandedIds({
+      const { violations: brandedViolations, coverage } = checkBrandedIds({
         projectDir: context.projectDir,
         tsconfigPath,
         declarations: [declaration],
@@ -97,6 +91,43 @@ export async function buildTypeDrivenStage(
           fix: { summary: v.fix },
         });
       }
+
+      // Zero-binding guard (parity with trace/effect/type-state): a branded-id
+      // that DECLARES an entity-scope but analyzes 0 files in it enforces
+      // nothing at runtime — a green check that protects nothing. We fire ONLY
+      // for enforced declarations (an advisory branded-id with no entity-scope
+      // intentionally delegates enforcement to the Python *_USES_BRANDED_TYPE
+      // invariants, so it must NOT trip the guard). Suppressed when the decl
+      // already produced violations (a missing file/type is reported above).
+      const cov = coverage[0];
+      if (
+        cov !== undefined &&
+        cov.enforced &&
+        cov.scopeFilesAnalyzed === 0 &&
+        brandedViolations.length === 0
+      ) {
+        const id = ruleId(`typedriven.branded-id.${b.id}.zero_binding`);
+        violations.push({
+          rule_id: id,
+          rule_kind: RULE_KIND_BRANDED,
+          severity: "error",
+          source: { tool: "stele", command, kind: "rule" },
+          location: { path: "contract/generated/ddd-typedriven.stele" },
+          cause: {
+            summary:
+              `Branded-id \`${b.id}\` declares (entity-scope "${b.entityScope}") but it resolves to 0 ` +
+              `analyzable files — it enforces nothing at runtime. A green check that protects nothing is not allowed.`,
+          },
+          fingerprint: id,
+          scope_paths: ["contract/generated/ddd-typedriven.stele"],
+          status: "active",
+          fix: {
+            summary:
+              `Fix the entity-scope glob so it matches real consumer files, or drop the (entity-scope ...) ` +
+              `field to make the branded-id explicitly advisory.`,
+          },
+        });
+      }
     } catch (e) {
       const id = ruleId(`typedriven.branded-id.${b.id}.execution_error`);
       violations.push({
@@ -114,61 +145,6 @@ export async function buildTypeDrivenStage(
     }
   }
 
-  // Smart constructors
-  if (smartCtors.length > 0) {
-    const targets: SmartConstructorTarget[] = smartCtors
-      .filter((s) => s.target !== undefined)
-      .map((s) => ({
-        id: s.id,
-        classTarget: resolve(context.projectDir, (s.target ?? "").split("::")[0] ?? "") + "::" + ((s.target ?? "").split("::")[1] ?? s.id),
-        factoryMethods: [s.constructorName],
-      }));
-
-    if (targets.length > 0) {
-      try {
-        const results = checkSmartConstructors({
-          tsconfigPath,
-          targets,
-        });
-
-        for (const result of results) {
-          for (const v of result.violations) {
-            const id = ruleId(`typedriven.smart-ctor.${result.target.id}`);
-            violations.push({
-              rule_id: id,
-              rule_kind: RULE_KIND_SMART,
-              severity: shapeSeverity(v),
-              source: { tool: "stele", command, kind: "rule" },
-              location: {
-                path: relativize(context.projectDir, v.file),
-                line: v.line,
-                column: v.column,
-              },
-              cause: { summary: v.message },
-              fingerprint: `${id}|${v.file}|${v.line ?? 0}|${v.column ?? 0}`,
-              scope_paths: [relativize(context.projectDir, v.file)],
-              status: "active",
-              fix: { summary: v.fix },
-            });
-          }
-        }
-      } catch (e) {
-        violations.push({
-          rule_id: ruleId("typedriven.smart-ctor.execution_error"),
-          rule_kind: RULE_KIND_SMART,
-          severity: "error",
-          source: { tool: "stele", command, kind: "rule" },
-          location: { path: "contract/generated/ddd-typedriven.stele" },
-          cause: { summary: `Smart-ctor check failed: ${e instanceof Error ? e.message : String(e)}` },
-          fingerprint: "typedriven.smart-ctor.execution_error",
-          scope_paths: ["contract/generated/ddd-typedriven.stele"],
-          status: "active",
-          fix: { summary: "Ensure tsconfig and smart-ctor targets are valid." },
-        });
-      }
-    }
-  }
-
   return createViolationReport({
     tool: "stele",
     command,
@@ -179,10 +155,6 @@ export async function buildTypeDrivenStage(
     },
     violations,
   });
-}
-
-function shapeSeverity(v: ShapeViolation): "error" | "warning" {
-  return v.severity === "warning" ? "warning" : "error";
 }
 
 function relativize(projectDir: string, file: string): string {

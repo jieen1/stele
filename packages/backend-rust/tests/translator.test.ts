@@ -652,7 +652,6 @@ describe("generateRustSource", () => {
             architectures: [],
             coreNodes: [],
             brandedIds: [],
-            smartCtors: [],
             tracePolicies: [],
             typeStates: [],
             typeStateBindings: [],

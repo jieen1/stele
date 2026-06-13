@@ -7,7 +7,7 @@ import { parseScenarioDeclaration } from "./structure-scenario.js";
 import { parseCodeShapeDeclaration } from "./structure-code-shape.js";
 import { parseArchitectureDeclaration } from "./structure-architecture.js";
 import { parseCoreNodeDeclaration } from "./structure-core-node.js";
-import { parseBrandedIdDeclaration, parseSmartCtorDeclaration } from "./structure-type-driven.js";
+import { parseBrandedIdDeclaration } from "./structure-type-driven.js";
 import { parseTracePolicyDeclaration } from "./structure-trace-policy.js";
 import {
   parseTypeStateBindingDeclaration,
@@ -38,7 +38,6 @@ import type {
   LoadedContractFile,
   MetadataDeclaration,
   OperatorDeclaration,
-  SmartCtorDeclaration,
   CheckerDeclaration,
   TracePolicyDeclaration,
   TypeStateBindingDeclaration,
@@ -62,7 +61,6 @@ export function buildContract(rootPath: string, files: LoadedContractFile[]): Co
     architectures: contractFiles.flatMap((file) => file.architectures),
     coreNodes: contractFiles.flatMap((file) => file.coreNodes),
     brandedIds: contractFiles.flatMap((file) => file.brandedIds),
-    smartCtors: contractFiles.flatMap((file) => file.smartCtors),
     tracePolicies: contractFiles.flatMap((file) => [...file.tracePolicies]),
     typeStates: contractFiles.flatMap((file) => [...file.typeStates]),
     typeStateBindings: contractFiles.flatMap((file) => [...file.typeStateBindings]),
@@ -96,7 +94,6 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
   const architectures: ArchitectureDeclaration[] = [];
   const coreNodes: CoreNodeDeclaration[] = [];
   const brandedIds: BrandedIdDeclaration[] = [];
-  const smartCtors: SmartCtorDeclaration[] = [];
   const tracePolicies: TracePolicyDeclaration[] = [];
   const typeStates: TypeStateDeclaration[] = [];
   const typeStateBindings: TypeStateBindingDeclaration[] = [];
@@ -185,9 +182,6 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
       case "branded-id":
         brandedIds.push(parseBrandedIdDeclaration(file.path, node));
         break;
-      case "smart-ctor":
-        smartCtors.push(parseSmartCtorDeclaration(file.path, node));
-        break;
       case "trace-policy":
         tracePolicies.push(parseTracePolicyDeclaration(file.path, node));
         break;
@@ -229,7 +223,6 @@ function parseContractFile(file: LoadedContractFile): ContractFile {
     architectures,
     coreNodes,
     brandedIds,
-    smartCtors,
     tracePolicies,
     typeStates,
     typeStateBindings,

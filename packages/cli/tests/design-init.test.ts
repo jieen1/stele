@@ -84,8 +84,6 @@ describe("design init --preset ddd-typedriven", () => {
     expect(profile.type_driven!.enabled).toBe(false);
     expect(profile.type_driven!.branded_ids!.mode).toBe("core_ids_only");
     expect(profile.type_driven!.branded_ids!.declarations).toEqual([]);
-    expect(profile.type_driven!.smart_constructors!.mode).toBe("all_value_objects");
-    expect(profile.type_driven!.smart_constructors!.value_objects).toEqual([]);
 
     expect(profile.toolchain_contracts).toBeDefined();
     expect(profile.toolchain_contracts!.typescript_config).toBeDefined();

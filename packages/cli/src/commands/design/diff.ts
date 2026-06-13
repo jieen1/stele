@@ -578,9 +578,6 @@ function compareTypeDriven(
     // ADT
     compareADT(oldTd, newTd, changes);
 
-    // Smart constructors
-    compareSmartConstructors(oldTd, newTd, changes);
-
     // Type state
     compareTypeState(oldTd, newTd, changes);
 
@@ -697,43 +694,6 @@ function compareADT(
         changeClass: "weakening",
         requiresApproval: true,
         description: `ADT entity removed: ${name}`,
-      });
-    }
-  }
-}
-
-function compareSmartConstructors(
-  oldTd: NonNullable<DesignProfile["type_driven"]>,
-  newTd: NonNullable<DesignProfile["type_driven"]>,
-  changes: DesignDiffChange[],
-): void {
-  const oldVos = oldTd.smart_constructors?.value_objects ?? [];
-  const newVos = newTd.smart_constructors?.value_objects ?? [];
-
-  const oldMap = new Map(oldVos.map((s) => [s.id, s]));
-  const newMap = new Map(newVos.map((s) => [s.id, s]));
-
-  const oldIds = new Set(oldMap.keys());
-  const newIds = new Set(newMap.keys());
-
-  for (const id of newIds) {
-    if (!oldIds.has(id)) {
-      changes.push({
-        field: `type_driven.smart_constructors.${id}`,
-        changeClass: "additive",
-        requiresApproval: true,
-        description: `New smart constructor: ${id}`,
-      });
-    }
-  }
-
-  for (const id of oldIds) {
-    if (!newIds.has(id)) {
-      changes.push({
-        field: `type_driven.smart_constructors.${id}`,
-        changeClass: "weakening",
-        requiresApproval: true,
-        description: `Smart constructor removed: ${id}`,
       });
     }
   }

@@ -121,6 +121,9 @@ class _PyExtractor:
         self.imports: dict[str, dict[str, str | None]] = {}
         # rel-path → {imported name → originating rel-path}
         self.from_imports: dict[str, dict[str, str | None]] = {}
+        # rel-path → module-scope {alias name → aliased name} (single-hop
+        # `w = delete_all` bindings). Per-function aliases are computed lazily.
+        self.module_aliases: dict[str, dict[str, str]] = {}
         self.parse_errors: list[tuple[str, str]] = []
 
     def record_parse_error(self, rel: str, message: str) -> None:
@@ -169,6 +172,8 @@ class _PyExtractor:
         self.module_defs[rel] = defs
         self.imports[rel] = imports
         self.from_imports[rel] = from_imports
+        # Module-scope single-hop aliases (skips nested def/class bodies).
+        self.module_aliases[rel] = _collect_name_aliases(tree.body)
 
         # Second pass: emit nodes + edges.
         self._emit_nodes_and_edges(rel, tree)
@@ -208,8 +213,9 @@ class _PyExtractor:
                 self._emit_class(rel, top)
             else:
                 # Top-level statements with calls → edges from module-init.
+                module_aliases = self.module_aliases.get(rel, {})
                 for call in _iter_calls(top):
-                    self._emit_call_edge(rel, module_init_id, None, call)
+                    self._emit_call_edge(rel, module_init_id, None, call, module_aliases)
 
     def _emit_class(self, rel: str, node: ast.ClassDef) -> None:
         cls_id = f"{rel}::{node.name}"
@@ -249,8 +255,11 @@ class _PyExtractor:
         if effects:
             node["effects"] = effects
         self._register_node(node)
+        # Function-scope aliases (own body, not nested defs) layered over
+        # module-scope aliases, so `w = delete_all; w()` resolves to a real edge.
+        aliases = {**self.module_aliases.get(rel, {}), **_collect_name_aliases(fn.body)}
         for call in _iter_calls(fn):
-            self._emit_call_edge(rel, nid, class_name, call)
+            self._emit_call_edge(rel, nid, class_name, call, aliases)
 
     def _emit_call_edge(
         self,
@@ -258,8 +267,9 @@ class _PyExtractor:
         from_id: str,
         enclosing_class: str | None,
         call: ast.Call,
+        aliases: dict[str, str],
     ) -> None:
-        target_id, raw = self._resolve_call(rel, enclosing_class, call)
+        target_id, raw = self._resolve_call(rel, enclosing_class, call, aliases)
         site = _span_of(call)
         is_async = isinstance(getattr(call, "_parent", None), ast.Await)
         if target_id is None:
@@ -269,6 +279,7 @@ class _PyExtractor:
                 "callSite": site,
                 "rawText": raw[:200],
                 "reason": reason,
+                "nameHidden": _is_name_hidden(call.func, reason),
             })
             return
         self.edges.append({
@@ -285,6 +296,7 @@ class _PyExtractor:
         rel: str,
         enclosing_class: str | None,
         call: ast.Call,
+        aliases: dict[str, str],
     ) -> tuple[str | None, str]:
         defs = self.module_defs.get(rel, {})
         from_imports = self.from_imports.get(rel, {})
@@ -296,15 +308,25 @@ class _PyExtractor:
             # Same-module top-level def.
             if name in defs:
                 return defs[name], raw
-            # `from MOD import name` binding. Only return a resolved
-            # target when the originating module is a project file;
-            # external (stdlib / 3rd-party) → None (caller classifies
-            # as external-lib).
+            # `from MOD import name` binding (project file → edge; external → None).
             if name in from_imports:
                 resolved_mod = from_imports[name]
                 if resolved_mod is None:
                     return None, raw
                 return f"{resolved_mod}::{name}", raw
+            # Single-hop local-alias resolution (mirrors the TS resolver's
+            # dereferenceIdentifierAlias): `w = delete_all; w()` binds `w` to a
+            # known def/import one hop away, so it becomes a REAL edge instead of
+            # a silently-dropped unresolved call the fail-closed gate never sees.
+            aliased = aliases.get(name)
+            if aliased is not None:
+                if aliased in defs:
+                    return defs[aliased], raw
+                if aliased in from_imports:
+                    resolved_mod = from_imports[aliased]
+                    if resolved_mod is None:
+                        return None, raw
+                    return f"{resolved_mod}::{aliased}", raw
             return None, raw
         if isinstance(func, ast.Attribute):
             attr = func.attr
@@ -490,6 +512,82 @@ def _classify_unresolved(
     if isinstance(func, ast.Subscript):
         return "dynamic"
     return "dynamic"
+
+
+def _is_name_hidden(func: ast.expr, reason: str) -> bool:
+    """Whether the called NAME is hidden from static analysis — the field the
+    trace-policy fail-closed gate keys on (see `UnresolvedCall.nameHidden` in
+    @stele/call-graph-core). True ONLY when the callee identity is not
+    statically recoverable, so the site COULD be the forbidden target:
+
+      - reflection (`getattr`/`setattr`/`eval`/`exec`/...) names a target at
+        runtime;
+      - computed-member dispatch `obj[expr]()`;
+      - invoking the result of another call/await `factory()()`, `(await c)()`;
+      - an immediately-invoked lambda / conditional callee.
+
+    A statically VISIBLE name that merely failed to resolve — a bare identifier
+    `predicate()` (a parameter holding a callback — the documented HOF residual
+    hole, mitigated by type-state/effect) or an attribute `obj.method()`, and the
+    `external-lib` / `module-not-resolved` reasons — is NOT treated as a hidden
+    bypass here.
+
+    Soundness boundary: this classifier is paired with single-hop local-alias
+    resolution in `_resolve_call` (`w = delete_all; w()` becomes a real edge, so
+    a name that ALIASES a forbidden target is caught directly, not via this
+    function). That alias resolution is what makes the visible-bare-name case
+    sound — without it, a bare-name alias of a forbidden target would be a
+    false-green. This mirrors the TypeScript resolver's combination of
+    `dereferenceIdentifierAlias` + the `nameHidden` assignment (resolve-callee.ts);
+    it is NOT the `nameHidden` rule alone.
+    """
+    if reason == "reflection":
+        return True
+    if reason in ("external-lib", "module-not-resolved"):
+        return False
+    # reason == "dynamic": the callee identity is recoverable only for a bare
+    # identifier (`predicate()`) or an attribute access (`obj.method()`).
+    # Subscript / call-result / await / lambda / conditional callees hide the
+    # name, so fail-closed must apply.
+    return not isinstance(func, (ast.Name, ast.Attribute))
+
+
+def _collect_name_aliases(body: list[ast.stmt]) -> dict[str, str]:
+    """Collect single-hop `name = <bare Name>` bindings within ONE scope, WITHOUT
+    descending into nested function/class bodies. Mirrors the TS resolver's
+    `dereferenceIdentifierAlias` (one hop, identifier-initializer only): a local
+    alias of a known callee, e.g. `w = delete_all; w()`, then resolves to a real
+    call-graph edge in `_resolve_call` instead of a silently-dropped unresolved
+    call. Recurses through control-flow blocks (if/for/while/with/try) so an
+    alias bound under a branch is still seen, but stops at nested def/class so a
+    nested scope's binding does not leak to its parent.
+    """
+    aliases: dict[str, str] = {}
+
+    def visit(stmts: list[ast.stmt]) -> None:
+        for s in stmts:
+            if (
+                isinstance(s, ast.Assign)
+                and len(s.targets) == 1
+                and isinstance(s.targets[0], ast.Name)
+                and isinstance(s.value, ast.Name)
+            ):
+                # Last write wins within the scope (best-effort, single hop).
+                aliases[s.targets[0].id] = s.value.id
+            if isinstance(s, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith)):
+                visit(getattr(s, "body", []))
+                visit(getattr(s, "orelse", []))
+            elif isinstance(s, ast.Try):
+                visit(s.body)
+                for handler in s.handlers:
+                    visit(handler.body)
+                visit(s.orelse)
+                visit(s.finalbody)
+            # NOTE: deliberately do not recurse into FunctionDef/AsyncFunctionDef/
+            # ClassDef bodies — those are separate scopes.
+
+    visit(body)
+    return aliases
 
 
 if __name__ == "__main__":

@@ -54,7 +54,6 @@ function makeContract(invariants: InvariantDeclaration[], groups?: import("@stel
         architectures: [],
         coreNodes: [],
         brandedIds: [],
-        smartCtors: [],
         tracePolicies: [],
         typeStates: [],
         typeStateBindings: [],

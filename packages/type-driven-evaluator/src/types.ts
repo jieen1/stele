@@ -1,30 +1,3 @@
-export interface ShapeViolation {
-  ruleId: string;
-  ruleKind: "typescript-shape";
-  file: string;
-  line?: number;
-  column?: number;
-  message: string;
-  severity: "error" | "warning";
-  fix: string;
-}
-
-export interface SmartConstructorTarget {
-  id: string;
-  classTarget: string;
-  factoryMethods: string[];
-}
-
-export interface SmartConstructorCheckOptions {
-  tsconfigPath: string;
-  targets: SmartConstructorTarget[];
-}
-
-export interface SmartConstructorResult {
-  target: SmartConstructorTarget;
-  violations: ShapeViolation[];
-}
-
 // Branded ID types
 
 export interface BrandedIdDeclaration {
@@ -45,4 +18,22 @@ export interface BrandedIdCheckOptions {
   projectDir: string;
   tsconfigPath?: string;
   declarations: BrandedIdDeclaration[];
+}
+
+/**
+ * Per-declaration binding coverage, so the check stage can detect a vacuously
+ * green branded-id — one whose `entity-scope` is declared but resolves to no
+ * analyzable file (a renamed/typo'd scope that enforces nothing at runtime).
+ */
+export interface BrandedIdCoverage {
+  typeName: string;
+  /** True when the declaration carries an `entity-scope` (enforcement attempted). */
+  enforced: boolean;
+  /** Scope files actually analyzed for raw-string usage (excludes the type-def file). */
+  scopeFilesAnalyzed: number;
+}
+
+export interface BrandedIdCheckResult {
+  violations: BrandedIdViolation[];
+  coverage: BrandedIdCoverage[];
 }

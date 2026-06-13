@@ -28,7 +28,13 @@ export interface ParsedNodeId {
   readonly container: readonly string[];
   /** "pay" / "lambda@N:M". */
   readonly symbolName: string;
-  readonly arity: number;
+  /**
+   * Call arity, or `"unspecified"` when the NodeId carries no `(N)` suffix —
+   * a backend (e.g. the Python extractor) that does not track arity. A trace
+   * pattern that omits arity matches an `"unspecified"` node; a pattern that
+   * pins `(N)` does not.
+   */
+  readonly arity: number | "unspecified";
   /** 8-char SHA-1 prefix. Undefined when not present. */
   readonly disambiguator: string | undefined;
 }
@@ -89,20 +95,46 @@ export function parseNodeId(text: string): ParsedNodeId | null {
   // that (joined by `::`) is the container chain. We locate the last
   // `::` that precedes the final `(...)` group.
   const tailMatch = TAIL_REGEX.exec(rest);
-  if (!tailMatch) {
-    return null;
-  }
-  const head = tailMatch[1];
-  const arityStr = tailMatch[2];
-  const disambiguator = tailMatch[3];
-
-  if (head === undefined || arityStr === undefined) {
-    return null;
-  }
-
-  const arity = Number(arityStr);
-  if (!Number.isFinite(arity) || arity < 0 || !Number.isInteger(arity)) {
-    return null;
+  let head: string;
+  let arity: number | "unspecified";
+  let disambiguator: string | undefined;
+  if (tailMatch) {
+    const headRaw = tailMatch[1];
+    const arityStr = tailMatch[2];
+    disambiguator = tailMatch[3];
+    if (headRaw === undefined || arityStr === undefined) {
+      return null;
+    }
+    const a = Number(arityStr);
+    if (!Number.isFinite(a) || a < 0 || !Number.isInteger(a)) {
+      return null;
+    }
+    head = headRaw;
+    arity = a;
+  } else {
+    // Arity-less NodeId (e.g. the Python extractor's `db.py::delete_all`): the
+    // backend does not record call arity. Parse `head[#disambig]` and mark the
+    // arity "unspecified" so pattern matching still works (an arity-less pattern
+    // matches; a `(N)` pattern does not).
+    let working = rest;
+    const hashIdx = working.lastIndexOf("#");
+    if (hashIdx >= 0 && /^[0-9a-f]{8}$/.test(working.slice(hashIdx + 1))) {
+      disambiguator = working.slice(hashIdx + 1);
+      working = working.slice(0, hashIdx);
+    }
+    // A genuinely arity-less id carries no parens or stray `#`. If either
+    // remains, this was a MALFORMED `(N)` / disambiguator — keep rejecting it
+    // (preserve the strict-parse contract) rather than absorbing it as a symbol.
+    if (
+      working.length === 0 ||
+      working.includes("(") ||
+      working.includes(")") ||
+      working.includes("#")
+    ) {
+      return null;
+    }
+    head = working;
+    arity = "unspecified";
   }
 
   // Split head into container chain + symbol.
@@ -136,7 +168,8 @@ export function formatNodeId(parts: {
   externLogicalName?: string;
   container?: readonly string[];
   symbolName: string;
-  arity: number;
+  /** `"unspecified"` round-trips an arity-less NodeId (omits the `(N)` group). */
+  arity: number | "unspecified";
   disambiguator?: string;
 }): string {
   const {
@@ -161,8 +194,8 @@ export function formatNodeId(parts: {
   if (typeof symbolName !== "string" || symbolName.length === 0) {
     throw new Error("formatNodeId: symbolName required");
   }
-  if (!Number.isInteger(arity) || arity < 0) {
-    throw new Error("formatNodeId: arity must be a non-negative integer");
+  if (arity !== "unspecified" && (!Number.isInteger(arity) || arity < 0)) {
+    throw new Error("formatNodeId: arity must be a non-negative integer or 'unspecified'");
   }
   if (disambiguator !== undefined && !/^[0-9a-f]{8}$/.test(disambiguator)) {
     throw new Error(
@@ -176,8 +209,9 @@ export function formatNodeId(parts: {
       : (filePath as string);
 
   const containerSegment = container.length > 0 ? `${container.join("::")}::` : "";
+  const aritySegment = arity === "unspecified" ? "" : `(${arity})`;
   const suffix = disambiguator !== undefined ? `#${disambiguator}` : "";
-  return `${prefix}::${containerSegment}${symbolName}(${arity})${suffix}`;
+  return `${prefix}::${containerSegment}${symbolName}${aritySegment}${suffix}`;
 }
 
 /**

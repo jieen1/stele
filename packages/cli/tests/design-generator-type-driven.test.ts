@@ -3,7 +3,6 @@ import type { DesignProfile } from "../src/design-profile/types.js";
 import { generateFromProfile } from "../src/design-generator/ddd.js";
 import {
   renderBrandedId,
-  renderSmartCtor,
   renderTypeDrivenDeclarations,
   resolveBrandedIdTarget,
 } from "../src/design-generator/render-stele.js";
@@ -60,18 +59,6 @@ describe("renderBrandedId", () => {
   });
 });
 
-describe("renderSmartCtor", () => {
-  it("renders constructor and deny-raw flags", () => {
-    const cdl = renderSmartCtor({
-      name: "RuleId",
-      ...({ constructor: "parseRuleId(input: string): RuleId", deny_raw: true } as Record<string, unknown>),
-    });
-    expect(cdl).toContain('(smart-ctor "RuleId"');
-    expect(cdl).toContain('(constructor "parseRuleId")');
-    expect(cdl).toContain('(deny-raw "true")');
-  });
-});
-
 describe("resolveBrandedIdTarget", () => {
   it("returns explicit target when provided", () => {
     expect(resolveBrandedIdTarget("X", "explicit.ts::X")).toBe("explicit.ts::X");
@@ -87,10 +74,9 @@ describe("renderTypeDrivenDeclarations", () => {
   it("returns empty arrays when type_driven absent", () => {
     const out = renderTypeDrivenDeclarations(minimalProfile());
     expect(out.brandedIds).toEqual([]);
-    expect(out.smartCtors).toEqual([]);
   });
 
-  it("renders branded-id and smart-ctor from profile.type_driven", () => {
+  it("renders branded-id from profile.type_driven", () => {
     const profile: DesignProfile = {
       ...minimalProfile(),
       type_driven: {
@@ -99,12 +85,6 @@ describe("renderTypeDrivenDeclarations", () => {
           mode: "hard",
           declarations: [
             { name: "RuleId", ...({ base_type: "string", invariant: "matches /^[a-z]+$/" } as Record<string, unknown>) },
-          ],
-        },
-        smart_constructors: {
-          mode: "hard",
-          value_objects: [
-            { name: "RuleId", ...({ constructor: "parseRuleId(input: string): RuleId", deny_raw: true } as Record<string, unknown>) },
           ],
         },
         adt: { mode: "hard" },
@@ -114,13 +94,11 @@ describe("renderTypeDrivenDeclarations", () => {
     const out = renderTypeDrivenDeclarations(profile);
     expect(out.brandedIds).toHaveLength(1);
     expect(out.brandedIds[0]).toContain('(branded-id "RuleId"');
-    expect(out.smartCtors).toHaveLength(1);
-    expect(out.smartCtors[0]).toContain('(smart-ctor "RuleId"');
   });
 });
 
 describe("generateFromProfile — type-driven integration", () => {
-  it("emits branded-id and smart-ctor blocks in combined output", () => {
+  it("emits branded-id blocks in combined output", () => {
     const profile: DesignProfile = {
       ...minimalProfile(),
       type_driven: {
@@ -131,21 +109,13 @@ describe("generateFromProfile — type-driven integration", () => {
             { name: "RuleId", ...({ base_type: "string", invariant: "matches /^[a-z]+$/" } as Record<string, unknown>) },
           ],
         },
-        smart_constructors: {
-          mode: "hard",
-          value_objects: [
-            { name: "RuleId", ...({ constructor: "parseRuleId(input: string): RuleId", deny_raw: true } as Record<string, unknown>) },
-          ],
-        },
         adt: { mode: "hard" },
         type_state: { mode: "hard" },
       },
     };
     const result = generateFromProfile(brand(profile));
     expect(result.brandedIds).toHaveLength(1);
-    expect(result.smartCtors).toHaveLength(1);
     expect(result.combined).toContain('(branded-id "RuleId"');
-    expect(result.combined).toContain('(smart-ctor "RuleId"');
   });
 
   it("output is byte-stable across repeated calls", () => {
@@ -158,12 +128,6 @@ describe("generateFromProfile — type-driven integration", () => {
           declarations: [
             { name: "A", ...({ base_type: "string", invariant: "matches /^a/" } as Record<string, unknown>) },
             { name: "B", ...({ base_type: "string", invariant: "matches /^b/" } as Record<string, unknown>) },
-          ],
-        },
-        smart_constructors: {
-          mode: "hard",
-          value_objects: [
-            { name: "A", ...({ constructor: "parseA", deny_raw: true } as Record<string, unknown>) },
           ],
         },
         adt: { mode: "hard" },

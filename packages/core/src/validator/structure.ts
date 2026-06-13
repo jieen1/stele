@@ -35,10 +35,7 @@ export {
   readCodeShapeNameList,
 } from "./structure-code-shape.js";
 
-export {
-  parseBrandedIdDeclaration,
-  parseSmartCtorDeclaration,
-} from "./structure-type-driven.js";
+export { parseBrandedIdDeclaration } from "./structure-type-driven.js";
 
 export {
   parseTracePolicyDeclaration,
@@ -109,7 +106,6 @@ export type {
   CoreNodeMetricName,
   CoreNodeRole,
   BrandedIdDeclaration,
-  SmartCtorDeclaration,
   TracePolicyDeclaration,
   TracePolicyExempt,
   TypeStateBindingDeclaration,

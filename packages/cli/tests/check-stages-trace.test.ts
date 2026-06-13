@@ -1,5 +1,8 @@
-import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   CallGraph,
   CallGraphEdge,
@@ -120,7 +123,6 @@ function mkContract(policies: readonly TracePolicyDeclaration[]): Contract {
     architectures: [],
     coreNodes: [],
     brandedIds: [],
-    smartCtors: [],
     tracePolicies: policies,
   } as unknown as Contract;
 }
@@ -446,6 +448,105 @@ describe("buildTraceStage — successful evaluation", () => {
     _clearCallGraphCacheForTests(context);
   });
 
+  it("P0 regression: a PYTHON graph with a name-hidden unresolved call fails closed", async () => {
+    // The original hole: the Python extractor never emitted `nameHidden`, so on
+    // a python-target project `!u.nameHidden` was truthy for EVERY unresolved
+    // call and the fail-closed gate never fired — a getattr()/obj[expr]()
+    // dispatch to a forbidden target passed green. With the extractor now
+    // classifying nameHidden, a python-shaped graph must fail closed exactly
+    // like the TypeScript one above.
+    const policy = mkPolicy({ id: "PAYMENT_GUARD", target: [DB], mustTransit: [REPO] });
+    const callGraph = mkCallGraph({
+      language: "python",
+      nodes: [
+        mkNode({ id: CTRL, filePath: "controllers/order.py" }),
+        mkNode({ id: REPO, filePath: "repository/orders.py" }),
+        mkNode({ id: DB, filePath: "db/users.py" }),
+      ],
+      edges: [mkEdge({ from: CTRL, to: REPO }), mkEdge({ from: REPO, to: DB })],
+      unresolvedCalls: [
+        {
+          fromId: CTRL,
+          callSite: { line: 21, column: 9 },
+          rawText: "getattr(self, name)()",
+          reason: "reflection",
+          nameHidden: true,
+        },
+      ],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      targetLanguage: "python",
+      projectDir: resolve(__dirname, ".."),
+    });
+    const extract = vi.fn(async () => callGraph);
+
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+    });
+
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(report.ok).toBe(false);
+    const failClosed = report.violations.find(
+      (v) => v.rule_id === "trace.PAYMENT_GUARD.unresolved_call_blocks_evaluation",
+    );
+    expect(failClosed).toBeDefined();
+    expect(failClosed!.severity).toBe("error");
+    expect(failClosed!.location.line).toBe(21);
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("precision: a PYTHON name-VISIBLE unresolved call (predicate()) does NOT over-block", async () => {
+    // The companion guarantee: a visible-name callback that merely failed to
+    // resolve (nameHidden:false) must NOT trip fail-closed, or trace-policy
+    // would be unusable on any Python project that passes callbacks. The
+    // controller reaches DB only INDIRECTLY (via the service), so deny-direct is
+    // clean and an examined call site exists; the only unresolved site is
+    // name-visible, so the build stays green.
+    const SVC = "services/order.py::OrderService::run(0)";
+    const policy = mkPolicy({
+      id: "NO_DIRECT_DB",
+      target: ["**/db/**::*"],
+      denyDirect: ["**/controllers/**::*"],
+    });
+    const callGraph = mkCallGraph({
+      language: "python",
+      nodes: [
+        mkNode({ id: CTRL, filePath: "controllers/order.py" }),
+        mkNode({ id: SVC, filePath: "services/order.py" }),
+        mkNode({ id: DB, filePath: "db/users.py" }),
+      ],
+      edges: [mkEdge({ from: CTRL, to: SVC }), mkEdge({ from: SVC, to: DB })],
+      unresolvedCalls: [
+        {
+          fromId: CTRL,
+          callSite: { line: 7, column: 5 },
+          rawText: "predicate()",
+          reason: "dynamic",
+          nameHidden: false,
+        },
+      ],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      targetLanguage: "python",
+      projectDir: resolve(__dirname, ".."),
+    });
+    const extract = vi.fn(async () => callGraph);
+
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check", {
+      extractCallGraph: extract,
+    });
+
+    const failClosed = report.violations.find(
+      (v) => v.rule_id === "trace.NO_DIRECT_DB.unresolved_call_blocks_evaluation",
+    );
+    expect(failClosed).toBeUndefined();
+    expect(report.ok).toBe(true);
+    expect(report.violations).toHaveLength(0);
+    _clearCallGraphCacheForTests(context);
+  });
+
   it("merges evaluator notices into the violations array without flipping ok", async () => {
     const policy = mkPolicy({
       id: "TRACE_NOTICE",
@@ -602,6 +703,109 @@ describe("buildTraceStage — extern pattern resolution defaults", () => {
 
     expect(report.violations.length).toBeGreaterThanOrEqual(1);
     expect(report.violations[0]!.rule_id).toContain("STRIPE_GUARD");
+    _clearCallGraphCacheForTests(context);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: REAL Python extractor -> trace stage (no injected graph).
+// Closes the seam the two unit halves leave unverified (extractor JSON shape
+// <-> evaluator contract) AND end-to-end-validates the P0 alias fix.
+// ---------------------------------------------------------------------------
+
+function pythonAvailable(): boolean {
+  for (const c of ["python3", "python"]) {
+    try {
+      execFileSync(c, ["--version"], { stdio: "ignore" });
+      return true;
+    } catch {
+      /* try next */
+    }
+  }
+  return false;
+}
+
+const describePy = pythonAvailable() ? describe : describe.skip;
+
+describePy("buildTraceStage — REAL Python extractor (integration)", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs) {
+      try {
+        rmSync(d, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
+    }
+    dirs.length = 0;
+  });
+
+  function mkPyProject(files: Record<string, string>): string {
+    const root = mkdtempSync(join(tmpdir(), "stele-trace-py-"));
+    dirs.push(root);
+    for (const [rel, content] of Object.entries(files)) {
+      const full = join(root, rel);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, content, "utf8");
+    }
+    return root;
+  }
+
+  it("alias of a forbidden target (w = delete_all; w()) is CAUGHT via a real edge (P0 fix, end-to-end)", async () => {
+    const root = mkPyProject({
+      "db.py": "def delete_all():\n    pass\n",
+      "handler.py":
+        "from db import delete_all\n\ndef handler():\n    w = delete_all\n    w()\n",
+    });
+    const policy = mkPolicy({
+      id: "NO_DELETE_ALL",
+      target: ["db.py::delete_all"],
+      denyDirect: ["handler.py::handler"],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      targetLanguage: "python",
+      projectDir: root,
+    });
+
+    // NOTE: no extractCallGraph injected -> the real pyCallGraphExtractor runs.
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check");
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.violations.some((v) => v.rule_id === "trace.NO_DELETE_ALL.direct_call_denied"),
+    ).toBe(true);
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("getattr(self, name)() hidden dispatch fires fail-closed through the real pipeline", async () => {
+    const root = mkPyProject({
+      "db.py": "def delete_all():\n    pass\n",
+      "svc.py":
+        "class Svc:\n" +
+        "    def run(self, name):\n" +
+        "        return getattr(self, name)()\n",
+    });
+    const policy = mkPolicy({
+      id: "GUARD",
+      target: ["db.py::delete_all"],
+      scope: ["svc.py::Svc::run"],
+      mustTransit: ["repo.py::find"],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      targetLanguage: "python",
+      projectDir: root,
+    });
+
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check");
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.violations.some(
+        (v) => v.rule_id === "trace.GUARD.unresolved_call_blocks_evaluation",
+      ),
+    ).toBe(true);
     _clearCallGraphCacheForTests(context);
   });
 });

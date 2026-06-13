@@ -152,18 +152,6 @@ export type BrandedId = {
 };
 
 // ---------------------------------------------------------------------------
-// Smart Constructor
-// ---------------------------------------------------------------------------
-
-export type SmartConstructor = {
-  id?: string;
-  name?: string;
-  decision_ref?: string;
-  class_target?: string;
-  factory_methods?: string[];
-};
-
-// ---------------------------------------------------------------------------
 // Type-Driven section
 // ---------------------------------------------------------------------------
 
@@ -182,10 +170,6 @@ export type TypeDrivenSection = {
   adt?: {
     mode: string;
     entities?: Array<{ name: string; type_target: string }>;
-  };
-  smart_constructors?: {
-    mode: string;
-    value_objects?: SmartConstructor[];
   };
   type_state?: {
     mode: string;

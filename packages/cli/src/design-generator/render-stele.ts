@@ -12,7 +12,6 @@ export { renderAclIntegration } from "./render/context-map.js";
 export { renderAggregateCoreNode, renderAggregateClassShape } from "./render/core-node.js";
 export {
   renderBrandedId,
-  renderSmartCtor,
   renderTypeDrivenDeclarations,
   resolveBrandedIdTarget,
 } from "./render/type-driven.js";
@@ -26,7 +25,6 @@ export function renderAllDeclarations(
   aclArchitecture: string | undefined,
   coreNodes: string[],
   brandedIds: string[] = [],
-  smartCtors: string[] = [],
 ): string {
   const parts: string[] = [...contextArchitectures];
   if (aclArchitecture) {
@@ -34,6 +32,5 @@ export function renderAllDeclarations(
   }
   parts.push(...coreNodes);
   parts.push(...brandedIds);
-  parts.push(...smartCtors);
   return parts.join("\n\n");
 }

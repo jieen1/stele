@@ -337,24 +337,6 @@ function addTypeDrivenErrors(profile: DesignProfile, errors: ValidationErrors, p
 
   // Note: type_driven.adt is deprecated (Phase B); the field is silently accepted
   // for back-compat but never validated. Deprecation notice is emitted by loadProfile.
-
-  // Smart constructor class_target format (skip if not declared)
-  if (td.smart_constructors?.value_objects) {
-    for (const sc of td.smart_constructors.value_objects) {
-      if (!sc.class_target) continue;
-      const err = validateTargetFormat(
-        sc.class_target,
-        `type_driven.smart_constructors.${sc.id ?? sc.name ?? 'unknown'}.class_target`,
-      );
-      if (err) {
-        errors.push({
-          field: `type_driven.smart_constructors.${sc.id ?? sc.name ?? 'unknown'}.class_target`,
-          path: profilePath,
-          message: err,
-        });
-      }
-    }
-  }
 }
 
 /**

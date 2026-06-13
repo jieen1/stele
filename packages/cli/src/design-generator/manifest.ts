@@ -30,13 +30,12 @@ export type ProvenanceRule = {
   // Round 4 F-A-06: widened to accept Phase B CDL forms. The ddd
   // generator may now emit trace-policy / type-state / effect-policy /
   // effect-suppression provenance entries alongside the legacy Phase A
-  // architecture / core-node / branded-id / smart-ctor kinds.
+  // architecture / core-node / branded-id kinds.
   kind:
     | "architecture"
     | "core-node"
     | "class-shape"
     | "branded-id"
-    | "smart-ctor"
     | "trace-policy"
     | "type-state"
     | "effect-policy"

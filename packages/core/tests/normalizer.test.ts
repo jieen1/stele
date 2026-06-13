@@ -205,7 +205,6 @@ function createSingleFileContract(_contract: Contract, file: Contract["files"][n
     coreNodes: [...(file.coreNodes ?? [])],
     architectures: [...(file.architectures ?? [])],
     brandedIds: [...(file.brandedIds ?? [])],
-    smartCtors: [...(file.smartCtors ?? [])],
     tracePolicies: [...(file.tracePolicies ?? [])],
     typeStates: [...(file.typeStates ?? [])],
     typeStateBindings: [...(file.typeStateBindings ?? [])],

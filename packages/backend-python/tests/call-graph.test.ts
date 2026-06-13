@@ -112,6 +112,108 @@ describe("pyCallGraphExtractor", () => {
     );
     expect(unresolved).toBeDefined();
     expect(unresolved!.reason).toBe("external-lib");
+    // external-lib is a statically VISIBLE name → not a hidden bypass.
+    expect(unresolved!.nameHidden).toBe(false);
+  });
+
+  // P0 regression guard: every unresolved call MUST carry a boolean nameHidden.
+  // The trace-policy fail-closed gate fires only on nameHidden===true; if the
+  // extractor omitted the field, `!undefined` skipped EVERY unresolved Python
+  // call and silently disabled fail-closed on Python projects.
+  it("emits a boolean nameHidden on every unresolved call", async () => {
+    const root = await mkProject({
+      "mixed.py":
+        "import os\n" +
+        "def f(predicate, table, name, o):\n" +
+        "    os.getpid()\n" +
+        "    predicate()\n" +
+        "    table[name]()\n" +
+        "    getattr(o, name)()\n",
+    });
+    const graph = await pyCallGraphExtractor.extract({ projectRoot: root });
+    expect(graph.unresolvedCalls.length).toBeGreaterThan(0);
+    for (const u of graph.unresolvedCalls) {
+      expect(typeof u.nameHidden).toBe("boolean");
+    }
+  });
+
+  it("marks computed-member dispatch obj[expr]() as nameHidden=true", async () => {
+    const root = await mkProject({
+      "dispatch.py":
+        "def route(table, name):\n    return table[name]()\n",
+    });
+    const graph = await pyCallGraphExtractor.extract({ projectRoot: root });
+    const hidden = graph.unresolvedCalls.find(
+      (u) => u.fromId === "dispatch.py::route" && u.rawText === "table[name]()",
+    );
+    expect(hidden).toBeDefined();
+    expect(hidden!.nameHidden).toBe(true);
+  });
+
+  it("marks reflection getattr(o, name)() dispatch as nameHidden=true", async () => {
+    const root = await mkProject({
+      "reflect.py":
+        "def call(o, name):\n    return getattr(o, name)()\n",
+    });
+    const graph = await pyCallGraphExtractor.extract({ projectRoot: root });
+    const hidden = graph.unresolvedCalls.filter(
+      (u) => u.fromId === "reflect.py::call" && u.nameHidden === true,
+    );
+    // Both the outer `(...)()` invocation of a call-result AND the inner
+    // getattr(...) reflection call are name-hidden — at least one fires.
+    expect(hidden.length).toBeGreaterThan(0);
+  });
+
+  it("resolves a single-hop local alias of an imported target to a REAL edge (no false-green)", async () => {
+    // Regression for the review's HIGH finding: `w = delete_all; w()` must
+    // resolve to a real edge to the project target (so a trace deny-policy
+    // fires directly), not a silently-dropped unresolved call.
+    const root = await mkProject({
+      "db.py": "def delete_all():\n    pass\n",
+      "handler.py":
+        "from db import delete_all\n\ndef handler():\n    w = delete_all\n    w()\n",
+    });
+    const graph = await pyCallGraphExtractor.extract({ projectRoot: root });
+    const edge = graph.edges.find(
+      (e) => e.fromId === "handler.py::handler" && e.toId === "db.py::delete_all",
+    );
+    expect(edge).toBeDefined();
+    // No leftover unresolved `w()` (which would have been the false-green).
+    expect(graph.unresolvedCalls.find((u) => u.rawText === "w()")).toBeUndefined();
+  });
+
+  it("does not leak a sibling function's alias (per-scope aliasing)", async () => {
+    // `a` aliases delete_all; `b` only calls `w()` with no alias of its own.
+    // b's `w()` must NOT resolve to delete_all — aliases are scoped per function.
+    const root = await mkProject({
+      "db.py": "def delete_all():\n    pass\n",
+      "two.py":
+        "from db import delete_all\n\n" +
+        "def a():\n    w = delete_all\n    w()\n\n" +
+        "def b():\n    w()\n",
+    });
+    const graph = await pyCallGraphExtractor.extract({ projectRoot: root });
+    // a's w() resolves to a real edge.
+    expect(
+      graph.edges.find((e) => e.fromId === "two.py::a" && e.toId === "db.py::delete_all"),
+    ).toBeDefined();
+    // b's w() does NOT (no alias in b's scope) — no leak.
+    expect(
+      graph.edges.find((e) => e.fromId === "two.py::b" && e.toId === "db.py::delete_all"),
+    ).toBeUndefined();
+  });
+
+  it("marks a visible-name callback predicate() as nameHidden=false (no over-block)", async () => {
+    const root = await mkProject({
+      "cb.py":
+        "def run(predicate):\n    return predicate()\n",
+    });
+    const graph = await pyCallGraphExtractor.extract({ projectRoot: root });
+    const visible = graph.unresolvedCalls.find(
+      (u) => u.fromId === "cb.py::run" && u.rawText === "predicate()",
+    );
+    expect(visible).toBeDefined();
+    expect(visible!.nameHidden).toBe(false);
   });
 
   it("extracts effects from @stele.effects([...]) decorator", async () => {
