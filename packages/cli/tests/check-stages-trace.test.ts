@@ -197,17 +197,17 @@ describe("buildTraceStage — non-typescript target language (Round 4 F-A-02 fai
     expect(ruleIds).not.toContain("trace.not-yet-supported.python");
   });
 
-  it("fails loud with an error violation for go", async () => {
+  it("fails loud with an error violation for rust (no extractor yet)", async () => {
     const policy = mkPolicy({ id: "P1", target: [DB] });
     const context = mkContext({
       contract: mkContract([policy]),
-      targetLanguage: "go",
+      targetLanguage: "rust",
     });
 
     const report = await buildTraceStage(context, PROTECTED_STATE, "check");
 
     expect(report.ok).toBe(false);
-    expect(report.violations[0]!.rule_id).toBe("trace.not-yet-supported.go");
+    expect(report.violations[0]!.rule_id).toBe("trace.not-yet-supported.rust");
     expect(report.violations[0]!.severity).toBe("error");
   });
 });
@@ -805,6 +805,93 @@ describePy("buildTraceStage — REAL Python extractor (integration)", () => {
       report.violations.some(
         (v) => v.rule_id === "trace.GUARD.unresolved_call_blocks_evaluation",
       ),
+    ).toBe(true);
+    _clearCallGraphCacheForTests(context);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: REAL Go extractor -> trace stage (no injected graph).
+// Gated on a reachable Go toolchain (STELE_GO env or `go` on PATH).
+// ---------------------------------------------------------------------------
+
+function goReachable(): boolean {
+  const candidate =
+    process.env.STELE_GO && process.env.STELE_GO.trim().length > 0 ? process.env.STELE_GO.trim() : "go";
+  try {
+    execFileSync(candidate, ["version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const describeGo = goReachable() ? describe : describe.skip;
+
+describeGo("buildTraceStage — REAL Go extractor (integration)", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs) {
+      try {
+        rmSync(d, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
+    }
+    dirs.length = 0;
+  });
+
+  function mkGoProject(files: Record<string, string>): string {
+    const root = mkdtempSync(join(tmpdir(), "stele-trace-go-"));
+    dirs.push(root);
+    for (const [rel, content] of Object.entries(files)) {
+      const full = join(root, rel);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, content, "utf8");
+    }
+    return root;
+  }
+
+  it("deny-direct fires on a real same-package edge to the forbidden target", async () => {
+    const root = mkGoProject({
+      "m.go": "package m\nfunc handler() { deleteAll() }\nfunc deleteAll() {}\n",
+    });
+    const policy = mkPolicy({
+      id: "NO_DELETE_ALL",
+      target: ["m.go::deleteAll"],
+      denyDirect: ["m.go::handler"],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      targetLanguage: "go",
+      projectDir: root,
+    });
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check");
+    expect(report.ok).toBe(false);
+    expect(report.violations.some((v) => v.rule_id === "trace.NO_DELETE_ALL.direct_call_denied")).toBe(true);
+    _clearCallGraphCacheForTests(context);
+  });
+
+  it("computed dispatch (handlers[name]()) fires fail-closed through the real pipeline", async () => {
+    const root = mkGoProject({
+      "m.go":
+        "package m\nfunc Run(name string, handlers map[string]func()) {\n\thandlers[name]()\n}\n",
+    });
+    const policy = mkPolicy({
+      id: "GUARD",
+      target: ["m.go::deleteAll"],
+      scope: ["m.go::Run"],
+      mustTransit: ["m.go::repo"],
+    });
+    const context = mkContext({
+      contract: mkContract([policy]),
+      targetLanguage: "go",
+      projectDir: root,
+    });
+    const report = await buildTraceStage(context, PROTECTED_STATE, "check");
+    expect(report.ok).toBe(false);
+    expect(
+      report.violations.some((v) => v.rule_id === "trace.GUARD.unresolved_call_blocks_evaluation"),
     ).toBe(true);
     _clearCallGraphCacheForTests(context);
   });

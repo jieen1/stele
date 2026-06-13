@@ -48,7 +48,8 @@ export interface TraceStageDeps {
  *
  * Skipped (returns ok report) when `context.contract.tracePolicies` is empty.
  *
- * Phase B B.1: TypeScript only. Python/Go/Java/Rust adapters land in B.2/B.3.
+ * Phase B: TypeScript + Python + Go have call-graph extractors today; Java/Rust
+ * adapters are still to land.
  * For non-TypeScript projects the stage currently returns ok with a warning
  * violation `trace.not-yet-supported.<lang>` so users see the gap without the
  * check failing.
@@ -107,7 +108,7 @@ export async function buildTraceStage(
           status: "active",
           fix: {
             summary:
-              "Stele Phase B supports TypeScript + Python today. Either remove the (trace-policy …) declarations from this contract, or wait for the Go / Java / Rust backend to land.",
+              "Stele Phase B supports TypeScript + Python + Go today. Either remove the (trace-policy …) declarations from this contract, or wait for the Java / Rust backend to land.",
           },
         }),
       ],

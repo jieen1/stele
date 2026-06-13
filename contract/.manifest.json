@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-06-06T19:18:28.642Z",
+  "generated_at": "2026-06-13T14:01:47.293Z",
   "stele_version": "0.1.0",
   "protected_files": {
     ".github/workflows/ci.yml": {
@@ -124,8 +124,8 @@
       "size": 233
     },
     "packages/backend-go/package.json": {
-      "sha256": "8baabca63da00cb2f772e173ff0ae92f0c49a8986ddf8152bb9a465161629966",
-      "size": 1069
+      "sha256": "d704114f931b6bc1588fc1b72ac00dea9222f001b865b0ad727bf655fb3d4170",
+      "size": 1334
     },
     "packages/backend-java/package.json": {
       "sha256": "563f4ae174855977f3adedd181bc59798f15a76df4d5c1af57388db4d233d8ce",
@@ -244,8 +244,8 @@
       "size": 220
     },
     "pnpm-lock.yaml": {
-      "sha256": "57320d8cf9d525a06a4ef6a2155795c766877fb5413b75b0a8581a25f45d01d3",
-      "size": 113474
+      "sha256": "3d8a402de53c9163ce1d93c96726bd92788aaa6c8efc527439d3feef0c9b51f5",
+      "size": 113684
     },
     "pnpm-workspace.yaml": {
       "sha256": "0e316502859ceee6cd5180c9cdef463274c2531f518d2a9d73e31b4af12c1acf",

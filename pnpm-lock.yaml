@@ -60,9 +60,15 @@ importers:
 
   packages/backend-go:
     dependencies:
+      '@stele/call-graph-core':
+        specifier: workspace:*
+        version: link:../call-graph-core
       '@stele/core':
         specifier: workspace:*
         version: link:../core
+      '@stele/effect-evaluator':
+        specifier: workspace:*
+        version: link:../effect-evaluator
 
   packages/backend-java:
     dependencies:

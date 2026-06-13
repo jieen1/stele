@@ -1,4 +1,8 @@
 import {
+  goCallGraphExtractor,
+  goEffectAnnotationExtractor,
+} from "@stele/backend-go";
+import {
   pyCallGraphExtractor,
   pyEffectAnnotationExtractor,
 } from "@stele/backend-python";
@@ -132,18 +136,21 @@ export function listRegisteredBackends(): readonly RegisteredBackend[] {
 export function pickTraceCallGraphExtractor(language: string): CallGraphExtractor | null {
   if (language === "typescript") return tsCallGraphExtractor;
   if (language === "python") return pyCallGraphExtractor;
+  if (language === "go") return goCallGraphExtractor;
   return null;
 }
 
 export function pickEffectCallGraphExtractor(language: string): CallGraphExtractor | null {
   if (language === "typescript") return tsCallGraphExtractor;
   if (language === "python") return pyCallGraphExtractor;
+  if (language === "go") return goCallGraphExtractor;
   return null;
 }
 
 export function pickEffectAnnotationExtractor(language: string): EffectAnnotationExtractor | null {
   if (language === "typescript") return tsEffectAnnotationExtractor;
   if (language === "python") return pyEffectAnnotationExtractor;
+  if (language === "go") return goEffectAnnotationExtractor;
   return null;
 }
 

@@ -9,3 +9,5 @@ export {
 } from "./translator.js";
 export type { TranslationContext } from "./translator.js";
 export { writeFixtureBootstrap } from "./conformance-bootstrap.js";
+export { goCallGraphExtractor } from "./extractors/call-graph.js";
+export { goEffectAnnotationExtractor } from "./extractors/effect-annotations.js";

@@ -140,7 +140,7 @@ export async function buildEffectStage(
           status: "active",
           fix: {
             summary:
-              "Stele Phase B supports TypeScript + Python today. Either remove the (effect-policy …) declarations or wait for Go / Rust / Java backend coverage.",
+              "Stele Phase B supports TypeScript + Python + Go today. Either remove the (effect-policy …) declarations or wait for Rust / Java backend coverage.",
           },
         }),
       ],
