@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, delimiter, join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { commandName } from "@stele/core";
 import type { Command } from "commander";
@@ -23,6 +23,13 @@ import {
   proofsScratchDir,
   readDraftJson,
 } from "./shared.js";
+import {
+  type BiteClass,
+  type ResolvedToolchain,
+  type TeethRunner,
+  assertSafeTestBasename,
+  resolveTeethRunner,
+} from "./teeth-runners.js";
 
 /**
  * The teeth verdict union is shared with `approve`: teeth itself only ever
@@ -48,13 +55,23 @@ export type RunResult = { exit: number; outputSha256: string };
  * The on-disk `.stele/proofs/<id>/teeth.json` shape. `producedAtFromGit` is the
  * fix commit's committer date (ISO-8601 from `git show -s --format=%cI`), never
  * a wall-clock read, so the file is reproducible. `testSha256` binds the proof
- * to the exact candidate-test bytes copied byte-identically into both worktrees.
+ * to the exact candidate-test bytes; `invariantSha256` binds it to the exact
+ * invariant CDL text — so approve can refuse a draft that proved teeth on one
+ * invariant then swapped in a weaker one (the proof attests to BOTH the test
+ * AND the invariant it was produced for).
  */
 export type TeethProof = {
   verdict: TeethVerdict;
   parentSha: string;
   fixSha: string;
   testSha256: string;
+  invariantSha256: string;
+  /**
+   * How the PARENT run failed (B2 bite-strength). TEETH_PROVEN requires this to
+   * NOT be `collection-or-build` — a parent that failed to import/compile never
+   * ran its assertions, so it does not prove the test catches the regression.
+   */
+  parentBiteClass: BiteClass;
   parentRun: RunResult;
   fixRun: RunResult;
   producedAtFromGit: string;
@@ -62,34 +79,8 @@ export type TeethProof = {
 
 export type IncidentTeethOptions = { id: string };
 
-const TEST_FILENAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_.-]*\.py$/;
-
 function sha256Hex(data: Buffer | string): string {
   return createHash("sha256").update(data).digest("hex");
-}
-
-/**
- * Defense-in-depth path safety for the candidate test filename (the bytes come
- * from agent-supplied draft.json). Mirrors addChecker's idiom: the basename must
- * match a bare *.py pattern AND equal its own basename (no separators, not
- * absolute), so the file copied into each worktree can never escape the worktree
- * root. shared.parseDraftInput already enforces this at draft time; we re-check
- * here because teeth reads draft.json from disk and must not trust it blindly.
- */
-function safeTestBasename(testFilename: string): string {
-  const name = basename(testFilename);
-  if (
-    name !== testFilename ||
-    !TEST_FILENAME_PATTERN.test(name) ||
-    name.includes("/") ||
-    name.includes("\\")
-  ) {
-    throw new Error(
-      `Unsafe testFilename ${JSON.stringify(testFilename)} in draft.json: ` +
-        "must be a bare *.py filename with no path separators.",
-    );
-  }
-  return name;
 }
 
 function git(projectDir: string, args: string[]): string {
@@ -123,91 +114,39 @@ function removeWorktree(projectDir: string, dir: string): void {
 }
 
 /**
- * Locate the python interpreter. Prefer the repo venv so the worktree's own
- * source at that SHA is imported with the project's dependencies; otherwise fall
- * back to `python`, then `python3`, on PATH. Absence of ALL is an INFRA error
- * (caller maps to exit 1) — never a TEETH_FAILED verdict, so a missing
- * interpreter can't masquerade as a toothless test.
- */
-function locatePython(projectDir: string): string {
-  const venvPython = join(projectDir, ".venv", "bin", "python");
-  if (existsSync(venvPython)) {
-    return venvPython;
-  }
-  if (binaryOnPath("python")) {
-    return "python";
-  }
-  if (binaryOnPath("python3")) {
-    return "python3";
-  }
-  throw new Error(
-    "No python interpreter found (.venv/bin/python, python, python3 all absent); cannot run teeth.",
-  );
-}
-
-function binaryOnPath(name: string): boolean {
-  try {
-    execFileSync(name, ["--version"], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Run the candidate test at one revision inside its isolated worktree. The test
- * is written to a NON-tracked path at the worktree root (it cannot collide with
- * a tracked file at the historical SHA), then pytest runs with cwd = worktree
- * root so imports resolve against that revision's source. "Fails" means non-zero
- * exit — that includes both an assertion failure AND a pytest collection/import
- * error (e.g. the test imports a module that only exists at <fix>); both are
- * legitimate "the bug was reproducible at the parent" signals.
+ * is written (per the runner's placement) to a NON-tracked path under the
+ * worktree, then the runner's command runs with cwd = worktree root so the test
+ * resolves against that revision's source. "Fails" means non-zero exit — that
+ * includes both an assertion failure AND a collection/import/compile error (e.g.
+ * the test references a symbol that only exists at <fix>); both are legitimate
+ * "the bug was reproducible at the parent" signals. The verdict is derived from
+ * the exit code ONLY, so this stays language-agnostic.
  */
 function runTestInWorktree(
-  python: string,
+  runner: TeethRunner,
+  toolchain: ResolvedToolchain,
   worktreeDir: string,
   testBasename: string,
   testBytes: Buffer,
-): RunResult {
-  const testPath = join(worktreeDir, testBasename);
-  writeFileSync(testPath, testBytes);
+): RunResult & { normalizedOutput: string } {
+  const placedRel = runner.placement(testBasename);
+  const placedAbs = join(worktreeDir, placedRel);
+  mkdirSync(dirname(placedAbs), { recursive: true });
+  writeFileSync(placedAbs, testBytes);
+
+  const { cmd, args, env } = runner.buildRun(toolchain, placedRel, worktreeDir);
 
   let exit: number;
   let stdout = "";
   let stderr = "";
   try {
-    // PYTHONPATH = worktree root so a candidate test can `import <pkg>` against
-    // the revision's own source regardless of pytest's sys.path/import-mode
-    // policy (some pytest configs do NOT prepend the test file's dir). Prepend
-    // to any inherited PYTHONPATH rather than clobbering it.
-    const inheritedPyPath = process.env.PYTHONPATH;
-    const pythonPath = inheritedPyPath
-      ? `${worktreeDir}${delimiter}${inheritedPyPath}`
-      : worktreeDir;
-    // --noconftest: the candidate negative test is a single self-contained file
-    // and must NOT load an ancestor conftest.py (pytest otherwise walks up the
-    // filesystem from rootdir loading every conftest, which can import host-repo
-    // modules absent in the isolated worktree). --rootdir pins discovery to the
-    // worktree; -p no:cacheprovider keeps a .pytest_cache out of it.
-    stdout = execFileSync(
-      python,
-      [
-        "-m",
-        "pytest",
-        testBasename,
-        "-q",
-        "--noconftest",
-        "-p",
-        "no:cacheprovider",
-        `--rootdir=${worktreeDir}`,
-      ],
-      {
-        cwd: worktreeDir,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, PYTHONPATH: pythonPath },
-      },
-    );
+    stdout = execFileSync(cmd, [...args], {
+      cwd: worktreeDir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env,
+    });
     exit = 0;
   } catch (error) {
     const err = error as {
@@ -217,9 +156,9 @@ function runTestInWorktree(
       stderr?: string | Buffer;
     };
     if (err.code === "ENOENT") {
-      // python binary itself is missing — INFRA error, not a verdict.
+      // The toolchain binary itself is missing — INFRA error, not a verdict.
       throw new Error(
-        `Python interpreter ${JSON.stringify(python)} not found; cannot run teeth.`,
+        `${runner.language} toolchain ${JSON.stringify(cmd)} not found; cannot run teeth.`,
       );
     }
     if (typeof err.status === "number") {
@@ -227,7 +166,7 @@ function runTestInWorktree(
     } else {
       // Killed by signal / no numeric status — treat as infra failure.
       throw new Error(
-        `pytest did not exit with a numeric status (signal?); cannot determine verdict.`,
+        `${runner.language} test runner did not exit with a numeric status (signal?); cannot determine verdict.`,
       );
     }
     stdout = err.stdout ? err.stdout.toString() : "";
@@ -235,7 +174,95 @@ function runTestInWorktree(
   }
 
   const combined = normalizeTeethOutput(`${stdout}${stderr}`, worktreeDir);
-  return { exit, outputSha256: sha256Hex(Buffer.from(combined, "utf8")) };
+  return {
+    exit,
+    outputSha256: sha256Hex(Buffer.from(combined, "utf8")),
+    normalizedOutput: combined,
+  };
+}
+
+export type WorktreeRun = RunResult & { normalizedOutput: string };
+
+/**
+ * Create two isolated detached worktrees (parentSha, fixSha) under os.tmpdir(),
+ * place + run the candidate test in each via the runner, and ALWAYS remove +
+ * prune both worktrees in a finally. Shared by `teeth` (produce the proof) and
+ * `reverify` (re-derive the verdict from git). Throws on any infra failure
+ * (missing rev, worktree-add failure, absent toolchain) — callers map that to
+ * exit 1, never a verdict.
+ */
+export function runCandidateInWorktrees(
+  projectDir: string,
+  opts: {
+    tmpLabel: string;
+    parentSha: string;
+    fixSha: string;
+    testBasename: string;
+    testBytes: Buffer;
+    runner: TeethRunner;
+    toolchain: ResolvedToolchain;
+  },
+): { parentRun: WorktreeRun; fixRun: WorktreeRun } {
+  const sha8 = (s: string): string => s.slice(0, 8);
+  const base = mkdtempSync(join(tmpdir(), `stele-incident-${opts.tmpLabel}-`));
+  const parentDir = join(base, `parent-${sha8(opts.parentSha)}`);
+  const fixDir = join(base, `fix-${sha8(opts.fixSha)}`);
+
+  let parentAdded = false;
+  let fixAdded = false;
+  try {
+    // Prune stale registrations from a prior crash before adding (git refuses a
+    // path whose registration lingers); the finally prunes again after removal.
+    try {
+      git(projectDir, ["worktree", "prune"]);
+    } catch {
+      // best-effort
+    }
+    addWorktree(projectDir, parentDir, opts.parentSha);
+    parentAdded = true;
+    addWorktree(projectDir, fixDir, opts.fixSha);
+    fixAdded = true;
+
+    const parentRun = runTestInWorktree(opts.runner, opts.toolchain, parentDir, opts.testBasename, opts.testBytes);
+    const fixRun = runTestInWorktree(opts.runner, opts.toolchain, fixDir, opts.testBasename, opts.testBytes);
+    return { parentRun, fixRun };
+  } finally {
+    if (parentAdded) {
+      removeWorktree(projectDir, parentDir);
+    }
+    if (fixAdded) {
+      removeWorktree(projectDir, fixDir);
+    }
+    try {
+      git(projectDir, ["worktree", "prune"]);
+    } catch {
+      // best-effort
+    }
+    try {
+      rmSync(base, { recursive: true, force: true });
+    } catch {
+      // best-effort — the ephemeral base dir.
+    }
+  }
+}
+
+/**
+ * Derive the verdict + parent bite-class from the two runs. TEETH_PROVEN iff the
+ * parent FAILS, the fix PASSES, and the parent failure was not a collection/
+ * build error (which means the test never ran its assertions at <fix>^).
+ * `unknown` bite-class conservatively falls back to the exit-code rule.
+ */
+export function deriveTeethVerdict(
+  parentRun: WorktreeRun,
+  fixRun: WorktreeRun,
+  runner: TeethRunner,
+): { verdict: TeethVerdict; parentBiteClass: BiteClass } {
+  const parentBiteClass: BiteClass =
+    parentRun.exit === 0 ? "passed" : runner.classifyFailure(parentRun.normalizedOutput);
+  const exitsProve = parentRun.exit !== 0 && fixRun.exit === 0;
+  const verdict: TeethVerdict =
+    exitsProve && parentBiteClass !== "collection-or-build" ? "TEETH_PROVEN" : "TEETH_FAILED";
+  return { verdict, parentBiteClass };
 }
 
 /**
@@ -255,6 +282,10 @@ export function normalizeTeethOutput(raw: string, worktreeDir: string): string {
   return raw
     .replace(/\r\n/g, "\n")
     .replace(new RegExp(escaped, "g"), "<worktree>")
+    // node:test TAP footer "# duration_ms 30.716676" -> "# duration_ms <duration>"
+    .replace(/# duration_ms\s+\d+(?:\.\d+)?/g, "# duration_ms <duration>")
+    // node:test per-subtest YAML "  duration_ms: 0.318376" (no '#', no 's' suffix)
+    .replace(/duration_ms:\s+\d+(?:\.\d+)?/g, "duration_ms: <duration>")
     // "1 passed in 0.12s", "in 0.12s", "in 1.3s ===" -> "in <duration>"
     .replace(/\bin\s+\d+(?:\.\d+)?s\b/g, "in <duration>")
     // any remaining bare "0.12s" timing token (durations report rows)
@@ -272,6 +303,8 @@ function serializeTeeth(proof: TeethProof): string {
     parentSha: proof.parentSha,
     fixSha: proof.fixSha,
     testSha256: proof.testSha256,
+    invariantSha256: proof.invariantSha256,
+    parentBiteClass: proof.parentBiteClass,
     parentRun: { exit: proof.parentRun.exit, outputSha256: proof.parentRun.outputSha256 },
     fixRun: { exit: proof.fixRun.exit, outputSha256: proof.fixRun.outputSha256 },
     producedAtFromGit: proof.producedAtFromGit,
@@ -327,7 +360,7 @@ export async function runIncidentTeeth(
     parentSha = draft.parentSha;
     fixSha = draft.fixSha;
 
-    testBasename = safeTestBasename(draft.testFilename);
+    testBasename = assertSafeTestBasename(draft.testFilename);
     const incidentDir = incidentScratchDir(projectDir, id);
     const candidateTestPath = join(incidentDir, testBasename);
 
@@ -348,100 +381,80 @@ export async function runIncidentTeeth(
   }
 
   const testSha256 = sha256Hex(testBytes);
+  // Bind the proof to the EXACT invariant text too (raw bytes — byte-stable
+  // because draft.invariantCdl is persisted once and read identically here and
+  // at approve). Closes the "prove teeth on a strict invariant, then swap in a
+  // vacuous one" hole; approve re-checks this against the current draft.
+  const invariantSha256 = sha256Hex(draft.invariantCdl);
 
-  let python: string;
+  let runner: TeethRunner;
+  let toolchain: ResolvedToolchain;
   try {
-    // deps.python is the test seam (inject the repo venv python in vitest);
-    // production resolves .venv/bin/python -> python -> python3. A missing
-    // interpreter is an INFRA error (exit 1), never a TEETH_FAILED verdict.
-    python = deps.python ?? locatePython(projectDir);
+    // The language is inferred from the test filename extension; the runner owns
+    // toolchain location and the per-revision run command. deps.python is the
+    // python-only test seam (inject the repo venv python in vitest). A missing
+    // toolchain is an INFRA error (exit 1), never a TEETH_FAILED verdict, so a
+    // missing interpreter can't masquerade as a toothless test.
+    runner = resolveTeethRunner(testBasename);
+    toolchain = runner.locate(
+      projectDir,
+      runner.language === "python" ? deps.python : undefined,
+    );
   } catch (error) {
     fail((error as Error).message);
     return;
   }
 
-  // Unique ephemeral base per invocation: `git worktree add` refuses a path
-  // that already exists, and reusing a deterministic name collides across
-  // back-to-back runs (same fix SHA -> same name). The dir is removed in the
-  // finally, so the random suffix has NO effect on any teeth.json output —
-  // determinism lives entirely in producedAtFromGit/testSha256, not here.
-  const sha8 = (s: string): string => s.slice(0, 8);
-  const base = mkdtempSync(join(tmpdir(), `stele-incident-${id}-`));
-  const parentDir = join(base, `parent-${sha8(parentSha)}`);
-  const fixDir = join(base, `fix-${sha8(fixSha)}`);
-
-  let parentAdded = false;
-  let fixAdded = false;
+  let parentRun: WorktreeRun;
+  let fixRun: WorktreeRun;
   try {
-    // Defense-in-depth (F5): prune stale worktree registrations left by a
-    // previous crash BEFORE adding. `git worktree add` refuses a path whose
-    // registration still lingers, so an orphaned entry from an interrupted run
-    // could otherwise block re-running teeth for the same id. The finally below
-    // also prunes after removal, so registrations are cleaned on both ends.
-    try {
-      git(projectDir, ["worktree", "prune"]);
-    } catch {
-      // best-effort
-    }
-    addWorktree(projectDir, parentDir, parentSha);
-    parentAdded = true;
-    addWorktree(projectDir, fixDir, fixSha);
-    fixAdded = true;
-
-    const parentRun = runTestInWorktree(python, parentDir, testBasename, testBytes);
-    const fixRun = runTestInWorktree(python, fixDir, testBasename, testBytes);
-
-    // Verdict from exit codes ONLY: a vacuous always-pass test passes at BOTH
-    // revs (parent exit 0) → not proven → TEETH_FAILED.
-    const verdict: TeethVerdict =
-      parentRun.exit !== 0 && fixRun.exit === 0 ? "TEETH_PROVEN" : "TEETH_FAILED";
-
-    const proof: TeethProof = {
-      verdict,
+    ({ parentRun, fixRun } = runCandidateInWorktrees(projectDir, {
+      tmpLabel: id,
       parentSha,
       fixSha,
-      testSha256,
-      parentRun,
-      fixRun,
-      producedAtFromGit,
-    };
-    writeTeethProof(projectDir, id, proof);
-
-    out.write(`Teeth verdict: ${verdict}\n`);
-    out.write(`  parent ${parentSha}  exit=${parentRun.exit}\n`);
-    out.write(`  fix    ${fixSha}  exit=${fixRun.exit}\n`);
-    out.write(`  testSha256 ${testSha256}\n`);
-    out.write(`  proof  .stele/proofs/${id}/teeth.json\n`);
-    if (verdict === "TEETH_PROVEN") {
-      out.write(`\nNext: stele incident approve --id ${id}\n`);
-    } else {
-      out.write(
-        `\nNot proven: the test must FAIL at <fix>^ AND PASS at <fix>. ` +
-          `Revise the negative test and re-run draft.\n`,
-      );
-    }
-    // teeth ran — exit 0 regardless of verdict.
+      testBasename,
+      testBytes,
+      runner,
+      toolchain,
+    }));
   } catch (error) {
     fail((error as Error).message);
-  } finally {
-    // ALWAYS remove BOTH worktrees, each in its own try/catch, then prune so a
-    // failure removing one never strands the other.
-    if (parentAdded) {
-      removeWorktree(projectDir, parentDir);
-    }
-    if (fixAdded) {
-      removeWorktree(projectDir, fixDir);
-    }
-    try {
-      git(projectDir, ["worktree", "prune"]);
-    } catch {
-      // best-effort
-    }
-    try {
-      rmSync(base, { recursive: true, force: true });
-    } catch {
-      // best-effort — the ephemeral base dir.
-    }
+    return;
+  }
+
+  const { verdict, parentBiteClass } = deriveTeethVerdict(parentRun, fixRun, runner);
+
+  const proof: TeethProof = {
+    verdict,
+    parentSha,
+    fixSha,
+    testSha256,
+    invariantSha256,
+    parentBiteClass,
+    parentRun,
+    fixRun,
+    producedAtFromGit,
+  };
+  writeTeethProof(projectDir, id, proof);
+
+  out.write(`Teeth verdict: ${verdict}\n`);
+  out.write(`  parent ${parentSha}  exit=${parentRun.exit}  (${parentBiteClass})\n`);
+  out.write(`  fix    ${fixSha}  exit=${fixRun.exit}\n`);
+  out.write(`  testSha256 ${testSha256}\n`);
+  out.write(`  proof  .stele/proofs/${id}/teeth.json\n`);
+  if (verdict === "TEETH_PROVEN") {
+    out.write(`\nNext: stele incident approve --id ${id}\n`);
+  } else if (parentRun.exit !== 0 && fixRun.exit === 0 && parentBiteClass === "collection-or-build") {
+    out.write(
+      `\nNot proven: the test FAILED at <fix>^ only because it could not be ` +
+        `collected/compiled (it never ran its assertions). Write the negative test ` +
+        `against an entry point that exists at BOTH <fix>^ and <fix>, then re-run.\n`,
+    );
+  } else {
+    out.write(
+      `\nNot proven: the test must FAIL at <fix>^ AND PASS at <fix>. ` +
+        `Revise the negative test and re-run draft.\n`,
+    );
   }
 }
 

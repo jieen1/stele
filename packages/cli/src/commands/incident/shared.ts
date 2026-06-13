@@ -3,8 +3,9 @@ import { promises as fs } from "node:fs";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import { isAbsoluteLikePath, isMissingFileError } from "../../utils/shared-utils.js";
+import { isMissingFileError } from "../../utils/shared-utils.js";
 import type { TeethProof, TeethVerdict } from "./teeth.js";
+import { type BiteClass, assertSafeTestBasename } from "./teeth-runners.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -41,7 +42,6 @@ export type IncidentDraft = {
 };
 
 const INCIDENT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const TEST_FILENAME_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]*\.py$/;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 const INCIDENT_SUBDIR = ".stele/incident";
@@ -129,10 +129,11 @@ function nonEmptyString(value: unknown): value is string {
 
 /**
  * JSON.parse + validate {invariantCdl:non-empty string, negativeTest:non-empty
- * string, testFilename?:string}. When testFilename is present it must match
- * /^[A-Za-z0-9_][A-Za-z0-9_.-]*\.py$/ and equal its own basename (no path
- * separators, not absolute) else throws — closes the agent-supplied path-escape
- * vector.
+ * string, testFilename?:string}. When testFilename is present it must be a bare,
+ * path-safe basename ending in a supported test extension (`assertSafeTestBasename`
+ * — .py/.ts/.js/.mjs/.cjs/.rs); separators, traversal, and unsupported languages
+ * (e.g. .go/.java/.txt) are rejected — closing the agent-supplied path-escape
+ * vector and dead-end drafts in one place.
  */
 export function parseDraftInput(raw: string): DraftInput {
   let parsed: unknown;
@@ -161,18 +162,9 @@ export function parseDraftInput(raw: string): DraftInput {
     if (typeof obj.testFilename !== "string") {
       throw new Error("Draft input field 'testFilename' must be a string.");
     }
-    const name = obj.testFilename;
-    if (
-      !TEST_FILENAME_PATTERN.test(name) ||
-      name !== basename(name) ||
-      isAbsoluteLikePath(name)
-    ) {
-      throw new Error(
-        `Draft input field 'testFilename' ${JSON.stringify(name)} is unsafe: ` +
-          "must be a bare *.py filename with no path separators.",
-      );
-    }
-    result.testFilename = name;
+    // Throws a precise message naming the supported extensions on any unsafe /
+    // unsupported value; the word "testFilename" is preserved in the message.
+    result.testFilename = assertSafeTestBasename(obj.testFilename);
   }
   return result;
 }
@@ -281,7 +273,13 @@ function asTeethProof(value: unknown): TeethProof {
       `Malformed teeth.json: 'verdict' must be one of ${VALID_VERDICTS.join(", ")}.`,
     );
   }
-  for (const key of ["parentSha", "fixSha", "testSha256", "producedAtFromGit"] as const) {
+  const VALID_BITE: readonly BiteClass[] = ["assertion", "collection-or-build", "unknown", "passed"];
+  if (typeof obj.parentBiteClass !== "string" || !VALID_BITE.includes(obj.parentBiteClass as BiteClass)) {
+    throw new Error(
+      `Malformed teeth.json: 'parentBiteClass' must be one of ${VALID_BITE.join(", ")}.`,
+    );
+  }
+  for (const key of ["parentSha", "fixSha", "testSha256", "invariantSha256", "producedAtFromGit"] as const) {
     if (!nonEmptyString(obj[key])) {
       throw new Error(`Malformed teeth.json: field '${key}' must be a non-empty string.`);
     }
@@ -304,6 +302,8 @@ function asTeethProof(value: unknown): TeethProof {
     parentSha: obj.parentSha as string,
     fixSha: obj.fixSha as string,
     testSha256: obj.testSha256 as string,
+    invariantSha256: obj.invariantSha256 as string,
+    parentBiteClass: obj.parentBiteClass as BiteClass,
     parentRun: asRun(obj.parentRun, "parentRun"),
     fixRun: asRun(obj.fixRun, "fixRun"),
     producedAtFromGit: obj.producedAtFromGit as string,

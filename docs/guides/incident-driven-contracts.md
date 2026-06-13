@@ -24,10 +24,34 @@ human approves
    │
    ▼
 stele incident approve →  hard teeth gate → atomic apply → generate → lock,
-                          with provenance tags + a signed approval record
+                          with provenance tags + a signed approval record, and a
+                          COMMITTED provenance record at contract/provenance/<id>.json
+   │
+   ▼
+stele incident reverify → re-derive the locked verdict from git on demand
+                          (exit 0 reproduced / 2 contradicted / 1 could-not-reproduce)
 ```
 
-`.stele/incident/` and `.stele/proofs/` are **scratch**: never hashed into the manifest, never added to the protected globs.
+`.stele/incident/` and `.stele/proofs/` are **scratch**: never hashed into the manifest, never added to the protected globs. The `contract/provenance/<id>.json` record, by contrast, is **committed** — it carries the SHAs + the negative-test bytes so anyone with the repo can re-run the proof.
+
+## Re-deriving a verdict (`reverify`)
+
+The teeth proof is computed once. To let an auditor — or CI on a fresh clone — confirm a locked invariant was genuinely proven, `stele incident reverify` re-creates the two worktrees from the committed record's SHAs, re-runs the embedded negative test, and re-derives the verdict:
+
+```bash
+stele incident reverify --id <id>     # one incident
+stele incident reverify --all         # every committed provenance record (CI)
+```
+
+Three outcomes, with distinct exit codes so an absent toolchain or a missing SHA is never confused with a tamper:
+
+- **reproduced (exit 0)** — the re-run agrees with the recorded verdict.
+- **contradicted (exit 2)** — the re-run ran but disagrees, or the record's own hashes don't match its bytes (tamper, or the proof no longer holds). CI should fail.
+- **could-not-reproduce (exit 1)** — the proof could not be re-run at all (a SHA absent from this clone, an absent toolchain). Distinct from a contradiction.
+
+The exit-code core (parent fails, fix passes) is stable; the `parentBiteClass` refinement depends on the runner's failure output staying classifiable, so a `contradicted` arising from a runner-version output change should prompt re-running `teeth`, not an assumption of tamper.
+
+> Wiring `contract/provenance/**` into the protected globs (manifest-enforced tamper-evidence) and a dedicated GitHub Action `reverify` mode are planned follow-ons; today a CI job runs `stele incident reverify --all` as a step.
 
 ## Worked example
 
@@ -62,10 +86,23 @@ Pass `--id <slug>` to choose the id explicitly; pass `--draft-from -` to read th
 stele incident teeth --id add-must-return-the-sum-of-both-operands
 ```
 
-Stele creates two isolated detached `git worktree`s — one at `<fix>^`, one at `<fix>` — copies the candidate test into each, runs it with the repo python (`.venv/bin/python -m pytest`, else `python`/`python3`), and derives the verdict from exit codes only:
+Stele creates two isolated detached `git worktree`s — one at `<fix>^`, one at `<fix>` — places the candidate test into each, runs it against that revision's own source, and derives the verdict from exit codes only:
 
-- **`TEETH_PROVEN`** — test FAILS at `<fix>^` AND PASSES at `<fix>`. The test has teeth.
-- **`TEETH_FAILED`** — anything else (vacuous always-pass, fails at both, etc.).
+- **`TEETH_PROVEN`** — test FAILS at `<fix>^` AND PASSES at `<fix>`, **and** the parent failure was a real assertion failure (not a collection/compile error).
+- **`TEETH_FAILED`** — anything else (vacuous always-pass, fails at both, **or** the parent only failed because the test couldn't be collected/compiled — e.g. it imports a symbol that exists only at `<fix>` — so it never ran its assertions).
+
+Stele records *how* the parent failed in `parentBiteClass` (`assertion` / `collection-or-build` / `unknown` / `passed`). A `collection-or-build` parent failure is **not** teeth: write the negative test against an entry point present at both `<fix>^` and `<fix>`. An output shape Stele can't classify (`unknown`) conservatively falls back to the exit-code rule — it never invents a `TEETH_FAILED`.
+
+The runner is chosen from the candidate test's filename extension, so the gate is language-agnostic:
+
+| extension | runner |
+| --- | --- |
+| `.py` | `python -m pytest` (`.venv/bin/python`, else `python`/`python3`) |
+| `.js` / `.mjs` / `.cjs` | `node --test` |
+| `.ts` / `.mts` / `.cts` | `node --test --experimental-strip-types` |
+| `.rs` | `cargo test --test <stem>` (placed under `tests/`) |
+
+A missing toolchain is an **infra error (exit 1), never a `TEETH_FAILED` verdict** — a missing interpreter can't masquerade as a toothless test. Go and Java are not yet wired (a single root-level test cannot soundly exercise project code under `go test`/JUnit without a package/build-aware runner); author the test in a supported language or approve with `--teeth-unavailable-reason`.
 
 The proof is written to `.stele/proofs/<id>/teeth.json`:
 
@@ -75,11 +112,15 @@ The proof is written to `.stele/proofs/<id>/teeth.json`:
   "parentSha": "1111111111111111111111111111111111111111",
   "fixSha": "2222222222222222222222222222222222222222",
   "testSha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "invariantSha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
+  "parentBiteClass": "assertion",
   "parentRun": { "exit": 1, "outputSha256": "aaaa...parent-pytest-output-hash" },
   "fixRun": { "exit": 0, "outputSha256": "bbbb...fix-pytest-output-hash" },
   "producedAtFromGit": "2026-05-29T12:00:00+00:00"
 }
 ```
+
+The proof binds **both** the candidate test (`testSha256`) and the invariant text (`invariantSha256`). At `approve`, Stele re-hashes the current draft's invariant and test and refuses if either changed since the proof — so you cannot prove teeth on a strict invariant and then lock a weaker one.
 
 Its timestamp (`producedAtFromGit`) is the fix commit's committer date (`git show -s --format=%cI`) — never a wall clock — so the proof is byte-reproducible. There is no `producedAt` / `timestamp` wall-clock field by design. Both worktrees are always removed in a `finally`.
 

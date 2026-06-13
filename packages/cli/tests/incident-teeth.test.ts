@@ -76,6 +76,32 @@ function makeProvenFixture(): Fixture {
   return { dir, parentSha, fixSha };
 }
 
+/**
+ * Build a repo where the FIX adds a brand-new symbol (`guard`) absent at the
+ * parent. A negative test that imports `guard` therefore fails to COLLECT at the
+ * parent (ImportError) rather than failing an assertion — the B2 bite-strength
+ * classifier must reject this as `collection-or-build`, NOT TEETH_PROVEN.
+ */
+function makeFixOnlySymbolFixture(): Fixture {
+  const dir = mkdtempSync(join(tmpdir(), "stele-teeth-fixonly-"));
+  git(dir, ["init", "-q"]);
+  git(dir, ["config", "user.email", "test@example.com"]);
+  git(dir, ["config", "user.name", "Test"]);
+
+  mkdirSync(join(dir, "src"), { recursive: true });
+  writeFileSync(join(dir, "src", "__init__.py"), "");
+  writeFileSync(join(dir, "src", "calc.py"), "def add(a, b):\n    return a + b\n");
+  const parentSha = commit(dir, "no guard yet", OLD_DATE);
+
+  writeFileSync(
+    join(dir, "src", "calc.py"),
+    "def add(a, b):\n    return a + b\n\ndef guard():\n    return True\n",
+  );
+  const fixSha = commit(dir, "add guard", OLD_DATE);
+
+  return { dir, parentSha, fixSha };
+}
+
 async function seedDraft(
   dir: string,
   id: string,
@@ -207,6 +233,39 @@ describePy("runIncidentTeeth — verdict logic", () => {
     expect((teeth.fixRun as { exit: number }).exit).toBe(0);
   });
 
+  it("FAILED (B2): parent failure is a collection/import error, not a real assertion", async () => {
+    const f = makeFixOnlySymbolFixture();
+    track(f.dir);
+    const id = "collection-error";
+    // Imports a fix-only symbol → ImportError at <fix>^ (collection), passes at
+    // <fix>. Pre-B2 this was a false TEETH_PROVEN; now it must be FAILED.
+    const test = "from src.calc import guard\n\ndef test_guard():\n    assert guard() is True\n";
+    await seedDraft(f.dir, id, f, test);
+
+    await runIncidentTeeth(f.dir, { id }, { python: TEST_PYTHON });
+
+    expect(process.exitCode).toBe(0);
+    const teeth = readTeeth(f.dir, id);
+    expect(teeth.verdict).toBe("TEETH_FAILED");
+    expect(teeth.parentBiteClass).toBe("collection-or-build");
+    // The exit codes alone WOULD have "proven" it (parent nonzero, fix zero) —
+    // the bite-strength classifier is what correctly rejects it.
+    expect((teeth.parentRun as { exit: number }).exit).not.toBe(0);
+    expect((teeth.fixRun as { exit: number }).exit).toBe(0);
+  });
+
+  it("PROVEN records parentBiteClass=assertion", async () => {
+    const f = makeProvenFixture();
+    track(f.dir);
+    const id = "biteclass-assertion";
+    const test = "from src.calc import add\n\ndef test_add():\n    assert add(1, 2) == 3\n";
+    await seedDraft(f.dir, id, f, test);
+    await runIncidentTeeth(f.dir, { id }, { python: TEST_PYTHON });
+    const teeth = readTeeth(f.dir, id);
+    expect(teeth.verdict).toBe("TEETH_PROVEN");
+    expect(teeth.parentBiteClass).toBe("assertion");
+  });
+
   it("FAILED: test fails at BOTH revs", async () => {
     const f = makeProvenFixture();
     track(f.dir);
@@ -329,6 +388,18 @@ describe("normalizeTeethOutput (pure, F2)", () => {
     const ha = sha256Hex(normalizeTeethOutput("AssertionError: 4 != 3\n", worktree));
     const hb = sha256Hex(normalizeTeethOutput("AssertionError: 5 != 3\n", worktree));
     expect(ha).not.toBe(hb);
+  });
+
+  it("canonicalizes node:test per-subtest `duration_ms:` YAML lines (F2 for js/ts runners)", () => {
+    // node --test emits a per-subtest YAML `  duration_ms: 0.31` (no '#', no 's'
+    // suffix) plus a TAP footer `# duration_ms 29.0`. Both vary per run; both
+    // must canonicalize so the js/ts teeth.json is byte-reproducible.
+    const a = "ok 1 - add\n  ---\n  duration_ms: 0.318376\n  ...\n# duration_ms 29.059\n";
+    const b = "ok 1 - add\n  ---\n  duration_ms: 9.871234\n  ...\n# duration_ms 31.402\n";
+    const na = normalizeTeethOutput(a, worktree);
+    expect(na).not.toMatch(/duration_ms:\s+\d/);
+    expect(na).not.toMatch(/# duration_ms\s+\d/);
+    expect(sha256Hex(na)).toBe(sha256Hex(normalizeTeethOutput(b, worktree)));
   });
 
   it("canonicalizes hex object-repr memory addresses (F2 residual)", () => {

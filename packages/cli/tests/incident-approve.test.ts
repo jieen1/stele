@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkProject } from "../src/commands/check.js";
 import { runGenerate } from "../src/commands/generate.js";
 import { runLock } from "../src/commands/lock.js";
+import { readProvenance } from "../src/commands/incident/provenance.js";
 import {
   runIncidentApprove,
   type IncidentApproveOptions,
@@ -105,6 +106,8 @@ function seedTeeth(
     parentSha: draft.parentSha,
     fixSha: draft.fixSha,
     testSha256: createHash("sha256").update(testBytes).digest("hex"),
+    invariantSha256: createHash("sha256").update(draft.invariantCdl).digest("hex"),
+    parentBiteClass: verdict === "TEETH_PROVEN" ? "assertion" : "passed",
     parentRun: { exit: verdict === "TEETH_PROVEN" ? 1 : 0, outputSha256: "d".repeat(64) },
     fixRun: { exit: 0, outputSha256: "e".repeat(64) },
     producedAtFromGit: "2021-01-02T03:04:05+00:00",
@@ -262,6 +265,31 @@ describe("runIncidentApprove — teeth gate", () => {
     expect(after.manifest).toBe(before.manifest);
   });
 
+  it("refuse-on-swapped-invariant: TEETH_PROVEN but invariantCdl weakened after proof → exit 1, no mutation", async () => {
+    // B1: the prove-strict-then-lock-vacuous hole. Prove teeth on the original
+    // invariant, then swap in a weaker invariant with byte-identical test/SHAs.
+    // The invariant-hash binding must refuse — the proof attests to the test AND
+    // the invariant it was produced for.
+    const dir = await makeLockedProject();
+    const id = "swapped-invariant";
+    await seedDraft(dir, id);
+    seedTeeth(dir, id, "TEETH_PROVEN");
+    await seedDraft(dir, id, {
+      invariantCdl:
+        '(invariant incident_rule\n  (severity error)\n  (description "weakened")\n  (assert (eq 0 0)))\n',
+    });
+    const before = snapshotMutationSet(dir);
+
+    const err = (await approve(dir, { id, approvedBy: GOOD_APPROVER })) as { exitCode?: number };
+    expect(err).toBeDefined();
+    expect(err.exitCode).toBe(1);
+
+    const after = snapshotMutationSet(dir);
+    expect(after.entry).toBe(before.entry);
+    expect(after.proposal).toBe(before.proposal);
+    expect(after.manifest).toBe(before.manifest);
+  });
+
   it("refuse-on-repointed-fixSha: TEETH_PROVEN but draft.fixSha repointed after proof → exit 1, no mutation", async () => {
     const dir = await makeLockedProject();
     const id = "repointed";
@@ -310,6 +338,17 @@ describe("runIncidentApprove — accept paths", () => {
     const record = JSON.parse(readFileSync(join(scratchDir, approvals[0]), "utf8"));
     expect(record.approved_by).toBe(GOOD_APPROVER);
 
+    // B3: a COMMITTED provenance record is written and round-trips with the
+    // proof's SHAs/verdict/biteClass (reverify depends on this artifact).
+    expect(existsSync(join(dir, "contract", "provenance", `${id}.json`))).toBe(true);
+    const prov = await readProvenance(dir, id);
+    expect(prov.parentSha).toBe(draft.parentSha);
+    expect(prov.fixSha).toBe(draft.fixSha);
+    expect(prov.verdict).toBe("TEETH_PROVEN");
+    expect(prov.parentBiteClass).toBe("assertion");
+    expect(prov.invariantId).toBe("incident_rule");
+    expect(prov.invariantSha256).toBe(createHash("sha256").update(draft.invariantCdl).digest("hex"));
+
     await expectCheckClean(dir);
   });
 
@@ -335,6 +374,10 @@ describe("runIncidentApprove — accept paths", () => {
     const approvals = readdirSync(scratchDir).filter((f) => f.startsWith("approval-"));
     const record = JSON.parse(readFileSync(join(scratchDir, approvals[0]), "utf8"));
     expect(record.reason).toContain("sandbox offline");
+
+    // B3: a teeth-UNAVAILABLE approval has no re-runnable proof → no provenance
+    // record (reverify only re-derives genuinely-proven incidents).
+    expect(existsSync(join(dir, "contract", "provenance", `${id}.json`))).toBe(false);
 
     await expectCheckClean(dir);
   });

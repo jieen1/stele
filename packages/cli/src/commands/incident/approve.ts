@@ -15,6 +15,11 @@ import {
   writeSignedApproval,
   type ApprovalPayload,
 } from "../design/approval-lifecycle.js";
+import {
+  type ProvenanceRecord,
+  provenancePath,
+  writeProvenance,
+} from "./provenance.js";
 import { resolveApprovedBy } from "../design/approve.js";
 import { runGenerate } from "../generate.js";
 import { runLock } from "../lock.js";
@@ -191,9 +196,13 @@ function sha256Hex(data: Buffer | string): string {
  * genuine bug/fix pair, then swap a weaker invariant / different test / repointed
  * fixSha into draft.json and have approve lock the EDITED draft under the stale
  * TEETH_PROVEN verdict. We therefore require the proof's parentSha/fixSha to equal
- * the draft's, AND recompute the sha256 of the current candidate-test bytes and
- * require it to equal teeth.testSha256. Any mismatch means the draft changed since
- * the proof was produced; refuse and instruct the user to re-run teeth.
+ * the draft's, recompute the sha256 of the current candidate-test bytes and require
+ * it to equal teeth.testSha256, AND recompute the sha256 of the current invariant
+ * CDL and require it to equal teeth.invariantSha256. The invariant hash closes the
+ * "prove teeth on a strict invariant, then swap in a vacuous one (same test bytes)"
+ * hole — the proof attests to BOTH the test and the invariant it was produced for.
+ * Any mismatch means the draft changed since the proof was produced; refuse and
+ * instruct the user to re-run teeth.
  */
 async function enforceTeethBinding(
   projectDir: string,
@@ -237,6 +246,15 @@ async function enforceTeethBinding(
     throw new CliCommandError(
       `Candidate-test sha256 (${actual}) does not match the teeth proof testSha256 (${teeth.testSha256}). ` +
         "The negative test changed since the proof was produced. Re-run `stele incident teeth`.",
+      ExitCode.USER_ERROR,
+    );
+  }
+  const actualInvariant = sha256Hex(draft.invariantCdl);
+  if (actualInvariant !== teeth.invariantSha256) {
+    throw new CliCommandError(
+      `Invariant sha256 (${actualInvariant}) does not match the teeth proof invariantSha256 (${teeth.invariantSha256}). ` +
+        "The invariant changed since the proof was produced — teeth proves the test bites for the ORIGINAL invariant, " +
+        "not this one. Re-run `stele incident teeth`.",
       ExitCode.USER_ERROR,
     );
   }
@@ -368,30 +386,37 @@ async function applyGenerateLock(
     propose: typeof runPropose;
     generate: typeof runGenerate;
     lock: typeof runLock;
+    /** Committed provenance record to write atomically (null = teeth-unavailable). */
+    provenance: ProvenanceRecord | null;
   },
 ): Promise<void> {
-  const { projectDir, config, propose, generate, lock } = ctx;
+  const { projectDir, config, propose, generate, lock, provenance } = ctx;
   const { id, invariant, rationale, tags } = bound;
 
-  // OUTER snapshot of the mutation set BEFORE any write.
+  // OUTER snapshot of the mutation set BEFORE any write. The provenance record
+  // is part of the set: snapshotFile records its ABSENCE so a mid-sequence
+  // failure's rollback deletes it (the record must never outlive a failed lock).
   const entryAbs = resolve(projectDir, config.entry);
   const proposalAbs = resolve(projectDir, PROPOSAL_FILE);
   const manifestAbs = resolve(projectDir, config.manifestPath);
   const generatedDirAbs = resolve(projectDir, config.generatedDir);
+  const provenanceAbs = provenance ? provenancePath(projectDir, id) : null;
 
   const entrySnap = await snapshotFile(entryAbs);
   const proposalSnap = await snapshotFile(proposalAbs);
   const manifestSnap = await snapshotFile(manifestAbs);
   const generatedSnap = await snapshotDir(generatedDirAbs);
+  const provenanceSnap = provenanceAbs ? await snapshotFile(provenanceAbs) : null;
 
   const rollback = async (): Promise<void> => {
+    if (provenanceSnap) await restoreFile(provenanceSnap);
     await restoreFile(entrySnap);
     await restoreFile(proposalSnap);
     await restoreDir(generatedDirAbs, generatedSnap);
     await restoreFile(manifestSnap);
   };
 
-  // atomic apply → generate → lock.
+  // atomic apply → generate → lock → write provenance.
   try {
     await propose(projectDir, {
       kind: "invariant",
@@ -406,6 +431,9 @@ async function applyGenerateLock(
     });
     await generate(projectDir, { force: true });
     await lock(projectDir, { reason: `incident:${id}` });
+    if (provenance) {
+      await writeProvenance(projectDir, provenance);
+    }
   } catch (error) {
     // restore the pre-call snapshot exactly, then re-throw the native code.
     await rollback();
@@ -523,10 +551,35 @@ export async function runIncidentApprove(
   }
   const bound = bindTeethProof(proven);
 
-  // (5+6) atomic apply → generate → lock under the sink's OUTER snapshot/
-  // rollback. The sink accepts ONLY the Bound witness and reads all data off it.
+  // Build the COMMITTED provenance record for a genuinely-proven incident, so
+  // `stele incident reverify` can re-derive the verdict from git later. Only the
+  // TEETH_PROVEN branch produces one — a teeth-unavailable approval has no
+  // re-runnable proof. All fields come from the proof + draft (no wall-clock:
+  // producedAtFromGit is the fix committer date).
+  const provenance: ProvenanceRecord | null =
+    !gate.teethUnavailable && teeth !== null
+      ? {
+          schemaVersion: 1,
+          incidentId: id,
+          invariantId: invariant.id,
+          parentSha: draft.parentSha,
+          fixSha: draft.fixSha,
+          testFilename: draft.testFilename,
+          negativeTest: draft.negativeTest,
+          testSha256: teeth.testSha256,
+          invariantCdl: draft.invariantCdl,
+          invariantSha256: teeth.invariantSha256,
+          verdict: teeth.verdict,
+          parentBiteClass: teeth.parentBiteClass,
+          producedAtFromGit: teeth.producedAtFromGit,
+        }
+      : null;
+
+  // (5+6) atomic apply → generate → lock → provenance under the sink's OUTER
+  // snapshot/rollback. The sink accepts ONLY the Bound witness for the contract
+  // mutation; the provenance record rides the same atomic set.
   const config = await loadConfig(projectDir);
-  await applyGenerateLock(bound, { projectDir, config, propose, generate, lock });
+  await applyGenerateLock(bound, { projectDir, config, propose, generate, lock, provenance });
 
   // (8) only after the sequence succeeds, write the signed approval record under
   // scratch via the typed lifecycle chain.
@@ -555,6 +608,9 @@ export async function runIncidentApprove(
   out.write(`  fix            ${draft.fixSha}\n`);
   out.write(`  approved by    ${approver.approvedBy}\n`);
   out.write(`  approval       ${approvalPath}\n`);
+  if (provenance) {
+    out.write(`  provenance     contract/provenance/${id}.json  (stele incident reverify --id ${id})\n`);
+  }
   if (gate.teethUnavailable) {
     out.write(`  teeth          UNPROVEN: ${gate.unavailableReason}\n`);
   }

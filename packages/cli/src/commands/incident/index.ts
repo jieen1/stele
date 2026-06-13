@@ -3,6 +3,7 @@ import { commandName } from "@stele/core";
 
 import { registerIncidentApprove } from "./approve.js";
 import { runIncidentDraft } from "./draft.js";
+import { registerIncidentReverify } from "./reverify.js";
 import { registerIncidentTeeth } from "./teeth.js";
 
 /**
@@ -40,4 +41,5 @@ export function addIncidentCommand(program: Command): void {
 
   registerIncidentTeeth(incident);
   registerIncidentApprove(incident);
+  registerIncidentReverify(incident);
 }
