@@ -28,6 +28,7 @@ const DEFAULT_PROTECTED = [
   "contract/design/proposals/**/*",
   "contract/design/approvals/**/*",
   "contract/generated/**/*",
+  "contract/provenance/**/*",
   "tests/contract/**/*",
   "packages/claude-code-plugin/scripts/pre-tool-protect.js",
   "packages/claude-code-plugin/scripts/stop-validate.js",

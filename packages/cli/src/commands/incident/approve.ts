@@ -416,7 +416,11 @@ async function applyGenerateLock(
     await restoreFile(manifestSnap);
   };
 
-  // atomic apply → generate → lock → write provenance.
+  // atomic apply → generate → write provenance → lock. The provenance record
+  // is written BEFORE lock so that lock's collectProtectedPaths globs it under
+  // `contract/provenance/**` and hashes it into the manifest — making the
+  // committed verdict tamper-evident. Writing it after lock would leave an
+  // untracked protected file and surface as stele-check exit-3 (protected drift).
   try {
     await propose(projectDir, {
       kind: "invariant",
@@ -430,10 +434,10 @@ async function applyGenerateLock(
       apply: true,
     });
     await generate(projectDir, { force: true });
-    await lock(projectDir, { reason: `incident:${id}` });
     if (provenance) {
       await writeProvenance(projectDir, provenance);
     }
+    await lock(projectDir, { reason: `incident:${id}` });
   } catch (error) {
     // restore the pre-call snapshot exactly, then re-throw the native code.
     await rollback();

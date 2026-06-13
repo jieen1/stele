@@ -32,6 +32,9 @@ export const DEFAULT_PROTECTED_PATTERNS: readonly string[] = [
   // approvals directory is editable by the agent, the gate is a no-op.
   "contract/design/approvals/**/*",
   "contract/generated/**/*",
+  // Incident provenance records (committed teeth proofs). Protecting them makes
+  // a locked verdict tamper-evident under the manifest, on top of git history.
+  "contract/provenance/**/*",
   "tests/contract/**/*",
   // Hook scripts — direct edit = complete kill switch (Round 3 Reviewer G P0-3)
   "packages/claude-code-plugin/scripts/pre-tool-protect.js",

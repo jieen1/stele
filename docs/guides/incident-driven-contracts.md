@@ -51,7 +51,7 @@ Three outcomes, with distinct exit codes so an absent toolchain or a missing SHA
 
 The exit-code core (parent fails, fix passes) is stable; the `parentBiteClass` refinement depends on the runner's failure output staying classifiable, so a `contradicted` arising from a runner-version output change should prompt re-running `teeth`, not an assumption of tamper.
 
-> Wiring `contract/provenance/**` into the protected globs (manifest-enforced tamper-evidence) and a dedicated GitHub Action `reverify` mode are planned follow-ons; today a CI job runs `stele incident reverify --all` as a step.
+`contract/provenance/**` is wired into the default protected globs, so a committed record is hashed into the manifest at `approve` time: mutating a locked verdict surfaces as `stele check` exit 3 (protected drift) — manifest-enforced tamper-evidence on top of git history and `reverify`. A dedicated GitHub Action `reverify` mode ships in `@stele/github-action` (run `stele incident reverify --all` on a fresh clone in CI).
 
 ## Worked example
 

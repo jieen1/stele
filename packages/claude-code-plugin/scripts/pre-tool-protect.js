@@ -33,6 +33,7 @@ const DEFAULT_PROTECTED = [
   "contract/design/proposals/**/*",
   "contract/design/approvals/**/*",
   "contract/generated/**/*",
+  "contract/provenance/**/*",
   "contract/.baseline.json",
   "contract/.manifest.json",
   "tests/contract/**/*",

@@ -352,6 +352,40 @@ describe("runIncidentApprove — accept paths", () => {
     await expectCheckClean(dir);
   });
 
+  it("tamper-evidence: the committed provenance record is manifest-hashed; mutating its verdict → check exit 3", async () => {
+    const dir = await makeLockedProject();
+    const id = "tamper";
+    await seedDraft(dir, id);
+    seedTeeth(dir, id, "TEETH_PROVEN");
+
+    const err = await approve(dir, { id, approvedBy: GOOD_APPROVER });
+    expect(err).toBeUndefined();
+
+    // The record was written BEFORE approve's lock, so collectProtectedPaths
+    // globbed it under `contract/provenance/**` and hashed it into the manifest:
+    // the post-approve repo is check-0 WITH the record under manifest coverage.
+    const recordPath = join(dir, "contract", "provenance", `${id}.json`);
+    expect(existsSync(recordPath)).toBe(true);
+    await expectCheckClean(dir);
+
+    // Tamper: launder the locked verdict from PROVEN to FAILED. Because the
+    // record lives under a protected glob, its manifest hash no longer matches —
+    // stele check must surface protected-file drift (exit 3, TAMPER_DETECTED),
+    // never silently accept the altered verdict. (This is belt-and-suspenders on
+    // top of reverify re-deriving the verdict from git.)
+    const original = readFileSync(recordPath, "utf8");
+    const tampered = original.replace('"TEETH_PROVEN"', '"TEETH_FAILED"');
+    expect(tampered).not.toBe(original);
+    writeFileSync(recordPath, tampered, "utf8");
+
+    const caught = await checkProject(dir, {}).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(caught).not.toBeNull();
+    expect(numericExit(caught)).toBe(3);
+  });
+
   it("teeth-unavailable: no proof + reason → teeth:unproven tag + recorded reason", async () => {
     const dir = await makeLockedProject();
     const id = "unavail";

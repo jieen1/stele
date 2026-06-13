@@ -20,6 +20,7 @@
     "contract/checker_impls/**/*",
     "contract/design/**/*",
     "contract/generated/**/*",
+    "contract/provenance/**/*",
     "contract/.baseline.json",
     "contract/.manifest.json",
     "tests/contract/**/*",
